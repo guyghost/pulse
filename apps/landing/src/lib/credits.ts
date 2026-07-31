@@ -1,10 +1,6 @@
 export type CreditPackId = 'starter' | 'pro' | 'power';
 
-export type CreditTransactionReason =
-  | 'purchase'
-  | 'premium_monthly_bonus'
-  | 'generation'
-  | 'adjustment';
+export type CreditTransactionReason = 'purchase' | 'generation' | 'adjustment';
 
 export interface CreditPack {
   id: CreditPackId;
@@ -12,8 +8,6 @@ export interface CreditPack {
   priceCents: number;
   label: string;
 }
-
-export const PREMIUM_MONTHLY_CREDITS = 20;
 
 export const CREDIT_PACKS: Record<CreditPackId, CreditPack> = {
   starter: { id: 'starter', label: 'Starter', credits: 5, priceCents: 490 },

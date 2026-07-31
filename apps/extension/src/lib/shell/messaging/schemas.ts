@@ -11,12 +11,55 @@
  */
 
 import { z } from 'zod';
+import type { MissionTracking } from '../../core/types/tracking';
+import {
+  TASK5_APPLICATION_TRACKING_ERROR_CODES,
+  isSerializedApplicationTrackingError,
+} from '../../core/tracking/application-tracking-error';
+import { isCanonicalMissionTracking } from '../../core/tracking/application-tracking-contract';
+import { CANONICAL_INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
+import {
+  CopilotLinkResultPayloadSchema,
+  CopilotDeleteResultPayloadSchema,
+  CopilotDossierResultPayloadSchema,
+  CopilotEntitlementResultPayloadSchema,
+  CopilotJobIdSchema,
+  CopilotJobResultPayloadSchema,
+  CopilotMissionFieldSchema,
+  CopilotMissionIdSchema,
+  CopilotOperationKindSchema,
+  CopilotProfileFieldSchema,
+  CopilotRequestIdSchema,
+} from '../copilot/validation';
+import {
+  COPILOT_MISSION_FIELD_ALLOWLIST,
+  COPILOT_PROFILE_FIELD_ALLOWLIST,
+  MAX_COPILOT_EVIDENCE_ITEMS,
+} from '@pulse/domain';
 
 // ============================================================================
 // Helpers de validation réutilisables
 // ============================================================================
 
 const SafeString = z.string().max(4096);
+const ReleaseUuidSchema = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+const CanonicalEnabledConnectorIdsSchema = z
+  .array(z.string().min(1).max(120))
+  .max(50)
+  .refine((ids) => {
+    if (new Set(ids).size !== ids.length) {
+      return false;
+    }
+    const indexes = ids.map((id) =>
+      CANONICAL_INCLUDED_CONNECTOR_IDS.findIndex((connectorId) => connectorId === id)
+    );
+    return indexes.every(
+      (index, position) => index >= 0 && (position === 0 || indexes[position - 1] < index)
+    );
+  }, 'Enabled connector IDs must be unique and follow the shipped catalogue order');
 
 /** Valide qu'un objet sérialisé ne dépasse pas N octets */
 function maxBytes(maxB: number) {
@@ -33,6 +76,42 @@ function maxBytes(maxB: number) {
 // Schémas par type de message
 // ============================================================================
 
+// ── Form Assistant (shared sub-schema) ───────────────────────────────────────
+
+const FieldKindSchema = z.enum([
+  'first-name',
+  'last-name',
+  'full-name',
+  'email',
+  'phone',
+  'linkedin',
+  'cover-letter',
+  'availability',
+  'tjm',
+  'skill',
+  'address',
+  'job-title',
+  'free-text',
+]);
+const FieldInputTypeSchema = z.enum([
+  'text',
+  'textarea',
+  'email',
+  'tel',
+  'url',
+  'search',
+  'contenteditable',
+]);
+const FieldDescriptorSchema = z
+  .object({
+    kind: FieldKindSchema,
+    label: z.string().max(120),
+    placeholder: z.string().max(200),
+    inputType: FieldInputTypeSchema,
+    required: z.boolean(),
+  })
+  .strict();
+
 // ── Missions ─────────────────────────────────────────────────────────────────
 
 const MissionSchema = z
@@ -46,6 +125,8 @@ const MissionSchema = z
 const MissionsPayloadSchema = z.array(MissionSchema).max(500, {
   message: 'MISSIONS_UPDATED payload exceeds 500 items limit',
 });
+
+const ScanOperationIdSchema = z.string().min(1).max(128);
 
 const FeedIdTimestampMapSchema = z
   .record(z.string().max(256), z.number().int().min(0))
@@ -212,7 +293,7 @@ const PersistedConnectorStatusSchema = z
 const AppSettingsSchema = z
   .object({
     scanIntervalMinutes: z.number().int().min(1).max(1440),
-    enabledConnectors: z.array(z.string().min(1).max(120)).max(50),
+    enabledConnectors: CanonicalEnabledConnectorIdsSchema,
     notifications: z.boolean(),
     autoScan: z.boolean(),
     maxSemanticPerScan: z.number().int().min(0).max(100),
@@ -222,6 +303,137 @@ const AppSettingsSchema = z
     theme: z.enum(['light', 'dark', 'system']),
   })
   .strict();
+
+const SettingsReleaseSnapshotSchema = z
+  .object({
+    settings: AppSettingsSchema,
+    onboardingCompleted: z.boolean(),
+    revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    generation: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
+const SettingsReleaseReadResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('confirmed'), snapshot: SettingsReleaseSnapshotSchema }).strict(),
+  z
+    .object({
+      status: z.literal('unavailable'),
+      reason: z.enum(['actor_blocked', 'storage_ambiguous']),
+      snapshot: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('transport_rejected'),
+      reason: z.literal('queue_full'),
+      commandType: z.literal('read'),
+      correlationId: z.null(),
+      snapshot: z.null(),
+    })
+    .strict(),
+]);
+
+const SettingsReleaseIntentSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('save_settings'),
+      requestId: ReleaseUuidSchema,
+      baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+      settings: AppSettingsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('set_consent'),
+      requestId: ReleaseUuidSchema,
+      baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+      targetConsent: z.literal(true),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('clear_consent'),
+      requestId: ReleaseUuidSchema,
+      baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+      targetConsent: z.literal(false),
+    })
+    .strict(),
+]);
+
+const SettingsReleaseOutcomeBaseSchema = z.object({
+  commandId: z.string().min(1).max(180),
+  requestId: ReleaseUuidSchema,
+  intentDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  kind: z.enum(['save_settings', 'set_consent', 'clear_consent']),
+  settledRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  settledGeneration: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  snapshot: SettingsReleaseSnapshotSchema,
+});
+
+const SettingsReleaseOutcomeSchema = z.discriminatedUnion('status', [
+  SettingsReleaseOutcomeBaseSchema.extend({
+    status: z.literal('committed'),
+    reason: z.enum(['committed', 'recovered_candidate']),
+  }).strict(),
+  SettingsReleaseOutcomeBaseSchema.extend({
+    status: z.literal('not_committed'),
+    reason: z.enum([
+      'permission_missing',
+      'permission_unknown',
+      'storage_failed',
+      'recovered_previous',
+    ]),
+  }).strict(),
+  SettingsReleaseOutcomeBaseSchema.extend({
+    status: z.literal('compensated'),
+    reason: z.enum(['permission_lost', 'effect_compensated']),
+  }).strict(),
+]);
+
+const SettingsReleaseMutationResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('settled'), outcome: SettingsReleaseOutcomeSchema }).strict(),
+  z
+    .object({
+      status: z.literal('not_admitted'),
+      requestId: ReleaseUuidSchema,
+      commandId: z.null(),
+      reason: z.enum([
+        'already_confirmed',
+        'conflict',
+        'permission_missing',
+        'permission_unknown',
+        'storage_failed',
+      ]),
+      snapshot: SettingsReleaseSnapshotSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('blocked'),
+      requestId: ReleaseUuidSchema,
+      commandId: z.string().min(1).max(180).nullable(),
+      reason: z.enum([
+        'identity_exhausted',
+        'request_identity_conflict',
+        'actor_blocked',
+        'storage_ambiguous',
+        'effect_ambiguous',
+        'broadcast_ambiguous',
+        'scan_admission_unknown',
+      ]),
+      snapshot: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('transport_rejected'),
+      reason: z.literal('queue_full'),
+      commandType: z.literal('mutation'),
+      correlationId: ReleaseUuidSchema,
+      snapshot: z.null(),
+    })
+    .strict(),
+]);
 
 // ── Profile ──────────────────────────────────────────────────────────────────
 
@@ -386,7 +598,7 @@ const IsoDateTimeOrNullSchema = z
   .nullable();
 const MissionTrackingSchema = z
   .object({
-    missionId: z.string().max(256),
+    missionId: z.string().min(1).max(256),
     currentStatus: ApplicationStatusSchema,
     history: z.array(StatusTransitionSchema).min(1).max(200),
     generatedAssetIds: z.array(z.string().max(256)).max(100),
@@ -394,7 +606,29 @@ const MissionTrackingSchema = z
     notes: z.string().max(10_000),
     nextActionAt: IsoDateTimeOrNullSchema.optional(),
   })
-  .refine(maxBytes(40_000), { message: 'Mission tracking payload exceeds 40KB limit' });
+  .refine(maxBytes(40_000), { message: 'Mission tracking payload exceeds 40KB limit' })
+  .refine(isCanonicalMissionTracking, {
+    message: 'Mission tracking payload violates the Task 5 canonical contract',
+  });
+
+export function isMissionTrackingPayload(value: unknown): value is MissionTracking {
+  return MissionTrackingSchema.safeParse(value).success;
+}
+
+const SerializedApplicationTrackingErrorSchema = z
+  .object({
+    version: z.literal(1),
+    code: z.enum(TASK5_APPLICATION_TRACKING_ERROR_CODES),
+    intent: z.enum(['load', 'transition', 'details', 'restore']),
+    missionId: z.string().min(1).max(256).nullable(),
+    mutationId: z.null(),
+    message: z.string(),
+    recoverable: z.boolean(),
+  })
+  .strict()
+  .refine(isSerializedApplicationTrackingError, {
+    message: 'Tracking failure fields do not match the v1 contract',
+  });
 
 // ── Generation ───────────────────────────────────────────────────────────────
 
@@ -419,6 +653,93 @@ const ConnectorHealthSnapshotSchema = z.object({
   lastStateChangeAt: z.number(),
   recentLatenciesMs: z.array(z.number()).max(200),
 });
+
+const EntitlementSnapshotSchema = z
+  .object({
+    accountId: z.string().min(1),
+    planId: z.enum(['free', 'premium_yearly']),
+    status: z.enum([
+      'free',
+      'premium_active',
+      'premium_cancel_at_period_end',
+      'premium_past_due',
+      'premium_expired',
+      'premium_revoked',
+    ]),
+    validFromMs: z.number().nullable(),
+    validUntilMs: z.number().nullable(),
+    features: z.array(z.enum(['multi_account', 'application_form_ai_assistance'])),
+    sourceSubscriptionId: z.string().nullable(),
+    sourceVersion: z.object({
+      providerUpdatedAt: z.string(),
+      eventPriority: z.number().int(),
+      providerEventId: z.string(),
+    }),
+    revision: z.number().int().positive(),
+    issuedAtMs: z.number(),
+    cacheExpiresAtMs: z.number(),
+  })
+  .strict();
+
+const ExtensionAccountProjectionSchema = z
+  .object({
+    state: z.enum([
+      'unlinked',
+      'creating_link',
+      'awaiting_user_approval',
+      'linked',
+      'refused',
+      'expired',
+      'cancelled',
+      'error',
+    ]),
+    accountId: z.string().nullable(),
+    entitlement: EntitlementSnapshotSchema.nullable(),
+    premiumMaxBindingsPerConnector: z.number().int().min(2).max(20),
+    lastError: z.string().nullable(),
+  })
+  .strict();
+
+const PlatformAccountBindingSchema = z
+  .object({
+    id: z.string().uuid(),
+    accountId: z.string(),
+    connectorId: z.string(),
+    externalAccountKeyHash: z.string().regex(/^[a-f0-9]{64}$/),
+    displayLabel: z.string(),
+    status: z.enum([
+      'ready',
+      'locked_by_entitlement',
+      'needs_session',
+      'needs_permission',
+      'error',
+      'removed',
+    ]),
+    isActive: z.boolean(),
+    createdAtMs: z.number(),
+    revision: z.number().int().positive(),
+  })
+  .strict();
+
+const PlatformAccountOperationResultSchema = z.union([
+  z.object({ ok: z.literal(true), binding: PlatformAccountBindingSchema }).strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      error: z.enum([
+        'ACCOUNT_REQUIRED',
+        'PREMIUM_REQUIRED',
+        'LIMIT_REACHED',
+        'SESSION_REQUIRED',
+        'CONFIRMATION_REQUIRED',
+        'SESSION_MISMATCH',
+        'BINDING_NOT_FOUND',
+        'SERVER_ERROR',
+      ]),
+      state: z.string(),
+    })
+    .strict(),
+]);
 
 // ============================================================================
 // Registre des schémas par type de message
@@ -628,6 +949,49 @@ export const MessageSchemas = {
     type: z.literal('SETTINGS_UPDATED'),
     payload: AppSettingsSchema,
   }),
+  GET_SETTINGS_RELEASE: z.object({ type: z.literal('GET_SETTINGS_RELEASE') }).strict(),
+  SETTINGS_RELEASE_RESULT: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_RESULT'),
+      payload: SettingsReleaseReadResultSchema,
+    })
+    .strict(),
+  MUTATE_SETTINGS_RELEASE: z
+    .object({
+      type: z.literal('MUTATE_SETTINGS_RELEASE'),
+      payload: SettingsReleaseIntentSchema,
+    })
+    .strict(),
+  SETTINGS_RELEASE_MUTATION_RESULT: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_MUTATION_RESULT'),
+      payload: SettingsReleaseMutationResultSchema,
+    })
+    .strict(),
+  RETRY_SETTINGS_RELEASE: z.object({ type: z.literal('RETRY_SETTINGS_RELEASE') }).strict(),
+  SETTINGS_RELEASE_RETRY_RESULT: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_RETRY_RESULT'),
+      payload: z
+        .object({
+          status: z.enum(['retry_accepted', 'retry_already_queued', 'retry_not_applicable']),
+          snapshot: z.null(),
+        })
+        .strict(),
+    })
+    .strict(),
+  SETTINGS_RELEASE_UPDATED: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_UPDATED'),
+      payload: z
+        .object({
+          snapshot: SettingsReleaseSnapshotSchema,
+          commandId: z.string().min(1).max(180),
+          broadcastId: z.string().min(1).max(220),
+        })
+        .strict(),
+    })
+    .strict(),
   // Profile
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),
   PROFILE_RESULT: z.object({ type: z.literal('PROFILE_RESULT'), payload: z.unknown() }),
@@ -691,10 +1055,26 @@ export const MessageSchemas = {
   }),
 
   // Scan
-  SCAN_START: z.object({ type: z.literal('SCAN_START') }),
+  SCAN_START: z.object({
+    type: z.literal('SCAN_START'),
+    payload: z.object({ operationId: ScanOperationIdSchema, trigger: z.literal('manual') }),
+  }),
+  SCAN_STARTED: z.object({
+    type: z.literal('SCAN_STARTED'),
+    payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_START_REJECTED: z.object({
+    type: z.literal('SCAN_START_REJECTED'),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      code: SafeString,
+      message: SafeString,
+    }),
+  }),
   SCAN_PROGRESS: z.object({
     type: z.literal('SCAN_PROGRESS'),
     payload: z.object({
+      operationId: ScanOperationIdSchema,
       phase: ScanProgressPhaseSchema,
       current: z.number().int().min(0),
       total: z.number().int().min(0),
@@ -704,29 +1084,64 @@ export const MessageSchemas = {
   SCAN_PARTIAL_RESULT: z.object({
     type: z.literal('SCAN_PARTIAL_RESULT'),
     payload: z.object({
+      operationId: ScanOperationIdSchema,
       connectorId: SafeString,
       connectorName: SafeString,
       missions: MissionsPayloadSchema,
     }),
   }),
-  SCAN_COMPLETE: z.object({ type: z.literal('SCAN_COMPLETE'), payload: MissionsPayloadSchema }),
+  SCAN_COMPLETE: z.object({
+    type: z.literal('SCAN_COMPLETE'),
+    payload: z.object({ operationId: ScanOperationIdSchema, missions: MissionsPayloadSchema }),
+  }),
   SCAN_ERROR: z.object({
     type: z.literal('SCAN_ERROR'),
-    payload: z.object({ message: SafeString, code: SafeString }),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      message: SafeString,
+      code: SafeString,
+    }),
   }),
-  SCAN_CANCEL: z.object({ type: z.literal('SCAN_CANCEL') }),
+  SCAN_CANCEL: z.object({
+    type: z.literal('SCAN_CANCEL'),
+    payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_CANCEL_REQUESTED: z.object({
+    type: z.literal('SCAN_CANCEL_REQUESTED'),
+    payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_CANCEL_REJECTED: z.object({
+    type: z.literal('SCAN_CANCEL_REJECTED'),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      code: SafeString,
+      message: SafeString,
+    }),
+  }),
+  SCAN_CANCELLED: z.object({
+    type: z.literal('SCAN_CANCELLED'),
+    payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_BUSY: z.object({
+    type: z.literal('SCAN_BUSY'),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      activeOperationId: ScanOperationIdSchema,
+    }),
+  }),
 
   // Missions
   MISSIONS_UPDATED: z.object({
     type: z.literal('MISSIONS_UPDATED'),
     payload: MissionsPayloadSchema,
+    projection: z.enum(['replace', 'cold-only']).optional(),
   }),
 
   // Tracking
   UPDATE_TRACKING: z.object({
     type: z.literal('UPDATE_TRACKING'),
     payload: z.object({
-      missionId: z.string().max(256),
+      missionId: z.string().min(1).max(256),
       status: ApplicationStatusSchema,
       note: z.string().max(2048).optional(),
     }),
@@ -734,15 +1149,15 @@ export const MessageSchemas = {
   UPDATE_TRACKING_DETAILS: z.object({
     type: z.literal('UPDATE_TRACKING_DETAILS'),
     payload: z.object({
-      missionId: z.string().max(256),
-      nextActionAt: IsoDateTimeOrNullSchema.optional(),
+      missionId: z.string().min(1).max(256),
+      nextActionAt: z.string().max(64).nullable().optional(),
     }),
   }),
   RESTORE_TRACKING: z.object({
     type: z.literal('RESTORE_TRACKING'),
     payload: z.object({
-      missionId: z.string().max(256),
-      tracking: MissionTrackingSchema.nullable(),
+      missionId: z.string().min(1).max(256),
+      tracking: z.unknown().refine(maxBytes(40_000)).nullable(),
     }),
   }),
   TRACKING_UPDATED: z.object({
@@ -751,13 +1166,28 @@ export const MessageSchemas = {
   }),
   TRACKING_RESTORED: z.object({
     type: z.literal('TRACKING_RESTORED'),
-    payload: MissionTrackingSchema.nullable(),
+    payload: z
+      .object({
+        missionId: z.string().min(1).max(256),
+        tracking: MissionTrackingSchema.nullable(),
+      })
+      .strict()
+      .refine(({ missionId, tracking }) => tracking === null || tracking.missionId === missionId, {
+        message: 'Restored tracking identity mismatch',
+      }),
+  }),
+  TRACKING_FAILED: z.object({
+    type: z.literal('TRACKING_FAILED'),
+    payload: SerializedApplicationTrackingErrorSchema,
   }),
   GET_TRACKINGS: z.object({
     type: z.literal('GET_TRACKINGS'),
     payload: z.object({ status: ApplicationStatusSchema.optional() }).optional(),
   }),
-  TRACKINGS_RESULT: z.object({ type: z.literal('TRACKINGS_RESULT'), payload: z.unknown() }),
+  TRACKINGS_RESULT: z.object({
+    type: z.literal('TRACKINGS_RESULT'),
+    payload: z.array(MissionTrackingSchema).max(10_000),
+  }),
 
   // Generation
   GENERATE_ASSET: z.object({
@@ -776,6 +1206,146 @@ export const MessageSchemas = {
     type: z.literal('GENERATED_ASSETS_RESULT'),
     payload: z.unknown(),
   }),
+
+  // Premium Copilot — every command and result is fail-closed and strict.
+  COPILOT_LINK: z
+    .object({
+      type: z.literal('COPILOT_LINK'),
+      payload: z.object({ requestId: CopilotRequestIdSchema }).strict(),
+    })
+    .strict(),
+  COPILOT_LINK_RESULT: z
+    .object({
+      type: z.literal('COPILOT_LINK_RESULT'),
+      payload: CopilotLinkResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_SYNC_ENTITLEMENT: z
+    .object({
+      type: z.literal('COPILOT_SYNC_ENTITLEMENT'),
+      payload: z.object({ requestId: CopilotRequestIdSchema }).strict(),
+    })
+    .strict(),
+  COPILOT_ENTITLEMENT_RESULT: z
+    .object({
+      type: z.literal('COPILOT_ENTITLEMENT_RESULT'),
+      payload: CopilotEntitlementResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_CREATE_JOB: z
+    .object({
+      type: z.literal('COPILOT_CREATE_JOB'),
+      payload: z
+        .object({
+          requestId: CopilotRequestIdSchema,
+          missionId: CopilotMissionIdSchema,
+          kind: CopilotOperationKindSchema,
+          missionFields: z
+            .array(CopilotMissionFieldSchema)
+            .max(COPILOT_MISSION_FIELD_ALLOWLIST.length)
+            .refine((items) => new Set(items).size === items.length),
+          profileFields: z
+            .array(CopilotProfileFieldSchema)
+            .max(COPILOT_PROFILE_FIELD_ALLOWLIST.length)
+            .refine((items) => new Set(items).size === items.length),
+          evidenceIds: z
+            .array(z.string().trim().min(1).max(256))
+            .max(MAX_COPILOT_EVIDENCE_ITEMS)
+            .refine((items) => new Set(items).size === items.length),
+        })
+        .strict()
+        .refine(
+          ({ missionFields, profileFields, evidenceIds }) =>
+            missionFields.length + profileFields.length + evidenceIds.length > 0,
+          'Consent selection must not be empty'
+        ),
+    })
+    .strict(),
+  COPILOT_CREATE_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_CREATE_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_GET_DOSSIER: z
+    .object({
+      type: z.literal('COPILOT_GET_DOSSIER'),
+      payload: z
+        .object({ requestId: CopilotRequestIdSchema, missionId: CopilotMissionIdSchema })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_GET_DOSSIER_RESULT: z
+    .object({
+      type: z.literal('COPILOT_GET_DOSSIER_RESULT'),
+      payload: CopilotDossierResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_GET_JOB: z
+    .object({
+      type: z.literal('COPILOT_GET_JOB'),
+      payload: z
+        .object({ requestId: CopilotRequestIdSchema, missionId: CopilotMissionIdSchema })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_GET_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_GET_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_CANCEL_JOB: z
+    .object({
+      type: z.literal('COPILOT_CANCEL_JOB'),
+      payload: z
+        .object({
+          requestId: CopilotRequestIdSchema,
+          missionId: CopilotMissionIdSchema,
+          jobId: CopilotJobIdSchema,
+        })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_CANCEL_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_CANCEL_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_REVIEW_JOB: z
+    .object({
+      type: z.literal('COPILOT_REVIEW_JOB'),
+      payload: z
+        .object({
+          requestId: CopilotRequestIdSchema,
+          missionId: CopilotMissionIdSchema,
+          jobId: CopilotJobIdSchema,
+          decision: z.enum(['accept', 'reject']),
+        })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_REVIEW_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_REVIEW_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_DELETE_DOSSIER: z
+    .object({
+      type: z.literal('COPILOT_DELETE_DOSSIER'),
+      payload: z
+        .object({ requestId: CopilotRequestIdSchema, missionId: CopilotMissionIdSchema })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_DELETE_DOSSIER_RESULT: z
+    .object({
+      type: z.literal('COPILOT_DELETE_DOSSIER_RESULT'),
+      payload: CopilotDeleteResultPayloadSchema,
+    })
+    .strict(),
 
   // Toast
   SHOW_TOAST: z.object({
@@ -812,6 +1382,14 @@ export const MessageSchemas = {
       enable: z.boolean().optional(),
     }),
   }),
+  CONNECTOR_RECHECK_RESULT: z.object({
+    type: z.literal('CONNECTOR_RECHECK_RESULT'),
+    payload: z.object({
+      snapshots: z.array(ConnectorHealthSnapshotSchema),
+      scan: z.enum(['completed', 'failed']),
+      activation: z.enum(['not_requested', 'committed', 'already_confirmed', 'failed']),
+    }),
+  }),
   CONNECTOR_HEALTH_UPDATED: z.object({
     type: z.literal('CONNECTOR_HEALTH_UPDATED'),
     payload: z.object({
@@ -828,19 +1406,189 @@ export const MessageSchemas = {
     }),
   }),
 
-  // Premium status
+  // Connected Pulse account and canonical Premium projection
+  GET_EXTENSION_ACCOUNT: z.object({ type: z.literal('GET_EXTENSION_ACCOUNT') }),
+  EXTENSION_ACCOUNT_RESULT: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_RESULT'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  START_EXTENSION_ACCOUNT_LINK: z.object({ type: z.literal('START_EXTENSION_ACCOUNT_LINK') }),
+  EXTENSION_ACCOUNT_LINK_STARTED: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_LINK_STARTED'),
+    payload: z.object({
+      projection: ExtensionAccountProjectionSchema,
+      approvalUrl: z.string().url().nullable(),
+    }),
+  }),
+  POLL_EXTENSION_ACCOUNT_LINK: z.object({ type: z.literal('POLL_EXTENSION_ACCOUNT_LINK') }),
+  EXTENSION_ACCOUNT_LINK_STATUS: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_LINK_STATUS'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  REFRESH_EXTENSION_ENTITLEMENT: z.object({
+    type: z.literal('REFRESH_EXTENSION_ENTITLEMENT'),
+  }),
+  EXTENSION_ENTITLEMENT_REFRESHED: z.object({
+    type: z.literal('EXTENSION_ENTITLEMENT_REFRESHED'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  UNLINK_EXTENSION_ACCOUNT: z.object({ type: z.literal('UNLINK_EXTENSION_ACCOUNT') }),
+  EXTENSION_ACCOUNT_UNLINKED: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_UNLINKED'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  GET_PLATFORM_ACCOUNTS: z.object({ type: z.literal('GET_PLATFORM_ACCOUNTS') }),
+  PLATFORM_ACCOUNTS_RESULT: z.object({
+    type: z.literal('PLATFORM_ACCOUNTS_RESULT'),
+    payload: z.array(PlatformAccountBindingSchema).max(120),
+  }),
+  ADD_CURRENT_PLATFORM_ACCOUNT: z.object({
+    type: z.literal('ADD_CURRENT_PLATFORM_ACCOUNT'),
+    payload: z
+      .object({
+        connectorId: z.enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt']),
+        displayLabel: z.string().trim().min(1).max(80),
+        confirmed: z.boolean(),
+      })
+      .strict(),
+  }),
+  PLATFORM_ACCOUNT_ADDED: z.object({
+    type: z.literal('PLATFORM_ACCOUNT_ADDED'),
+    payload: PlatformAccountOperationResultSchema,
+  }),
+  SWITCH_CURRENT_PLATFORM_ACCOUNT: z.object({
+    type: z.literal('SWITCH_CURRENT_PLATFORM_ACCOUNT'),
+    payload: z.object({ bindingId: z.string().uuid() }).strict(),
+  }),
+  PLATFORM_ACCOUNT_SWITCHED: z.object({
+    type: z.literal('PLATFORM_ACCOUNT_SWITCHED'),
+    payload: PlatformAccountOperationResultSchema,
+  }),
+  REQUEST_FORM_ASSIST: z.object({
+    type: z.literal('REQUEST_FORM_ASSIST'),
+    payload: z.object({ consentApproved: z.boolean() }).strict(),
+  }),
+  FORM_ASSIST_RESULT: z.object({
+    type: z.literal('FORM_ASSIST_RESULT'),
+    payload: z.union([
+      z
+        .object({
+          ok: z.literal(true),
+          state: z.literal('reviewing'),
+          sessionId: z.string().uuid(),
+          origin: z.string().url(),
+          fields: z.array(
+            z
+              .object({
+                fieldId: z.string(),
+                kind: z.enum(['text', 'textarea', 'email', 'tel', 'url', 'select']),
+                label: z.string(),
+                value: z.string(),
+                autocomplete: z.string().nullable(),
+              })
+              .strict()
+          ),
+          suggestions: z.array(
+            z
+              .object({
+                suggestionId: z.string(),
+                fieldId: z.string(),
+                proposedValue: z.string(),
+                confidence: z.number().min(0).max(1),
+                rationale: z.string(),
+                sourceRefs: z.array(z.string()),
+              })
+              .strict()
+          ),
+        })
+        .strict(),
+      z
+        .object({
+          ok: z.literal(false),
+          state: z.string(),
+          error: z.enum([
+            'CONSENT_REQUIRED',
+            'ACCOUNT_REQUIRED',
+            'PREMIUM_REQUIRED',
+            'UNSUPPORTED_ORIGIN',
+            'PERMISSION_DENIED',
+            'NO_ACTIVE_TAB',
+            'NO_PROFILE',
+            'NO_SUPPORTED_FIELDS',
+            'CAPTURE_FAILED',
+            'AI_UNAVAILABLE',
+            'AI_FAILED',
+            'AI_OUTPUT_INVALID',
+            'SESSION_EXPIRED',
+            'FORM_CHANGED',
+            'APPLY_FAILED',
+            'MANUAL_REVIEW_REQUIRED',
+          ]),
+        })
+        .strict(),
+    ]),
+  }),
+  APPLY_FORM_ASSIST: z.object({
+    type: z.literal('APPLY_FORM_ASSIST'),
+    payload: z
+      .object({
+        sessionId: z.string().uuid(),
+        decisions: z
+          .array(
+            z
+              .object({
+                suggestionId: z.string().min(1).max(120),
+                decision: z.enum(['pending', 'approved', 'approved_edited', 'refused']),
+                editedValue: z.string().max(4_000).optional(),
+              })
+              .strict()
+          )
+          .max(40),
+      })
+      .strict(),
+  }),
+  FORM_ASSIST_APPLIED: z.object({
+    type: z.literal('FORM_ASSIST_APPLIED'),
+    payload: z.union([
+      z
+        .object({
+          ok: z.literal(true),
+          state: z.enum(['applied', 'refused']),
+          appliedCount: z.number().int().nonnegative(),
+        })
+        .strict(),
+      z
+        .object({
+          ok: z.literal(false),
+          state: z.string(),
+          error: z.enum([
+            'CONSENT_REQUIRED',
+            'ACCOUNT_REQUIRED',
+            'PREMIUM_REQUIRED',
+            'UNSUPPORTED_ORIGIN',
+            'PERMISSION_DENIED',
+            'NO_ACTIVE_TAB',
+            'NO_PROFILE',
+            'NO_SUPPORTED_FIELDS',
+            'CAPTURE_FAILED',
+            'AI_UNAVAILABLE',
+            'AI_FAILED',
+            'AI_OUTPUT_INVALID',
+            'SESSION_EXPIRED',
+            'FORM_CHANGED',
+            'APPLY_FAILED',
+            'MANUAL_REVIEW_REQUIRED',
+          ]),
+        })
+        .strict(),
+    ]),
+  }),
+
+  // Read-only compatibility status
   GET_PREMIUM_STATUS: z.object({ type: z.literal('GET_PREMIUM_STATUS') }),
   PREMIUM_STATUS_RESULT: z.object({
     type: z.literal('PREMIUM_STATUS_RESULT'),
     payload: z.boolean(),
-  }),
-  SET_PREMIUM: z.object({
-    type: z.literal('SET_PREMIUM'),
-    payload: z.boolean(),
-  }),
-  PREMIUM_SET: z.object({
-    type: z.literal('PREMIUM_SET'),
-    payload: z.object({ saved: z.boolean() }),
   }),
 
   // Diagnostic export
@@ -915,6 +1663,65 @@ export const MessageSchemas = {
   // SW → live panel broadcast: re-consume a pending deep-link intent after a
   // notification click on an already-open panel. No payload needed.
   NOTIFICATION_CLICKED: z.object({ type: z.literal('NOTIFICATION_CLICKED') }),
+
+  // ── Form Assistant (content script ↔ service worker) ───────────────────────
+  // Source de vérité : src/models/form-assistant.model.md.
+  FORM_ASSIST_STATUS: z.object({ type: z.literal('FORM_ASSIST_STATUS') }),
+  FORM_ASSIST_STATUS_RESULT: z.object({
+    type: z.literal('FORM_ASSIST_STATUS_RESULT'),
+    payload: z.object({
+      enabled: z.boolean(),
+      engine: z.enum(['local', 'remote']),
+    }),
+  }),
+  FORM_ASSIST_ENABLE: z.object({
+    type: z.literal('FORM_ASSIST_ENABLE'),
+    payload: z.object({ enabled: z.boolean() }),
+  }),
+  FORM_ASSIST_ENABLED: z.object({
+    type: z.literal('FORM_ASSIST_ENABLED'),
+    payload: z.object({
+      enabled: z.boolean(),
+      engine: z.enum(['local', 'remote']),
+    }),
+  }),
+  FORM_ASSIST_REQUEST: z.object({
+    type: z.literal('FORM_ASSIST_REQUEST'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+      field: FieldDescriptorSchema,
+    }),
+  }),
+  // Content → SW : annule une génération en cours (transition `requesting CANCEL`).
+  FORM_ASSIST_CANCEL: z.object({
+    type: z.literal('FORM_ASSIST_CANCEL'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+    }),
+  }),
+  FORM_ASSIST_PROPOSAL: z.object({
+    type: z.literal('FORM_ASSIST_PROPOSAL'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+      text: z.string().min(1).max(4000),
+      engine: z.enum(['local', 'remote']),
+    }),
+  }),
+  // SW → Content : accuse réception de l'annulation (transition `cancelling → idle`).
+  FORM_ASSIST_CANCEL_ACK: z.object({
+    type: z.literal('FORM_ASSIST_CANCEL_ACK'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+    }),
+  }),
+  FORM_ASSIST_ERROR: z.object({
+    type: z.literal('FORM_ASSIST_ERROR'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+      code: z.enum(['unavailable', 'failed', 'cancelled']),
+      message: z.string().min(1).max(280),
+    }),
+  }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;

@@ -197,7 +197,7 @@ async function s_feedStoryCriticalWithCache() {
 }
 
 // ===========================================================================
-// S3 — [MED] MissionComparison score divergence (semanticScore vs breakdown.total)
+// S3 — [MED] MissionComparison grade consistency (semanticScore vs breakdown.total)
 // ===========================================================================
 async function s_comparisonScoreDivergence() {
   // Patch free-work missions so semanticScore=12 (diverges from breakdown.total),
@@ -220,35 +220,32 @@ async function s_comparisonScoreDivergence() {
     await page.waitForTimeout(250);
     await compareBtn.first().click({ timeout: 4000 });
     await page.waitForTimeout(400);
-    // Open the comparison modal (exact match: 'Comparer' also matches score buckets).
+    // Open the comparison modal.
     await page.getByRole('button', { name: 'Comparer', exact: true }).click({ timeout: 3000 });
     await page.waitForTimeout(500);
     const modalText = await page
       .locator('[role="dialog"]')
       .innerText({ timeout: 2500 })
       .catch(() => '');
-    // Table "Score" cells show semanticScore (12/100); evidence "Score" shows total.
-    const tableHas12 = /12\/100/.test(modalText);
-    const evidenceHigh = /(\b[5-9]\d|100)\/100/.test(modalText);
+    // Scores stay numeric internally and must render only as canonical grades.
+    const numericScoreVisible = /\b\d{1,3}\/100\b/.test(modalText);
+    const noteLabelCount = (modalText.match(/\bNote\b/g) ?? []).length;
     const evidence = await screenshot(page, 'feed-comparison-score-divergence');
     record({
       id: 'FEED-03',
       area: 'Feed',
       severity: 'MED',
-      title:
-        'MissionComparison shows divergent scores (table semanticScore vs recommendation total)',
+      title: 'MissionComparison keeps one canonical letter grade across its surfaces',
       phaseA: 'confirms',
-      status: tableHas12 && evidenceHigh ? 'confirmed' : 'partial',
+      status: numericScoreVisible || noteLabelCount < 2 ? 'confirmed' : 'refuted',
       repro: [
         `Patch ${patched} free-work missions to semanticScore=12 (≠ breakdown.total).`,
         'Select two missions, open Comparison.',
-        'Table "Score" row shows 12/100 while the recommendation "Score" evidence shows the real total.',
+        'Inspect the note row and recommendation evidence.',
       ],
-      expected: 'A single, consistent score per mission across table and recommendation.',
-      actual:
-        `table shows 12/100=${tableHas12}; recommendation shows high total=${evidenceHigh}. ` +
-        '(In default dev the bug is masked because semanticScore is always null.)',
-      note: 'Masked in default dev (scanner forces semanticScore=null); reproduced via realistic enriched-state patch.',
+      expected: 'Only canonical letter grades are visible in both places.',
+      actual: `numeric /100 visible=${numericScoreVisible}; "Note" labels=${noteLabelCount}.`,
+      note: 'The structured total stays authoritative even when a legacy semantic score diverges.',
       evidence: [evidence],
       codeRefs: [
         'src/ui/organisms/MissionComparison.svelte:40-44',

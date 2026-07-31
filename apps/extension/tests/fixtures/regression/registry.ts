@@ -3,6 +3,7 @@ import { parseCollectiveProjects } from '../../../src/lib/core/connectors/collec
 import { parseFreeWorkAPI } from '../../../src/lib/core/connectors/freework-parser';
 import { parseHiwayJSON } from '../../../src/lib/core/connectors/hiway-json-parser';
 import { parseLeHibouHTML } from '../../../src/lib/core/connectors/lehibou-parser';
+import { parseMaltJSON } from '../../../src/lib/core/connectors/malt-parser';
 import type { Mission } from '../../../src/lib/core/types/mission';
 
 const HIWAY_BASE_URL = 'https://hiway-missions.fr';
@@ -55,5 +56,15 @@ export const REGRESSION_REGISTRY: ParserRegressionRegistryEntry[] = [
     format: 'json',
     parser: parseCherryPickMissions as (input: never, now: Date) => Mission[],
     now: new Date('2026-03-15T12:00:00Z'),
+  },
+  {
+    connectorId: 'malt',
+    fixtureDir: 'malt',
+    format: 'json',
+    parser: ((rows: unknown[], now: Date) => parseMaltJSON(rows, now, 'https://www.malt.fr')) as (
+      input: never,
+      now: Date
+    ) => Mission[],
+    now: new Date('2026-07-01T12:00:00Z'),
   },
 ];

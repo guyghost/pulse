@@ -5,9 +5,7 @@ declare global {
     interface Locals {
       session: Session | null;
     }
-    interface PageData {
-      session: Session | null;
-    }
+    interface PageData {}
   }
 }
 

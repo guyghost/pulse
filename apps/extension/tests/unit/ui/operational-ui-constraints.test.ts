@@ -107,7 +107,9 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('class="relative h-full overflow-y-auto"');
     expect(feedSource).toContain('data-testid="feed-scroll-container"');
     expect(feedSource).toContain('data-testid="mission-feed"');
-    expect(feedSource).toContain('class="px-4 pb-28 pt-4 focus:outline-none"');
+    expect(feedSource).toContain(
+      "class=\"px-4 pt-4 focus:outline-none {page.arrivalStackVisible ? 'pb-40' : 'pb-28'}\""
+    );
     expect(feedSource).not.toContain('class="flex-1 overflow-y-auto px-4 pb-5 pt-4"');
     expect(appSource).toContain('class="absolute inset-0 overflow-hidden"');
     expect(appSource).not.toContain(
@@ -130,8 +132,30 @@ describe('operational UI constraints', () => {
     expect(source).toContain('animation-iteration-count: 1 !important');
   });
 
+  it('keeps buffered mission arrivals anchored, bounded, and explicitly applied', () => {
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const stackSource = readFileSync('src/ui/organisms/MissionArrivalStack.svelte', 'utf8');
+    const toastSource = readFileSync('src/ui/organisms/ToastContainer.svelte', 'utf8');
+    const toastCollectionSource = readFileSync('src/ui/organisms/ToastCollection.svelte', 'utf8');
+
+    expect(feedSource).toContain("import('../organisms/MissionArrivalStack.svelte')");
+    expect(feedSource).toContain('await page.refreshArrivals()');
+    expect(feedSource).not.toContain('await controller.applyPendingMissions()');
+    expect(feedSource).toContain('stableQueueActive={page.stableQueueActive}');
+    expect(feedSource).toContain('onMissionReadSignal={page.handleMissionReadSignal}');
+    expect(feedSource).not.toContain('data-testid="pending-missions-banner"');
+
+    expect(stackSource).toContain('missions.slice(0, 3)');
+    expect(stackSource).toContain('data-testid="arrival-stack-layer"');
+    expect(stackSource).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(stackSource).not.toContain('backdrop');
+    expect(toastSource).toContain('use:modalFeedback');
+    expect(toastCollectionSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
+  });
+
   it('guides users from the feed summary to missions below the fold', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const storySource = readFileSync('src/lib/core/feed/build-feed-story.ts', 'utf8');
 
     expect(source).toContain('data-testid="mission-scroll-cue"');
     expect(source).toContain('data-testid="mission-feed-anchor"');
@@ -141,7 +165,9 @@ describe('operational UI constraints', () => {
     );
     expect(source).toContain('Missions proposées plus bas');
     expect(source).toContain('Missions proposées');
-    expect(source).toContain('Voir les ${formatStoryMissionCount(newCount)} nouvelles');
+    // buildFeedStory was extracted to the functional core (pure presentation
+    // logic); the new-mission cue string now lives there, not in FeedPage.
+    expect(storySource).toContain('Voir les ${newCount} nouvelles missions');
     expect(source).toContain('visibleFeedMissionLabel');
     expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
   });
@@ -153,36 +179,32 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain("label: 'Settings'");
   });
 
-  it('keeps premium destinations visible with an explanatory locked state', () => {
+  it('keeps the existing CV, application and TJM surfaces in the free product', () => {
     const source = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(source).toContain('const PREMIUM_LOCKS');
-    expect(source).toContain('Premium verrouillé');
-    expect(source).toContain('aria-label={itemLocked');
-    expect(source).toContain('primaryActionLabel="Voir les réglages"');
     expect(source).toContain('data-testid="page-profile"');
+    expect(source).toContain('{#if TJMPage}');
+    expect(source).toContain('{#if CvPage}');
+    expect(source).toContain('{#if ApplicationsPage}');
     expect(source).toContain("nav.currentPage !== 'profile'");
-    expect(source).not.toContain('Profil premium verrouillé');
-    expect(source).not.toContain("nav.currentPage === 'profile' && premium.isPremium");
+    expect(source).not.toContain('const PREMIUM_LOCKS');
+    expect(source).not.toContain('Premium verrouillé');
     expect(source).not.toContain('NAV_ITEMS.filter');
-    expect(source).not.toContain('Premium pages hidden');
   });
 
-  it('gates premium surfaces through the premium feature flag', () => {
+  it('limits Premium UI to multi-account and reviewed form assistance', () => {
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
     const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+    const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
+    const assistSource = readFileSync('src/ui/organisms/FormAssistPanel.svelte', 'utf8');
 
-    // The pure decision + feature store are wired into the UI gating.
-    expect(appSource).toContain("from '$lib/core/features/flags'");
-    expect(appSource).toContain('canAccessPremium');
-    expect(appSource).toContain('features.premiumFeatureActive');
-    // Page rendering consults the combined access decision, not raw isPremium.
-    expect(appSource).toContain('TJMPage && premiumAccessible');
-    expect(appSource).toContain('CvPage && premiumAccessible');
-    expect(appSource).toContain('ApplicationsPage && premiumAccessible');
-    // Settings reflects the dormant vs active state.
-    expect(settingsSource).toContain('features.premiumFeatureActive');
-    expect(settingsSource).toContain('Premium désactivé');
+    expect(appSource).not.toContain("from '$lib/core/features/flags'");
+    expect(settingsSource).toContain('PlatformAccountsPanel');
+    expect(settingsSource).toContain('Premium — 10 € TTC/an');
+    expect(applicationsSource).toContain('FormAssistPanel');
+    expect(assistSource).toContain('Vous approuvez chaque champ');
+    expect(assistSource).toContain('Pulse ne');
+    expect(assistSource).toContain('soumet jamais le formulaire');
   });
 
   it('keeps onboarding focused with duration and minimal shell navigation', () => {
@@ -449,6 +471,19 @@ describe('operational UI constraints', () => {
     expect(advancedIdx).toBeLessThan(presetsIdx);
   });
 
+  it('keeps the compact feed story aligned and unclipped at side-panel width', () => {
+    const storySource = readFileSync('src/ui/molecules/OperationalStoryCard.svelte', 'utf8');
+    const badgeSource = readFileSync('src/ui/atoms/OperationalStatusBadge.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(storySource).toContain('data-testid="operational-story-inline"');
+    expect(storySource).toContain('grid-cols-[auto_auto_minmax(0,1fr)]');
+    expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
+    expect(badgeSource).toContain('whitespace-nowrap');
+    expect(feedSource).toContain('data-testid="feed-hero-card"');
+    expect(feedSource).toContain("'sticky top-0 z-20 rounded-b-2xl");
+  });
+
   it('keeps feed filters decision-oriented with business presets', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const stateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
@@ -472,7 +507,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain(
       'La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.'
     );
-    expect(source).toContain('Départagez avec le TJM, le remote et la source avant de postuler.');
+    expect(source).toContain(
+      'Départagez-les avec le TJM, le remote et la source avant de postuler.'
+    );
     expect(source.indexOf('Décision recommandée')).toBeLessThan(
       source.indexOf('<!-- Titles row -->')
     );
@@ -488,13 +525,13 @@ describe('operational UI constraints', () => {
     expect(drawerSource).toContain('Mettre en suivi');
     expect(drawerSource).toContain('Comparer');
     expect(drawerSource).toContain('Masquer');
-    expect(drawerSource).toContain('Pourquoi ce score ?');
-    expect(cardSource).toContain('Pourquoi ce score ?');
+    expect(drawerSource).toContain('Pourquoi cette note ?');
+    expect(cardSource).toContain('Pourquoi cette note ?');
     expect(cardSource).toContain('function handleScoreDetailsToggle');
     expect(cardSource).toContain('aria-expanded={scoreDetailsOpen}');
     expect(cardSource).toContain('aria-controls={scoreDetailsId}');
-    expect(cardSource.indexOf('Pourquoi ce score ?')).toBeLessThan(
-      cardSource.indexOf('<!-- Detail grid -->')
+    expect(cardSource.indexOf('Pourquoi cette note ?')).toBeLessThan(
+      cardSource.indexOf('<!-- Inline details controlled by the scoped disclosure. -->')
     );
     expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(
       drawerSource.indexOf('Détails techniques')
@@ -668,6 +705,10 @@ describe('operational UI constraints', () => {
     expect(source).toContain('function handleConfirmReset()');
     expect(source).toContain('scrollIntoView');
     expect(source).toContain('disabled={!canConfirmReset}');
+    expect(source).toContain("resetAvailability.status === 'unavailable'");
+    expect(source).toContain('disabled={resetUnavailable}');
+    expect(source).toContain('role="alert"');
+    expect(source).toContain('{resetError}');
     expect(source).toContain('onCreateBackup');
     expect(source).toContain('Créer une sauvegarde avant suppression');
     expect(source).toContain('Suppression irréversible');
@@ -677,6 +718,11 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Après suppression : relancer l’onboarding');
     expect(source).toContain('Tapez SUPPRIMER pour confirmer');
     expect(settingsSource).toContain('onCreateBackup={handleCreateBackup}');
+    expect(settingsSource).toContain(
+      "{#if settings.localDataResetAvailability.status === 'available'}"
+    );
+    expect(settingsSource).toContain('resetAvailability={settings.localDataResetAvailability}');
+    expect(settingsSource).toContain('resetError={settings.resetError}');
     expect(source).not.toContain('Confirmer la suppression');
   });
 

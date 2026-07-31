@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
   import ToastContainer from '../ui/organisms/ToastContainer.svelte';
   import OperationalEmptyState from '../ui/molecules/OperationalEmptyState.svelte';
@@ -7,181 +7,213 @@
   import { cubicOut } from 'svelte/easing';
   import type { LogEntry } from '../dev/bridge-logger';
   import type { ToastType } from '$lib/state/toast.svelte.ts';
-  import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
+  import {
+    initToastService,
+    showToast,
+    stopToastService,
+  } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
-  import { createAppNavigation, NAV_ITEMS, type Page } from '$lib/state/app-navigation.svelte';
+  import {
+    createAppNavigation,
+    NAV_ITEMS,
+    type Page,
+    type PageLoadSnapshot,
+  } from '$lib/state/app-navigation.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
-  import { premium } from '$lib/state/premium.svelte';
-  import { features } from '$lib/state/features.svelte';
-  import { canAccessPremium } from '$lib/core/features/flags';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
 
+  type PageModules = {
+    feed: typeof import('../ui/pages/FeedPage.svelte');
+    profile: typeof import('../ui/pages/ProfilePage.svelte');
+    cv: typeof import('../ui/pages/CvPage.svelte');
+    applications: typeof import('../ui/pages/ApplicationsPage.svelte');
+    tjm: typeof import('../ui/pages/TJMPage.svelte');
+    settings: typeof import('../ui/pages/SettingsPage.svelte');
+    onboarding: typeof import('../ui/pages/OnboardingPage.svelte');
+  };
+  type PageImporters = { [CurrentPage in Page]: () => Promise<PageModules[CurrentPage]> };
+  type PageComponents = {
+    [CurrentPage in Page]: PageModules[CurrentPage]['default'] | null;
+  };
+
+  const DEFAULT_PAGE_IMPORTERS: PageImporters = {
+    feed: () => import('../ui/pages/FeedPage.svelte'),
+    profile: () => import('../ui/pages/ProfilePage.svelte'),
+    cv: () => import('../ui/pages/CvPage.svelte'),
+    applications: () => import('../ui/pages/ApplicationsPage.svelte'),
+    tjm: () => import('../ui/pages/TJMPage.svelte'),
+    settings: () => import('../ui/pages/SettingsPage.svelte'),
+    onboarding: () => import('../ui/pages/OnboardingPage.svelte'),
+  };
+
+  const {
+    pageImporters: pageImporterOverrides = {},
+  }: {
+    pageImporters?: Partial<PageImporters>;
+  } = $props();
+
+  const pageImporters: PageImporters = $derived({
+    ...DEFAULT_PAGE_IMPORTERS,
+    ...pageImporterOverrides,
+  });
   const nav = createAppNavigation();
   const theme = createThemeStore();
 
-  let FeedPage: typeof import('../ui/pages/FeedPage.svelte').default | null = $state(null);
-  let ProfilePage: typeof import('../ui/pages/ProfilePage.svelte').default | null = $state(null);
-  let CvPage: typeof import('../ui/pages/CvPage.svelte').default | null = $state(null);
-  let ApplicationsPage: typeof import('../ui/pages/ApplicationsPage.svelte').default | null =
-    $state(null);
-  let TJMPage: typeof import('../ui/pages/TJMPage.svelte').default | null = $state(null);
-  let SettingsPage: typeof import('../ui/pages/SettingsPage.svelte').default | null = $state(null);
-  let OnboardingPage: typeof import('../ui/pages/OnboardingPage.svelte').default | null =
-    $state(null);
+  let pageComponents = $state<PageComponents>({
+    feed: null,
+    profile: null,
+    cv: null,
+    applications: null,
+    tjm: null,
+    settings: null,
+    onboarding: null,
+  });
+  const FeedPage = $derived(pageComponents.feed);
+  const ProfilePage = $derived(pageComponents.profile);
+  const CvPage = $derived(pageComponents.cv);
+  const ApplicationsPage = $derived(pageComponents.applications);
+  const TJMPage = $derived(pageComponents.tjm);
+  const SettingsPage = $derived(pageComponents.settings);
+  const OnboardingPage = $derived(pageComponents.onboarding);
+  let pageLoads = $state<Partial<Record<Page, PageLoadSnapshot>>>({});
+  let pageRequestSequence = 0;
+  let shellMounted = true;
+  const inFlightPageLoads = new Map<Page, { requestId: string; promise: Promise<void> }>();
 
-  function loadPage(page: Page): void {
-    if (page === 'feed' && !FeedPage) {
-      launchMarks.markImportStart('feed');
-      import('../ui/pages/FeedPage.svelte').then((m) => {
-        FeedPage = m.default;
-        launchMarks.markPageLoaded('feed');
-      });
-      return;
-    }
-    if (page === 'profile' && !ProfilePage) {
-      launchMarks.markImportStart('profile');
-      import('../ui/pages/ProfilePage.svelte').then((m) => {
-        ProfilePage = m.default;
-        launchMarks.markPageLoaded('profile');
-      });
-      return;
-    }
-    if (page === 'cv' && !CvPage) {
-      launchMarks.markImportStart('cv');
-      import('../ui/pages/CvPage.svelte').then((m) => {
-        CvPage = m.default;
-        launchMarks.markPageLoaded('cv');
-      });
-      return;
-    }
-    if (page === 'applications' && !ApplicationsPage) {
-      launchMarks.markImportStart('applications');
-      import('../ui/pages/ApplicationsPage.svelte').then((m) => {
-        ApplicationsPage = m.default;
-        launchMarks.markPageLoaded('applications');
-      });
-      return;
-    }
-    if (page === 'tjm' && !TJMPage) {
-      launchMarks.markImportStart('tjm');
-      import('../ui/pages/TJMPage.svelte').then((m) => {
-        TJMPage = m.default;
-        launchMarks.markPageLoaded('tjm');
-      });
-      return;
-    }
-    if (page === 'settings' && !SettingsPage) {
-      launchMarks.markImportStart('settings');
-      import('../ui/pages/SettingsPage.svelte').then((m) => {
-        SettingsPage = m.default;
-        launchMarks.markPageLoaded('settings');
-      });
-      return;
-    }
-    if (page === 'onboarding' && !OnboardingPage) {
-      launchMarks.markImportStart('onboarding');
-      import('../ui/pages/OnboardingPage.svelte').then((m) => {
-        OnboardingPage = m.default;
-        launchMarks.markPageLoaded('onboarding');
-      });
-    }
+  function hasPageComponent(page: Page): boolean {
+    return pageComponents[page] !== null;
   }
 
-  // Load premium status from storage on mount
+  function assignPageComponent<CurrentPage extends Page>(
+    page: CurrentPage,
+    module: PageModules[CurrentPage]
+  ): void {
+    pageComponents[page] = module.default;
+  }
+
+  function setPageLoad(page: Page, snapshot: PageLoadSnapshot): void {
+    pageLoads = { ...pageLoads, [page]: snapshot };
+  }
+
+  function isCurrentPageRequest(page: Page, requestId: string): boolean {
+    return shellMounted && pageLoads[page]?.requestId === requestId;
+  }
+
+  function loadPage<CurrentPage extends Page>(page: CurrentPage, retry = false): void {
+    if (!shellMounted || nav.bootStatus !== 'ready' || hasPageComponent(page)) {
+      return;
+    }
+
+    const current = pageLoads[page];
+    if (current?.status === 'loading' || (current?.status === 'error' && !retry)) {
+      return;
+    }
+    if (retry && current?.status !== 'error') {
+      return;
+    }
+
+    const requestId = `${page}:${(pageRequestSequence += 1)}`;
+    const attempt = (current?.attempt ?? 0) + 1;
+    setPageLoad(page, { status: 'loading', requestId, attempt, error: null });
+    launchMarks.markImportStart(page as PageId);
+
+    const promise = Promise.resolve()
+      .then(() => pageImporters[page]())
+      .then((module) => {
+        if (!isCurrentPageRequest(page, requestId)) {
+          return;
+        }
+        assignPageComponent(page, module);
+        setPageLoad(page, { status: 'ready', requestId, attempt, error: null });
+        launchMarks.markPageLoaded(page as PageId);
+      })
+      .catch((error: unknown) => {
+        if (!isCurrentPageRequest(page, requestId)) {
+          return;
+        }
+        setPageLoad(page, {
+          status: 'error',
+          requestId,
+          attempt,
+          error: error instanceof Error ? error.message : 'Page import failed.',
+        });
+      })
+      .finally(() => {
+        if (inFlightPageLoads.get(page)?.requestId === requestId) {
+          inFlightPageLoads.delete(page);
+        }
+      });
+
+    inFlightPageLoads.set(page, { requestId, promise });
+  }
+
+  function retryPage(page: Page): void {
+    loadPage(page, true);
+  }
+
   $effect(() => {
-    premium.load();
+    return () => {
+      shellMounted = false;
+      pageRequestSequence += 1;
+      inFlightPageLoads.clear();
+      nav.dispose();
+      stopToastService();
+    };
   });
-
-  type PremiumLockContent = {
-    title: string;
-    description: string;
-    proofLabel: string;
-    proofValue: string;
-  };
-
-  const PREMIUM_LOCKS: Partial<Record<Page, PremiumLockContent>> = {
-    cv: {
-      title: 'Profil de référence inclus dans Premium',
-      description:
-        'Cette vue prépare un profil candidat cohérent pour LinkedIn, dashboard et plateformes. Vos sessions restent dans Chrome.',
-      proofLabel: 'Surface',
-      proofValue: 'CV',
-    },
-    applications: {
-      title: 'Suivi des candidatures inclus dans Premium',
-      description:
-        'Le pipeline transforme les missions retenues en relances, statuts et prochaines actions. Le feed reste disponible pour qualifier les missions.',
-      proofLabel: 'Surface',
-      proofValue: 'Suivi',
-    },
-    tjm: {
-      title: 'Analyse TJM incluse dans Premium',
-      description:
-        'L’analyse tarifaire consolide les missions scannées pour estimer une fourchette de négociation exploitable.',
-      proofLabel: 'Surface',
-      proofValue: 'TJM',
-    },
-  };
 
   const visibleNavItems = NAV_ITEMS;
   const denseNav = $derived(visibleNavItems.length > 4);
-  // Premium access combines the feature flag with the user's premium status.
-  // When the feature is dormant (flag off), access is always granted and no
-  // surface is gated. See models/premium-feature-flag.model.md.
-  const premiumAccessible = $derived(
-    canAccessPremium(features.premiumFeatureActive, premium.isPremium)
+  const currentPageLoad = $derived(pageLoads[nav.currentPage]);
+  const currentPageLabel = $derived(
+    NAV_ITEMS.find((item) => item.page === nav.currentPage)?.label ?? 'Onboarding'
   );
-  const lockedPremiumPage = $derived(
-    premiumAccessible ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
-  );
-  let initialPageLoadScheduled = $state(false);
-  let secondaryPagesPreloaded = $state(false);
-  let premiumPagesPreloaded = $state(false);
+  let initialPageLoadScheduled = false;
 
   $effect(() => {
-    if (lockedPremiumPage || nav.bootStatus !== 'ready') {
+    if (nav.bootStatus !== 'ready') {
       return;
     }
 
     const page = nav.currentPage;
     if (!initialPageLoadScheduled) {
       initialPageLoadScheduled = true;
-      requestAnimationFrame(() => loadPage(page));
-      return;
+      const frameId = requestAnimationFrame(() => {
+        if (!shellMounted || nav.bootStatus !== 'ready' || nav.currentPage !== page) {
+          return;
+        }
+        loadPage(page);
+      });
+      return () => cancelAnimationFrame(frameId);
     }
 
     loadPage(page);
   });
 
   $effect(() => {
-    if (nav.bootStatus !== 'ready' || secondaryPagesPreloaded) {
+    if (nav.bootStatus !== 'ready') {
       return;
     }
 
-    secondaryPagesPreloaded = true;
-    window.setTimeout(() => {
+    const preloadTimer = window.setTimeout(() => {
       loadPage('profile');
       loadPage('settings');
     }, 80);
+    return () => window.clearTimeout(preloadTimer);
   });
 
   $effect(() => {
-    if (nav.bootStatus !== 'ready' || !premiumAccessible || premiumPagesPreloaded) {
+    if (nav.bootStatus !== 'ready') {
       return;
     }
 
-    premiumPagesPreloaded = true;
-    window.setTimeout(() => {
+    const preloadTimer = window.setTimeout(() => {
       loadPage('cv');
       loadPage('applications');
       loadPage('tjm');
     }, 80);
+    return () => window.clearTimeout(preloadTimer);
   });
-
-  function isPremiumLocked(page: Page): boolean {
-    return !premiumAccessible && page in PREMIUM_LOCKS;
-  }
 
   // Initialize theme on mount
   theme.init();
@@ -229,10 +261,21 @@
   }
 
   function devSetState(state: 'empty' | 'loading' | 'loaded' | 'error') {
+    const devStateStorageKey = '__missionpulse_dev_feed_state';
     if (state === 'empty') {
       window.localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([]));
     }
-    window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: state }));
+    if (state === 'loaded') {
+      window.localStorage.removeItem('__missionpulse_dev_missions');
+      window.sessionStorage.removeItem(devStateStorageKey);
+    } else {
+      window.sessionStorage.setItem(devStateStorageKey, state);
+    }
+    const dispatchState = () => {
+      window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: state }));
+    };
+    dispatchState();
+    window.requestAnimationFrame(dispatchState);
   }
 
   function devToggleOnboarding() {
@@ -307,7 +350,7 @@
   <div class="relative z-10 flex h-full flex-col">
     {#if showOfflineBanner}
       <div
-        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-xs text-status-red"
+        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-meta text-status-red"
         transition:fade={{ duration: 200 }}
       >
         <Icon name="wifi-off" size={12} />
@@ -326,9 +369,8 @@
               : 'min-h-12 gap-1 p-1'}"
         >
           {#each visibleNavItems as item}
-            {@const itemLocked = isPremiumLocked(item.page)}
             <button
-              class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
+              class="relative flex min-w-0 items-center justify-center rounded-full text-caption font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
                 ? nav.currentPage === item.page
                   ? 'flex-1 gap-1.5 px-3 py-1.5'
@@ -340,18 +382,14 @@
                   : 'flex-1 basis-0 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
                 ? 'bg-surface-white text-text-primary shadow-subtle-2'
-                : itemLocked
-                  ? 'text-text-muted hover:bg-surface-white hover:text-text-primary'
-                  : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
+                : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
               aria-current={nav.currentPage === item.page ? 'page' : undefined}
-              aria-label={itemLocked
-                ? `${item.label} inclus dans Premium`
-                : (item.ariaLabel ?? item.label)}
-              title={itemLocked ? `${item.label} inclus dans Premium` : item.label}
+              aria-label={item.ariaLabel ?? item.label}
+              title={item.label}
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">
-                <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
+                <Icon name={item.icon as IconName} size={feedNavCompact || denseNav ? 13 : 16} />
               </span>
               <span
                 class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
@@ -360,14 +398,6 @@
                   ? 'max-w-0 opacity-0 -translate-x-1'
                   : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
               >
-              {#if itemLocked}
-                <span
-                  class="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-surface-white text-text-muted ring-1 ring-border-light"
-                  aria-hidden="true"
-                >
-                  <Icon name="lock" size={8} />
-                </span>
-              {/if}
             </button>
           {/each}
         </nav>
@@ -384,6 +414,50 @@
       </div>
     {/if}
     <main class="relative flex-1 overflow-hidden">
+      {#if nav.bootStatus === 'error'}
+        <div
+          data-testid="bootstrap-error"
+          class="absolute inset-0 z-20 overflow-y-auto bg-page-canvas p-4"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          <OperationalEmptyState
+            title="L’application n’a pas pu démarrer"
+            description="Les données locales nécessaires au démarrage sont momentanément indisponibles. Réessayez sans fermer l’extension."
+            severity="incident"
+            statusLabel="Démarrage interrompu"
+            icon="triangle-alert"
+            proofLabel="Etape"
+            proofValue="Initialisation"
+            primaryActionLabel="Réessayer"
+            primaryActionIcon="refresh-cw"
+            onPrimaryAction={() => void nav.retryBootstrap()}
+          />
+        </div>
+      {/if}
+      {#if nav.bootStatus === 'ready' && currentPageLoad?.status === 'error'}
+        <div
+          data-testid={`page-load-error-${nav.currentPage}`}
+          class="absolute inset-0 z-20 overflow-y-auto bg-page-canvas p-4"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
+        >
+          <OperationalEmptyState
+            title="Cette vue ne peut pas être chargée"
+            description="Le module local de cette vue est indisponible. Le reste de l’extension demeure utilisable."
+            severity="incident"
+            statusLabel="Chargement interrompu"
+            icon="triangle-alert"
+            proofLabel="Ecran"
+            proofValue={currentPageLabel}
+            primaryActionLabel="Réessayer"
+            primaryActionIcon="refresh-cw"
+            onPrimaryAction={() => retryPage(nav.currentPage)}
+          />
+        </div>
+      {/if}
       <div
         class="absolute inset-0 overflow-hidden"
         class:hidden={nav.currentPage !== 'feed'}
@@ -454,7 +528,7 @@
               <div class="relative flex h-full flex-col px-4 py-6">
                 <div class="section-card-strong relative my-auto w-full rounded-2xl p-5">
                   <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
-                  <h1 class="mt-3 text-xl font-semibold leading-tight text-text-primary">
+                  <h1 class="mt-3 text-heading-lg font-semibold leading-tight text-text-primary">
                     Configurez votre premier scan
                   </h1>
                   <div class="mt-6 grid grid-cols-3 gap-2">
@@ -487,30 +561,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if lockedPremiumPage}
-        <div
-          data-testid={`page-${nav.currentPage}`}
-          class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
-        >
-          <div class="p-4">
-            <OperationalEmptyState
-              title={lockedPremiumPage.title}
-              description={lockedPremiumPage.description}
-              severity="attention"
-              statusLabel="Premium verrouillé"
-              icon="lock"
-              proofLabel={lockedPremiumPage.proofLabel}
-              proofValue={lockedPremiumPage.proofValue}
-              primaryActionLabel="Voir les réglages"
-              primaryActionIcon="settings"
-              onPrimaryAction={() => nav.navigate('settings')}
-            />
-          </div>
-        </div>
-      {/if}
-      {#if TJMPage && premiumAccessible}
+      {#if TJMPage}
         <div
           data-testid="page-tjm"
           class="absolute inset-0 overflow-y-auto"
@@ -581,7 +632,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if CvPage && premiumAccessible}
+      {#if CvPage}
         <div
           data-testid="page-cv"
           class="absolute inset-0 overflow-y-auto"
@@ -615,7 +666,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if ApplicationsPage && premiumAccessible}
+      {#if ApplicationsPage}
         <div
           data-testid="page-applications"
           class="absolute inset-0 overflow-y-auto"
@@ -666,6 +717,7 @@
             <SettingsPage
               onBack={() => nav.navigate('feed')}
               onNavigateToOnboarding={nav.resetToOnboarding}
+              active={nav.currentPage === 'settings'}
             />
             {#snippet failed(error, reset)}
               <div class="p-4">

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { passkeyErrorMessage, requestEmailSessionLink } from '$lib/auth/passkey';
 
+  let { data } = $props();
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
   let linkSent = $state(false);
@@ -12,7 +13,7 @@
     formError = undefined;
 
     try {
-      await requestEmailSessionLink(email, { next: '/dashboard', shouldCreateUser: true });
+      await requestEmailSessionLink(email, { next: data.redirectTo, shouldCreateUser: true });
       linkSent = true;
     } catch (error) {
       formError = passkeyErrorMessage(error);

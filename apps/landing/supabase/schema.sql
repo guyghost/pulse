@@ -23,7 +23,7 @@ create table if not exists public.credit_transactions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   amount integer not null check (amount <> 0),
-  reason text not null check (reason in ('purchase', 'premium_monthly_bonus', 'generation', 'adjustment')),
+  reason text not null check (reason in ('purchase', 'generation', 'adjustment')),
   source text not null,
   lemon_order_id text,
   metadata jsonb not null default '{}'::jsonb,
@@ -145,65 +145,11 @@ create unique index if not exists idx_credit_transactions_lemon_order
   on public.credit_transactions (lemon_order_id)
   where lemon_order_id is not null;
 
-create unique index if not exists idx_credit_transactions_premium_period
-  on public.credit_transactions (user_id, (metadata->>'period'))
-  where reason = 'premium_monthly_bonus';
-
 create index if not exists idx_credit_transactions_user_created
   on public.credit_transactions (user_id, created_at desc);
 
 create index if not exists idx_favorite_missions_user_favorited
   on public.favorite_missions (user_id, favorited_at desc);
-
-create or replace function public.grant_premium_monthly_credits(
-  p_user_id uuid,
-  p_period text,
-  p_amount integer
-)
-returns integer
-language plpgsql
-security definer
-set search_path = public
-as $$
-declare
-  new_balance integer;
-begin
-  if p_amount <= 0 then
-    raise exception 'Credit amount must be positive';
-  end if;
-
-  if not exists (
-    select 1
-    from public.profiles
-    where id = p_user_id
-      and subscription_status = 'premium'
-      and (subscription_period_end is null or subscription_period_end > now())
-  ) then
-    select credit_balance into new_balance from public.profiles where id = p_user_id;
-    return coalesce(new_balance, 0);
-  end if;
-
-  insert into public.credit_transactions (user_id, amount, reason, source, metadata)
-  values (
-    p_user_id,
-    p_amount,
-    'premium_monthly_bonus',
-    'premium_monthly_bonus',
-    jsonb_build_object('period', p_period)
-  );
-
-  update public.profiles
-  set credit_balance = credit_balance + p_amount
-  where id = p_user_id
-  returning credit_balance into new_balance;
-
-  return new_balance;
-exception
-  when unique_violation then
-    select credit_balance into new_balance from public.profiles where id = p_user_id;
-    return coalesce(new_balance, 0);
-end;
-$$;
 
 create or replace function public.consume_generation_credit(
   p_user_id uuid,
@@ -300,15 +246,359 @@ exception
 end;
 $$;
 
-revoke execute on function public.grant_premium_monthly_credits(uuid, text, integer) from public, anon, authenticated;
 revoke execute on function public.consume_generation_credit(uuid, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.refund_generation_credit(uuid, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.add_credits_from_purchase(uuid, integer, text, jsonb) from public, anon, authenticated;
 
-grant execute on function public.grant_premium_monthly_credits(uuid, text, integer) to service_role;
 grant execute on function public.consume_generation_credit(uuid, text, jsonb) to service_role;
 grant execute on function public.refund_generation_credit(uuid, text, jsonb) to service_role;
 grant execute on function public.add_credits_from_purchase(uuid, integer, text, jsonb) to service_role;
+
+-- 7. Freemium billing authority for future subscriptions only.
+-- No legacy payment, credit, or entitlement backfill is performed.
+
+create table if not exists public.billing_checkout_intents (
+  id uuid primary key,
+  user_id uuid references auth.users(id) on delete cascade not null,
+  offer_id text not null check (offer_id = 'premium_yearly'),
+  catalog_version integer not null check (catalog_version > 0),
+  amount_minor integer not null check (amount_minor = 1000),
+  currency text not null check (currency = 'EUR'),
+  tax_included boolean not null check (tax_included),
+  idempotency_key text not null,
+  state text not null check (
+    state in (
+      'creating_checkout',
+      'create_failed_retryable',
+      'awaiting_payment',
+      'cancelled',
+      'expired',
+      'provisioning',
+      'provisioning_failed_retryable',
+      'provisioned',
+      'failed_terminal'
+    )
+  ),
+  provider_checkout_id text,
+  provider_subscription_id text,
+  checkout_url text,
+  error_code text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, idempotency_key)
+);
+
+create table if not exists public.subscription_entitlements (
+  user_id uuid references auth.users(id) on delete cascade primary key,
+  plan_id text not null check (plan_id in ('free', 'premium_yearly')),
+  status text not null check (
+    status in (
+      'free',
+      'premium_active',
+      'premium_cancel_at_period_end',
+      'premium_past_due',
+      'premium_expired',
+      'premium_revoked'
+    )
+  ),
+  valid_from timestamptz,
+  valid_until timestamptz,
+  features text[] not null default '{}',
+  source_subscription_id text,
+  provider_updated_at timestamptz not null,
+  event_priority integer not null,
+  provider_event_id text not null,
+  revision bigint not null default 1 check (revision > 0),
+  issued_at timestamptz not null,
+  cache_expires_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (
+    status not in ('premium_active', 'premium_cancel_at_period_end')
+    or (
+      plan_id = 'premium_yearly'
+      and valid_until is not null
+      and features @> array['multi_account', 'application_form_ai_assistance']::text[]
+    )
+  )
+);
+
+create unique index if not exists idx_subscription_entitlements_source
+  on public.subscription_entitlements (source_subscription_id)
+  where source_subscription_id is not null;
+
+create table if not exists public.billing_events (
+  provider_event_id text primary key,
+  payload_hash text not null,
+  event_name text not null,
+  user_id uuid references auth.users(id) on delete set null,
+  checkout_intent_id uuid references public.billing_checkout_intents(id) on delete set null,
+  source_subscription_id text,
+  signal_type text,
+  entitlement_status text,
+  provider_updated_at timestamptz,
+  event_priority integer,
+  state text not null check (
+    state in ('applying', 'applied', 'duplicate', 'ignored_stale', 'failed_terminal')
+  ),
+  error_code text,
+  processed_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.billing_checkout_intents enable row level security;
+alter table public.subscription_entitlements enable row level security;
+alter table public.billing_events enable row level security;
+
+create policy "Users can read own billing checkout intents"
+  on public.billing_checkout_intents for select
+  using (auth.uid() = user_id);
+
+create policy "Users can read own subscription entitlement"
+  on public.subscription_entitlements for select
+  using (auth.uid() = user_id);
+
+drop trigger if exists on_billing_checkout_intents_updated
+  on public.billing_checkout_intents;
+create trigger on_billing_checkout_intents_updated
+  before update on public.billing_checkout_intents
+  for each row execute function public.update_updated_at();
+
+drop trigger if exists on_subscription_entitlements_updated
+  on public.subscription_entitlements;
+create trigger on_subscription_entitlements_updated
+  before update on public.subscription_entitlements
+  for each row execute function public.update_updated_at();
+
+drop trigger if exists on_billing_events_updated on public.billing_events;
+create trigger on_billing_events_updated
+  before update on public.billing_events
+  for each row execute function public.update_updated_at();
+
+create or replace function public.apply_premium_billing_event(
+  p_provider_event_id text,
+  p_payload_hash text,
+  p_event_name text,
+  p_user_id uuid,
+  p_checkout_intent_id uuid,
+  p_offer_id text,
+  p_source_subscription_id text,
+  p_entitlement_status text,
+  p_signal_type text,
+  p_valid_from timestamptz,
+  p_valid_until timestamptz,
+  p_provider_updated_at timestamptz,
+  p_event_priority integer,
+  p_cache_ttl_hours integer
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  current_entitlement public.subscription_entitlements%rowtype;
+  effective_subscription_id text;
+  next_plan_id text;
+  next_features text[];
+  next_cache_expiry timestamptz;
+begin
+  if p_offer_id <> 'premium_yearly' then
+    return 'invalid_offer';
+  end if;
+  if p_cache_ttl_hours < 1 or p_cache_ttl_hours > 168 then
+    return 'invalid_cache_ttl';
+  end if;
+  if p_entitlement_status not in (
+    'premium_active',
+    'premium_cancel_at_period_end',
+    'premium_past_due',
+    'premium_expired',
+    'premium_revoked'
+  ) then
+    return 'invalid_status';
+  end if;
+  if p_entitlement_status in ('premium_active', 'premium_cancel_at_period_end')
+    and p_valid_until is null then
+    return 'missing_valid_until';
+  end if;
+  if not exists (
+    select 1
+    from public.billing_checkout_intents
+    where id = p_checkout_intent_id
+      and user_id = p_user_id
+      and offer_id = p_offer_id
+      and amount_minor = 1000
+      and currency = 'EUR'
+      and tax_included
+  ) then
+    return 'invalid_checkout_intent';
+  end if;
+
+  insert into public.billing_events (
+    provider_event_id,
+    payload_hash,
+    event_name,
+    user_id,
+    checkout_intent_id,
+    source_subscription_id,
+    signal_type,
+    entitlement_status,
+    provider_updated_at,
+    event_priority,
+    state
+  )
+  values (
+    p_provider_event_id,
+    p_payload_hash,
+    p_event_name,
+    p_user_id,
+    p_checkout_intent_id,
+    p_source_subscription_id,
+    p_signal_type,
+    p_entitlement_status,
+    p_provider_updated_at,
+    p_event_priority,
+    'applying'
+  )
+  on conflict (provider_event_id) do nothing;
+
+  if not found then
+    return 'duplicate';
+  end if;
+
+  select *
+  into current_entitlement
+  from public.subscription_entitlements
+  where user_id = p_user_id
+  for update;
+
+  if found and (
+    current_entitlement.provider_updated_at,
+    current_entitlement.event_priority,
+    current_entitlement.provider_event_id
+  ) >= (
+    p_provider_updated_at,
+    p_event_priority,
+    p_provider_event_id
+  ) then
+    update public.billing_events
+    set state = 'ignored_stale', processed_at = now()
+    where provider_event_id = p_provider_event_id;
+    return 'ignored_stale';
+  end if;
+
+  effective_subscription_id :=
+    coalesce(p_source_subscription_id, current_entitlement.source_subscription_id);
+  if effective_subscription_id is null then
+    update public.billing_events
+    set state = 'failed_terminal', error_code = 'missing_subscription', processed_at = now()
+    where provider_event_id = p_provider_event_id;
+    return 'missing_subscription';
+  end if;
+
+  if p_entitlement_status in ('premium_active', 'premium_cancel_at_period_end') then
+    next_plan_id := 'premium_yearly';
+    next_features := array['multi_account', 'application_form_ai_assistance']::text[];
+    next_cache_expiry := least(
+      p_valid_until,
+      now() + make_interval(hours => p_cache_ttl_hours)
+    );
+  else
+    next_plan_id := 'free';
+    next_features := '{}'::text[];
+    next_cache_expiry := now();
+  end if;
+
+  insert into public.subscription_entitlements (
+    user_id,
+    plan_id,
+    status,
+    valid_from,
+    valid_until,
+    features,
+    source_subscription_id,
+    provider_updated_at,
+    event_priority,
+    provider_event_id,
+    revision,
+    issued_at,
+    cache_expires_at
+  )
+  values (
+    p_user_id,
+    next_plan_id,
+    p_entitlement_status,
+    p_valid_from,
+    p_valid_until,
+    next_features,
+    effective_subscription_id,
+    p_provider_updated_at,
+    p_event_priority,
+    p_provider_event_id,
+    1,
+    now(),
+    next_cache_expiry
+  )
+  on conflict (user_id) do update set
+    plan_id = excluded.plan_id,
+    status = excluded.status,
+    valid_from = excluded.valid_from,
+    valid_until = excluded.valid_until,
+    features = excluded.features,
+    source_subscription_id = excluded.source_subscription_id,
+    provider_updated_at = excluded.provider_updated_at,
+    event_priority = excluded.event_priority,
+    provider_event_id = excluded.provider_event_id,
+    revision = public.subscription_entitlements.revision + 1,
+    issued_at = excluded.issued_at,
+    cache_expires_at = excluded.cache_expires_at;
+
+  if next_plan_id = 'free' then
+    update public.platform_account_bindings
+    set status = 'locked_by_entitlement', revision = revision + 1
+    where user_id = p_user_id
+      and not is_active
+      and status = 'ready';
+  else
+    update public.platform_account_bindings
+    set status = 'ready', revision = revision + 1
+    where user_id = p_user_id
+      and status = 'locked_by_entitlement';
+  end if;
+
+  update public.billing_checkout_intents
+  set
+    state = case
+      when p_entitlement_status in ('premium_active', 'premium_cancel_at_period_end')
+        then 'provisioned'
+      else state
+    end,
+    provider_subscription_id = effective_subscription_id,
+    error_code = null
+  where id = p_checkout_intent_id and user_id = p_user_id;
+
+  update public.billing_events
+  set
+    state = 'applied',
+    source_subscription_id = effective_subscription_id,
+    processed_at = now()
+  where provider_event_id = p_provider_event_id;
+
+  return 'applied';
+end;
+$$;
+
+revoke execute on function public.apply_premium_billing_event(
+  text, text, text, uuid, uuid, text, text, text, text, timestamptz,
+  timestamptz, timestamptz, integer, integer
+) from public, anon, authenticated;
+
+grant execute on function public.apply_premium_billing_event(
+  text, text, text, uuid, uuid, text, text, text, text, timestamptz,
+  timestamptz, timestamptz, integer, integer
+) to service_role;
 
 -- ============================================
 -- Connected dashboard product schema
@@ -336,9 +626,38 @@ set
   label = excluded.label,
   kind = excluded.kind;
 
+create table if not exists public.platform_account_bindings (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  connector_id text references public.mission_sources(id) not null,
+  external_account_key_hash text not null,
+  display_label text not null,
+  status text not null check (
+    status in (
+      'ready',
+      'locked_by_entitlement',
+      'needs_session',
+      'needs_permission',
+      'error',
+      'removed'
+    )
+  ),
+  is_active boolean not null default false,
+  revision bigint not null default 1 check (revision > 0),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  unique (user_id, connector_id, external_account_key_hash)
+);
+
+create unique index if not exists idx_platform_account_bindings_one_active
+  on public.platform_account_bindings (user_id, connector_id)
+  where is_active and status <> 'removed';
+
 create table if not exists public.missions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
+  platform_account_binding_id uuid
+    references public.platform_account_bindings(id) on delete set null,
   source text references public.mission_sources(id) not null,
   external_id text not null,
   canonical_key text not null,
@@ -359,9 +678,16 @@ create table if not exists public.missions (
   updated_by text not null default 'extension'
     check (updated_by in ('dashboard', 'extension', 'system')),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  unique (user_id, source, external_id)
+  updated_at timestamptz not null default now()
 );
+
+create unique index if not exists idx_missions_user_binding_source_external
+  on public.missions (
+    user_id,
+    source,
+    external_id,
+    coalesce(platform_account_binding_id, '00000000-0000-0000-0000-000000000000'::uuid)
+  );
 
 create table if not exists public.mission_scores (
   mission_id uuid primary key references public.missions(id) on delete cascade,
@@ -612,12 +938,43 @@ create table if not exists public.extension_devices (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   install_id text not null,
+  token_hash text,
   browser text,
   extension_version text not null,
   last_seen_at timestamptz,
+  linked_at timestamptz,
+  revoked_at timestamptz,
   created_at timestamptz not null default now(),
   unique (user_id, install_id)
 );
+
+create unique index if not exists idx_extension_devices_token_hash
+  on public.extension_devices (token_hash)
+  where token_hash is not null;
+
+create unique index if not exists idx_extension_devices_active_install
+  on public.extension_devices (install_id)
+  where revoked_at is null;
+
+create table if not exists public.extension_link_requests (
+  id uuid primary key default gen_random_uuid(),
+  install_id text not null,
+  secret_hash text not null,
+  user_id uuid references auth.users(id) on delete cascade,
+  state text not null default 'pending'
+    check (state in ('pending', 'approved', 'refused', 'expired', 'cancelled')),
+  expires_at timestamptz not null,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  check (
+    (state = 'pending' and resolved_at is null)
+    or (state <> 'pending' and resolved_at is not null)
+  )
+);
+
+create unique index if not exists idx_extension_link_requests_secret_hash
+  on public.extension_link_requests (secret_hash);
 
 create table if not exists public.sync_status (
   user_id uuid references auth.users(id) on delete cascade not null,
@@ -738,11 +1095,17 @@ alter table public.dashboard_alert_preferences enable row level security;
 alter table public.sync_conflicts enable row level security;
 alter table public.candidate_profile_field_suggestions enable row level security;
 alter table public.connector_health_events enable row level security;
+alter table public.platform_account_bindings enable row level security;
+alter table public.extension_link_requests enable row level security;
 
 drop policy if exists "Anyone can read mission sources" on public.mission_sources;
 create policy "Anyone can read mission sources"
   on public.mission_sources for select
   using (true);
+
+create policy "Users can read own platform account bindings"
+  on public.platform_account_bindings for select
+  using (auth.uid() = user_id);
 
 drop policy if exists "Users can manage own missions" on public.missions;
 create policy "Users can manage own missions"
@@ -887,10 +1250,10 @@ create policy "Users can manage own profile imports"
   with check (auth.uid() = user_id);
 
 drop policy if exists "Users can manage own extension devices" on public.extension_devices;
-create policy "Users can manage own extension devices"
-  on public.extension_devices for all
-  using (auth.uid() = user_id)
-  with check (auth.uid() = user_id);
+drop policy if exists "Users can read own extension devices" on public.extension_devices;
+create policy "Users can read own extension devices"
+  on public.extension_devices for select
+  using (auth.uid() = user_id);
 
 drop policy if exists "Users can manage own sync status" on public.sync_status;
 create policy "Users can manage own sync status"
@@ -1017,6 +1380,235 @@ create trigger on_connector_health_events_updated
   for each row
   execute function public.update_updated_at();
 
+drop trigger if exists on_platform_account_bindings_updated
+  on public.platform_account_bindings;
+create trigger on_platform_account_bindings_updated
+  before update on public.platform_account_bindings
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_extension_link_requests_updated
+  on public.extension_link_requests;
+create trigger on_extension_link_requests_updated
+  before update on public.extension_link_requests
+  for each row
+  execute function public.update_updated_at();
+
+create or replace function public.resolve_extension_link(
+  p_link_id uuid,
+  p_user_id uuid,
+  p_resolution text,
+  p_resolved_at timestamptz
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requested_link public.extension_link_requests%rowtype;
+  active_device public.extension_devices%rowtype;
+begin
+  if p_resolution not in ('approved', 'refused') then
+    return 'invalid_resolution';
+  end if;
+
+  select *
+  into requested_link
+  from public.extension_link_requests
+  where id = p_link_id
+  for update;
+
+  if not found then
+    return 'link_not_found';
+  end if;
+  if requested_link.state <> 'pending' then
+    return 'link_not_pending';
+  end if;
+  if requested_link.expires_at <= p_resolved_at then
+    update public.extension_link_requests
+    set state = 'expired', resolved_at = p_resolved_at
+    where id = p_link_id;
+    return 'link_expired';
+  end if;
+
+  if p_resolution = 'approved' then
+    select *
+    into active_device
+    from public.extension_devices
+    where install_id = requested_link.install_id
+      and revoked_at is null
+    for update;
+
+    if found and active_device.user_id <> p_user_id then
+      return 'installation_already_linked';
+    end if;
+
+    insert into public.extension_devices (
+      user_id,
+      install_id,
+      token_hash,
+      extension_version,
+      linked_at,
+      revoked_at
+    )
+    values (
+      p_user_id,
+      requested_link.install_id,
+      requested_link.secret_hash,
+      'unreported',
+      p_resolved_at,
+      null
+    )
+    on conflict (user_id, install_id) do update set
+      token_hash = excluded.token_hash,
+      linked_at = excluded.linked_at,
+      revoked_at = null;
+  end if;
+
+  update public.extension_link_requests
+  set
+    user_id = p_user_id,
+    state = p_resolution,
+    resolved_at = p_resolved_at
+  where id = p_link_id;
+
+  return p_resolution;
+end;
+$$;
+
+revoke execute on function public.resolve_extension_link(
+  uuid, uuid, text, timestamptz
+) from public, anon, authenticated;
+
+grant execute on function public.resolve_extension_link(
+  uuid, uuid, text, timestamptz
+) to service_role;
+
+create or replace function public.add_platform_account_binding(
+  p_user_id uuid,
+  p_connector_id text,
+  p_external_account_key_hash text,
+  p_display_label text,
+  p_max_bindings integer,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  binding_count integer;
+  premium_allowed boolean;
+  saved_binding public.platform_account_bindings%rowtype;
+begin
+  if p_max_bindings < 2 or p_max_bindings > 20 then
+    return jsonb_build_object('result', 'invalid_quota');
+  end if;
+  if length(p_external_account_key_hash) <> 64 or length(trim(p_display_label)) < 1 then
+    return jsonb_build_object('result', 'invalid_binding');
+  end if;
+
+  perform pg_advisory_xact_lock(hashtextextended(p_user_id::text || ':' || p_connector_id, 0));
+  select count(*) into binding_count
+  from public.platform_account_bindings
+  where user_id = p_user_id and connector_id = p_connector_id and status <> 'removed';
+  select exists (
+    select 1 from public.subscription_entitlements
+    where user_id = p_user_id
+      and status in ('premium_active', 'premium_cancel_at_period_end')
+      and valid_until > p_now and cache_expires_at > p_now
+      and features @> array['multi_account']::text[]
+  ) into premium_allowed;
+  if binding_count > 0 and not premium_allowed then
+    return jsonb_build_object('result', 'premium_required');
+  end if;
+  if binding_count >= p_max_bindings then
+    return jsonb_build_object('result', 'limit_reached');
+  end if;
+
+  insert into public.platform_account_bindings (
+    user_id, connector_id, external_account_key_hash, display_label, status, is_active
+  )
+  values (
+    p_user_id, p_connector_id, p_external_account_key_hash, trim(p_display_label),
+    'ready', binding_count = 0
+  )
+  on conflict (user_id, connector_id, external_account_key_hash) do update set
+    display_label = excluded.display_label,
+    status = 'ready',
+    revision = public.platform_account_bindings.revision + 1
+  returning * into saved_binding;
+  return jsonb_build_object('result', 'created', 'binding', to_jsonb(saved_binding));
+end;
+$$;
+
+create or replace function public.switch_platform_account_binding(
+  p_user_id uuid,
+  p_binding_id uuid,
+  p_session_key_hash text,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  target_binding public.platform_account_bindings%rowtype;
+  premium_allowed boolean;
+begin
+  select * into target_binding
+  from public.platform_account_bindings
+  where id = p_binding_id and user_id = p_user_id
+  for update;
+  if not found or target_binding.status = 'removed' then
+    return jsonb_build_object('result', 'binding_not_found');
+  end if;
+  if target_binding.is_active then
+    return jsonb_build_object('result', 'already_active', 'binding', to_jsonb(target_binding));
+  end if;
+  if target_binding.external_account_key_hash <> p_session_key_hash then
+    return jsonb_build_object('result', 'session_mismatch');
+  end if;
+  perform pg_advisory_xact_lock(
+    hashtextextended(p_user_id::text || ':' || target_binding.connector_id, 0)
+  );
+  select exists (
+    select 1 from public.subscription_entitlements
+    where user_id = p_user_id
+      and status in ('premium_active', 'premium_cancel_at_period_end')
+      and valid_until > p_now and cache_expires_at > p_now
+      and features @> array['multi_account']::text[]
+  ) into premium_allowed;
+  if not premium_allowed then
+    return jsonb_build_object('result', 'premium_required');
+  end if;
+  update public.platform_account_bindings
+  set is_active = false, revision = revision + 1
+  where user_id = p_user_id and connector_id = target_binding.connector_id and is_active;
+  update public.platform_account_bindings
+  set is_active = true, status = 'ready', revision = revision + 1
+  where id = p_binding_id
+  returning * into target_binding;
+  return jsonb_build_object('result', 'switched', 'binding', to_jsonb(target_binding));
+end;
+$$;
+
+revoke execute on function public.add_platform_account_binding(
+  uuid, text, text, text, integer, timestamptz
+) from public, anon, authenticated;
+revoke execute on function public.switch_platform_account_binding(
+  uuid, uuid, text, timestamptz
+) from public, anon, authenticated;
+grant execute on function public.add_platform_account_binding(
+  uuid, text, text, text, integer, timestamptz
+) to service_role;
+grant execute on function public.switch_platform_account_binding(
+  uuid, uuid, text, timestamptz
+) to service_role;
+
 drop trigger if exists on_sync_status_updated on public.sync_status;
 create trigger on_sync_status_updated
   before update on public.sync_status
@@ -1059,6 +1651,300 @@ create index if not exists idx_profile_imports_user_imported
 
 create index if not exists idx_extension_devices_user_last_seen
   on public.extension_devices (user_id, last_seen_at desc);
+
+-- ============================================
+-- Preproduction security hardening
+-- ============================================
+
+create table if not exists public.api_rate_limit_buckets (
+  scope text not null check (
+    scope in (
+      'extension_link_start_ip',
+      'extension_link_start_install',
+      'extension_link_status_ip',
+      'extension_link_status_link',
+      'extension_link_resolution_user'
+    )
+  ),
+  subject_hash text not null check (subject_hash ~ '^[a-f0-9]{64}$'),
+  window_started_at timestamptz not null,
+  hit_count bigint not null check (hit_count > 0),
+  expires_at timestamptz not null,
+  updated_at timestamptz not null,
+  primary key (scope, subject_hash, window_started_at),
+  check (expires_at > window_started_at)
+);
+
+create index if not exists idx_api_rate_limit_buckets_expires
+  on public.api_rate_limit_buckets (expires_at);
+
+create index if not exists idx_billing_events_user
+  on public.billing_events (user_id)
+  where user_id is not null;
+
+create index if not exists idx_billing_events_checkout_intent
+  on public.billing_events (checkout_intent_id)
+  where checkout_intent_id is not null;
+
+create index if not exists idx_billing_events_processed
+  on public.billing_events (processed_at)
+  where processed_at is not null;
+
+create index if not exists idx_platform_account_bindings_connector
+  on public.platform_account_bindings (connector_id);
+
+create index if not exists idx_missions_platform_account_binding
+  on public.missions (platform_account_binding_id)
+  where platform_account_binding_id is not null;
+
+create index if not exists idx_extension_link_requests_user
+  on public.extension_link_requests (user_id)
+  where user_id is not null;
+
+create index if not exists idx_extension_link_requests_terminal
+  on public.extension_link_requests (resolved_at)
+  where state <> 'pending';
+
+alter table public.api_rate_limit_buckets enable row level security;
+revoke all on table public.api_rate_limit_buckets from public, anon, authenticated;
+grant all on table public.api_rate_limit_buckets to service_role;
+
+drop policy if exists "Users can read own extension devices" on public.extension_devices;
+create policy "Users can read own extension devices"
+  on public.extension_devices for select
+  using ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can read own billing checkout intents"
+  on public.billing_checkout_intents;
+create policy "Users can read own billing checkout intents"
+  on public.billing_checkout_intents for select
+  using ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can read own subscription entitlement"
+  on public.subscription_entitlements;
+create policy "Users can read own subscription entitlement"
+  on public.subscription_entitlements for select
+  using ((select auth.uid()) = user_id);
+
+drop policy if exists "Users can read own platform account bindings"
+  on public.platform_account_bindings;
+create policy "Users can read own platform account bindings"
+  on public.platform_account_bindings for select
+  using ((select auth.uid()) = user_id);
+
+create or replace function public.consume_api_rate_limit(
+  p_scope text,
+  p_subject_hash text,
+  p_limit integer,
+  p_window_seconds integer,
+  p_now timestamptz
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  bucket_start timestamptz;
+  bucket_expiry timestamptz;
+  current_hits bigint;
+  retry_after integer;
+begin
+  if p_scope not in (
+    'extension_link_start_ip',
+    'extension_link_start_install',
+    'extension_link_status_ip',
+    'extension_link_status_link',
+    'extension_link_resolution_user'
+  ) then
+    raise exception 'invalid rate limit scope';
+  end if;
+  if p_subject_hash !~ '^[a-f0-9]{64}$' then
+    raise exception 'invalid rate limit subject';
+  end if;
+  if p_limit < 1 or p_limit > 1000 then
+    raise exception 'invalid rate limit';
+  end if;
+  if p_window_seconds < 60 or p_window_seconds > 3600 then
+    raise exception 'invalid rate limit window';
+  end if;
+
+  bucket_start := date_bin(
+    make_interval(secs => p_window_seconds),
+    p_now,
+    timestamptz '2000-01-01 00:00:00+00'
+  );
+  bucket_expiry := bucket_start + make_interval(secs => p_window_seconds);
+
+  insert into public.api_rate_limit_buckets (
+    scope,
+    subject_hash,
+    window_started_at,
+    hit_count,
+    expires_at,
+    updated_at
+  )
+  values (
+    p_scope,
+    p_subject_hash,
+    bucket_start,
+    1,
+    bucket_expiry,
+    p_now
+  )
+  on conflict (scope, subject_hash, window_started_at) do update set
+    hit_count = public.api_rate_limit_buckets.hit_count + 1,
+    updated_at = excluded.updated_at
+  returning hit_count into current_hits;
+
+  retry_after := greatest(
+    0,
+    ceil(extract(epoch from bucket_expiry - p_now))::integer
+  );
+
+  return jsonb_build_object(
+    'allowed', current_hits <= p_limit,
+    'remaining', greatest(p_limit - current_hits, 0),
+    'retry_after_seconds', retry_after
+  );
+end;
+$$;
+
+revoke execute on function public.consume_api_rate_limit(
+  text, text, integer, integer, timestamptz
+) from public, anon, authenticated;
+
+grant execute on function public.consume_api_rate_limit(
+  text, text, integer, integer, timestamptz
+) to service_role;
+
+create or replace function public.expire_extension_link(
+  p_link_id uuid,
+  p_now timestamptz
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  requested_link public.extension_link_requests%rowtype;
+begin
+  select *
+  into requested_link
+  from public.extension_link_requests
+  where id = p_link_id
+  for update;
+
+  if not found then
+    return 'link_not_found';
+  end if;
+  if requested_link.state <> 'pending' then
+    return requested_link.state;
+  end if;
+  if requested_link.expires_at > p_now then
+    return 'not_expired';
+  end if;
+
+  update public.extension_link_requests
+  set
+    state = 'expired',
+    resolved_at = requested_link.expires_at
+  where id = p_link_id
+    and state = 'pending';
+
+  if not found then
+    select state
+    into requested_link.state
+    from public.extension_link_requests
+    where id = p_link_id;
+    return coalesce(requested_link.state, 'link_not_found');
+  end if;
+
+  return 'expired';
+end;
+$$;
+
+revoke execute on function public.expire_extension_link(
+  uuid, timestamptz
+) from public, anon, authenticated;
+
+grant execute on function public.expire_extension_link(
+  uuid, timestamptz
+) to service_role;
+
+create or replace function public.purge_freemium_operational_data(
+  p_now timestamptz,
+  p_rate_limit_hours integer,
+  p_extension_link_hours integer,
+  p_terminal_checkout_days integer,
+  p_billing_event_days integer
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  expired_links bigint;
+  deleted_rate_limits bigint;
+  deleted_links bigint;
+  deleted_checkouts bigint;
+  deleted_billing_events bigint;
+begin
+  if p_rate_limit_hours < 1 or p_rate_limit_hours > 168
+    or p_extension_link_hours < 1 or p_extension_link_hours > 168
+    or p_terminal_checkout_days < 30 or p_terminal_checkout_days > 365
+    or p_billing_event_days < 365 or p_billing_event_days > 2555
+  then
+    raise exception 'invalid retention policy';
+  end if;
+
+  update public.extension_link_requests
+  set
+    state = 'expired',
+    resolved_at = expires_at
+  where state = 'pending'
+    and expires_at <= p_now;
+  get diagnostics expired_links = row_count;
+
+  delete from public.api_rate_limit_buckets
+  where expires_at < p_now - make_interval(hours => p_rate_limit_hours);
+  get diagnostics deleted_rate_limits = row_count;
+
+  delete from public.extension_link_requests
+  where state <> 'pending'
+    and resolved_at < p_now - make_interval(hours => p_extension_link_hours);
+  get diagnostics deleted_links = row_count;
+
+  delete from public.billing_checkout_intents
+  where state in ('cancelled', 'expired', 'failed_terminal')
+    and provider_subscription_id is null
+    and updated_at < p_now - make_interval(days => p_terminal_checkout_days);
+  get diagnostics deleted_checkouts = row_count;
+
+  delete from public.billing_events
+  where processed_at is not null
+    and processed_at < p_now - make_interval(days => p_billing_event_days);
+  get diagnostics deleted_billing_events = row_count;
+
+  return jsonb_build_object(
+    'expired_links', expired_links,
+    'deleted_rate_limits', deleted_rate_limits,
+    'deleted_links', deleted_links,
+    'deleted_checkouts', deleted_checkouts,
+    'deleted_billing_events', deleted_billing_events
+  );
+end;
+$$;
+
+revoke execute on function public.purge_freemium_operational_data(
+  timestamptz, integer, integer, integer, integer
+) from public, anon, authenticated;
+
+grant execute on function public.purge_freemium_operational_data(
+  timestamptz, integer, integer, integer, integer
+) to service_role;
 
 create index if not exists idx_sync_conflicts_user_pending
   on public.sync_conflicts (user_id, status, detected_at desc);

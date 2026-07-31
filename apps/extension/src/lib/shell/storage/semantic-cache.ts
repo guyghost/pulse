@@ -57,10 +57,13 @@ const buildProfileFingerprint = (profile: UserProfile): string =>
   ].join('|');
 
 /**
- * Build the storage key for a mission's semantic score.
+ * Build the storage key for a mission's semantic score from a precomputed
+ * fingerprint. Use this in hot paths that build many keys for the same profile
+ * — `buildProfileFingerprint` sorts keywords and normalises ~7 fields, so it
+ * must not be recomputed per mission.
  */
-const buildCacheKey = (missionId: string, profile: UserProfile): string =>
-  `${CACHE_KEY_PREFIX}${buildProfileFingerprint(profile)}-${missionId}`;
+const keyFromFingerprint = (missionId: string, fingerprint: string): string =>
+  `${CACHE_KEY_PREFIX}${fingerprint}-${missionId}`;
 
 const isSemanticCacheKey = (key: string): boolean =>
   key.startsWith(CACHE_KEY_PREFIX) && key !== CACHE_INDEX_KEY;
@@ -131,12 +134,13 @@ export const getCachedSemanticScores = async (
     return results;
   }
 
-  const keys = missionIds.map((missionId) => buildCacheKey(missionId, profile));
+  const fingerprint = buildProfileFingerprint(profile);
+  const keys = missionIds.map((missionId) => keyFromFingerprint(missionId, fingerprint));
   const stored = await chrome.storage.local.get(keys);
 
-  for (const missionId of missionIds) {
-    const key = buildCacheKey(missionId, profile);
-    const entry = stored[key] as SemanticCacheEntry | undefined;
+  for (let i = 0; i < missionIds.length; i++) {
+    const missionId = missionIds[i];
+    const entry = stored[keys[i]] as SemanticCacheEntry | undefined;
 
     if (!entry) {
       continue;
@@ -170,9 +174,12 @@ export const cacheSemanticScores = async (
   const toStore: Record<string, SemanticCacheEntry> = {};
   const cacheKeys: string[] = [];
   const now = Date.now();
+  // The profile is constant for the whole write — compute its fingerprint once
+  // instead of once per cached mission.
+  const fingerprint = buildProfileFingerprint(profile);
 
   for (const [missionId, result] of results) {
-    const key = buildCacheKey(missionId, profile);
+    const key = keyFromFingerprint(missionId, fingerprint);
     cacheKeys.push(key);
     toStore[key] = {
       score: result.score,

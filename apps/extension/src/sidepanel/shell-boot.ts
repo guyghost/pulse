@@ -10,10 +10,16 @@
  * instead of the generic skeleton.
  */
 
+import { CANONICAL_INCLUDED_CONNECTOR_IDS } from '../lib/shell/connectors/build-config';
+import {
+  captureSettingsReleaseData,
+  decodeSettingsReleaseSnapshot,
+} from '../lib/shell/settings-release/settings-release.contract';
+
 type MessageResponse =
   | { type: 'PROFILE_RESULT'; payload: unknown }
   | { type: 'FIRST_SCAN_DONE_RESULT'; payload: unknown }
-  | { type: 'ONBOARDING_COMPLETED_RESULT'; payload: unknown }
+  | { type: 'SETTINGS_RELEASE_RESULT'; payload: unknown }
   | { type: string; payload?: unknown };
 
 const ONBOARDING_SHELL_HTML = `
@@ -55,7 +61,7 @@ function initShellBoot() {
   Promise.all([
     chrome.runtime.sendMessage({ type: 'GET_PROFILE' }) as Promise<MessageResponse>,
     chrome.runtime.sendMessage({ type: 'GET_FIRST_SCAN_DONE' }) as Promise<MessageResponse>,
-    chrome.runtime.sendMessage({ type: 'GET_ONBOARDING_COMPLETED' }) as Promise<MessageResponse>,
+    chrome.runtime.sendMessage({ type: 'GET_SETTINGS_RELEASE' }) as Promise<MessageResponse>,
   ])
     .then(([profileResponse, firstScanResponse, onboardingResponse]) => {
       // P1: the sendMessage round-trip can resolve after main.ts has committed
@@ -72,8 +78,25 @@ function initShellBoot() {
         profileResponse?.type === 'PROFILE_RESULT' && profileResponse.payload !== null;
       const firstScanDone =
         firstScanResponse?.type === 'FIRST_SCAN_DONE_RESULT' && firstScanResponse.payload;
-      const onboardingCompleted =
-        onboardingResponse?.type === 'ONBOARDING_COMPLETED_RESULT' && onboardingResponse.payload;
+      const capturedReleaseResponse = captureSettingsReleaseData(onboardingResponse);
+      const releaseResponse =
+        capturedReleaseResponse !== null && typeof capturedReleaseResponse === 'object'
+          ? (capturedReleaseResponse as Record<string, unknown>)
+          : null;
+      const releasePayload =
+        releaseResponse?.type === 'SETTINGS_RELEASE_RESULT' &&
+        releaseResponse.payload !== null &&
+        typeof releaseResponse.payload === 'object'
+          ? (releaseResponse.payload as Record<string, unknown>)
+          : null;
+      const releaseSnapshot =
+        releasePayload?.status === 'confirmed'
+          ? decodeSettingsReleaseSnapshot(releasePayload.snapshot, CANONICAL_INCLUDED_CONNECTOR_IDS)
+          : null;
+      if (!releaseSnapshot) {
+        return;
+      }
+      const onboardingCompleted = releaseSnapshot.onboardingCompleted;
 
       if (!hasProfile && !firstScanDone && !onboardingCompleted) {
         renderOnboardingShell(app);

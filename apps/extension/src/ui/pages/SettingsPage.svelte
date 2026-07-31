@@ -1,14 +1,11 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button } from '@pulse/ui';
-  import { Icon } from '@pulse/ui';
+  import { Button, Icon, Toggle } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
-  import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
   import type { Mission } from '$lib/core/types/mission';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
-  import { features } from '$lib/state/features.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import OperationalStoryCard, {
@@ -16,6 +13,7 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import AlertBuilderCard from '../molecules/AlertBuilderCard.svelte';
+  import ThemeSelector from '../molecules/ThemeSelector.svelte';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import {
@@ -26,11 +24,13 @@
   import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
   import { getFavorites, getMissions, getSeenIds } from '$lib/shell/facades/feed-data.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+  import PlatformAccountsPanel from '../organisms/PlatformAccountsPanel.svelte';
 
   const {
     onBack,
     onNavigateToOnboarding,
-  }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
+    active = true,
+  }: { onBack?: () => void; onNavigateToOnboarding?: () => void; active?: boolean } = $props();
 
   const settings = new SettingsPageController({
     onNavigateToOnboarding: () => {
@@ -41,6 +41,7 @@
   const isOffline = $derived(connection.status === 'offline');
 
   type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data';
+  type SettingsDataStatus = 'inactive' | 'refreshing' | 'ready' | 'refresh-error';
 
   type SettingsSectionLink = {
     id: SettingsSectionId;
@@ -119,22 +120,57 @@
   let alertPreviewSeenIds = $state<string[]>([]);
   let alertHistory = $state<AlertHistoryEntry[]>([]);
   let aiSettingsSection: HTMLElement | null = $state(null);
+  let dataStatus = $state<SettingsDataStatus>('inactive');
+  let previousActive = false;
+  let refreshPromise: Promise<void> | null = null;
 
-  (async () => {
-    const [storedAlertPreferences, favorites, missions, seenIds, storedAlertHistory] =
-      await Promise.all([
-        getAlertPreferences(),
-        getFavorites(),
-        getMissions(),
-        getSeenIds(),
-        getAlertHistory(),
-      ]);
-    alertPreferences = storedAlertPreferences;
-    favoriteExportCount = Object.keys(favorites).length;
-    alertPreviewMissions = missions;
-    alertPreviewSeenIds = seenIds;
-    alertHistory = storedAlertHistory;
-  })().catch(() => {});
+  async function refreshPageData(): Promise<void> {
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+
+    refreshPromise = (async () => {
+      dataStatus = 'refreshing';
+      try {
+        const [storedAlertPreferences, favorites, missions, seenIds, storedAlertHistory] =
+          await Promise.all([
+            getAlertPreferences(),
+            getFavorites(),
+            getMissions(),
+            getSeenIds(),
+            getAlertHistory(),
+          ]);
+        alertPreferences = storedAlertPreferences;
+        favoriteExportCount = Object.keys(favorites).length;
+        alertPreviewMissions = missions;
+        alertPreviewSeenIds = seenIds;
+        alertHistory = storedAlertHistory;
+        dataStatus = 'ready';
+      } catch (error) {
+        dataStatus = 'refresh-error';
+        throw error;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+
+    return refreshPromise;
+  }
+
+  $effect(() => {
+    const becameActive = active && !previousActive;
+    const becameInactive = !active && previousActive;
+    previousActive = active;
+    if (becameInactive) {
+      dataStatus = 'inactive';
+    }
+    if (becameActive) {
+      void refreshPageData().catch(() => {
+        // Keep the last known values. The page remains usable and retries on
+        // the next activation.
+      });
+    }
+  });
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
@@ -154,24 +190,9 @@
     await showToast('Sauvegarde créée', 'success');
   }
 
-  async function handleRestoreBackup() {
-    const result = await settings.restoreBackup();
-    if (!result.ok) {
-      await showToast(result.error, 'error');
-      return;
-    }
-    await settings.load();
-    await showToast('Sauvegarde restaurée', 'success');
-  }
-
   async function handleScanIntervalChange(event: Event) {
     const value = Number.parseInt((event.target as HTMLInputElement).value, 10);
     await settings.updateScanInterval(value);
-  }
-
-  async function handleFileSelect(event: Event) {
-    const input = event.target as HTMLInputElement;
-    await settings.handleFileSelect(input.files?.[0]);
   }
 
   async function handleSaveAlertPreferences(nextPreferences: ConnectedAlertPreferences) {
@@ -287,10 +308,10 @@
         severity: favoriteExportCount > 0 ? 'success' : 'neutral',
       },
       {
-        label: 'Restore',
-        value: 'Confirmé',
+        label: 'Import',
+        value: 'Non proposé',
         icon: 'shield-check',
-        severity: 'success',
+        severity: 'neutral',
       },
     ];
 
@@ -298,9 +319,8 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Préparation requise',
-        title: 'La sauvegarde serait trop pauvre pour restaurer un espace utile',
-        description:
-          'Complétez au moins le profil ou la stack avant de créer un point de restauration.',
+        title: 'La sauvegarde serait trop pauvre pour être utile',
+        description: 'Complétez au moins le profil ou la stack avant de créer une archive locale.',
         evidence,
         primaryActionLabel: 'Compléter le profil',
         primaryActionIcon: 'user',
@@ -310,9 +330,9 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Sauvegardable',
-      title: 'Un point de restauration local peut être créé',
+      title: 'Une archive locale peut être créée',
       description:
-        'La sauvegarde capture profil, réglages, favoris et missions masquées. La restauration reste confirmée avant écriture.',
+        'La sauvegarde capture profil, réglages, favoris et missions masquées. L’import reste désactivé tant que sa transaction multi-stockage n’est pas prouvée.',
       evidence,
       primaryActionLabel: 'Créer une sauvegarde',
       primaryActionIcon: 'download',
@@ -495,7 +515,10 @@
   });
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
+<div
+  class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4"
+  aria-busy={dataStatus === 'refreshing'}
+>
   <!-- Hero -->
   <section class="section-card-strong rounded-2xl px-5 py-4">
     <div class="flex items-center gap-3">
@@ -506,7 +529,7 @@
       </div>
       <div>
         <p class="eyebrow text-blueprint-blue">Configuration</p>
-        <h2 class="mt-1 text-base font-semibold text-text-primary">Paramètres</h2>
+        <h1 class="mt-1 text-subheading font-semibold text-text-primary">Paramètres</h1>
       </div>
     </div>
 
@@ -520,7 +543,7 @@
         statusLabel={settingsStory.statusLabel}
         evidence={settingsStory.evidence}
         primaryActionLabel={settingsStory.primaryActionLabel}
-        primaryActionIcon={settingsStory.primaryActionIcon}
+        primaryActionIcon={settingsStory.primaryActionIcon as IconName}
         onPrimaryAction={handleSettingsStoryAction}
       />
     </div>
@@ -536,7 +559,7 @@
 
   <section class="section-card rounded-xl p-4" aria-label="Sections de réglages">
     <div class="grid gap-2 sm:grid-cols-2">
-      {#each settingsSections as section}
+      {#each settingsSections as section (section.id)}
         <button
           type="button"
           class="flex min-h-20 items-start gap-3 rounded-lg border border-border-light bg-page-canvas p-3 text-left transition-colors hover:border-blueprint-blue/25 hover:bg-blueprint-blue/6 focus:outline-none focus:ring-2 focus:ring-blueprint-blue/30"
@@ -549,12 +572,12 @@
           </span>
           <span class="min-w-0">
             <span
-              class="block text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted"
+              class="block text-micro font-semibold uppercase tracking-[0.15em] text-text-muted"
             >
               {section.label}
             </span>
-            <span class="mt-1 block text-xs font-medium text-text-primary">{section.title}</span>
-            <span class="mt-1 block text-[11px] leading-4 text-text-subtle">
+            <span class="mt-1 block text-meta font-medium text-text-primary">{section.title}</span>
+            <span class="mt-1 block text-caption leading-4 text-text-subtle">
               {section.description}
             </span>
           </span>
@@ -577,10 +600,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Sources</p>
-          <h3 id="settings-sources-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-sources-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Choisir les sources à scanner
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Cadence, notifications et historique source alimentent les missions visibles.
           </p>
         </div>
@@ -598,6 +621,67 @@
         onToggleNotifications={() => settings.toggleNotifications()}
         onScanIntervalChange={handleScanIntervalChange}
       />
+
+      <div class="section-card space-y-3 rounded-xl p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-meta font-semibold text-text-primary">
+              Sources incluses dans cette version
+            </p>
+            <p class="mt-1 text-caption leading-4 text-text-muted">
+              Seules les plateformes réellement livrées avec l’extension peuvent être activées.
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
+          >
+            {settings.connectorSources.filter((source) => source.enabled).length}/{settings
+              .connectorSources.length} actives
+          </span>
+        </div>
+
+        <div
+          class="divide-y divide-border-light rounded-lg border border-border-light bg-surface-white"
+        >
+          {#each settings.connectorSources as source (source.id)}
+            <div class="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+                >
+                  <Icon name="database" size={13} />
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-meta font-medium text-text-primary">
+                    {source.name}
+                  </span>
+                  <span class="mt-0.5 block text-micro text-text-muted">
+                    {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
+                  </span>
+                </span>
+              </div>
+
+              <Toggle
+                checked={source.enabled}
+                disabled={settings.isSavingSettings}
+                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
+                onclick={() => settings.toggleConnector(source.id)}
+              />
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      {#if settings.settingsError}
+        <p
+          class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red"
+          role="alert"
+        >
+          {settings.settingsError}. La dernière configuration confirmée reste active.
+        </p>
+      {:else if settings.isSavingSettings}
+        <p class="px-1 text-caption text-text-muted" role="status">Enregistrement…</p>
+      {/if}
     </section>
 
     <section
@@ -613,10 +697,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Alertes</p>
-          <h3 id="settings-alerts-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-alerts-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Choisir les missions qui méritent une alerte
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Ajustez les conditions avant d’autoriser une notification prioritaire.
           </p>
         </div>
@@ -646,10 +730,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Compte & IA</p>
-          <h3 id="settings-account-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-account-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Synchroniser et enrichir
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Le dashboard connecté et l’analyse locale restent optionnels, mais clarifient le
             pilotage.
           </p>
@@ -666,14 +750,16 @@
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 class="text-sm font-medium text-text-primary">Compte et synchronisation</h3>
-                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                <h3 class="text-body-lg font-medium text-text-primary">
+                  Compte et synchronisation
+                </h3>
+                <p class="mt-1 text-meta leading-5 text-text-subtle">
                   Le scan reste local. Le compte MissionPulse sert à synchroniser les snapshots vers
                   le dashboard connecté.
                 </p>
               </div>
               <span
-                class="rounded-md border px-2 py-1 text-[10px] font-medium {settings.isConnectedAccount
+                class="rounded-md border px-2 py-1 text-micro font-medium {settings.isConnectedAccount
                   ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
                   : 'border-border-light bg-page-canvas text-text-subtle'}"
               >
@@ -685,32 +771,28 @@
 
         <div class="grid gap-2 sm:grid-cols-2">
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.connectedAccountEmail ?? 'Non connecté'}
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
-              {features.premiumFeatureActive
-                ? settings.premiumEnabled
-                  ? 'Premium local actif'
-                  : 'Gratuit local'
-                : 'Premium désactivé'}
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
+              {settings.premiumEnabled ? 'Premium — 10 € TTC/an' : 'Gratuit'}
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
               Appareil
             </p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.connectedDeviceLabel}
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.connectedPendingUploads} envoi · {settings.connectedPendingDownloads}
               réception
             </p>
@@ -718,21 +800,38 @@
         </div>
 
         <p
-          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs leading-5 text-text-subtle"
+          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta leading-5 text-text-subtle"
         >
           {settings.syncStatusText}
         </p>
 
+        {#if settings.isConnectedAccount}
+          <PlatformAccountsPanel />
+        {/if}
+
         <div class="flex flex-wrap gap-2">
           <button
-            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={() => settings.openAccountCenter()}
           >
             <Icon name="user" size={13} />
-            {settings.isConnectedAccount ? 'Gérer mon compte' : 'Connecter mon compte'}
+            {settings.isConnectedAccount
+              ? 'Gérer mon compte'
+              : settings.extensionAccountState === 'awaiting_user_approval'
+                ? 'Vérifier la connexion'
+                : 'Connecter mon compte'}
           </button>
+          {#if settings.isConnectedAccount}
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+              onclick={() => settings.disconnectExtensionAccount()}
+            >
+              <Icon name="log-out" size={13} />
+              Déconnecter cette extension
+            </button>
+          {/if}
           <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
             onclick={() => settings.openConnectedDashboard()}
           >
             <Icon name="external-link" size={13} />
@@ -740,7 +839,7 @@
           </button>
         </div>
 
-        <p class="text-[11px] leading-5 text-text-muted">
+        <p class="text-caption leading-5 text-text-muted">
           Les sessions Free-Work, LeHibou, Hiway, Collective et Cherry Pick restent dans Chrome;
           seuls les résultats normalisés, les candidatures, le CV et les préférences peuvent être
           synchronisés.
@@ -759,8 +858,8 @@
             <Icon name="cpu" size={14} class="text-blueprint-blue" />
           </div>
           <div>
-            <h3 class="text-sm font-medium text-text-primary">IA locale</h3>
-            <p class="mt-1 text-xs text-text-subtle">
+            <h3 class="text-body-lg font-medium text-text-primary">IA locale</h3>
+            <p class="mt-1 text-meta text-text-subtle">
               L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API
               externe.
             </p>
@@ -775,13 +874,13 @@
           statusLabel={aiStory.statusLabel}
           evidence={aiStory.evidence}
           primaryActionLabel={aiStory.primaryActionLabel}
-          primaryActionIcon={aiStory.primaryActionIcon}
+          primaryActionIcon={aiStory.primaryActionIcon as IconName}
           onPrimaryAction={() => settings.openAiHelp()}
         />
         <div class="grid grid-cols-2 gap-2">
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.aiAvailability === 'available'
                 ? 'Disponible'
                 : settings.aiAvailability === 'after-download'
@@ -790,35 +889,77 @@
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
               Missions / scan
             </p>
-            <p class="mt-1 text-xs font-medium text-text-primary">{settings.maxSemanticPerScan}</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
+              {settings.maxSemanticPerScan}
+            </p>
           </div>
         </div>
         <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
           <div class="flex items-start gap-2">
             <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
             <div class="min-w-0">
-              <p class="text-xs font-medium text-text-primary">Données utilisées par l'IA locale</p>
-              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+              <p class="text-meta font-medium text-text-primary">
+                Données utilisées par l'IA locale
+              </p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
                 Gemini Nano reçoit uniquement le contexte utile au score de mission. Le résultat
                 reste local avec le score et une raison courte.
               </p>
             </div>
           </div>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            {#each aiTransparencyItems as item}
+            {#each aiTransparencyItems as item, i (i)}
               <div class="rounded-md bg-surface-white px-2.5 py-2">
                 <div class="flex items-center gap-1.5">
                   <Icon name={item.icon} size={12} class="text-blueprint-blue" />
-                  <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
                     {item.label}
                   </p>
                 </div>
-                <p class="mt-1 text-[11px] leading-4 text-text-secondary">{item.value}</p>
+                <p class="mt-1 text-caption leading-4 text-text-secondary">{item.value}</p>
               </div>
             {/each}
+          </div>
+        </div>
+      </div>
+
+      <!-- Form Assistant (Machine D — src/models/form-assistant.model.md) -->
+      <div class="section-card rounded-xl p-5 space-y-3">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
+          >
+            <Icon name="file-text" size={14} class="text-blueprint-blue" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-body-lg font-medium text-text-primary">Assistant de candidature</h3>
+            <p class="mt-1 text-meta text-text-subtle">
+              Au focus sur un champ d'un formulaire de candidature, propose une valeur issue de
+              votre profil. Vous restez seul à valider l'insertion (rien n'est jamais rempli
+              automatiquement).
+            </p>
+          </div>
+          <Toggle
+            checked={settings.formAssistEnabled}
+            disabled={settings.formAssistStatus === 'loading'}
+            aria-label="Activer l'assistant de candidature"
+            onclick={() => settings.toggleFormAssist()}
+          />
+        </div>
+        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+          <div class="flex items-start gap-2">
+            <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+            <div class="min-w-0">
+              <p class="text-meta font-medium text-text-primary">Périmètre et confidentialité</p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
+                Actif uniquement sur les plateformes connecteurs compatibles (Free-Work pour la
+                phase pilote). La génération utilise Gemini Nano en local ; aucune donnée de page
+                n'est envoyée à un serveur.
+              </p>
+            </div>
           </div>
         </div>
       </div>
@@ -833,10 +974,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Données</p>
-          <h3 id="settings-data-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Sorties, restauration et nettoyage
+          <h3 id="settings-data-title" class="mt-1 text-body-lg font-semibold text-text-primary">
+            Sorties et nettoyage
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Les actions qui modifient ou exportent l’espace local sont regroupées ici.
           </p>
         </div>
@@ -844,29 +985,20 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Apparence</h3>
-          <p class="mt-1 text-xs text-text-subtle">Choisir le thème de l'interface.</p>
+          <h3 class="text-body-lg font-medium text-text-primary">Apparence</h3>
+          <p class="mt-1 text-meta text-text-subtle">Choisir le thème de l'interface.</p>
         </div>
-        <div class="flex gap-2">
-          {#each [{ id: 'light', label: 'Clair', icon: 'sun' }, { id: 'dark', label: 'Sombre', icon: 'moon' }, { id: 'system', label: 'Système', icon: 'monitor' }] as option}
-            <button
-              class="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors
-                {settings.theme === option.id
-                ? 'border-blueprint-blue bg-blueprint-blue/10 text-blueprint-blue'
-                : 'border-border-light bg-page-canvas text-text-primary hover:bg-subtle-gray'}"
-              onclick={() => settings.updateTheme(option.id as 'light' | 'dark' | 'system')}
-            >
-              <Icon name={option.icon} size={14} />
-              {option.label}
-            </button>
-          {/each}
-        </div>
+        <ThemeSelector
+          theme={settings.theme}
+          busy={settings.isSavingSettings}
+          onSelect={(theme) => void settings.updateTheme(theme)}
+        />
       </div>
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Export</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Export</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Préparer une shortlist partageable ou sortir les données brutes.
           </p>
         </div>
@@ -879,15 +1011,15 @@
           statusLabel={exportStory.statusLabel}
           evidence={exportStory.evidence}
           primaryActionLabel={exportStory.primaryActionLabel}
-          primaryActionIcon={exportStory.primaryActionIcon}
+          primaryActionIcon={exportStory.primaryActionIcon as IconName}
           onPrimaryAction={handleExportStoryAction}
         />
         <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
           <div class="flex items-start gap-2">
             <Icon name="file-text" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
             <div class="min-w-0">
-              <p class="text-xs font-medium text-text-primary">Rapport shortlist</p>
-              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+              <p class="text-meta font-medium text-text-primary">Rapport shortlist</p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
                 Le Markdown inclut synthèse, critères visibles, signaux de score, liens sources et
                 rappel de confidentialité locale.
               </p>
@@ -895,28 +1027,28 @@
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2 text-center">
             <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+              <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
                 {favoriteExportCount}
               </p>
-              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Favoris</p>
+              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Favoris</p>
             </div>
             <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="text-sm font-semibold text-text-primary">MD</p>
-              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Rapport</p>
+              <p class="text-body-lg font-semibold text-text-primary">MD</p>
+              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Rapport</p>
             </div>
             <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="text-sm font-semibold text-text-primary">Local</p>
-              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Sessions</p>
+              <p class="text-body-lg font-semibold text-text-primary">Local</p>
+              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Sessions</p>
             </div>
           </div>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
             Formats secondaires
           </p>
           <div class="mt-2 flex flex-wrap gap-2">
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
               onclick={() => handleExportFavorites('json')}
               disabled={settings.isExporting}
             >
@@ -924,7 +1056,7 @@
               JSON
             </button>
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
               onclick={() => handleExportFavorites('csv')}
               disabled={settings.isExporting}
             >
@@ -932,7 +1064,7 @@
               CSV
             </button>
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
               onclick={() => handleExportFavorites('markdown')}
               disabled={settings.isExporting}
             >
@@ -948,10 +1080,10 @@
             aria-live="polite"
           >
             <div class="flex items-start gap-2">
-              <Icon name="check-circle-2" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+              <Icon name="check-circle" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
               <div class="min-w-0">
-                <p class="text-xs font-medium text-text-primary">Export prêt à partager</p>
-                <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
+                <p class="text-meta font-medium text-text-primary">Export prêt à partager</p>
+                <p class="mt-0.5 text-caption leading-4 text-text-subtle">
                   {settings.lastExportSummary}
                 </p>
               </div>
@@ -962,9 +1094,9 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Sauvegarde</h3>
-          <p class="mt-1 text-xs text-text-subtle">
-            Sauvegarder ou restaurer vos données (profil, paramètres, favoris).
+          <h3 class="text-body-lg font-medium text-text-primary">Sauvegarde</h3>
+          <p class="mt-1 text-meta text-text-subtle">
+            Exporter une archive de vos données (profil, paramètres, favoris).
           </p>
         </div>
         <OperationalStoryCard
@@ -976,35 +1108,20 @@
           statusLabel={backupStory.statusLabel}
           evidence={backupStory.evidence}
           primaryActionLabel={null}
-          primaryActionIcon={backupStory.primaryActionIcon}
+          primaryActionIcon={backupStory.primaryActionIcon as IconName}
         />
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" onclick={handleCreateBackup}>
-            {#snippet children()}
-              <Icon name="download" size={14} class="mr-1" />
-              Créer une sauvegarde
-            {/snippet}
-          </Button>
-          <input
-            type="file"
-            accept=".pulse-backup,.json"
-            class="hidden"
-            onchange={handleFileSelect}
-            bind:this={settings.fileInput}
-          />
-          <Button variant="ghost" onclick={() => settings.triggerFileSelect()}>
-            {#snippet children()}
-              <Icon name="upload" size={14} class="mr-1" />
-              Restaurer
-            {/snippet}
+            <Icon name="download" size={14} class="mr-1" />
+            Créer une sauvegarde
           </Button>
         </div>
       </div>
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Diagnostic</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Diagnostic</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Exportez un rapport local pour signaler un problème de connecteur ou de scan. Aucune
             session ni cookie n'est inclus.
           </p>
@@ -1013,8 +1130,8 @@
           <div class="flex items-start gap-2">
             <Icon name="activity" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
             <div class="min-w-0">
-              <p class="text-xs font-medium text-text-primary">Rapport technique</p>
-              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+              <p class="text-meta font-medium text-text-primary">Rapport technique</p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
                 Erreurs récentes, état des connecteurs et version Chrome. À joindre aux issues
                 GitHub si un scan échoue de façon répétée.
               </p>
@@ -1022,7 +1139,7 @@
           </div>
           <div class="mt-3">
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
               onclick={handleExportDiagnostic}
             >
               <Icon name="file-json" size={14} class="text-blueprint-blue" />
@@ -1034,47 +1151,38 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Onboarding</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Onboarding</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Rejouer l'accompagnement initial ou relancer le tour du feed.
           </p>
         </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" onclick={() => settings.restartOnboarding()}>
-            {#snippet children()}
-              <Icon name="star" size={14} class="mr-1" />
-              Rejouer l'onboarding
-            {/snippet}
+            <Icon name="star" size={14} class="mr-1" />
+            Rejouer l'onboarding
           </Button>
           <Button variant="ghost" onclick={() => settings.replayFeedTour()}>
-            {#snippet children()}
-              <Icon name="play" size={14} class="mr-1" />
-              Revoir le tour du feed
-            {/snippet}
+            <Icon name="play" size={14} class="mr-1" />
+            Revoir le tour du feed
           </Button>
         </div>
       </div>
 
-      <DangerZone
-        showResetConfirm={settings.showResetConfirm}
-        onShowConfirm={() => {
-          settings.showResetConfirm = true;
-        }}
-        onCancelConfirm={() => {
-          settings.showResetConfirm = false;
-        }}
-        onConfirmReset={() => settings.resetAll()}
-        onCreateBackup={handleCreateBackup}
-      />
+      {#if settings.localDataResetAvailability.status === 'available'}
+        <DangerZone
+          showResetConfirm={settings.showResetConfirm}
+          resetAvailability={settings.localDataResetAvailability}
+          resetError={settings.resetError}
+          onShowConfirm={() => {
+            settings.showResetConfirm = true;
+          }}
+          onCancelConfirm={() => {
+            settings.showResetConfirm = false;
+          }}
+          onConfirmReset={() => settings.resetAll()}
+          onCreateBackup={handleCreateBackup}
+        />
+      {/if}
     </section>
   </div>
 </div>
-
-{#if settings.showBackupModal}
-  <BackupRestoreModal
-    backup={settings.pendingBackup}
-    error={settings.backupError}
-    onConfirm={handleRestoreBackup}
-    onCancel={() => settings.cancelRestore()}
-  />
-{/if}

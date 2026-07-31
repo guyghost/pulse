@@ -110,7 +110,7 @@ export class FreeWorkConnector extends BaseConnector {
         }
 
         const url = buildFreeWorkApiUrl(page, context);
-        await globalRateLimiter.acquire(url);
+        await globalRateLimiter.acquire(url, signal);
 
         const result = await this.fetchJSON(
           url,

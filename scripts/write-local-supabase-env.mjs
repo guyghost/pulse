@@ -106,7 +106,7 @@ function main() {
     'SERVICE_ROLE_KEY',
   ]);
 
-  let chromeStoreUrl = 'https://chromewebstore.google.com/search/MissionPulse';
+  let chromeStoreUrl = '';
   try {
     const currentLandingEnv = readFileSync(resolve(rootDir, 'apps/landing/.env'), 'utf8');
     const match = currentLandingEnv.match(/^PUBLIC_CHROME_STORE_URL=(.*)$/m);

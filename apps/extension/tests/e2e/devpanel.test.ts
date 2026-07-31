@@ -1,6 +1,7 @@
 import { test, expect } from './fixtures';
 import {
   expectMissionCount,
+  getMissionTotalCount,
   openDevPanel,
   closeDevPanel,
   devPanel,
@@ -59,6 +60,15 @@ test.describe('DevPanel', () => {
   });
 
   test('set state empty shows "Aucune mission"', async ({ page }) => {
+    // The dev-mode stub fires SCAN_COMPLETE after ~800ms and dispatches a
+    // `dev:missions` event that overwrites the feed with mock missions.
+    // Clicking "empty" before the scan settles causes the scan to race back
+    // and clear the empty state before the assertion runs.
+    // Wait for the initial scan to populate the feed first, then let it fully
+    // settle, so no pending scan can overwrite our explicit empty click.
+    await expect.poll(async () => getMissionTotalCount(page), { timeout: 5000 }).toBeGreaterThan(0);
+    await page.waitForTimeout(900);
+
     await openDevPanel(page);
 
     await page.getByRole('button', { name: 'empty' }).click();

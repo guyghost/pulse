@@ -77,7 +77,11 @@ describe('withErrorBoundary — validation', () => {
     const wrapped = withErrorBoundary(handler, 'SCAN_CANCEL');
 
     const sendResponse = vi.fn();
-    wrapped({ type: 'SCAN_CANCEL' }, noopSender, sendResponse);
+    wrapped(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-1' } },
+      noopSender,
+      sendResponse
+    );
 
     expect(handler).toHaveBeenCalledOnce();
   });
@@ -106,7 +110,13 @@ describe('withErrorBoundary — error boundary sync', () => {
     const sendResponse = vi.fn();
 
     // Ne devrait pas lever d'exception
-    expect(() => wrapped({ type: 'SCAN_START' }, noopSender, sendResponse)).not.toThrow();
+    expect(() =>
+      wrapped(
+        { type: 'SCAN_START', payload: { operationId: 'operation-1', trigger: 'manual' } },
+        noopSender,
+        sendResponse
+      )
+    ).not.toThrow();
     expect(sendResponse).toHaveBeenCalledWith(
       expect.objectContaining({
         success: false,

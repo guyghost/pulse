@@ -95,36 +95,31 @@
 </script>
 
 {#if resolvedVariant === 'inline'}
-  <!-- Single-row status strip: icon + title/status + inline action. No evidence, no description. -->
+  <!-- Compact decision strip: icon + stable status + flexible action. -->
   <section
-    class="flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors {containerClass}"
+    data-testid="operational-story-inline"
+    aria-label={eyebrow ? `${eyebrow} : ${title}` : title}
+    class="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2 transition-colors {containerClass}"
   >
     <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md {iconClass}">
       <Icon name={iconName} size={13} />
     </div>
-    <div class="flex min-w-0 flex-1 items-center gap-2">
-      {#if eyebrow}
-        <span
-          class="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted"
-        >
-          {eyebrow}
-        </span>
-        <span class="text-text-muted/40" aria-hidden="true">·</span>
-      {/if}
-      <p class="truncate text-xs font-medium text-text-primary">{title}</p>
-      {#if statusLabel}
-        <OperationalStatusBadge label={statusLabel} {severity} />
-      {/if}
-    </div>
+    {#if statusLabel}
+      <OperationalStatusBadge label={statusLabel} {severity} />
+    {:else}
+      <p class="truncate text-meta font-medium text-text-primary">{title}</p>
+    {/if}
     {#if primaryActionLabel}
       <button
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
+        class="inline-flex min-w-0 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-meta font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
         onclick={onPrimaryAction}
         type="button"
       >
-        {primaryActionLabel}
-        <Icon name={primaryActionIcon} size={12} />
+        <span class="min-w-0 truncate">{primaryActionLabel}</span>
+        <Icon name={primaryActionIcon} size={12} class="shrink-0" />
       </button>
+    {:else if statusLabel}
+      <p class="min-w-0 truncate text-meta font-medium text-text-primary">{title}</p>
     {/if}
   </section>
 {:else}
@@ -141,7 +136,7 @@
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
           {#if eyebrow}
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
               {eyebrow}
             </p>
           {/if}
@@ -149,19 +144,19 @@
             <OperationalStatusBadge label={statusLabel} {severity} />
           {/if}
         </div>
-        <h3 class="mt-1 text-sm font-semibold leading-5 text-text-primary">{title}</h3>
+        <h3 class="mt-1 text-body-lg font-semibold leading-5 text-text-primary">{title}</h3>
         {#if description && resolvedVariant === 'full'}
-          <p class="mt-1 text-xs leading-5 text-text-subtle">{description}</p>
+          <p class="mt-1 text-meta leading-5 text-text-subtle">{description}</p>
         {/if}
       </div>
     </div>
 
     {#if evidence.length > 0}
       <div class="grid grid-cols-3 gap-2">
-        {#each evidence as item}
+        {#each evidence as item, i (i)}
           <div class="rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
             <p
-              class="flex items-center gap-1 text-[9px] uppercase tracking-[0.13em] text-text-muted"
+              class="flex items-center gap-1 text-caption uppercase tracking-[0.13em] text-text-subtle"
             >
               {#if item.icon}
                 <Icon name={item.icon} size={10} />
@@ -169,7 +164,7 @@
               {item.label}
             </p>
             <p
-              class="mt-1 font-mono text-sm font-semibold tabular-nums {evidenceClass(
+              class="mt-1 font-mono text-body-lg font-semibold tabular-nums {evidenceClass(
                 item.severity
               )}"
             >
@@ -184,7 +179,7 @@
       <div class="flex flex-wrap gap-2 border-t border-border-light pt-3">
         {#if primaryActionLabel}
           <button
-            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={onPrimaryAction}
             type="button"
           >
@@ -194,7 +189,7 @@
         {/if}
         {#if secondaryActionLabel}
           <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
             onclick={onSecondaryAction}
             type="button"
           >

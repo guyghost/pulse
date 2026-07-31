@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { PREMIUM_YEARLY_OFFER } from '@pulse/domain';
 import {
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
@@ -469,8 +470,7 @@ describe('dashboard core', () => {
   it('keeps CV sync behind an authenticated account', () => {
     const anonymous: DashboardAccountEntitlements = {
       isAuthenticated: false,
-      subscriptionStatus: 'free',
-      subscriptionPeriodEndMs: null,
+      entitlement: null,
       creditBalance: 0,
     };
 
@@ -488,8 +488,7 @@ describe('dashboard core', () => {
   it('unlocks account and credit features from purchase entitlements', () => {
     const account: DashboardAccountEntitlements = {
       isAuthenticated: true,
-      subscriptionStatus: 'free',
-      subscriptionPeriodEndMs: null,
+      entitlement: null,
       creditBalance: 2,
     };
 
@@ -502,8 +501,23 @@ describe('dashboard core', () => {
   it('derives active premium status without reading ambient time', () => {
     const premium: DashboardAccountEntitlements = {
       isAuthenticated: true,
-      subscriptionStatus: 'premium',
-      subscriptionPeriodEndMs: Date.parse('2026-06-01T00:00:00.000Z'),
+      entitlement: {
+        accountId: 'account-1',
+        planId: 'premium_yearly',
+        status: 'premium_active',
+        validFromMs: Date.parse('2026-05-01T00:00:00.000Z'),
+        validUntilMs: Date.parse('2026-06-01T00:00:00.000Z'),
+        features: PREMIUM_YEARLY_OFFER.features,
+        sourceSubscriptionId: 'subscription-1',
+        sourceVersion: {
+          providerUpdatedAt: '2026-05-01T00:00:00.000Z',
+          eventPriority: 40,
+          providerEventId: 'event-1',
+        },
+        revision: 1,
+        issuedAtMs: Date.parse('2026-05-01T00:00:00.000Z'),
+        cacheExpiresAtMs: Date.parse('2026-06-01T00:00:00.000Z'),
+      },
       creditBalance: 0,
     };
 

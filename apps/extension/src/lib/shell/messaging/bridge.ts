@@ -20,6 +20,36 @@ import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 import type { AlertHistoryEntry } from '../../core/types/alert-history';
 import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
+import type {
+  ExtensionAccountProjection,
+  StartAccountLinkResult,
+} from '../account/account-connection';
+import type {
+  FormAssistApplyResult,
+  FormAssistDecision,
+  FormAssistRequestResult,
+} from '../ai/form-assist';
+import type {
+  PlatformAccountConnectorId,
+  PlatformAccountOperationResult,
+} from '../account/platform-accounts';
+import type { PlatformAccountBinding } from '@pulse/domain';
+import type { SerializedApplicationTrackingError } from '../../core/tracking/application-tracking-error';
+import type {
+  SettingsReleaseMutationIntent,
+  SettingsReleaseMutationResult,
+  SettingsReleaseReadResult,
+  SettingsReleaseSnapshot,
+} from '../settings-release/settings-release.contract';
+import type {
+  CopilotCreateCommand,
+  CopilotDeleteResultPayload,
+  CopilotDossierResultPayload,
+  CopilotEntitlementResultPayload,
+  CopilotJobResultPayload,
+  CopilotLinkResultPayload,
+} from '../copilot/contracts';
+import type { FieldDescriptor } from '../../core/form-assistant/types';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -37,6 +67,7 @@ export interface ConnectorProgress {
  * Payload du message SCAN_PROGRESS
  */
 export interface ScanProgressPayload {
+  operationId: string;
   phase: 'connecting' | 'scanning' | 'post-processing' | 'done';
   current: number;
   total: number;
@@ -44,6 +75,7 @@ export interface ScanProgressPayload {
 }
 
 export interface ScanPartialResultPayload {
+  operationId: string;
   connectorId: string;
   connectorName: string;
   missions: Mission[];
@@ -59,7 +91,11 @@ export interface ConnectorHealthPayload {
 }
 
 export type BridgeMessage =
-  | { type: 'MISSIONS_UPDATED'; payload: Mission[] }
+  | {
+      type: 'MISSIONS_UPDATED';
+      payload: Mission[];
+      projection?: 'replace' | 'cold-only';
+    }
   | { type: 'GET_FEED_MISSIONS' }
   | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
   | { type: 'GET_FEED_FAVORITES' }
@@ -125,6 +161,26 @@ export type BridgeMessage =
   | { type: 'SAVE_SETTINGS'; payload: AppSettings }
   | { type: 'SETTINGS_SAVED'; payload: { saved: boolean; settings: AppSettings | null } }
   | { type: 'SETTINGS_UPDATED'; payload: AppSettings }
+  | { type: 'GET_SETTINGS_RELEASE' }
+  | { type: 'SETTINGS_RELEASE_RESULT'; payload: SettingsReleaseReadResult }
+  | { type: 'MUTATE_SETTINGS_RELEASE'; payload: SettingsReleaseMutationIntent }
+  | { type: 'SETTINGS_RELEASE_MUTATION_RESULT'; payload: SettingsReleaseMutationResult }
+  | { type: 'RETRY_SETTINGS_RELEASE' }
+  | {
+      type: 'SETTINGS_RELEASE_RETRY_RESULT';
+      payload: {
+        status: 'retry_accepted' | 'retry_already_queued' | 'retry_not_applicable';
+        snapshot: null;
+      };
+    }
+  | {
+      type: 'SETTINGS_RELEASE_UPDATED';
+      payload: {
+        snapshot: SettingsReleaseSnapshot;
+        commandId: string;
+        broadcastId: string;
+      };
+    }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
@@ -146,12 +202,27 @@ export type BridgeMessage =
         | { imported: false; errorCode: string; errorMessage: string };
     }
   // Scan orchestration (panel ↔ service worker)
-  | { type: 'SCAN_START' }
+  | { type: 'SCAN_START'; payload: { operationId: string; trigger: 'manual' } }
+  | { type: 'SCAN_STARTED'; payload: { operationId: string } }
+  | {
+      type: 'SCAN_START_REJECTED';
+      payload: { operationId: string; code: string; message: string };
+    }
   | { type: 'SCAN_PROGRESS'; payload: ScanProgressPayload }
   | { type: 'SCAN_PARTIAL_RESULT'; payload: ScanPartialResultPayload }
-  | { type: 'SCAN_COMPLETE'; payload: Mission[] }
-  | { type: 'SCAN_ERROR'; payload: { message: string; code: string } }
-  | { type: 'SCAN_CANCEL' }
+  | { type: 'SCAN_COMPLETE'; payload: { operationId: string; missions: Mission[] } }
+  | { type: 'SCAN_ERROR'; payload: { operationId: string; message: string; code: string } }
+  | { type: 'SCAN_CANCEL'; payload: { operationId: string } }
+  | { type: 'SCAN_CANCEL_REQUESTED'; payload: { operationId: string } }
+  | {
+      type: 'SCAN_CANCEL_REJECTED';
+      payload: { operationId: string; code: string; message: string };
+    }
+  | { type: 'SCAN_CANCELLED'; payload: { operationId: string } }
+  | {
+      type: 'SCAN_BUSY';
+      payload: { operationId: string; activeOperationId: string };
+    }
   // Tracking
   | {
       type: 'UPDATE_TRACKING';
@@ -166,7 +237,11 @@ export type BridgeMessage =
       payload: { missionId: string; tracking: MissionTracking | null };
     }
   | { type: 'TRACKING_UPDATED'; payload: MissionTracking }
-  | { type: 'TRACKING_RESTORED'; payload: MissionTracking | null }
+  | {
+      type: 'TRACKING_RESTORED';
+      payload: { missionId: string; tracking: MissionTracking | null };
+    }
+  | { type: 'TRACKING_FAILED'; payload: SerializedApplicationTrackingError }
   | { type: 'GET_TRACKINGS'; payload?: { status?: ApplicationStatus } }
   | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }
   // Generation
@@ -174,6 +249,34 @@ export type BridgeMessage =
   | { type: 'GENERATION_RESULT'; payload: GenerationResultPayload }
   | { type: 'GET_GENERATED_ASSETS'; payload: { missionId: string } }
   | { type: 'GENERATED_ASSETS_RESULT'; payload: GeneratedAsset[] }
+  // Premium Copilot (remote, distinct from on-device GENERATE_ASSET)
+  | { type: 'COPILOT_LINK'; payload: { requestId: string } }
+  | { type: 'COPILOT_LINK_RESULT'; payload: CopilotLinkResultPayload }
+  | { type: 'COPILOT_SYNC_ENTITLEMENT'; payload: { requestId: string } }
+  | { type: 'COPILOT_ENTITLEMENT_RESULT'; payload: CopilotEntitlementResultPayload }
+  | { type: 'COPILOT_CREATE_JOB'; payload: CopilotCreateCommand }
+  | { type: 'COPILOT_CREATE_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | { type: 'COPILOT_GET_DOSSIER'; payload: { requestId: string; missionId: string } }
+  | { type: 'COPILOT_GET_DOSSIER_RESULT'; payload: CopilotDossierResultPayload }
+  | { type: 'COPILOT_GET_JOB'; payload: { requestId: string; missionId: string } }
+  | { type: 'COPILOT_GET_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | {
+      type: 'COPILOT_CANCEL_JOB';
+      payload: { requestId: string; missionId: string; jobId: string };
+    }
+  | { type: 'COPILOT_CANCEL_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | {
+      type: 'COPILOT_REVIEW_JOB';
+      payload: {
+        requestId: string;
+        missionId: string;
+        jobId: string;
+        decision: 'accept' | 'reject';
+      };
+    }
+  | { type: 'COPILOT_REVIEW_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | { type: 'COPILOT_DELETE_DOSSIER'; payload: { requestId: string; missionId: string } }
+  | { type: 'COPILOT_DELETE_DOSSIER_RESULT'; payload: CopilotDeleteResultPayload }
   // Toast
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
   | { type: 'TOAST_SHOWN' }
@@ -188,16 +291,56 @@ export type BridgeMessage =
       type: 'RECHECK_CONNECTOR_HEALTH';
       payload: { connectorId: string; enable?: boolean };
     }
+  | {
+      type: 'CONNECTOR_RECHECK_RESULT';
+      payload: {
+        snapshots: ConnectorHealthSnapshot[];
+        scan: 'completed' | 'failed';
+        activation: 'not_requested' | 'committed' | 'already_confirmed' | 'failed';
+      };
+    }
   | { type: 'CONNECTOR_HEALTH_UPDATED'; payload: ConnectorHealthPayload }
   | {
       type: 'CONNECTOR_SKIPPED';
       payload: { connectorId: string; connectorName: string; reason: 'circuit-open' };
     }
-  // Premium status
+  // Connected Pulse account and canonical Premium projection
+  | { type: 'GET_EXTENSION_ACCOUNT' }
+  | { type: 'EXTENSION_ACCOUNT_RESULT'; payload: ExtensionAccountProjection }
+  | { type: 'START_EXTENSION_ACCOUNT_LINK' }
+  | { type: 'EXTENSION_ACCOUNT_LINK_STARTED'; payload: StartAccountLinkResult }
+  | { type: 'POLL_EXTENSION_ACCOUNT_LINK' }
+  | { type: 'EXTENSION_ACCOUNT_LINK_STATUS'; payload: ExtensionAccountProjection }
+  | { type: 'REFRESH_EXTENSION_ENTITLEMENT' }
+  | { type: 'EXTENSION_ENTITLEMENT_REFRESHED'; payload: ExtensionAccountProjection }
+  | { type: 'UNLINK_EXTENSION_ACCOUNT' }
+  | { type: 'EXTENSION_ACCOUNT_UNLINKED'; payload: ExtensionAccountProjection }
+  | { type: 'GET_PLATFORM_ACCOUNTS' }
+  | { type: 'PLATFORM_ACCOUNTS_RESULT'; payload: PlatformAccountBinding[] }
+  | {
+      type: 'ADD_CURRENT_PLATFORM_ACCOUNT';
+      payload: {
+        connectorId: PlatformAccountConnectorId;
+        displayLabel: string;
+        confirmed: boolean;
+      };
+    }
+  | { type: 'PLATFORM_ACCOUNT_ADDED'; payload: PlatformAccountOperationResult }
+  | { type: 'SWITCH_CURRENT_PLATFORM_ACCOUNT'; payload: { bindingId: string } }
+  | { type: 'PLATFORM_ACCOUNT_SWITCHED'; payload: PlatformAccountOperationResult }
+  // Premium form assistance: local capture → local AI suggestions → explicit
+  // per-field review → freshness check → DOM write. Never submits the form.
+  | { type: 'REQUEST_FORM_ASSIST'; payload: { consentApproved: boolean } }
+  | { type: 'FORM_ASSIST_RESULT'; payload: FormAssistRequestResult }
+  | {
+      type: 'APPLY_FORM_ASSIST';
+      payload: { sessionId: string; decisions: FormAssistDecision[] };
+    }
+  | { type: 'FORM_ASSIST_APPLIED'; payload: FormAssistApplyResult }
+  // Read-only compatibility message for existing consumers. Production status
+  // is derived from the canonical entitlement; there is no SET_PREMIUM command.
   | { type: 'GET_PREMIUM_STATUS' }
   | { type: 'PREMIUM_STATUS_RESULT'; payload: boolean }
-  | { type: 'SET_PREMIUM'; payload: boolean }
-  | { type: 'PREMIUM_SET'; payload: { saved: boolean } }
   // Diagnostic export (privacy-first, local only)
   | { type: 'GET_DIAGNOSTIC_EXPORT' }
   | {
@@ -234,7 +377,35 @@ export type BridgeMessage =
   // to re-consume a freshly-written deep-link intent. sidePanel.open() is a
   // no-op when the panel is already open, so without this the mount effect
   // would not re-fire and the intent would stay pending.
-  | { type: 'NOTIFICATION_CLICKED' };
+  | { type: 'NOTIFICATION_CLICKED' }
+  // Form Assistant (Grammarly-like field fill, content script ↔ service worker).
+  // Source de vérité : src/models/form-assistant.model.md.
+  // Content → SW : la feature est-elle active pour cette origine ?
+  | { type: 'FORM_ASSIST_STATUS' }
+  | {
+      type: 'FORM_ASSIST_STATUS_RESULT';
+      payload: { enabled: boolean; engine: 'local' | 'remote' };
+    }
+  // Side panel → SW : activer/désactiver la feature (persisté).
+  | { type: 'FORM_ASSIST_ENABLE'; payload: { enabled: boolean } }
+  | { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean; engine: 'local' | 'remote' } }
+  // Content → SW : demander une proposition pour un champ (Machine B).
+  // Le field est un FieldDescriptor canonical (sanit-isé, sans PII DOM).
+  | { type: 'FORM_ASSIST_REQUEST'; payload: { requestId: string; field: FieldDescriptor } }
+  // Content → SW : annuler une requête en vol (changement de champ, fermeture widget).
+  | { type: 'FORM_ASSIST_CANCEL'; payload: { requestId: string } }
+  // SW → Content : proposition prête (ACCEPT explicite requis pour appliquer).
+  | {
+      type: 'FORM_ASSIST_PROPOSAL';
+      payload: { requestId: string; text: string; engine: 'local' | 'remote' };
+    }
+  // SW → Content : annulation prise en compte.
+  | { type: 'FORM_ASSIST_CANCEL_ACK'; payload: { requestId: string } }
+  // SW → Content : échec (moteur indisponible, génération en erreur, ou annulée).
+  | {
+      type: 'FORM_ASSIST_ERROR';
+      payload: { requestId: string; code: 'unavailable' | 'failed' | 'cancelled'; message: string };
+    };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

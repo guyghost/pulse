@@ -9,7 +9,7 @@
  *  - Verify is migration-gated (skipped when no migration pending)   [Inv-6b]
  *  - Concurrent runMigrations() dedup (cold-start guard)            [Inv-9]
  *
- * Module singletons (migrationSnapshot, migrationInProgress, inFlightOpen)
+ * Module singletons (migrationSnapshot, migrationInProgress, tracked opener)
  * are reset between tests via `vi.resetModules()` + dynamic import.
  */
 import 'fake-indexeddb/auto';
@@ -75,7 +75,32 @@ describe('DB migration orchestrator', () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await dropDatabase();
+  });
+
+  it('returns a non-destructive open failure and never calls deleteDatabase', async () => {
+    const db = await importFresh();
+    const originalOpen = indexedDB.open.bind(indexedDB);
+    let versionedOpenFailed = false;
+    vi.spyOn(indexedDB, 'open').mockImplementation((name: string, version?: number) => {
+      if (version === db.DB_VERSION && !versionedOpenFailed) {
+        versionedOpenFailed = true;
+        throw new Error('synthetic open failure');
+      }
+      return version === undefined ? originalOpen(name) : originalOpen(name, version);
+    });
+    const deleteDatabase = vi.spyOn(indexedDB, 'deleteDatabase');
+
+    const result = await db.runMigrations();
+
+    expect(versionedOpenFailed).toBe(true);
+    expect(deleteDatabase).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: false,
+      code: 'corrupt',
+      message: 'synthetic open failure',
+    });
   });
 
   it('structural cascade v0 → DB_VERSION creates every store [Inv-1]', async () => {
@@ -89,7 +114,7 @@ describe('DB migration orchestrator', () => {
 
     const handle = await db.openDB();
     const stores = Array.from(handle.objectStoreNames);
-    handle.close();
+    db.releaseDB(handle);
 
     expect(stores).toEqual(
       expect.arrayContaining([
@@ -102,6 +127,31 @@ describe('DB migration orchestrator', () => {
       ])
     );
     expect(db.DB_VERSION).toBe(5);
+  });
+
+  it('keeps the non-cutover schema at DB5/data2 without epoch or bootstrap writes', async () => {
+    const db = await importFresh();
+
+    const result = await db.runMigrations();
+
+    expect(result.ok).toBe(true);
+    expect(db.DB_VERSION).toBe(5);
+    expect(db.APP_DATA_VERSION).toBe(2);
+    if (!result.ok) {
+      return;
+    }
+    expect(result.to).toEqual({ db: 5, data: 2 });
+
+    const handle = await db.openDB();
+    const stores = Array.from(handle.objectStoreNames);
+    db.releaseDB(handle);
+
+    expect(stores).not.toContain('tracking_meta');
+    expect(stores).not.toContain('tracking_mutations');
+    expect(stores).not.toContain('tracking_outbox');
+    expect(Object.keys(mockStorage)).not.toEqual(
+      expect.arrayContaining(['missionpulse.datasetEpoch', 'missionpulse.localDatasetBootstrap'])
+    );
   });
 
   it('upgrades legacy tracking v4 databases by adding quarantine at v5', async () => {
@@ -134,7 +184,7 @@ describe('DB migration orchestrator', () => {
 
     const handle = await db.openDB();
     const stores = Array.from(handle.objectStoreNames);
-    handle.close();
+    db.releaseDB(handle);
     expect(stores).toEqual(expect.arrayContaining(['mission_tracking', 'quarantine']));
   });
 
@@ -305,7 +355,7 @@ describe('DB migration orchestrator', () => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-    handle.close();
+    db.releaseDB(handle);
 
     // First orchestrator run: dataPending=true → verify runs → 2/10 = 20% > 10%.
     const result = await db.runMigrations();
@@ -355,7 +405,7 @@ describe('DB migration orchestrator', () => {
       tx.oncomplete = () => resolve();
       tx.onerror = () => reject(tx.error);
     });
-    handle.close();
+    db.releaseDB(handle);
 
     // Second run: nothing pending → verify is skipped → bad records stay in place.
     const second = await db.runMigrations();

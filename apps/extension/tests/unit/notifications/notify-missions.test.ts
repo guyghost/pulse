@@ -17,6 +17,15 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   getSettings,
 }));
 
+vi.mock('../../../src/lib/shell/settings-release/settings-release-reader', () => ({
+  readSettingsReleaseSnapshot: vi.fn(async () => ({
+    settings: await getSettings(),
+    onboardingCompleted: true,
+    revision: 0,
+    generation: 0,
+  })),
+}));
+
 vi.mock('../../../src/lib/shell/storage/db', () => ({
   getMissions,
 }));
@@ -125,7 +134,11 @@ describe('notifyHighScoreMissions', () => {
       await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([makeMission()]);
 
-    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(result).toEqual({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: [],
+    });
     expect(notificationsCreate).not.toHaveBeenCalled();
   });
 
@@ -142,7 +155,11 @@ describe('notifyHighScoreMissions', () => {
       }),
     ]);
 
-    expect(result).toEqual({ shown: true, notifiedMissionIds: ['low-basic'] });
+    expect(result).toEqual({
+      shown: true,
+      notifiedMissionIds: ['low-basic'],
+      notifiableMissionIds: ['low-basic'],
+    });
     expect(notificationsCreate).toHaveBeenCalledWith(
       'high-score-missions',
       expect.objectContaining({
@@ -174,7 +191,11 @@ describe('notifyHighScoreMissions', () => {
       makeMission({ id: 'new-one', title: 'Nouvelle mission', score: 92 }),
     ]);
 
-    expect(result).toEqual({ shown: true, notifiedMissionIds: ['new-one'] });
+    expect(result).toEqual({
+      shown: true,
+      notifiedMissionIds: ['new-one'],
+      notifiableMissionIds: ['new-one'],
+    });
     expect(notificationsCreate).toHaveBeenCalledWith(
       'high-score-missions',
       expect.objectContaining({ message: 'Nouvelle mission' })
@@ -191,7 +212,11 @@ describe('notifyHighScoreMissions', () => {
       makeMission({ id: '4', title: 'Mission 4', score: 92 }),
     ]);
 
-    expect(result).toEqual({ shown: true, notifiedMissionIds: ['1', '2', '3', '4'] });
+    expect(result).toEqual({
+      shown: true,
+      notifiedMissionIds: ['1', '2', '3', '4'],
+      notifiableMissionIds: ['1', '2', '3', '4'],
+    });
     expect(notificationsCreate).toHaveBeenCalledWith(
       'high-score-missions',
       expect.objectContaining({
@@ -221,7 +246,11 @@ describe('notifyHighScoreMissions', () => {
       makeMission({ id: 'low-tjm', title: 'Low TJM', stack: ['Svelte'], score: 90, tjm: 500 }),
     ]);
 
-    expect(result).toEqual({ shown: true, notifiedMissionIds: ['svelte'] });
+    expect(result).toEqual({
+      shown: true,
+      notifiedMissionIds: ['svelte'],
+      notifiableMissionIds: ['svelte'],
+    });
     expect(notificationsCreate).toHaveBeenCalledWith(
       'high-score-missions',
       expect.objectContaining({ message: 'Svelte' })
@@ -254,7 +283,11 @@ describe('notifyHighScoreMissions', () => {
       await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([makeMission({ score: 99 })]);
 
-    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(result).toEqual({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: [],
+    });
     expect(notificationsCreate).not.toHaveBeenCalled();
   });
 
@@ -274,19 +307,29 @@ describe('notifyHighScoreMissions', () => {
       await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([makeMission({ score: 99 })]);
 
-    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(result).toEqual({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: [],
+    });
     expect(notificationsCreate).not.toHaveBeenCalled();
     expect(recordAlertHistoryEntry).not.toHaveBeenCalled();
   });
 
-  it('returns false when cooldown is still active from session storage', async () => {
+  it('returns notifiable ids without showing when cooldown is still active', async () => {
     sessionGet.mockResolvedValueOnce({ last_notification_time: 1_700_000_000_000 - 60_000 });
 
     const { notifyHighScoreMissions } =
       await import('../../../src/lib/shell/notifications/notify-missions');
-    const result = await notifyHighScoreMissions([makeMission({ title: 'Mission rate-limited' })]);
+    const result = await notifyHighScoreMissions([
+      makeMission({ id: 'rate-limited', title: 'Mission rate-limited', score: 90 }),
+    ]);
 
-    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(result).toEqual({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: ['rate-limited'],
+    });
     expect(notificationsCreate).not.toHaveBeenCalled();
   });
 
@@ -320,7 +363,11 @@ describe('notifyHighScoreMissions', () => {
       await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([makeMission({ id: 'm1', score: 90 })]);
 
-    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(result).toEqual({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: ['m1'],
+    });
     // The optimistic intent write must be cleaned up so the next panel open
     // does not land on missions the user was never actually notified about.
     expect(sessionRemove).toHaveBeenCalled();

@@ -19,7 +19,7 @@ export function navButton(page: Page, name: string): Locator {
 }
 
 export function missionCards(page: Page): Locator {
-  return page.locator('[data-testid="mission-feed"] [role="button"][tabindex="0"]');
+  return page.getByTestId('mission-feed').getByRole('article');
 }
 
 export function favoritesToggle(page: Page): Locator {
@@ -32,7 +32,7 @@ export function allMissionsToggle(page: Page): Locator {
 
 export function scanButton(page: Page): Locator {
   return page.getByRole('button', {
-    name: /Lancer le scan des missions|Scan en cours|Scan indisponible hors ligne/,
+    name: /Lancer le scan des missions|Réessayer le scan des missions|Scan en cours|Scan indisponible hors ligne/,
   });
 }
 
@@ -75,6 +75,9 @@ export async function dismissFeedTour(page: Page) {
 
 export async function expectFeedReady(page: Page) {
   await expect(mainNavigation(page)).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(page.locator('[data-initial-shell]')).toHaveCount(0, {
     timeout: 10000,
   });
   await expect(navButton(page, 'Feed')).toHaveAttribute('aria-current', 'page', {
@@ -131,7 +134,7 @@ export async function openDevPanel(page: Page) {
 export async function closeDevPanel(page: Page) {
   const closeButton = page.getByRole('button', { name: 'Fermer le centre de contrôle dev' });
   if (await closeButton.isVisible().catch(() => false)) {
-    await closeButton.click();
+    await closeButton.dispatchEvent('click');
   } else {
     await page.keyboard.press('Control+Shift+D');
   }
@@ -156,7 +159,7 @@ export async function injectMissions(page: Page, count: number) {
   // exact: true — the DevPanel also has an "Inject QA seed (500)" button whose
   // accessible name contains "inject", which would otherwise cause a strict-mode
   // violation (2 elements). We want the volume injector button named exactly "inject".
-  await devPanel(page).getByRole('button', { name: 'inject', exact: true }).click();
+  await devPanel(page).getByRole('button', { name: 'inject', exact: true }).dispatchEvent('click');
   await closeDevPanel(page);
 
   // Two dev-mode timing hazards can mask the injected set:
@@ -198,13 +201,14 @@ export async function mockNoProfile(page: Page) {
   await page.addInitScript(() => {
     let _chrome: unknown = undefined;
     const profileStorageKey = '__missionpulse_e2e_saved_profile';
-    const readSavedProfile = (): unknown => {
-      const rawProfile = window.localStorage.getItem(profileStorageKey);
-      return rawProfile ? (JSON.parse(rawProfile) as unknown) : null;
-    };
     const writeSavedProfile = (profile: unknown) => {
       window.localStorage.setItem(profileStorageKey, JSON.stringify(profile));
     };
+    if (window.localStorage.getItem(profileStorageKey) === null) {
+      window.localStorage.setItem('__missionpulse_dev_profile', 'null');
+      window.localStorage.setItem('__missionpulse_dev_first_scan_done', 'false');
+      window.localStorage.setItem('__missionpulse_dev_onboarding_completed', 'false');
+    }
     Object.defineProperty(window, 'chrome', {
       configurable: true,
       enumerable: true,
@@ -221,18 +225,15 @@ export async function mockNoProfile(page: Page) {
             type: string;
             payload?: unknown;
           }) => {
-            if (msg?.type === 'GET_PROFILE') {
-              return { type: 'PROFILE_RESULT', payload: readSavedProfile() };
-            }
             if (msg?.type === 'SAVE_PROFILE') {
-              writeSavedProfile(msg.payload);
-              return { type: 'PROFILE_RESULT', payload: readSavedProfile() };
-            }
-            if (msg?.type === 'GET_FIRST_SCAN_DONE') {
-              return { type: 'FIRST_SCAN_DONE_RESULT', payload: Boolean(readSavedProfile()) };
-            }
-            if (msg?.type === 'GET_ONBOARDING_COMPLETED') {
-              return { type: 'ONBOARDING_COMPLETED_RESULT', payload: Boolean(readSavedProfile()) };
+              const response = (await origSend.call(
+                (val as Record<string, unknown>).runtime,
+                msg
+              )) as { type?: string; payload?: unknown };
+              if (response.type === 'PROFILE_RESULT' && response.payload !== null) {
+                writeSavedProfile(response.payload);
+              }
+              return response;
             }
             return origSend.call((val as Record<string, unknown>).runtime, msg);
           };
@@ -274,7 +275,11 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
   };
 
   await fillOnboardingForm(page, defaultProfile);
-  await page.getByRole('button', { name: /Sauvegarder mon profil|C.est parti|Commencer/ }).click();
+  const submitButton = page.getByRole('button', {
+    name: /Sauvegarder mon profil|C.est parti|Commencer/,
+  });
+  await expect(submitButton).toBeEnabled({ timeout: 10000 });
+  await submitButton.click();
 }
 
 /**
@@ -283,36 +288,17 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
 export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile> = {}) {
   await page.goto(SIDE_PANEL);
 
-  const ensureOnce = async () => {
-    const navVisible = await page
-      .getByRole('navigation', { name: 'Main navigation' })
-      .isVisible()
-      .catch(() => false);
-    if (navVisible) {
-      return true;
-    }
+  const navigation = mainNavigation(page);
+  const onboardingFirstName = page.locator('#ob-firstname');
+  await expect(navigation.or(onboardingFirstName)).toBeVisible({ timeout: 10000 });
 
-    const onboardingVisible = await page
-      .locator('#ob-firstname')
-      .isVisible()
-      .catch(() => false);
-    if (onboardingVisible) {
-      await completeOnboarding(page, {
-        firstName: 'Jean',
-        jobTitle: 'Développeur React Senior',
-        location: 'Paris',
-        ...profile,
-      });
-      return true;
-    }
-
-    return false;
-  };
-
-  const ready = await ensureOnce();
-  if (!ready) {
-    await page.reload().catch(() => {});
-    await ensureOnce();
+  if (await onboardingFirstName.isVisible()) {
+    await completeOnboarding(page, {
+      firstName: 'Jean',
+      jobTitle: 'Développeur React Senior',
+      location: 'Paris',
+      ...profile,
+    });
   }
 
   await expectFeedReady(page);
@@ -331,6 +317,16 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
     (window as unknown as Record<string, unknown>).__mockMissions = missionsData;
 
     let _chrome: unknown = undefined;
+    const runtimeListeners: Array<
+      (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+    > = [];
+
+    function emitRuntimeMessage(message: unknown): void {
+      for (const listener of runtimeListeners) {
+        listener(message, { id: 'e2e-scan-results' }, () => {});
+      }
+    }
+
     Object.defineProperty(window, 'chrome', {
       configurable: true,
       enumerable: true,
@@ -339,27 +335,76 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
       },
       set(val) {
         _chrome = val;
-        if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-          const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown
-          ) => Promise<unknown>;
-          (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-            type: string;
-            payload?: unknown;
-          }) => {
-            if (msg?.type === 'SCAN_START') {
-              const mockMissions = (window as unknown as Record<string, unknown>).__mockMissions;
-              return {
-                type: 'SCAN_COMPLETE',
-                payload: mockMissions,
-              };
+        const chromeStub = val as {
+          runtime?: {
+            sendMessage?: (msg: unknown) => Promise<unknown>;
+            onMessage?: {
+              addListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+              removeListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+            };
+          };
+        };
+        if (!chromeStub.runtime?.sendMessage) {
+          return;
+        }
+
+        const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+        const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+        const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+
+        if (chromeStub.runtime.onMessage) {
+          chromeStub.runtime.onMessage.addListener = (listener) => {
+            runtimeListeners.push(listener);
+            originalAddListener?.(listener);
+          };
+          chromeStub.runtime.onMessage.removeListener = (listener) => {
+            const index = runtimeListeners.indexOf(listener);
+            if (index >= 0) {
+              runtimeListeners.splice(index, 1);
             }
-            return origSend.call((val as Record<string, unknown>).runtime, msg);
+            originalRemoveListener?.(listener);
           };
         }
+
+        chromeStub.runtime.sendMessage = async (msg: unknown) => {
+          const message = msg as { type?: string; payload?: { operationId?: string } };
+          if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
+            return originalSendMessage(msg);
+          }
+
+          const operationId = message.payload.operationId;
+          const mockMissions = (window as unknown as Record<string, unknown>).__mockMissions;
+          window.setTimeout(() => {
+            emitRuntimeMessage({
+              type: 'SCAN_COMPLETE',
+              payload: { operationId, missions: mockMissions },
+            });
+          }, 0);
+
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        };
       },
     });
   }, missions);
+
+  await page.reload();
+  await expectFeedReady(page);
 }
 
 /**
@@ -483,6 +528,16 @@ export async function mockConnectorFailure(
   await page.addInitScript(
     ({ connector, code }: { connector: string; code: number }) => {
       let _chrome: unknown = undefined;
+      const runtimeListeners: Array<
+        (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+      > = [];
+
+      function emitRuntimeMessage(message: unknown): void {
+        for (const listener of runtimeListeners) {
+          listener(message, { id: 'e2e-connector-failure' }, () => {});
+        }
+      }
+
       Object.defineProperty(window, 'chrome', {
         configurable: true,
         enumerable: true,
@@ -491,32 +546,81 @@ export async function mockConnectorFailure(
         },
         set(val) {
           _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-              payload?: { connectorId?: string };
-            }) => {
-              if (msg?.type === 'SCAN_START' && msg?.payload?.connectorId === connector) {
-                return {
-                  type: 'SCAN_ERROR',
-                  payload: {
-                    connectorId: connector,
-                    error: `HTTP ${code}`,
-                    code,
-                  },
-                };
+          const chromeStub = val as {
+            runtime?: {
+              sendMessage?: (msg: unknown) => Promise<unknown>;
+              onMessage?: {
+                addListener?: (
+                  listener: (
+                    message: unknown,
+                    sender: unknown,
+                    sendResponse: (response?: unknown) => void
+                  ) => void
+                ) => void;
+                removeListener?: (
+                  listener: (
+                    message: unknown,
+                    sender: unknown,
+                    sendResponse: (response?: unknown) => void
+                  ) => void
+                ) => void;
+              };
+            };
+          };
+          if (!chromeStub.runtime?.sendMessage) {
+            return;
+          }
+
+          const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+          const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+            chromeStub.runtime.onMessage
+          );
+          const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+            chromeStub.runtime.onMessage
+          );
+
+          if (chromeStub.runtime.onMessage) {
+            chromeStub.runtime.onMessage.addListener = (listener) => {
+              runtimeListeners.push(listener);
+              originalAddListener?.(listener);
+            };
+            chromeStub.runtime.onMessage.removeListener = (listener) => {
+              const index = runtimeListeners.indexOf(listener);
+              if (index >= 0) {
+                runtimeListeners.splice(index, 1);
               }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
+              originalRemoveListener?.(listener);
             };
           }
+
+          chromeStub.runtime.sendMessage = async (msg: unknown) => {
+            const message = msg as { type?: string; payload?: { operationId?: string } };
+            if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
+              return originalSendMessage(msg);
+            }
+
+            const operationId = message.payload.operationId;
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_ERROR',
+                payload: {
+                  operationId,
+                  message: `Le connecteur ${connector} a échoué avec HTTP ${code}.`,
+                  code: `HTTP_${code}`,
+                },
+              });
+            }, 0);
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
+          };
         },
       });
     },
     { connector: connectorId, code: errorCode }
   );
+
+  await page.reload();
+  await expectFeedReady(page);
 }
 
 // ============================================================================

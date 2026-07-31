@@ -1,11 +1,6 @@
-import type { BackupData, Result, ValidationError } from '$lib/core/backup/backup';
-import {
-  createBackup,
-  generateBackupFilename,
-  parseBackupJson,
-  serializeBackup,
-  validateBackup,
-} from '$lib/core/backup/backup';
+import type { Result } from '$lib/core/backup/backup';
+import { SvelteDate } from 'svelte/reactivity';
+import { createBackup, generateBackupFilename, serializeBackup } from '$lib/core/backup/backup';
 import type { AppSettings } from '$lib/core/types/app-settings';
 import {
   exportMissionsToCSV,
@@ -16,18 +11,14 @@ import {
 } from '$lib/core/export/mission-export';
 import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
 import { downloadCSV, downloadJSON, downloadMarkdown } from '$lib/shell/export/download';
-import {
-  getFavorites,
-  getHidden,
-  saveFavorites,
-  saveHidden,
-} from '$lib/shell/facades/feed-data.facade';
+import { getFavorites, getHidden } from '$lib/shell/facades/feed-data.facade';
 import {
   getSettings,
-  setSettings,
+  setSettingsConfirmed,
   getProfile,
   saveProfile,
 } from '$lib/shell/facades/settings.facade';
+import { subscribeSettingsReleaseSnapshots } from '$lib/shell/facades/settings-release.facade';
 import {
   getConnectorStatuses,
   getMissions,
@@ -38,35 +29,45 @@ import { showToast } from '$lib/shell/notifications/toast-service';
 import { buildDiagnosticFilename } from '$lib/core/diagnostics/diagnostic-report';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
-import { getPremium } from '$lib/shell/facades/premium.facade';
+import {
+  getExtensionAccount,
+  pollExtensionAccountLink,
+  refreshExtensionEntitlement,
+  startExtensionAccountLink,
+  unlinkExtensionAccount,
+} from '$lib/shell/facades/premium.facade';
+import type { ExtensionAccountLinkState } from '$lib/shell/account/account-connection';
+import { canUsePremiumFeature } from '@pulse/domain';
+import {
+  getConnectorsMeta,
+  type ConnectorId,
+  type ConnectorMeta,
+} from '$lib/shell/connectors/meta';
 import {
   appendUniqueNormalized,
   normalizeDailyRate,
   normalizeProfileDraft,
   normalizeTextInput,
-  withProfileDefaults,
 } from '$lib/core/profile/normalize-profile';
 import { createProfileStore, type ProfileStatus } from '$lib/state/profile.svelte';
+import {
+  LOCAL_DATA_RESET_RUNTIME_AVAILABILITY,
+  type LocalDataResetRuntimeAvailability,
+} from '../../models/local-data-reset-availability.contract';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
+  connectorCatalog?: readonly ConnectorMeta[];
+  resetAvailability?: LocalDataResetRuntimeAvailability;
 }
 
-/**
- * Default settings used to fill missing fields when restoring old backups
- * that predate the `theme` field addition.
- */
-const DEFAULT_SETTINGS: AppSettings = {
-  scanIntervalMinutes: 30,
-  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'],
-  notifications: true,
-  autoScan: true,
-  maxSemanticPerScan: 10,
-  notificationScoreThreshold: 70,
-  respectRateLimits: true,
-  customDelayMs: 0,
-  theme: 'system',
-};
+export interface SettingsConnectorSource {
+  id: ConnectorId;
+  name: string;
+  icon: string;
+  url: string;
+  enabled: boolean;
+}
 
 const formatBackupDateKey = (timestamp: number): string =>
   new Date(timestamp).toISOString().split('T')[0] ?? 'backup';
@@ -85,7 +86,11 @@ const exportFormatLabels: Record<ExportFormat, string> = {
 };
 
 export class SettingsPageController {
+  private readonly shippedConnectorCatalog: readonly ConnectorMeta[];
+  private readonly resetAvailability: LocalDataResetRuntimeAvailability;
   private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
+  private readonly unsubscribeFormAssistMessages = this.subscribeFormAssistMessages();
+  private readonly unsubscribeSettingsSnapshots: () => void;
 
   private readonly profileActor = createProfileStore({
     loadProfile: getProfile,
@@ -115,18 +120,30 @@ export class SettingsPageController {
   notifications = $state(true);
   autoScan = $state(true);
   theme = $state<'light' | 'dark' | 'system'>('system');
+  enabledConnectorIds = $state<ConnectorId[]>([]);
+  isSavingSettings = $state(false);
+  settingsError = $state<string | null>(null);
   lastScanAt = $state<number | null>(null);
   scanHistorySourceCount = $state(0);
   scanHistoryMissionCount = $state(0);
   scanHistoryErrorCount = $state(0);
 
   premiumEnabled = $state(false);
+  extensionAccountState = $state<ExtensionAccountLinkState>('unlinked');
   connectedAccountEmail = $state<string | null>(null);
   connectedDeviceLabel = $state('Extension Chrome locale');
   connectedLastSyncAt = $state<string | null>(null);
   connectedPendingUploads = $state(0);
   connectedPendingDownloads = $state(0);
   connectedSyncError = $state<string | null>(null);
+
+  /**
+   * Form Assistant activation (Machine D — src/models/form-assistant.model.md).
+   * Miroir de l'état persisté dans le SW (chrome.storage.local). Le toggle ne
+   * écrit JAMAIS directement en storage : il émet FORM_ASSIST_ENABLE via bridge.
+   */
+  formAssistEnabled = $state(false);
+  formAssistStatus = $state<'loading' | 'ready' | 'error'>('loading');
 
   showResetConfirm = $state(false);
   resetError = $state<string | null>(null);
@@ -135,12 +152,32 @@ export class SettingsPageController {
   exportSuccess = $state(false);
   lastExportSummary = $state<string | null>(null);
 
-  showBackupModal = $state(false);
-  pendingBackup: BackupData | null = $state(null);
-  backupError: ValidationError | null = $state(null);
-  fileInput: HTMLInputElement | null = $state(null);
+  constructor(private readonly options: SettingsPageControllerOptions = {}) {
+    this.shippedConnectorCatalog = (options.connectorCatalog ?? getConnectorsMeta()).map(
+      (connector) => ({
+        ...connector,
+        hostPermissions: [...connector.hostPermissions],
+      })
+    );
+    this.resetAvailability = options.resetAvailability ?? LOCAL_DATA_RESET_RUNTIME_AVAILABILITY;
+    this.unsubscribeSettingsSnapshots = subscribeSettingsReleaseSnapshots((snapshot) => {
+      this.applyConfirmedSettings(snapshot.settings);
+    });
+  }
 
-  constructor(private readonly options: SettingsPageControllerOptions = {}) {}
+  get localDataResetAvailability(): LocalDataResetRuntimeAvailability {
+    return this.resetAvailability;
+  }
+
+  get connectorSources(): SettingsConnectorSource[] {
+    return this.shippedConnectorCatalog.map((connector) => ({
+      id: connector.id,
+      name: connector.name,
+      icon: connector.icon,
+      url: connector.url,
+      enabled: this.enabledConnectorIds.includes(connector.id),
+    }));
+  }
 
   private subscribeProfileMessages(): () => void {
     try {
@@ -154,8 +191,27 @@ export class SettingsPageController {
     }
   }
 
+  /**
+   * Racolement Machine D : le SW diffuse FORM_ASSIST_ENABLED après toute
+   * mutation persistée. Le panel est un miroir, jamais la source primaire.
+   */
+  private subscribeFormAssistMessages(): () => void {
+    try {
+      return subscribeMessages((message) => {
+        if (message.type === 'FORM_ASSIST_ENABLED') {
+          this.formAssistEnabled = Boolean(message.payload.enabled);
+          this.formAssistStatus = 'ready';
+        }
+      });
+    } catch {
+      return () => {};
+    }
+  }
+
   destroy(): void {
     this.unsubscribeProfileMessages();
+    this.unsubscribeFormAssistMessages();
+    this.unsubscribeSettingsSnapshots();
   }
 
   get profileStatus(): ProfileStatus {
@@ -181,6 +237,7 @@ export class SettingsPageController {
       this.loadSettings(),
       this.loadConnectedAccount(),
       this.loadScanHistory(),
+      this.loadFormAssist(),
     ]);
   }
 
@@ -217,35 +274,104 @@ export class SettingsPageController {
     }
   }
 
+  /**
+   * Lit l'état persisté du Form Assistant auprès du SW (Machine D — INIT).
+   * Échec (SW injoignable) → état `error` mais la page reste utilisable.
+   */
+  async loadFormAssist(): Promise<void> {
+    this.formAssistStatus = 'loading';
+    try {
+      const result = (await sendMessage({ type: 'FORM_ASSIST_STATUS' })) as
+        { type: 'FORM_ASSIST_STATUS_RESULT'; payload: { enabled: boolean } } | undefined;
+      this.formAssistEnabled = Boolean(result?.payload.enabled);
+      this.formAssistStatus = 'ready';
+    } catch {
+      this.formAssistStatus = 'error';
+    }
+  }
+
+  /**
+   * Bascule l'activation du Form Assistant. Le SW persiste et diffuse
+   * FORM_ASSIST_ENABLED (racolement). L'UI reste optimiste : on met à jour
+   * immédiatement pour la réactivité, et le message SW confirme/rétablit.
+   */
+  async toggleFormAssist(): Promise<void> {
+    if (this.formAssistStatus === 'loading') {
+      return;
+    }
+    const next = !this.formAssistEnabled;
+    const previous = this.formAssistEnabled;
+    this.formAssistEnabled = next;
+    this.formAssistStatus = 'loading';
+    try {
+      const result = (await sendMessage({
+        type: 'FORM_ASSIST_ENABLE',
+        payload: { enabled: next },
+      })) as { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean } } | undefined;
+      // La réponse du SW est la source de vérité (elle peut différer de
+      // l'optimisme en cas d'erreur persistée côté SW).
+      this.formAssistEnabled = Boolean(result?.payload.enabled);
+      this.formAssistStatus = 'ready';
+    } catch {
+      this.formAssistEnabled = previous;
+      this.formAssistStatus = 'error';
+      await showToast("Impossible d'activer l'assistant de candidature", 'error');
+    }
+  }
+
   async loadSettings(): Promise<void> {
     try {
       const settings = await getSettings();
-      this.scanInterval = settings.scanIntervalMinutes;
-      this.notifications = settings.notifications;
-      this.autoScan = settings.autoScan;
-      this.maxSemanticPerScan = settings.maxSemanticPerScan;
-      this.theme = settings.theme;
+      this.applyConfirmedSettings(settings);
     } catch {
       // Hors contexte extension
     }
   }
 
+  private applyConfirmedSettings(settings: AppSettings): void {
+    this.scanInterval = settings.scanIntervalMinutes;
+    this.notifications = settings.notifications;
+    this.autoScan = settings.autoScan;
+    this.maxSemanticPerScan = settings.maxSemanticPerScan;
+    this.theme = settings.theme;
+    const shippedIds = this.shippedConnectorCatalog.map((connector) => connector.id);
+    this.enabledConnectorIds = settings.enabledConnectors.filter((id): id is ConnectorId =>
+      shippedIds.includes(id as ConnectorId)
+    );
+  }
+
   async loadConnectedAccount(): Promise<void> {
     try {
-      this.premiumEnabled = await getPremium();
-      if (import.meta.env.DEV && this.premiumEnabled) {
-        this.connectedAccountEmail = 'demo@missionpulse.app';
-        this.connectedLastSyncAt = "à l'instant";
-        this.connectedPendingUploads = 0;
-        this.connectedPendingDownloads = 0;
-      }
+      const local = await getExtensionAccount();
+      const projection = local.state === 'linked' ? await refreshExtensionEntitlement() : local;
+      this.applyExtensionAccountProjection(projection);
     } catch {
       this.premiumEnabled = false;
+      this.extensionAccountState = 'error';
       this.connectedAccountEmail = null;
       this.connectedLastSyncAt = null;
       this.connectedPendingUploads = 0;
       this.connectedPendingDownloads = 0;
     }
+  }
+
+  private applyExtensionAccountProjection(
+    projection: Awaited<ReturnType<typeof getExtensionAccount>>
+  ): void {
+    this.extensionAccountState = projection.state;
+    this.connectedAccountEmail =
+      projection.accountId === null ? null : `Compte ${projection.accountId.slice(0, 8)}`;
+    this.connectedSyncError = projection.lastError;
+    this.premiumEnabled = canUsePremiumFeature({
+      snapshot: projection.entitlement,
+      accountState: projection.accountId === null ? 'anonymous' : 'active',
+      accountId: projection.accountId,
+      feature: 'multi_account',
+      nowMs: Date.now(),
+    });
+    this.connectedLastSyncAt = projection.state === 'linked' ? "à l'instant" : null;
+    this.connectedPendingUploads = 0;
+    this.connectedPendingDownloads = 0;
   }
 
   async loadScanHistory(): Promise<void> {
@@ -279,6 +405,9 @@ export class SettingsPageController {
     if (this.connectedSyncError) {
       return 'Action requise';
     }
+    if (this.extensionAccountState === 'awaiting_user_approval') {
+      return 'Autorisation en attente';
+    }
     return this.isConnectedAccount ? 'Connecté' : 'Local uniquement';
   }
 
@@ -291,6 +420,9 @@ export class SettingsPageController {
         ? `Dernière synchro ${this.connectedLastSyncAt}`
         : 'Compte connecté, première synchronisation en attente.';
     }
+    if (this.extensionAccountState === 'awaiting_user_approval') {
+      return "Autorisez cette installation dans l'onglet MissionPulse, puis vérifiez la connexion.";
+    }
     return "Vos scans, favoris, CV et candidatures restent dans l'extension tant qu'aucun compte n'est connecté.";
   }
 
@@ -298,7 +430,7 @@ export class SettingsPageController {
     if (!this.lastScanAt) {
       return 'Aucun scan enregistré';
     }
-    return `Dernier déclenchement ${scanDateFormatter.format(new Date(this.lastScanAt))}`;
+    return `Dernier déclenchement ${scanDateFormatter.format(new SvelteDate(this.lastScanAt))}`;
   }
 
   get scanHistoryLabel(): string {
@@ -324,7 +456,7 @@ export class SettingsPageController {
     if (nextScanAt <= Date.now()) {
       return 'Prochain scan dès que Chrome déclenche l’alarme';
     }
-    return `Prochain déclenchement vers ${scanDateFormatter.format(new Date(nextScanAt))}`;
+    return `Prochain déclenchement vers ${scanDateFormatter.format(new SvelteDate(nextScanAt))}`;
   }
 
   get scanHistoryTone(): 'success' | 'attention' | 'neutral' {
@@ -335,7 +467,20 @@ export class SettingsPageController {
   }
 
   async openAccountCenter(): Promise<void> {
-    await openExternalUrl('https://missionpulse.app/dashboard');
+    if (this.isConnectedAccount) {
+      await openExternalUrl('https://missionpulse.app/dashboard');
+      return;
+    }
+    if (this.extensionAccountState === 'awaiting_user_approval') {
+      this.applyExtensionAccountProjection(await pollExtensionAccountLink());
+      return;
+    }
+    const result = await startExtensionAccountLink();
+    this.applyExtensionAccountProjection(result.projection);
+  }
+
+  async disconnectExtensionAccount(): Promise<void> {
+    this.applyExtensionAccountProjection(await unlinkExtensionAccount());
   }
 
   async openConnectedDashboard(): Promise<void> {
@@ -447,43 +592,63 @@ export class SettingsPageController {
   }
 
   async updateScanInterval(value: number): Promise<void> {
-    this.scanInterval = value;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, scanIntervalMinutes: value });
-    } catch {
-      // Hors contexte extension
-    }
+    await this.persistSettings((settings) => ({ ...settings, scanIntervalMinutes: value }));
   }
 
   async toggleNotifications(): Promise<void> {
-    this.notifications = !this.notifications;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, notifications: this.notifications });
-    } catch {
-      // Hors contexte extension
-    }
+    await this.persistSettings((settings) => ({
+      ...settings,
+      notifications: !settings.notifications,
+    }));
   }
 
   async toggleAutoScan(): Promise<void> {
-    this.autoScan = !this.autoScan;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, autoScan: this.autoScan });
-    } catch {
-      // Hors contexte extension
-    }
+    await this.persistSettings((settings) => ({ ...settings, autoScan: !settings.autoScan }));
   }
 
   async updateTheme(value: 'light' | 'dark' | 'system'): Promise<void> {
-    this.theme = value;
-    window.dispatchEvent(new CustomEvent('mp:theme-changed', { detail: value }));
+    await this.persistSettings((settings) => ({ ...settings, theme: value }));
+  }
+
+  async toggleConnector(connectorId: ConnectorId): Promise<void> {
+    if (!this.shippedConnectorCatalog.some((connector) => connector.id === connectorId)) {
+      return;
+    }
+
+    await this.persistSettings((settings) => {
+      const wasEnabled = settings.enabledConnectors.some((id) => id === connectorId);
+      const nextConnectorIds = this.shippedConnectorCatalog
+        .map((connector) => connector.id)
+        .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+        .filter((id) => {
+          if (id === connectorId) {
+            return !wasEnabled;
+          }
+          return settings.enabledConnectors.some((enabledId) => enabledId === id);
+        });
+      return { ...settings, enabledConnectors: nextConnectorIds };
+    });
+  }
+
+  private async persistSettings(
+    buildCandidate: (settings: AppSettings) => AppSettings
+  ): Promise<void> {
+    if (this.isSavingSettings) {
+      return;
+    }
+
+    this.isSavingSettings = true;
+    this.settingsError = null;
     try {
       const settings = await getSettings();
-      await setSettings({ ...settings, theme: value });
+      const confirmed = await setSettingsConfirmed(buildCandidate(settings));
+      this.applyConfirmedSettings(confirmed);
     } catch {
-      // Hors contexte extension
+      const message = 'Impossible d’enregistrer les réglages';
+      this.settingsError = message;
+      await showToast(message, 'error');
+    } finally {
+      this.isSavingSettings = false;
     }
   }
 
@@ -499,6 +664,10 @@ export class SettingsPageController {
 
   async resetAll(): Promise<void> {
     this.resetError = null;
+    if (this.resetAvailability.status === 'unavailable') {
+      this.resetError = this.resetAvailability.reason;
+      return;
+    }
     try {
       const response = await sendMessage({ type: 'RESET_LOCAL_DATA' });
       if (response.type !== 'LOCAL_DATA_RESET' || !response.payload.reset) {
@@ -532,7 +701,7 @@ export class SettingsPageController {
 
       const allMissions = await getMissions();
       const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
-      const now = new Date();
+      const now = new SvelteDate();
       const filename = generateFilename('favoris', format, now);
       const exportedCount = favoriteMissions.length;
 
@@ -595,82 +764,6 @@ export class SettingsPageController {
     }
   }
 
-  async handleFileSelect(file: File | null | undefined): Promise<void> {
-    if (!file) {
-      return;
-    }
-
-    try {
-      const text = await file.text();
-      const parseResult = parseBackupJson(text);
-
-      if (!parseResult.ok) {
-        this.backupError = parseResult.error;
-        this.pendingBackup = null;
-        this.showBackupModal = true;
-        return;
-      }
-
-      const validateResult = validateBackup(parseResult.value);
-
-      if (!validateResult.ok) {
-        this.backupError = validateResult.error;
-        this.pendingBackup = null;
-      } else {
-        this.backupError = null;
-        this.pendingBackup = validateResult.value;
-      }
-
-      this.showBackupModal = true;
-    } catch {
-      this.backupError = { type: 'INVALID_JSON', message: 'Impossible de lire le fichier' };
-      this.pendingBackup = null;
-      this.showBackupModal = true;
-    } finally {
-      if (this.fileInput) {
-        this.fileInput.value = '';
-      }
-    }
-  }
-
-  async restoreBackup(): Promise<Result<void, string>> {
-    if (!this.pendingBackup) {
-      return { ok: false, error: 'Aucune sauvegarde à restaurer' };
-    }
-
-    try {
-      const { profile, settings, favorites, hidden } = this.pendingBackup;
-
-      // Merge with defaults to fill fields missing from old backups (e.g. theme)
-      const restoredSettings: AppSettings = { ...DEFAULT_SETTINGS, ...settings };
-
-      await Promise.all([
-        saveProfile(withProfileDefaults(profile)),
-        setSettings(restoredSettings),
-        saveFavorites(favorites),
-        saveHidden(hidden),
-      ]);
-
-      this.showBackupModal = false;
-      this.pendingBackup = null;
-      this.backupError = null;
-
-      return { ok: true, value: undefined };
-    } catch {
-      return { ok: false, error: 'Erreur lors de la restauration du backup' };
-    }
-  }
-
-  cancelRestore(): void {
-    this.showBackupModal = false;
-    this.pendingBackup = null;
-    this.backupError = null;
-  }
-
-  triggerFileSelect(): void {
-    this.fileInput?.click();
-  }
-
   async exportDiagnostic(): Promise<Result<void, string>> {
     try {
       const response = await sendMessage({ type: 'GET_DIAGNOSTIC_EXPORT' });
@@ -678,7 +771,7 @@ export class SettingsPageController {
         return { ok: false, error: 'Réponse diagnostic inattendue' };
       }
 
-      const exportedAt = new Date(response.payload.exportedAt);
+      const exportedAt = new SvelteDate(response.payload.exportedAt);
       downloadJSON(response.payload, buildDiagnosticFilename(exportedAt));
       return { ok: true, value: undefined };
     } catch {

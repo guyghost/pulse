@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, Toggle } from '@pulse/ui';
   import CircuitBadge from '../atoms/CircuitBadge.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import type { AppError } from '$lib/core/errors';
@@ -9,6 +9,7 @@
     type ConnectorHealthRecord,
   } from '$lib/core/connectors/parser-health-logic';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
+  import { formatMissionCount, formatRelativeTime } from '$lib/core/utils/format';
   import ConnectorHealthCard from '../molecules/ConnectorHealthCard.svelte';
 
   import type { SourceStatus } from '$lib/shell/facades/feed-controller.svelte';
@@ -55,26 +56,7 @@
   };
 
   function getRelativeTime(timestamp: number | null): string {
-    if (timestamp === null) {
-      return 'jamais';
-    }
-    const diff = Date.now() - timestamp;
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) {
-      return "à l'instant";
-    }
-    if (minutes < 60) {
-      return `il y a ${minutes}min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) {
-      return `il y a ${hours}h`;
-    }
-    return `il y a ${Math.floor(hours / 24)}j`;
-  }
-
-  function formatMissionCount(count: number): string {
-    return `${count} mission${count > 1 ? 's' : ''}`;
+    return formatRelativeTime(timestamp, Date.now()) ?? 'jamais';
   }
 
   function getHealthLabel(snapshot: ConnectorHealthSnapshot): string {
@@ -269,14 +251,14 @@
                 }}
               />
             {:else}
-              <span class="text-[8px] font-bold text-text-secondary shrink-0">
+              <span class="text-micro font-bold text-text-secondary shrink-0">
                 {source.name.slice(0, 2).toUpperCase()}
               </span>
             {/if}
             <!-- Mission count -->
             {#if hasData}
               <span
-                class="text-[10px] font-mono font-medium
+                class="text-micro font-mono font-medium
                   {isFiltered
                   ? 'text-blueprint-blue'
                   : hasData && isEnabled
@@ -304,12 +286,12 @@
       <div class="px-4 pt-3 pb-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
               Sources
             </p>
             {#if !isChecking}
               <span
-                class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-medium
+                class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium
                   {connectedCount === totalSources
                   ? 'bg-accent-green/10 text-accent-green'
                   : connectedCount > 0
@@ -381,21 +363,12 @@
           >
             <!-- Toggle switch -->
             {#if onToggleConnector}
-              <button
-                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200
-                  {isEnabled
-                  ? 'border-accent-green/30 bg-accent-green/15'
-                  : 'border-border-light bg-surface-white'}"
-                onclick={() => onToggleConnector(source.connectorId)}
-                role="switch"
-                aria-checked={isEnabled}
+              <Toggle
+                size="sm"
+                checked={isEnabled}
                 aria-label={isEnabled ? `Désactiver ${source.name}` : `Activer ${source.name}`}
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 rounded-full transition-transform duration-200
-                    {isEnabled ? 'translate-x-4 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
-                ></span>
-              </button>
+                onclick={() => onToggleConnector(source.connectorId)}
+              />
             {/if}
 
             <!-- Favicon -->
@@ -417,7 +390,7 @@
                   }}
                 />
               {:else}
-                <span class="text-[9px] font-bold text-text-secondary">
+                <span class="text-micro font-bold text-text-secondary">
                   {source.name.slice(0, 2).toUpperCase()}
                 </span>
               {/if}
@@ -425,10 +398,10 @@
 
             <!-- Name + count -->
             <div class="min-w-0 flex-1">
-              <span class="block truncate text-[12px] font-medium text-text-primary"
+              <span class="block truncate text-meta font-medium text-text-primary"
                 >{source.name}</span
               >
-              <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+              <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro">
                 <span class="text-text-muted">{formatMissionCount(missionCount)} dernier scan</span>
                 {#if source.lastSyncAt}
                   <span class="text-text-muted">Sync {getRelativeTime(source.lastSyncAt)}</span>
@@ -445,7 +418,7 @@
                 {/if}
               </div>
               {#if source.error}
-                <span class="mt-0.5 block truncate text-[10px] text-status-red">
+                <span class="mt-0.5 block truncate text-micro text-status-red">
                   {sourceErrorCopy.label}
                 </span>
               {/if}
@@ -460,7 +433,7 @@
               >
                 <div class="flex items-center justify-between gap-2">
                   <span
-                    class="text-[10px] font-medium {diagnosis.severity === 'incident'
+                    class="text-micro font-medium {diagnosis.severity === 'incident'
                       ? 'text-status-red'
                       : diagnosis.severity === 'attention'
                         ? 'text-status-orange'
@@ -470,10 +443,10 @@
                   >
                     {diagnosis.statusLabel}
                   </span>
-                  <span class="text-[10px] text-text-muted">Action</span>
+                  <span class="text-micro text-text-muted">Action</span>
                 </div>
-                <p class="mt-0.5 text-[10px] leading-4 text-text-subtle">{diagnosis.impact}</p>
-                <p class="mt-0.5 text-[10px] leading-4 text-text-primary">{diagnosis.action}</p>
+                <p class="mt-0.5 text-micro leading-4 text-text-subtle">{diagnosis.impact}</p>
+                <p class="mt-0.5 text-micro leading-4 text-text-primary">{diagnosis.action}</p>
               </div>
             </div>
 
@@ -481,7 +454,7 @@
             <div class="flex shrink-0 items-center gap-2">
               {#if snap}
                 <span
-                  class="rounded-md px-1.5 py-0.5 text-[9px] font-medium
+                  class="rounded-md px-1.5 py-0.5 text-micro font-medium
                     {healthStatus === 'broken'
                     ? 'bg-status-red/10 text-status-red'
                     : healthStatus === 'degraded'
@@ -496,23 +469,23 @@
               {/if}
 
               {#if source.sessionStatus === 'checking'}
-                <span class="flex items-center gap-1 text-[10px] text-text-muted">
+                <span class="flex items-center gap-1 text-micro text-text-muted">
                   <span class="animate-spin"><Icon name="loader" size={11} /></span>
                 </span>
               {:else if source.sessionStatus === 'connected'}
-                <span class="flex items-center gap-1.5 text-[10px] text-accent-green">
+                <span class="flex items-center gap-1.5 text-micro text-accent-green">
                   <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-green"></span>
                   Connecté
                 </span>
               {:else if source.sessionStatus === 'not-connected'}
                 <button
-                  class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-[10px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/10"
+                  class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-micro font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/10"
                   onclick={() => handleReconnect(source.url)}
                 >
                   Se connecter
                 </button>
               {:else if source.sessionStatus === 'error'}
-                <span class="flex items-center gap-1 text-[10px] text-status-red">
+                <span class="flex items-center gap-1 text-micro text-status-red">
                   <Icon name="x-circle" size={11} />
                   <span class="max-w-28 truncate">{sourceErrorCopy.label}</span>
                 </span>
@@ -521,7 +494,7 @@
               {#if snap}
                 {#if deriveHealthStatus(snap) === 'broken' && onRecheckConnector}
                   <button
-                    class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-[10px] font-medium text-status-red transition-colors hover:bg-status-red/10"
+                    class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-micro font-medium text-status-red transition-colors hover:bg-status-red/10"
                     onclick={() => onRecheckConnector(source.connectorId, !isEnabled)}
                   >
                     {isEnabled ? 'Relancer' : 'Activer'}
@@ -536,7 +509,7 @@
                   description={`${formatMissionCount(missionCount)} détectée${missionCount > 1 ? 's' : ''} sur cette source.`}
                 >
                   <button
-                    class="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-medium transition-colors
+                    class="rounded-md px-1.5 py-0.5 text-micro font-mono font-medium transition-colors
                       {isFiltered
                       ? 'bg-blueprint-blue/10 text-blueprint-blue'
                       : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
@@ -557,9 +530,7 @@
 
       {#if unhealthySnapshots.length > 0}
         <div class="border-t border-border-light px-4 py-3">
-          <p class="text-[10px] uppercase tracking-[0.15em] text-text-muted mb-2">
-            Santé détaillée
-          </p>
+          <p class="text-micro uppercase tracking-[0.15em] text-text-muted mb-2">Santé détaillée</p>
           <div class="space-y-2">
             {#each unhealthySnapshots as item (item.connectorId)}
               <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />

@@ -81,6 +81,9 @@ describe('AlertBuilderCard', () => {
     expect(text).toContain('Éligibles');
     expect(text).toContain('Notifiées');
     expect(text).toContain('1 mission déjà vue exclue du volume');
+    expect(text).toContain('Note minimale');
+    expect(text).toContain('Note B');
+    expect(text).not.toMatch(/\b70\+/);
   });
 
   it('shows temporary mute state without losing alert criteria', async () => {

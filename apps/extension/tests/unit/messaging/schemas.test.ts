@@ -98,14 +98,6 @@ describe('validateMessage — structure de base', () => {
 // ============================================================================
 
 describe('validateMessage — messages sans payload', () => {
-  it('accepte SCAN_START', () => {
-    expect(validateMessage({ type: 'SCAN_START' }).valid).toBe(true);
-  });
-
-  it('accepte SCAN_CANCEL', () => {
-    expect(validateMessage({ type: 'SCAN_CANCEL' }).valid).toBe(true);
-  });
-
   it('accepte GET_PROFILE', () => {
     expect(validateMessage({ type: 'GET_PROFILE' }).valid).toBe(true);
   });
@@ -136,11 +128,75 @@ describe('validateMessage — messages sans payload', () => {
 });
 
 describe('validateMessage — scan progressif', () => {
+  it('exige un operationId pour démarrer et annuler un scan', () => {
+    expect(
+      validateMessage({
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-1', trigger: 'manual' },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({ type: 'SCAN_CANCEL', payload: { operationId: 'operation-1' } }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'SCAN_START' }).valid).toBe(false);
+    expect(validateMessage({ type: 'SCAN_CANCEL' }).valid).toBe(false);
+  });
+
+  it('valide les ACK non terminaux avec le même operationId', () => {
+    expect(
+      validateMessage({ type: 'SCAN_STARTED', payload: { operationId: 'operation-1' } }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SCAN_CANCEL_REQUESTED',
+        payload: { operationId: 'operation-1' },
+      }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'SCAN_STARTED' }).valid).toBe(false);
+    expect(validateMessage({ type: 'SCAN_CANCEL_REQUESTED' }).valid).toBe(false);
+  });
+
+  it('valide les rejets de commande non terminaux avec une erreur typée', () => {
+    expect(
+      validateMessage({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-1',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'Session storage indisponible.',
+        },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: {
+          operationId: 'operation-1',
+          code: 'STALE_OPERATION',
+          message: 'Aucun scan actif ne correspond à cette opération.',
+        },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SCAN_START_REJECTED',
+        payload: { operationId: 'operation-1', code: 'CHECKPOINT_STORAGE' },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: { operationId: 'operation-1', message: 'Erreur' },
+      }).valid
+    ).toBe(false);
+  });
+
   it('accepte SCAN_PARTIAL_RESULT avec missions par connecteur', () => {
     expect(
       validateMessage({
         type: 'SCAN_PARTIAL_RESULT',
         payload: {
+          operationId: 'operation-1',
           connectorId: 'free-work',
           connectorName: 'Free-Work',
           missions: [{ id: 'mission-1', title: 'Lead Svelte', source: 'free-work' }],
@@ -154,6 +210,7 @@ describe('validateMessage — scan progressif', () => {
       validateMessage({
         type: 'SCAN_PARTIAL_RESULT',
         payload: {
+          operationId: 'operation-1',
           connectorName: 'Free-Work',
           missions: [{ id: 'mission-1', title: 'Lead Svelte', source: 'free-work' }],
         },
@@ -204,6 +261,227 @@ describe('validateMessage — settings bridge', () => {
       validateMessage({
         type: 'SAVE_SETTINGS',
         payload: { ...validSettings, scanIntervalMinutes: 0 },
+      }).valid
+    ).toBe(false);
+  });
+});
+
+describe('validateMessage — settings release protocol', () => {
+  const releaseSnapshot = {
+    settings: validSettings,
+    onboardingCompleted: true,
+    revision: 4,
+    generation: 7,
+  };
+  const requestId = '93000000-0000-4000-8000-000000000001';
+  const commandId = 'settings-release:92000000-0000-4000-8000-000000000001:5:command';
+
+  it('requires lower-case RFC 4122 v4 request IDs', () => {
+    for (const invalidRequestId of [
+      'A3000000-0000-4000-8000-000000000001',
+      '93000000-0000-1000-8000-000000000001',
+      '93000000-0000-4000-7000-000000000001',
+    ]) {
+      expect(
+        validateMessage({
+          type: 'MUTATE_SETTINGS_RELEASE',
+          payload: {
+            kind: 'set_consent',
+            requestId: invalidRequestId,
+            baseRevision: 4,
+            targetConsent: true,
+          },
+        }).valid
+      ).toBe(false);
+    }
+  });
+
+  it('requires strict catalogue-ordered unique connector IDs in intents and snapshots', () => {
+    for (const enabledConnectors of [
+      ['lehibou', 'free-work'],
+      ['free-work', 'free-work'],
+      ['unknown-source'],
+    ]) {
+      expect(
+        validateMessage({
+          type: 'MUTATE_SETTINGS_RELEASE',
+          payload: {
+            kind: 'save_settings',
+            requestId,
+            baseRevision: 4,
+            settings: { ...validSettings, enabledConnectors },
+          },
+        }).valid
+      ).toBe(false);
+      expect(
+        validateMessage({
+          type: 'SETTINGS_RELEASE_RESULT',
+          payload: {
+            status: 'confirmed',
+            snapshot: {
+              ...releaseSnapshot,
+              settings: { ...validSettings, enabledConnectors },
+            },
+          },
+        }).valid
+      ).toBe(false);
+    }
+  });
+
+  it('valide les lectures confirmées, indisponibles et rejetées par la file', () => {
+    expect(validateMessage({ type: 'GET_SETTINGS_RELEASE' }).valid).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'confirmed', snapshot: releaseSnapshot },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'unavailable', reason: 'actor_blocked', snapshot: null },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'read',
+          correlationId: null,
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette les champs supplémentaires et les métadonnées de lecture manquantes', () => {
+    expect(validateMessage({ type: 'GET_SETTINGS_RELEASE', payload: {} }).valid).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: {
+          status: 'confirmed',
+          snapshot: { ...releaseSnapshot, source: 'legacy' },
+        },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'read',
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('valide une intention et son règlement corrélé', () => {
+    expect(
+      validateMessage({
+        type: 'MUTATE_SETTINGS_RELEASE',
+        payload: {
+          kind: 'set_consent',
+          requestId,
+          baseRevision: 4,
+          targetConsent: true,
+        },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+        payload: {
+          status: 'settled',
+          outcome: {
+            commandId,
+            requestId,
+            intentDigest: 'a'.repeat(64),
+            kind: 'set_consent',
+            settledRevision: 4,
+            settledGeneration: 7,
+            snapshot: releaseSnapshot,
+            status: 'committed',
+            reason: 'committed',
+          },
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette une intention enrichie et un rejet de file non corrélé', () => {
+    expect(
+      validateMessage({
+        type: 'MUTATE_SETTINGS_RELEASE',
+        payload: {
+          kind: 'clear_consent',
+          requestId,
+          baseRevision: 4,
+          targetConsent: false,
+          origin: 'sidepanel',
+        },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'mutation',
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'mutation',
+          correlationId: requestId,
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('valide le contrôle de reprise et refuse tout payload implicite', () => {
+    expect(validateMessage({ type: 'RETRY_SETTINGS_RELEASE' }).valid).toBe(true);
+    expect(validateMessage({ type: 'RETRY_SETTINGS_RELEASE', payload: null }).valid).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RETRY_RESULT',
+        payload: { status: 'retry_accepted', snapshot: null },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RETRY_RESULT',
+        payload: { status: 'retry_accepted', snapshot: null, retryAfterMs: 100 },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('valide un broadcast strict et rejette les métadonnées étrangères', () => {
+    const broadcast = {
+      type: 'SETTINGS_RELEASE_UPDATED',
+      payload: {
+        snapshot: releaseSnapshot,
+        commandId,
+        broadcastId: `${commandId}:broadcast`,
+      },
+    };
+    expect(validateMessage(broadcast).valid).toBe(true);
+    expect(
+      validateMessage({
+        ...broadcast,
+        payload: { ...broadcast.payload, revision: releaseSnapshot.revision },
       }).valid
     ).toBe(false);
   });
@@ -583,6 +861,30 @@ describe('validateMessage — feed local data bridge', () => {
   });
 });
 
+describe('validateMessage — connector recheck settlement', () => {
+  it('accepte les axes scan et activation distincts', () => {
+    expect(
+      validateMessage({
+        type: 'CONNECTOR_RECHECK_RESULT',
+        payload: {
+          snapshots: [],
+          scan: 'failed',
+          activation: 'already_confirmed',
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it("rejette l'ancien résultat ambigu de santé", () => {
+    expect(
+      validateMessage({
+        type: 'CONNECTOR_RECHECK_RESULT',
+        payload: [],
+      }).valid
+    ).toBe(false);
+  });
+});
+
 // ============================================================================
 // UPDATE_TRACKING — statuts valides
 // ============================================================================
@@ -642,12 +944,12 @@ describe('validateMessage — UPDATE_TRACKING_DETAILS', () => {
     expect(r.valid).toBe(true);
   });
 
-  it('rejette une date invalide', () => {
+  it('laisse une date bornée au handler pour une erreur métier typée', () => {
     const r = validateMessage({
       type: 'UPDATE_TRACKING_DETAILS',
       payload: { missionId: 'm1', nextActionAt: 'demain' },
     });
-    expect(r.valid).toBe(false);
+    expect(r.valid).toBe(true);
   });
 });
 
@@ -737,7 +1039,7 @@ describe('validateMessage — RESTORE_TRACKING', () => {
     expect(r.valid).toBe(true);
   });
 
-  it('rejette un snapshot sans historique canonique', () => {
+  it('laisse un snapshot borné au handler pour une erreur métier typée', () => {
     const r = validateMessage({
       type: 'RESTORE_TRACKING',
       payload: {
@@ -754,8 +1056,180 @@ describe('validateMessage — RESTORE_TRACKING', () => {
       },
     });
 
-    expect(r.valid).toBe(false);
+    expect(r.valid).toBe(true);
   });
+});
+
+// ============================================================================
+// TRACKING_FAILED / TRACKING_RESTORED — truthful v1 settlement contract
+// ============================================================================
+
+describe('validateMessage — tracking settlement v1', () => {
+  const loadFailure = {
+    type: 'TRACKING_FAILED',
+    payload: {
+      version: 1,
+      code: 'LOAD_FAILED',
+      intent: 'load',
+      missionId: null,
+      mutationId: null,
+      message: 'Impossible de charger le suivi des candidatures.',
+      recoverable: true,
+    },
+  } as const;
+
+  it('accepts the exact structured-clone-safe load failure', () => {
+    expect(validateMessage(loadFailure).valid).toBe(true);
+  });
+
+  it.each([
+    ['transition', 'Impossible d’enregistrer le nouveau statut.'],
+    ['details', 'Impossible d’enregistrer les détails de suivi.'],
+    ['restore', 'Impossible d’annuler la modification.'],
+  ] as const)('accepts PERSIST_FAILED for %s with exact identity', (intent, message) => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_FAILED',
+        payload: {
+          version: 1,
+          code: 'PERSIST_FAILED',
+          intent,
+          missionId: 'mission-1',
+          mutationId: null,
+          message,
+          recoverable: true,
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it.each([
+    ['STALE_UNDO', 'restore'],
+    ['APPLICATION_BUSY', 'transition'],
+    ['CANCELLED', 'details'],
+    ['WORKER_RESTARTED', 'restore'],
+  ])('rejects reserved wire-v1 code %s', (code, intent) => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_FAILED',
+        payload: {
+          ...loadFailure.payload,
+          code,
+          intent,
+          missionId: 'mission-1',
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it.each([
+    { payload: { ...loadFailure.payload, version: 2 } },
+    { payload: { ...loadFailure.payload, missionId: 'mission-1' } },
+    { payload: { ...loadFailure.payload, mutationId: 'mutation-1' } },
+    { payload: { ...loadFailure.payload, recoverable: false } },
+    { payload: { ...loadFailure.payload, message: 'storage down' } },
+    {
+      payload: {
+        ...loadFailure.payload,
+        code: 'INVALID_TRANSITION',
+        intent: 'load',
+        recoverable: false,
+        message: 'Ce changement de statut n’est pas autorisé.',
+      },
+    },
+  ])('rejects invalid failure fields %#', ({ payload }) => {
+    expect(validateMessage({ type: 'TRACKING_FAILED', payload }).valid).toBe(false);
+  });
+
+  it('requires restore success identity even when the confirmed tracking is null', () => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_RESTORED',
+        payload: { missionId: 'mission-1', tracking: null },
+      }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'TRACKING_RESTORED', payload: null }).valid).toBe(false);
+  });
+
+  it('rejects a restore success whose nested identity differs', () => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_RESTORED',
+        payload: {
+          missionId: 'mission-1',
+          tracking: {
+            missionId: 'mission-2',
+            currentStatus: 'selected',
+            history: [{ from: null, to: 'detected', timestamp: 1, note: null }],
+            generatedAssetIds: [],
+            userRating: null,
+            notes: '',
+            nextActionAt: null,
+          },
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('validates TRACKINGS_RESULT as canonical records instead of unknown', () => {
+    expect(validateMessage({ type: 'TRACKINGS_RESULT', payload: {} }).valid).toBe(false);
+    expect(validateMessage({ type: 'TRACKINGS_RESULT', payload: [] }).valid).toBe(true);
+  });
+
+  it('rejects an empty mission identity before the tracking handler runs', () => {
+    expect(
+      validateMessage({
+        type: 'UPDATE_TRACKING',
+        payload: { missionId: '', status: 'selected' },
+      }).valid
+    ).toBe(false);
+  });
+
+  it.each(['TRACKING_UPDATED', 'TRACKINGS_RESULT', 'TRACKING_RESTORED'] as const)(
+    'rejects a %s record whose current status disagrees with its history',
+    (type) => {
+      const inconsistent = {
+        missionId: 'mission-1',
+        currentStatus: 'applied',
+        history: [{ from: null, to: 'selected', timestamp: 1, note: null }],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: null,
+      };
+      const payload =
+        type === 'TRACKINGS_RESULT'
+          ? [inconsistent]
+          : type === 'TRACKING_RESTORED'
+            ? { missionId: 'mission-1', tracking: inconsistent }
+            : inconsistent;
+
+      expect(validateMessage({ type, payload }).valid).toBe(false);
+    }
+  );
+
+  it.each(['TRACKING_UPDATED', 'TRACKINGS_RESULT', 'TRACKING_RESTORED'] as const)(
+    'rejects a %s terminal record with a scheduled follow-up',
+    (type) => {
+      const inconsistent = {
+        missionId: 'mission-1',
+        currentStatus: 'accepted',
+        history: [{ from: 'offer', to: 'accepted', timestamp: 1, note: null }],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: '2026-07-30T09:00:00.000Z',
+      };
+      const payload =
+        type === 'TRACKINGS_RESULT'
+          ? [inconsistent]
+          : type === 'TRACKING_RESTORED'
+            ? { missionId: 'mission-1', tracking: inconsistent }
+            : inconsistent;
+
+      expect(validateMessage({ type, payload }).valid).toBe(false);
+    }
+  );
 });
 
 // ============================================================================

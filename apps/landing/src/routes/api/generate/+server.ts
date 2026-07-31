@@ -4,12 +4,7 @@ import { env } from '$env/dynamic/private';
 import { env as pubEnv } from '$env/dynamic/public';
 import { createServerClient } from '@supabase/ssr';
 import { createSupabaseAdminClient } from '$lib/server/supabase';
-import {
-  consumeGenerationCredit,
-  grantPremiumMonthlyCredits,
-  isPremiumProfileActive,
-  refundGenerationCredit,
-} from '$lib/server/credits';
+import { consumeGenerationCredit, refundGenerationCredit } from '$lib/server/credits';
 import { parseGenerateBodyText, type GenerateBody } from '$lib/server/generate-validation';
 
 function buildPrompt(body: GenerateBody): string {
@@ -87,16 +82,11 @@ export const POST: RequestHandler = async ({ request }) => {
   const admin = createSupabaseAdminClient();
   const { data: profile } = await supabase
     .from('profiles')
-    .select('subscription_status, subscription_period_end, credit_balance')
+    .select('credit_balance')
     .eq('id', userId)
     .single();
 
-  const isPremium = profile ? isPremiumProfileActive(profile) : false;
-  let creditBalance = profile?.credit_balance ?? 0;
-
-  if (isPremium) {
-    creditBalance = (await grantPremiumMonthlyCredits(admin, userId)) ?? creditBalance;
-  }
+  const creditBalance = profile?.credit_balance ?? 0;
 
   if (creditBalance <= 0) {
     return json(

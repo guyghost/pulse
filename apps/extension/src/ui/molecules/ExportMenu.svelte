@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import type { ExportFormat } from '$lib/core/export/mission-export';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
 
   interface Props {
     missions: Mission[];
@@ -15,7 +15,7 @@
   let includeDescription = $state(true);
   let dateFormat: 'iso' | 'locale' | 'relative' = $state('locale');
 
-  const formats: { id: ExportFormat; label: string; icon: string }[] = [
+  const formats: { id: ExportFormat; label: string; icon: IconName }[] = [
     { id: 'json', label: 'JSON', icon: 'file-json' },
     { id: 'csv', label: 'CSV', icon: 'file-spreadsheet' },
     { id: 'markdown', label: 'Markdown', icon: 'file-text' },
@@ -63,7 +63,7 @@
 
 <div class="export-menu relative inline-block">
   <button
-    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-subtle-gray px-4 py-2.5 text-sm font-semibold text-text-primary transition-all duration-200 hover:bg-subtle-gray"
+    class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-subtle-gray px-4 py-2.5 text-body-lg font-semibold text-text-primary transition-all duration-200 hover:bg-subtle-gray"
     onclick={toggleMenu}
     aria-haspopup="true"
     aria-expanded={isOpen}
@@ -80,7 +80,7 @@
     >
       <!-- Options -->
       <div class="space-y-3 border-b border-border-light p-3">
-        <label class="flex cursor-pointer items-center gap-2 text-sm text-text-secondary">
+        <label class="flex cursor-pointer items-center gap-2 text-body-lg text-text-secondary">
           <input
             type="checkbox"
             class="accent-blueprint-blue"
@@ -93,9 +93,9 @@
         </label>
 
         <div class="space-y-1">
-          <span class="text-xs text-text-muted">Format de date</span>
+          <span class="text-meta text-text-muted">Format de date</span>
           <select
-            class="w-full rounded-md border border-border-light bg-page-canvas px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue/30 focus:outline-none"
+            class="w-full rounded-md border border-border-light bg-page-canvas px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue/30 focus:outline-none"
             value={dateFormat}
             onchange={(e) => {
               dateFormat = e.currentTarget.value as typeof dateFormat;
@@ -110,9 +110,9 @@
 
       <!-- Formats -->
       <div class="p-1 pt-2">
-        {#each formats as format}
+        {#each formats as format (format.id)}
           <button
-            class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:bg-subtle-gray"
+            class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray"
             onclick={() => handleFormatSelect(format.id)}
             role="menuitem"
           >

@@ -1,6 +1,8 @@
 import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CREDIT_PACKS, PREMIUM_MONTHLY_CREDITS, type CreditPackId } from '$lib/credits';
+import { CREDIT_PACKS, type CreditPackId } from '$lib/credits';
+
+const PREMIUM_MONTHLY_CREDITS = 20;
 
 export const creditPackVariantIds: Record<CreditPackId, string | undefined> = {
   starter: env.LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID,
@@ -27,11 +29,12 @@ export function isPremiumProfileActive(profile: {
 
 export async function grantPremiumMonthlyCredits(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  now = new Date()
 ): Promise<number | null> {
   const { data, error } = await supabase.rpc('grant_premium_monthly_credits', {
     p_user_id: userId,
-    p_period: currentPremiumCreditPeriod(),
+    p_period: currentPremiumCreditPeriod(now),
     p_amount: PREMIUM_MONTHLY_CREDITS,
   });
 

@@ -7,6 +7,8 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
+import { untrack } from 'svelte';
+import { SvelteMap, SvelteSet, SvelteDate } from 'svelte/reactivity';
 import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
 import type {
   FeedDecisionPresetId,
@@ -21,6 +23,7 @@ import type { AiAvailability } from '$lib/shell/ai/capabilities';
 import type { PanelSide } from '$lib/shell/ui/panel-layout';
 import {
   getSeenIds,
+  getMissions,
   saveSeenIds,
   getFavorites,
   saveFavorites,
@@ -41,9 +44,11 @@ import {
   consumeDeepLinkIntent,
   subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
+import { rankStacksByCount } from '$lib/core/filters/stack-ranking';
+import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
-import { showToastAction } from '$lib/shell/notifications/toast-service';
+import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
 import { createUndoController, type UndoController } from '$lib/shell/undo/undo-controller';
 import {
   buildProfileImpactItems,
@@ -65,6 +70,23 @@ import {
   hasFocusMatch,
   formatFocusSince,
 } from '$lib/core/deep-link/deep-link-intent';
+import {
+  createMissionArrivalQueueState,
+  deriveFeedPresentation,
+  getMissionArrivalStackView,
+  isArrivalStackRenderable,
+  type MissionArrivalQueueEffect,
+  type MissionDwellSignal,
+} from '$lib/core/feed/mission-arrival-queue';
+import {
+  createArrivalPreviewCacheState,
+  transitionArrivalPreviewCache,
+  type ArrivalPreviewCacheSource,
+} from '$lib/core/feed/arrival-preview-cache';
+import {
+  createMissionArrivalActor,
+  type MissionArrivalActorEvent,
+} from '$lib/shell/arrival/mission-arrival-actor';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -109,7 +131,7 @@ interface FeedAggregates {
 }
 
 function getMissionScore(mission: Mission): number {
-  return mission.scoreBreakdown?.total ?? mission.score ?? 0;
+  return getCanonicalMissionScore(mission) ?? 0;
 }
 
 function getScoreBucket(score: number): ScoreBucket {
@@ -230,9 +252,32 @@ export function createFeedPageState(
   // Internal state (not directly bound)
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
+  const favoritePendingIds = new SvelteSet<string>();
   let hidden = $state<Record<string, number>>({});
-  let pendingSeenIds = new Set<string>();
+  let pendingSeenIds = new SvelteSet<string>();
   let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
+  let arrivalQueueState = $state(createMissionArrivalQueueState());
+  let arrivalObservedEffects: MissionArrivalQueueEffect[] = [];
+  const arrivalActor = createMissionArrivalActor({
+    readFeed: () => feedStore.missions,
+    replaceFeedSync: (nextMissions) => feedStore.setMissions([...nextMissions]),
+    loadProjection: (orderedIds) => controller.loadArrivalProjection(orderedIds),
+    persistSeen: async (missionId) => {
+      const nextSeenIds = markAsSeen(Array.from(seenIds), [missionId]);
+      await saveSeenIds(nextSeenIds);
+      seenIds = nextSeenIds;
+    },
+    onStateChanged: (nextState) => {
+      arrivalQueueState = nextState;
+    },
+    onEffect: (effect) => {
+      arrivalObservedEffects = [...arrivalObservedEffects, effect];
+    },
+  });
+  let arrivalPreviewCacheState = $state.raw(
+    createArrivalPreviewCacheState(controller.pendingMissions)
+  );
+  const arrivalPreviewCatalog = $derived(arrivalPreviewCacheState.byId);
 
   // ============================================================
   // Focus lens — driven by the notification deep-link intent.
@@ -254,7 +299,7 @@ export function createFeedPageState(
     onCommit: (_id, _snapshot, { stillPending }) => {
       // Persist every hidden mission EXCEPT those whose undo window is still open —
       // committing must not finalize a sibling hide the user can still undo.
-      const pendingIds = new Set(stillPending.map((p) => p.targetId));
+      const pendingIds = new SvelteSet(stillPending.map((p) => p.targetId));
       const persist: Record<string, number> = {};
       for (const [hid, ts] of Object.entries(hidden)) {
         if (!pendingIds.has(hid)) {
@@ -312,12 +357,12 @@ export function createFeedPageState(
   const isLoading = $derived(feedStore.state === 'loading');
   const error = $derived(feedStore.error);
   const searchQuery = $derived(feedStore.searchQuery);
-  const totalMissions = $derived(missions.length);
+  const totalMissions = $derived(allMissions.length);
 
   // ============================================================
   // Derived — UI computations
   // ============================================================
-  const seenSet = $derived(new Set(Array.isArray(seenIds) ? Array.from(seenIds) : []));
+  const seenSet = $derived(new SvelteSet(Array.isArray(seenIds) ? Array.from(seenIds) : []));
 
   const favoriteCount = $derived(Object.keys(favorites).length);
   const hiddenCount = $derived(Object.keys(hidden).length);
@@ -331,7 +376,8 @@ export function createFeedPageState(
   const profileNeedsCompletion = $derived(missingProfileItems.length > 0);
 
   const filterActive = $derived(
-    selectedSource !== null ||
+    searchQuery.trim().length > 0 ||
+      selectedSource !== null ||
       selectedRemote !== null ||
       selectedStacks.length > 0 ||
       selectedSeniority !== null ||
@@ -340,15 +386,21 @@ export function createFeedPageState(
       showNewOnly
   );
 
-  const availableStacks = $derived.by(() => {
-    const counts = new Map<string, number>();
+  const stackCounts = $derived.by(() => {
+    // Null-prototype dictionary: stack names are scraped from external pages
+    // (untrusted), so a plain {} would let keys like "__proto__" / "constructor"
+    // collide with inherited members. Object.create(null) has no prototype, so
+    // every key is a plain own property.
+    const counts: Record<string, number> = Object.create(null);
     for (const m of missions) {
       for (const s of m.stack) {
-        counts.set(s, (counts.get(s) ?? 0) + 1);
+        counts[s] = (counts[s] ?? 0) + 1;
       }
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+    return counts;
   });
+
+  const availableStacks = $derived(rankStacksByCount(stackCounts));
 
   // Shared base filter (enabled connectors + favorites + hidden) reused by both
   // sourceCountBaseMissions and dashboardScopeMissions so this prefix runs once.
@@ -367,11 +419,11 @@ export function createFeedPageState(
     return result;
   });
 
-  const sourceCountBaseMissions = $derived.by(() => {
+  const decisionFilteredMissions = $derived.by(() => {
     let result = baseFilteredMissions;
 
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
-      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
+      const stacksSet = selectedStacks.length > 0 ? new SvelteSet(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
@@ -388,15 +440,44 @@ export function createFeedPageState(
     if (selectedScoreBucket !== null) {
       result = result.filter((m) => getScoreBucket(getMissionScore(m)) === selectedScoreBucket);
     }
-    if (showNewOnly) {
-      result = result.filter((m) => !seenSet.has(m.id));
-    }
-    if (decisionPreset !== null) {
+    if (decisionPreset !== null && decisionPreset !== 'new') {
       const activePreset = decisionPreset;
       result = result.filter((m) => matchesDecisionPreset(m, activePreset, seenSet, profileTjmMin));
     }
 
     return result;
+  });
+
+  const newQueueRequested = $derived(showNewOnly || decisionPreset === 'new');
+  const stableQueueActive = $derived(arrivalQueueState.queue.value === 'stable-queue');
+  const stableQueueIds = $derived(
+    arrivalQueueState.queue.value === 'stable-queue'
+      ? new SvelteSet(arrivalQueueState.queue.queueIds)
+      : null
+  );
+
+  function sortCurrentMissions(input: Mission[]): Mission[] {
+    return sortBy === 'score' ? rankMissions(input, new SvelteDate()) : sortMissions(input, sortBy);
+  }
+
+  const newQueueCandidateMissions = $derived.by(() => {
+    const scoped =
+      selectedSource === null
+        ? decisionFilteredMissions
+        : decisionFilteredMissions.filter((mission) => mission.source === selectedSource);
+    return sortCurrentMissions(scoped.filter((mission) => !seenSet.has(mission.id)));
+  });
+
+  const sourceCountBaseMissions = $derived.by(() => {
+    if (!newQueueRequested) {
+      return decisionFilteredMissions;
+    }
+
+    if (stableQueueIds) {
+      return decisionFilteredMissions.filter((mission) => stableQueueIds.has(mission.id));
+    }
+
+    return decisionFilteredMissions.filter((mission) => !seenSet.has(mission.id));
   });
 
   const dashboardScopeMissions = $derived.by(() => {
@@ -405,7 +486,7 @@ export function createFeedPageState(
       result = result.filter((m) => m.source === selectedSource);
     }
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
-      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
+      const stacksSet = selectedStacks.length > 0 ? new SvelteSet(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
@@ -423,10 +504,10 @@ export function createFeedPageState(
   });
 
   const feedAggregates = $derived.by<FeedAggregates>(() => {
-    const counts = new Map<ScoreBucket, number>(
+    const counts = new SvelteMap<ScoreBucket, number>(
       SCORE_BUCKETS.map((bucket) => [bucket.bucket, 0] as const)
     );
-    const sourceMissionCounts = new Map<string, number>();
+    const sourceMissionCounts = new SvelteMap<string, number>();
     let highScoreCount = 0;
     let newCount = 0;
     let priorityPresetCount = 0;
@@ -498,7 +579,7 @@ export function createFeedPageState(
         {
           id: 'priority',
           label: 'Prioritaires',
-          description: 'Score 80+',
+          description: 'Note A',
           count: priorityPresetCount,
           active: decisionPreset === 'priority',
         },
@@ -566,7 +647,7 @@ export function createFeedPageState(
       const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
         return sortBy === 'score'
-          ? rankMissions(focused, new Date())
+          ? rankMissions(focused, new SvelteDate())
           : sortMissions(focused, sortBy);
       }
     }
@@ -579,12 +660,30 @@ export function createFeedPageState(
     // 'score' sort uses the composite ranking (relevance + freshness + source
     // diversity) instead of a plain single-key sort. Users can switch to 'date'
     // or 'tjm' for an explicit single-key sort.
-    if (sortBy === 'score') {
-      return rankMissions(scopedMissions, new Date());
-    }
-
-    return sortMissions(scopedMissions, sortBy);
+    return sortCurrentMissions(scopedMissions);
   });
+
+  const feedPresentation = $derived(
+    deriveFeedPresentation({
+      feedState: feedStore.state,
+      ownedScan: controller.ownedScan,
+      networkOnline: connection.status !== 'offline',
+    })
+  );
+  const arrivalStackView = $derived(getMissionArrivalStackView(arrivalQueueState));
+  const arrivalPreviewMissions = $derived.by(() => {
+    const missionCatalog = new SvelteMap(
+      [...allMissions, ...controller.pendingMissions, ...Object.values(arrivalPreviewCatalog)].map(
+        (mission) => [mission.id, mission] as const
+      )
+    );
+    return arrivalStackView.previewIds
+      .map((id) => missionCatalog.get(id))
+      .filter((mission): mission is Mission => mission !== undefined);
+  });
+  const arrivalStackVisible = $derived(
+    isArrivalStackRenderable({ ...arrivalQueueState, presentation: feedPresentation })
+  );
 
   // Focus-lens derived views for the banner UI.
   const focusMissions = $derived(
@@ -598,7 +697,7 @@ export function createFeedPageState(
     if (comparisonMissionIds.length < 2) {
       return [];
     }
-    const idSet = new Set(comparisonMissionIds);
+    const idSet = new SvelteSet(comparisonMissionIds);
     return (missions ?? []).filter((m) => idSet.has(m.id));
   });
 
@@ -623,13 +722,94 @@ export function createFeedPageState(
   // Event handlers
   // ============================================================
 
+  function dispatchArrival(event: MissionArrivalActorEvent): void {
+    arrivalActor.dispatch(event);
+  }
+
+  function enterStableNewQueue(): void {
+    dispatchArrival({
+      type: 'ENTER_NEW_QUEUE',
+      orderedUnseenIds: newQueueCandidateMissions.map((mission) => mission.id),
+    });
+  }
+
+  function exitStableNewQueue(): void {
+    dispatchArrival({ type: 'EXIT_NEW_QUEUE' });
+  }
+
+  function handleMissionReadSignal(missionId: string, signal: MissionDwellSignal): void {
+    if (signal.type === 'started') {
+      dispatchArrival({ type: 'DWELL_STARTED', missionId, now: signal.at });
+      return;
+    }
+    if (signal.type === 'cancelled') {
+      dispatchArrival({ type: 'DWELL_CANCELLED', missionId });
+      return;
+    }
+    dispatchArrival({ type: 'DWELL_ELAPSED', missionId, now: signal.at });
+  }
+
+  function rememberArrivalPreviews(
+    pendingMissions: readonly Mission[],
+    source: ArrivalPreviewCacheSource
+  ): void {
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'PREVIEW_OBJECTS_OBSERVED',
+      source,
+      missions: pendingMissions,
+    });
+  }
+
+  function receiveAlarmMissions(alarmMissions: readonly Mission[]): void {
+    rememberArrivalPreviews(alarmMissions, 'alarm-ingress');
+    arrivalActor.publishAlarm(alarmMissions);
+  }
+
+  function openArrivalStack(): void {
+    rememberArrivalPreviews(controller.pendingMissions, 'facade-pending-snapshot');
+    dispatchArrival({ type: 'OPEN_STACK' });
+  }
+
+  function closeArrivalStack(): void {
+    dispatchArrival({ type: 'CLOSE_STACK' });
+  }
+
+  async function refreshArrivals(): Promise<MissionArrivalQueueEffect[]> {
+    const effectOffset = arrivalObservedEffects.length;
+    dispatchArrival(
+      arrivalQueueState.stack.value === 'projection-error'
+        ? { type: 'RETRY_REQUESTED' }
+        : { type: 'APPLY_REQUESTED' }
+    );
+    await arrivalActor.whenIdle();
+    const effects = arrivalObservedEffects.slice(effectOffset);
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'APPLY_CYCLE_SETTLED',
+      hasRemainingPreviewMembership: getMissionArrivalStackView(arrivalQueueState).count > 0,
+    });
+    return effects;
+  }
+
+  async function bootstrapArrivalActor(): Promise<void> {
+    rememberArrivalPreviews(controller.pendingMissions, 'facade-pending-snapshot');
+    arrivalActor.synchronizePresentation({
+      feedState: feedStore.state,
+      ownedScan: controller.ownedScan,
+      networkOnline: connection.status !== 'offline',
+    });
+    arrivalActor.synchronizeScope(
+      new SvelteSet([...controller.enabledConnectorIds] as MissionSource[])
+    );
+    await arrivalActor.whenIdle();
+  }
+
   function flushSeenIds(): void {
     if (pendingSeenIds.size === 0) {
       return;
     }
 
     const nextSeenIds = markAsSeen(Array.from(seenIds), [...pendingSeenIds]);
-    pendingSeenIds = new Set();
+    pendingSeenIds = new SvelteSet();
     seenIds = nextSeenIds;
     saveSeenIds(nextSeenIds).catch(() => {});
   }
@@ -650,23 +830,44 @@ export function createFeedPageState(
       return;
     }
 
-    pendingSeenIds = new Set(pendingSeenIds).add(missionId);
+    pendingSeenIds = new SvelteSet(pendingSeenIds).add(missionId);
     scheduleSeenFlush();
   }
 
-  function handleToggleFavorite(id: string): void {
+  async function handleToggleFavorite(id: string): Promise<void> {
+    if (favoritePendingIds.has(id)) {
+      return;
+    }
+
     const previous = { ...favorites };
-    const wasFavorite = id in favorites;
+    const wasFavorite = id in previous;
     const updated = toggleFavorite(favorites, id, Date.now());
-    favorites = updated;
-    saveFavorites(favorites).catch(() => {});
-    showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
-      label: 'Annuler',
-      onClick: () => {
-        favorites = previous;
-        saveFavorites(previous).catch(() => {});
-      },
-    });
+    favoritePendingIds.add(id);
+
+    try {
+      await saveFavorites(updated);
+      favorites = updated;
+      showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
+        label: 'Annuler',
+        onClick: () => {
+          void (async () => {
+            favoritePendingIds.add(id);
+            try {
+              await saveFavorites(previous);
+              favorites = previous;
+            } catch {
+              void showToast('Impossible d’annuler le changement de favori', 'error');
+            } finally {
+              favoritePendingIds.delete(id);
+            }
+          })();
+        },
+      });
+    } catch {
+      void showToast('Impossible de confirmer le favori', 'error');
+    } finally {
+      favoritePendingIds.delete(id);
+    }
   }
 
   function handleHide(id: string): void {
@@ -756,6 +957,12 @@ export function createFeedPageState(
     if (preset === 'new') {
       showNewOnly = false;
     }
+
+    if (decisionPreset === 'new' || showNewOnly) {
+      enterStableNewQueue();
+    } else {
+      exitStableNewQueue();
+    }
   }
 
   function toggleNewOnly(): void {
@@ -764,9 +971,19 @@ export function createFeedPageState(
     if (showNewOnly && decisionPreset === 'new') {
       decisionPreset = null;
     }
+    if (showNewOnly || decisionPreset === 'new') {
+      enterStableNewQueue();
+    } else {
+      exitStableNewQueue();
+    }
   }
 
   function clearAllFilters(): void {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = null;
+    }
+    feedStore.clearSearch();
     activeSavedViewId = null;
     selectedStacks = [];
     selectedSource = null;
@@ -775,6 +992,8 @@ export function createFeedPageState(
     selectedScoreBucket = null;
     decisionPreset = null;
     showNewOnly = false;
+    showFilters = false;
+    exitStableNewQueue();
   }
 
   function currentFilters(): FeedViewFilters {
@@ -847,6 +1066,11 @@ export function createFeedPageState(
     const nextViews = [view, ...savedViews].slice(0, MAX_SAVED_VIEWS);
     await persistSavedViews(nextViews);
     activeSavedViewId = view.id;
+    if (showNewOnly || decisionPreset === 'new') {
+      enterStableNewQueue();
+    } else {
+      exitStableNewQueue();
+    }
   }
 
   function applySavedView(viewId: string): void {
@@ -988,6 +1212,41 @@ export function createFeedPageState(
         .catch(() => {});
     });
 
+    $effect(() => {
+      const pendingMissions = controller.pendingMissions;
+      untrack(() => {
+        rememberArrivalPreviews(pendingMissions, 'facade-pending-snapshot');
+      });
+    });
+
+    $effect(() => {
+      const facts = {
+        feedState: feedStore.state,
+        ownedScan: controller.ownedScan,
+        networkOnline: connection.status !== 'offline',
+      };
+      untrack(() => {
+        arrivalActor.synchronizePresentation(facts);
+      });
+    });
+
+    $effect(() => {
+      const enabledSources = new SvelteSet([...controller.enabledConnectorIds] as MissionSource[]);
+      const orderedIds = feedStore.missions.map((mission) => mission.id);
+      untrack(() => {
+        void orderedIds;
+        arrivalActor.synchronizeScope(enabledSources);
+      });
+    });
+
+    $effect(() => {
+      if (newQueueRequested && !stableQueueActive) {
+        enterStableNewQueue();
+      } else if (!newQueueRequested && stableQueueActive) {
+        exitStableNewQueue();
+      }
+    });
+
     // Load favorites & hidden
     $effect(() => {
       getFavorites()
@@ -1058,8 +1317,21 @@ export function createFeedPageState(
         {
           config: FeedShortcuts.REFRESH,
           handler: () => {
-            if (!controller.isScanning && !isLoading && !isOffline) {
-              controller.startScan();
+            const presentation = deriveFeedPresentation({
+              feedState: feedStore.state,
+              ownedScan: controller.ownedScan,
+              networkOnline: connection.status !== 'offline',
+            });
+            if (!presentation.actionEnabled) {
+              return;
+            }
+            if (presentation.primaryAction === 'cancel') {
+              void controller.stopScan();
+            } else if (
+              presentation.primaryAction === 'start' ||
+              presentation.primaryAction === 'retry'
+            ) {
+              void controller.startScan();
             }
           },
         },
@@ -1109,6 +1381,9 @@ export function createFeedPageState(
         if (message.type === 'PROFILE_UPDATED') {
           applyProfile(message.payload);
         }
+        if (message.type === 'MISSIONS_UPDATED' && message.projection === 'cold-only') {
+          receiveAlarmMissions(message.payload);
+        }
       });
 
       return unsubscribe;
@@ -1129,6 +1404,10 @@ export function createFeedPageState(
             feedStore.load();
           } else if (devState === 'error') {
             feedStore.setError('[Dev] Simulated error');
+          } else if (devState === 'loaded') {
+            void getMissions()
+              .then((missions) => feedStore.setMissions(missions))
+              .catch(() => feedStore.setError('[Dev] Unable to restore missions'));
           }
         }
         window.addEventListener('dev:missions', handleMissions);
@@ -1178,6 +1457,11 @@ export function createFeedPageState(
     // Cancel pending undo windows without committing (safe-by-default, invariant I5).
     hideUndo.dispose();
     viewDeleteUndo.dispose();
+    arrivalActor.dispose();
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'PREVIEW_CACHE_DISPOSED',
+      reason: 'feed-unmounted',
+    });
   }
 
   // ============================================================
@@ -1274,6 +1558,9 @@ export function createFeedPageState(
     get favorites() {
       return favorites;
     },
+    get favoritePendingIds() {
+      return favoritePendingIds;
+    },
     get hidden() {
       return hidden;
     },
@@ -1317,8 +1604,33 @@ export function createFeedPageState(
     get availableStacks() {
       return availableStacks;
     },
+    get stackCounts() {
+      return stackCounts;
+    },
     get displayMissions() {
       return displayMissions;
+    },
+    get stableQueueActive() {
+      return stableQueueActive;
+    },
+    get arrivalStackState() {
+      return {
+        value: arrivalStackView.state,
+        message: arrivalStackView.errorMessage,
+        drawerOpen: arrivalStackView.drawerOpen,
+      };
+    },
+    get arrivalStackCount() {
+      return arrivalStackView.count;
+    },
+    get arrivalStackVisible() {
+      return arrivalStackVisible;
+    },
+    get feedPresentation() {
+      return feedPresentation;
+    },
+    get arrivalPreviewMissions() {
+      return arrivalPreviewMissions;
     },
     get visibleCount() {
       return visibleCount;
@@ -1373,6 +1685,12 @@ export function createFeedPageState(
 
     // Actions
     handleMissionSeen,
+    handleMissionReadSignal,
+    receiveAlarmMissions,
+    openArrivalStack,
+    closeArrivalStack,
+    refreshArrivals,
+    bootstrapArrivalActor,
     handleToggleFavorite,
     handleHide,
     handleCopyLink,

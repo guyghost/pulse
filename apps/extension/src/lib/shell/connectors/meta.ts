@@ -13,6 +13,12 @@ export interface ConnectorMeta {
   icon: string;
   url: string;
   hostPermissions: readonly string[];
+  /**
+   * Active le Form Assistant (remplissage de champs type Grammarly) sur ce
+   * connecteur. Le content script est injecté uniquement sur les connecteurs
+   * `formAssist: true`. Source de vérité : src/models/form-assistant.model.md.
+   */
+  formAssist?: boolean;
 }
 
 /**
@@ -26,6 +32,7 @@ const CATALOG: readonly ConnectorMeta[] = [
     icon: 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32',
     url: 'https://www.free-work.com',
     hostPermissions: ['https://www.free-work.com/*'],
+    formAssist: true,
   },
   {
     id: 'lehibou',
@@ -33,6 +40,7 @@ const CATALOG: readonly ConnectorMeta[] = [
     icon: 'https://www.google.com/s2/favicons?domain=lehibou.com&sz=32',
     url: 'https://www.lehibou.com',
     hostPermissions: ['https://*.lehibou.com/*'],
+    formAssist: true,
   },
   {
     id: 'hiway',
@@ -42,6 +50,7 @@ const CATALOG: readonly ConnectorMeta[] = [
     // Hiway fetches missions from a Supabase REST endpoint; that host is
     // Hiway-owned infra and must be dropped when Hiway is excluded.
     hostPermissions: ['https://hiway-missions.fr/*', 'https://jhgjtlkfewuiiofxfrvh.supabase.co/*'],
+    formAssist: true,
   },
   {
     id: 'collective',
@@ -49,6 +58,7 @@ const CATALOG: readonly ConnectorMeta[] = [
     icon: 'https://www.google.com/s2/favicons?domain=collective.work&sz=32',
     url: 'https://app.collective.work/',
     hostPermissions: ['https://*.collective.work/*'],
+    formAssist: true,
   },
   {
     id: 'cherry-pick',
@@ -56,6 +66,7 @@ const CATALOG: readonly ConnectorMeta[] = [
     icon: 'https://www.google.com/s2/favicons?domain=cherry-pick.io&sz=32',
     url: 'https://www.cherry-pick.io',
     hostPermissions: ['https://app.cherry-pick.io/*'],
+    formAssist: true,
   },
   {
     id: 'malt',
@@ -63,6 +74,7 @@ const CATALOG: readonly ConnectorMeta[] = [
     icon: 'https://www.google.com/s2/favicons?domain=malt.fr&sz=32',
     url: 'https://www.malt.fr',
     hostPermissions: ['https://*.malt.fr/*', 'https://*.malt.io/*'],
+    formAssist: true,
   },
 ] as const;
 

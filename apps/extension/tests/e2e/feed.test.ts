@@ -166,7 +166,7 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
         }
 
         chromeStub.runtime.sendMessage = async (msg: unknown) => {
-          const message = msg as { type?: string };
+          const message = msg as { type?: string; payload?: { operationId?: string } };
 
           if (message?.type === 'GET_PROFILE') {
             return {
@@ -181,11 +181,35 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
             };
           }
 
+          if (message?.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
+            const syncedAt = Date.now();
+            return {
+              type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+              payload: [
+                {
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  lastState: 'done',
+                  missionsCount: 10,
+                  error: null,
+                  lastSyncAt: syncedAt,
+                  lastSuccessAt: syncedAt,
+                },
+              ],
+            };
+          }
+
           if (message?.type === 'SCAN_START') {
+            const operationId = message.payload?.operationId;
+            if (!operationId) {
+              return originalSendMessage(msg);
+            }
+
             window.setTimeout(() => {
               emitRuntimeMessage({
                 type: 'SCAN_PARTIAL_RESULT',
                 payload: {
+                  operationId,
                   connectorId: 'free-work',
                   connectorName: 'Free-Work',
                   missions: [partialMission],
@@ -193,11 +217,14 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
               });
             }, 150);
 
-            return new Promise((resolve) => {
-              window.setTimeout(() => {
-                resolve({ type: 'SCAN_COMPLETE', payload: [partialMission] });
-              }, 2500);
-            });
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_COMPLETE',
+                payload: { operationId, missions: [partialMission] },
+              });
+            }, 2500);
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
           }
 
           return originalSendMessage(msg);
@@ -250,6 +277,27 @@ test.describe('Feed', () => {
     await expect(feedSearchInput(page)).toHaveValue('React');
 
     await expect(page.getByText(/React/).first()).toBeVisible();
+  });
+
+  test('search with no result stays a filtered state and can be cleared', async ({ page }) => {
+    await mockUserWithProfile(page);
+    await page.goto(SIDE_PANEL);
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
+    await injectMissions(page, 5);
+    await expectMissionCount(page, 5);
+
+    await feedSearchInput(page).fill('zzzz-introuvable');
+
+    await expect(
+      page.getByRole('heading', { name: 'Aucune mission pour « zzzz-introuvable »' }).first()
+    ).toBeVisible({ timeout: 3000 });
+    await expect(
+      page.getByRole('heading', { name: /Lancez un premier scan|profil actuel/ })
+    ).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Effacer la recherche' }).first().click();
+    await expect(feedSearchInput(page)).toHaveValue('');
+    await expectMissionCount(page, 5);
   });
 
   test('error state shows error message', async ({ page }) => {
@@ -402,33 +450,62 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5, 2000);
   });
 
-  test('partial scan missions stay buffered and become interactive after applying them', async ({
+  test('manual partial results become interactive only after the terminal projection', async ({
     page,
   }) => {
     await mockUserWithProfileAndSlowPartialScan(page);
     await page.goto(SIDE_PANEL);
 
     await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
-    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+    await expect(missionCards(page)).toHaveCount(10, { timeout: 5000 });
+    await expect(scanButton(page)).toHaveAccessibleName('Lancer le scan des missions');
+    await expect(scanButton(page)).toBeEnabled();
 
     await scanButton(page).click();
 
-    const pendingBanner = page.getByTestId('pending-missions-banner');
-    await expect(pendingBanner).toBeVisible({ timeout: 1000 });
+    const arrivalStack = page.getByTestId('mission-arrival-stack');
+    await expect(arrivalStack).not.toBeVisible();
     await expect(page.getByText('Partial Scan Action Test')).not.toBeVisible();
     await expect(page.getByText('Collecte...')).toBeVisible();
 
-    await pendingBanner.getByRole('button', { name: /Afficher 1 mission/ }).click();
-
     const partialCard = missionCards(page).filter({ hasText: 'Partial Scan Action Test' });
-    await expect(partialCard).toBeVisible();
+    await expect(partialCard).toBeVisible({ timeout: 10000 });
+    await expect(missionCards(page)).toHaveCount(1);
+    await expect(scanButton(page)).toHaveAccessibleName('Lancer le scan des missions');
+    await expect(arrivalStack).not.toBeVisible();
 
     const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
     await expect(investigateButton).toBeEnabled();
     await investigateButton.click();
 
-    await expect(page.getByRole('dialog', { name: 'Investigation mission' })).toBeVisible();
-    await expect(page.getByText('Collecte...')).toBeVisible();
+    const investigation = page.getByRole('dialog', { name: 'Investigation mission' });
+    await expect(investigation).toBeVisible();
+    await expect(investigation).toContainText('Partial Scan Action Test');
+  });
+
+  test('keeps the active new-mission queue stable while visible cards become seen', async ({
+    page,
+  }) => {
+    await mockUserWithProfile(page);
+    await page.goto(SIDE_PANEL);
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
+    await injectMissions(page, 8);
+
+    await page.getByRole('button', { name: 'Afficher les détails opérationnels' }).click();
+    const newMissionsToggle = page.getByTitle('Filtrer les nouvelles missions');
+    await newMissionsToggle.click();
+    await expect(newMissionsToggle).toHaveAttribute('aria-pressed', 'true');
+
+    const cards = missionCards(page);
+    const initialCount = await cards.count();
+    const firstCard = cards.first();
+    const firstTitle = await firstCard.locator('h3').textContent();
+    await firstCard.scrollIntoViewIfNeeded();
+
+    await expect(firstCard.getByText('Vu', { exact: true })).toBeVisible({ timeout: 3000 });
+
+    await expect(cards).toHaveCount(initialCount);
+    await expect(cards.first().locator('h3')).toHaveText(firstTitle ?? '');
   });
 
   test('header star button and refresh button are visible', async ({ page }) => {
@@ -474,5 +551,16 @@ test.describe('Feed', () => {
     // Filter panel uses role="group" with aria-label "Options de filtrage"
     const filterPanel = page.getByRole('group', { name: /Options de filtrage/ });
     await expect(filterPanel).toBeVisible();
+
+    const panelIsTopmost = await filterPanel.evaluate((panel) => {
+      const rect = panel.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 24);
+      return hit === panel || (hit !== null && panel.contains(hit));
+    });
+    expect(panelIsTopmost).toBe(true);
+
+    const remoteFilter = filterPanel.getByRole('button', { name: 'Full remote', exact: true });
+    await remoteFilter.click();
+    await expect(remoteFilter).toHaveAttribute('aria-pressed', 'true');
   });
 });

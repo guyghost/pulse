@@ -1,0 +1,53 @@
+{
+  "schema": "missionpulse.connector-catalogue-history-candidate-snapshot",
+  "version": 1,
+  "authorityStatus": "approved",
+  "registryJcsSha256": "9a81cff62e4d3f270e64e0fa98934535c49da6689a64a395dddf8d9191670334",
+  "registry": {
+    "schema": "missionpulse.connector-catalogue-history",
+    "version": 1,
+    "catalogues": [
+      {
+        "catalogFingerprint": "7d6f226e18b8dbb40d8843a9b869608dcf1c5888894cb9afc151cfd9aa0970f7",
+        "tuples": [
+          ["cherry-pick", true, ["https://app.cherry-pick.io/*"]],
+          ["collective", true, ["https://*.collective.work/*"]],
+          ["free-work", true, ["https://www.free-work.com/*"]],
+          ["hiway", true, ["https://hiway-missions.fr/*"]],
+          ["lehibou", true, ["https://*.lehibou.com/*"]],
+          ["malt", true, ["https://*.malt.fr/*", "https://*.malt.io/*"]]
+        ]
+      },
+      {
+        "catalogFingerprint": "c9e1c0e29cf8ee05beb1b657f48edc9ef04600969a139906c9d35303cc79098c",
+        "tuples": [
+          ["cherry-pick", true, ["https://app.cherry-pick.io/*"]],
+          ["collective", true, ["https://*.collective.work/*"]],
+          ["free-work", true, ["https://www.free-work.com/*"]],
+          [
+            "hiway",
+            true,
+            ["https://hiway-missions.fr/*", "https://jhgjtlkfewuiiofxfrvh.supabase.co/*"]
+          ],
+          ["lehibou", true, ["https://*.lehibou.com/*"]],
+          ["malt", true, ["https://*.malt.fr/*", "https://*.malt.io/*"]]
+        ]
+      },
+      {
+        "catalogFingerprint": "82dcefb0db1cf25137c1a1bdfd9ad0eb0120a842376097a773019b78134eb9e0",
+        "tuples": [
+          ["cherry-pick", true, ["https://app.cherry-pick.io/*"]],
+          ["collective", false, ["https://*.collective.work/*"]],
+          ["free-work", true, ["https://www.free-work.com/*"]],
+          [
+            "hiway",
+            true,
+            ["https://hiway-missions.fr/*", "https://jhgjtlkfewuiiofxfrvh.supabase.co/*"]
+          ],
+          ["lehibou", true, ["https://*.lehibou.com/*"]],
+          ["malt", false, ["https://*.malt.fr/*", "https://*.malt.io/*"]]
+        ]
+      }
+    ]
+  }
+}

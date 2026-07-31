@@ -1,40 +1,48 @@
 /**
- * Premium State Store — tracks whether the user has premium (paid) features enabled.
+ * Read-only Premium projection for the connected Pulse account.
  *
  * Routes through the facade/bridge pattern: side panel → facade → bridge →
  * service worker → chrome.storage.local. No direct chrome.* API calls.
  */
 
-import { getPremium, savePremium as persistPremium } from '$lib/shell/facades/premium.facade';
+import { refreshExtensionEntitlement } from '$lib/shell/facades/premium.facade';
+import type { ExtensionAccountProjection } from '$lib/shell/account/account-connection';
+import { canUsePremiumFeature, type PremiumFeature } from '@pulse/domain';
 
 function createPremiumStore() {
-  let isPremium = $state(false);
+  let projection = $state<ExtensionAccountProjection | null>(null);
 
   const load = async (): Promise<void> => {
     try {
-      isPremium = await getPremium();
+      projection = await refreshExtensionEntitlement();
     } catch (e) {
       console.error('[premium] failed to load', e);
-      isPremium = false;
+      projection = null;
     }
   };
 
-  const setPremium = async (enabled: boolean): Promise<void> => {
-    isPremium = enabled;
-    try {
-      await persistPremium(enabled);
-    } catch (e) {
-      console.error('[premium] failed to save', e);
-      isPremium = !enabled;
+  const canUse = (feature: PremiumFeature, nowMs = Date.now()): boolean => {
+    if (projection === null) {
+      return false;
     }
+    return canUsePremiumFeature({
+      snapshot: projection.entitlement,
+      accountState: projection.accountId === null ? 'anonymous' : 'active',
+      accountId: projection.accountId,
+      feature,
+      nowMs,
+    });
   };
 
   return {
     get isPremium() {
-      return isPremium;
+      return canUse('multi_account');
+    },
+    get projection() {
+      return projection;
     },
     load,
-    setPremium,
+    canUse,
   };
 }
 

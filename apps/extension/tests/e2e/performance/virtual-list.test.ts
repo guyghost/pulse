@@ -108,9 +108,64 @@ async function mockMultiBatchPartialScan(page: Page) {
         }
 
         chromeStub.runtime.sendMessage = async (msg: unknown) => {
-          const message = msg as { type?: string };
+          const message = msg as { type?: string; payload?: { operationId?: string } };
+
+          if (message?.type === 'GET_SETTINGS_RELEASE') {
+            const response = (await originalSendMessage(msg)) as {
+              type?: string;
+              payload?: {
+                status?: string;
+                snapshot?: {
+                  settings?: Record<string, unknown>;
+                  [key: string]: unknown;
+                };
+                [key: string]: unknown;
+              };
+            };
+            if (
+              response.type === 'SETTINGS_RELEASE_RESULT' &&
+              response.payload?.status === 'confirmed' &&
+              response.payload.snapshot?.settings
+            ) {
+              return {
+                ...response,
+                payload: {
+                  ...response.payload,
+                  snapshot: {
+                    ...response.payload.snapshot,
+                    settings: {
+                      ...response.payload.snapshot.settings,
+                      enabledConnectors: ['free-work', 'lehibou', 'hiway'],
+                    },
+                  },
+                },
+              };
+            }
+            return response;
+          }
+
+          if (message?.type === 'GET_SETTINGS') {
+            const response = (await originalSendMessage(msg)) as {
+              type?: string;
+              payload?: Record<string, unknown>;
+            };
+            return response.type === 'SETTINGS_RESULT' && response.payload
+              ? {
+                  ...response,
+                  payload: {
+                    ...response.payload,
+                    enabledConnectors: ['free-work', 'lehibou', 'hiway'],
+                  },
+                }
+              : response;
+          }
 
           if (message?.type !== 'SCAN_START') {
+            return originalSendMessage(msg);
+          }
+
+          const operationId = message.payload?.operationId;
+          if (!operationId) {
             return originalSendMessage(msg);
           }
 
@@ -126,6 +181,7 @@ async function mockMultiBatchPartialScan(page: Page) {
                 emitRuntimeMessage({
                   type: 'SCAN_PARTIAL_RESULT',
                   payload: {
+                    operationId,
                     connectorId: batch.connectorId,
                     connectorName: batch.connectorName,
                     missions: Array.from({ length: 20 }, (_, index) =>
@@ -138,21 +194,29 @@ async function mockMultiBatchPartialScan(page: Page) {
             );
           });
 
-          return new Promise((resolve) => {
-            window.setTimeout(() => {
-              resolve({
-                type: 'SCAN_COMPLETE',
-                payload: batches.flatMap((batch) =>
+          window.setTimeout(() => {
+            emitRuntimeMessage({
+              type: 'SCAN_COMPLETE',
+              payload: {
+                operationId,
+                missions: batches.flatMap((batch) =>
                   Array.from({ length: 20 }, (_, index) =>
                     makeMission(batch.offset + index, batch.connectorId)
                   )
                 ),
-              });
-            }, 900);
-          });
+              },
+            });
+          }, 900);
+
+          return { type: 'SCAN_STARTED', payload: { operationId } };
         };
       },
     });
+  });
+
+  await page.reload();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+    timeout: 10000,
   });
 }
 
@@ -377,14 +441,15 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     await scanButton(page).click();
 
-    const pendingBanner = page.getByTestId('pending-missions-banner');
-    await expect(pendingBanner).toBeVisible({ timeout: 2000 });
+    const arrivalStack = page.getByTestId('mission-arrival-stack');
+    await expect(arrivalStack).not.toBeVisible();
     await expectMissionCount(page, 120, 1000);
 
     const searchInput = feedSearchInput(page);
     await searchInput.fill('React');
     await expect(searchInput).toHaveValue('React');
-    await expect(pendingBanner.getByRole('button', { name: /Afficher/ })).toBeEnabled();
+    await expectMissionCount(page, 60, 5000);
+    await expect(arrivalStack).not.toBeVisible();
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {
