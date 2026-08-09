@@ -2,20 +2,58 @@ import type { Mission } from '$lib/core/types/mission';
 
 export type FeedState = 'empty' | 'loading' | 'loaded' | 'error';
 
-const recomputeFilteredMissions = (missions: Mission[], searchQuery: string): Mission[] => {
-  if (!searchQuery.trim()) {
-    return missions;
+/**
+ * Build the lowercased, space-joined haystack of a mission's searchable
+ * fields. Pure and query-independent, so it can be memoised in a `$derived`
+ * that only recomputes when the *missions* change — not on every search
+ * keystroke.
+ *
+ * Field set, ordering, and the `string && length > 0` guard are identical to
+ * the previous inline implementation, so matching results are unchanged:
+ * title → client → description → location → source → stack items.
+ */
+const buildSearchHaystack = (mission: Mission): string => {
+  const parts: string[] = [];
+  if (typeof mission.title === 'string' && mission.title.length > 0) {
+    parts.push(mission.title);
   }
+  if (typeof mission.client === 'string' && mission.client.length > 0) {
+    parts.push(mission.client);
+  }
+  if (typeof mission.description === 'string' && mission.description.length > 0) {
+    parts.push(mission.description);
+  }
+  if (typeof mission.location === 'string' && mission.location.length > 0) {
+    parts.push(mission.location);
+  }
+  // mission.source is always a non-empty string enum value.
+  parts.push(mission.source);
+  for (const item of mission.stack) {
+    if (typeof item === 'string' && item.length > 0) {
+      parts.push(item);
+    }
+  }
+  return parts.join(' ').toLowerCase();
+};
 
-  const query = searchQuery.toLowerCase().trim();
-  return missions.filter((m) => {
-    const searchableText = [m.title, m.client, m.description, m.location, m.source, ...m.stack]
-      .filter((value): value is string => typeof value === 'string' && value.length > 0)
-      .join(' ')
-      .toLowerCase();
-
-    return searchableText.includes(query);
-  });
+/**
+ * Filter missions by a precomputed lowercase query against a parallel array
+ * of lowercased haystacks. Only the `.includes` check runs per query here;
+ * the expensive haystack construction lives in `missionHaystacks` above and
+ * is recomputed solely when missions change.
+ */
+const filterMissionsByQuery = (
+  missions: Mission[],
+  haystacks: string[],
+  normalizedQuery: string
+): Mission[] => {
+  const matches: Mission[] = [];
+  for (let i = 0; i < missions.length; i++) {
+    if (haystacks[i].includes(normalizedQuery)) {
+      matches.push(missions[i]);
+    }
+  }
+  return matches;
 };
 
 export function createFeedStore() {
@@ -24,7 +62,18 @@ export function createFeedStore() {
   let searchQuery = $state('');
   let error = $state<string | null>(null);
 
-  const filteredMissions = $derived(recomputeFilteredMissions(missions, searchQuery));
+  // Query-independent index: rebuilds only when missions change (new scan /
+  // reload), not when the user types. Previously this work was redone for
+  // every mission on every search.
+  const missionHaystacks = $derived(missions.map((m) => buildSearchHaystack(m)));
+
+  const filteredMissions = $derived.by(() => {
+    const trimmed = searchQuery.trim();
+    if (trimmed.length === 0) {
+      return missions;
+    }
+    return filterMissionsByQuery(missions, missionHaystacks, trimmed.toLowerCase());
+  });
 
   return {
     get state() {
