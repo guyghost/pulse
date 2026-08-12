@@ -312,6 +312,34 @@ describe('deduplicateMissions', () => {
     expect(result).toHaveLength(2);
   });
 
+  it('dedupes across disjoint locations when one carries a remote token', () => {
+    // Exercises the compareLocations remote-context fallback: location token
+    // sets are disjoint (no weighted similarity), but "teletravail" is in
+    // REMOTE_LOCATION_TOKENS, so the pair stays compatible and merges.
+    // Regression guard for the allocation-free hasAnyToken implementation.
+    const missions = [
+      makeMission({
+        id: 'paris',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Paris',
+        remote: null,
+      }),
+      makeMission({
+        id: 'remote',
+        title: 'Developpeur React Senior',
+        stack: ['React'],
+        location: 'Teletravail',
+        remote: null,
+      }),
+    ];
+
+    const result = deduplicateMissionsDetailed(missions);
+    expect(result.missions).toHaveLength(1);
+    expect(result.duplicateRelations).toHaveLength(1);
+    expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
   it('handles complex duplicate scenarios', () => {
     const missions = [
       makeMission({

@@ -140,6 +140,22 @@ const tokenize = (text: string | null | undefined): Set<string> =>
   );
 
 /**
+ * True if any member of `needles` is present in `tokens`. Iterates `needles`
+ * (typically a tiny constant set such as REMOTE_LOCATION_TOKENS) and does O(1)
+ * membership checks against `tokens`, allocating nothing. Replaces the previous
+ * `[...aTokens, ...bTokens].some(...)` in compareLocations, which allocated a
+ * merged array on every candidate pair — a hot path during deduplication.
+ */
+const hasAnyToken = (tokens: Set<string>, needles: Set<string>): boolean => {
+  for (const needle of needles) {
+    if (tokens.has(needle)) {
+      return true;
+    }
+  }
+  return false;
+};
+
+/**
  * Counts shared elements between two sets, iterating the smaller set to minimise
  * membership checks. Allocates no intermediate arrays/sets — important because
  * this runs per mission-pair during deduplication.
@@ -316,7 +332,8 @@ const compareLocations = (
   const hasRemoteContext =
     a.remote === 'full' ||
     b.remote === 'full' ||
-    [...aTokens, ...bTokens].some((token) => REMOTE_LOCATION_TOKENS.has(token));
+    hasAnyToken(aTokens, REMOTE_LOCATION_TOKENS) ||
+    hasAnyToken(bTokens, REMOTE_LOCATION_TOKENS);
 
   return { compatible: hasRemoteContext, score: hasRemoteContext ? 0.4 : 0 };
 };
