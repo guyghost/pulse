@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFeedStore } from '../../../src/lib/state/feed.svelte';
 import {
+  countMissionsForFilterDraft,
   createFeedPageState,
   isRemoteCompatibleInsight,
   needsTjmNegotiation,
 } from '../../../src/lib/state/feed-page.svelte';
 import type { Mission, MissionSource } from '../../../src/lib/core/types/mission';
 import type { FeedController } from '../../../src/lib/shell/facades/feed-controller.svelte';
+import type { FeedFilterDraft } from '../../../src/models/feed-filter-sheet.model';
 
 const feedDataMock = vi.hoisted(() => ({
   getSeenIds: vi.fn(),
@@ -689,6 +691,27 @@ describe('feed page state', () => {
     expect(needsTjmNegotiation(makeMission({ tjm: 900 }), 600)).toBe(false);
     expect(needsTjmNegotiation(makeMission({ tjm: null }), 600)).toBe(false);
     expect(needsTjmNegotiation(makeMission({ tjm: 590 }), null)).toBe(false);
+  });
+
+  it('previews a filter draft count without mutating its inputs', () => {
+    const missions = [
+      makeMission({ id: 'priority-remote', score: 92, source: 'free-work', remote: 'full' }),
+      makeMission({ id: 'priority-onsite', score: 88, source: 'free-work', remote: 'onsite' }),
+      makeMission({ id: 'weak-remote', score: 55, source: 'hiway', remote: 'full' }),
+    ];
+    const draft: FeedFilterDraft = {
+      decisionPreset: 'priority',
+      selectedScoreBucket: null,
+      selectedTjmMin: null,
+      selectedSource: 'free-work',
+      selectedRemote: 'full',
+      selectedSeniority: null,
+      selectedStacks: [],
+    };
+
+    expect(countMissionsForFilterDraft(missions, draft, [], 600)).toBe(1);
+    expect(missions).toHaveLength(3);
+    expect(draft.selectedStacks).toEqual([]);
   });
 
   it('counts only explicit full or hybrid remote as remote-compatible insight', () => {

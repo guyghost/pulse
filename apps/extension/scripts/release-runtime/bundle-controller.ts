@@ -166,9 +166,8 @@ export async function bundleReleaseController(
 
   const sourceRoot = await realpath(dirname(fileURLToPath(import.meta.url)));
   const repositoryRoot = resolve(sourceRoot, '../../../..');
-  const esbuildExecutable = await realpath(
-    resolve(repositoryRoot, 'node_modules/esbuild/bin/esbuild')
-  );
+  const nodeModulesRoot = resolve(repositoryRoot, 'node_modules');
+  const esbuildExecutable = await realpath(resolve(nodeModulesRoot, 'esbuild/bin/esbuild'));
   const temporaryDirectory = await mkdtemp(join(tmpdir(), 'missionpulse-esbuild-'));
   const temporarySourceRoot = resolve(temporaryDirectory, 'sources');
   const snapshotEsbuildExecutable = resolve(temporaryDirectory, 'esbuild');
@@ -227,7 +226,24 @@ export async function bundleReleaseController(
       ],
       {
         cwd: temporarySourceRoot,
-        env: { HOME: '/nonexistent', LANG: 'C', LC_ALL: 'C', TZ: 'UTC' },
+        // The esbuild bin is a `#!/usr/bin/env node` shim that, at runtime,
+        // `require.resolve`s its platform-specific native binary. It runs from
+        // an isolated temp copy, so it needs two controlled env entries:
+        //   - PATH: the directory of the node already running this build, so
+        //     the `node` interpreter is found. We do NOT inherit the caller's
+        //     PATH (that would reintroduce the injection vector this boundary
+        //     exists to prevent).
+        //   - NODE_PATH: the repo's own node_modules, so the shim resolves its
+        //     `@esbuild/<platform>` optional dependency. Scoped to the already
+        //     trusted dependency tree; NODE_OPTIONS and friends stay unset.
+        env: {
+          HOME: '/nonexistent',
+          LANG: 'C',
+          LC_ALL: 'C',
+          TZ: 'UTC',
+          PATH: dirname(process.execPath),
+          NODE_PATH: nodeModulesRoot,
+        },
         encoding: 'utf8',
         timeout: 30_000,
         maxBuffer: 1_048_576,

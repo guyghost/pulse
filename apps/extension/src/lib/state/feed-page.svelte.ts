@@ -87,6 +87,13 @@ import {
   createMissionArrivalActor,
   type MissionArrivalActorEvent,
 } from '$lib/shell/arrival/mission-arrival-actor';
+import {
+  createFeedFilterSheetState,
+  transitionFeedFilterSheet,
+  type FeedFilterDraft,
+  type FeedFilterSheetDismissReason,
+  type FeedFilterSheetEvent,
+} from '../../models/feed-filter-sheet.model';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -196,6 +203,50 @@ function matchesDecisionPreset(
   return !seenSet.has(mission.id);
 }
 
+export function countMissionsForFilterDraft(
+  missions: Mission[],
+  draft: FeedFilterDraft,
+  seenIds: string[],
+  profileTjmMin: number | null
+): number {
+  const seenSet = new SvelteSet(seenIds);
+  const selectedStacks = new SvelteSet(draft.selectedStacks);
+
+  return missions.filter((mission) => {
+    if (draft.selectedSource !== null && mission.source !== draft.selectedSource) {
+      return false;
+    }
+    if (draft.selectedRemote !== null && mission.remote !== draft.selectedRemote) {
+      return false;
+    }
+    if (draft.selectedSeniority !== null && mission.seniority !== draft.selectedSeniority) {
+      return false;
+    }
+    if (selectedStacks.size > 0 && !mission.stack.some((stack) => selectedStacks.has(stack))) {
+      return false;
+    }
+    if (
+      draft.selectedScoreBucket !== null &&
+      getScoreBucket(getMissionScore(mission)) !== draft.selectedScoreBucket
+    ) {
+      return false;
+    }
+    if (
+      draft.selectedTjmMin !== null &&
+      (mission.tjm === null || mission.tjm < draft.selectedTjmMin)
+    ) {
+      return false;
+    }
+    if (
+      draft.decisionPreset !== null &&
+      !matchesDecisionPreset(mission, draft.decisionPreset, seenSet, profileTjmMin)
+    ) {
+      return false;
+    }
+    return true;
+  }).length;
+}
+
 /**
  * Feed Page State — factory function returning a reactive state object.
  *
@@ -228,12 +279,13 @@ export function createFeedPageState(
   });
   let showFavoritesOnly = $state(false);
   let showHidden = $state(false);
-  let showFilters = $state(false);
+  let filterSheetState = $state(createFeedFilterSheetState());
   let selectedStacks = $state<string[]>([]);
   let selectedSource = $state<MissionSource | null>(null);
   let selectedRemote = $state<RemoteType | null>(null);
   let selectedSeniority = $state<SeniorityLevel | null>(null);
   let selectedScoreBucket = $state<ScoreBucket | null>(null);
+  let selectedTjmMin = $state<number | null>(null);
   let decisionPreset = $state<DecisionPresetId | null>(null);
   let showNewOnly = $state(false);
   let firstName = $state('');
@@ -382,8 +434,13 @@ export function createFeedPageState(
       selectedStacks.length > 0 ||
       selectedSeniority !== null ||
       selectedScoreBucket !== null ||
+      selectedTjmMin !== null ||
       decisionPreset !== null ||
       showNewOnly
+  );
+  const showFilters = $derived(filterSheetState.value === 'open');
+  const filterSheetDraft = $derived(
+    filterSheetState.value === 'open' ? filterSheetState.filters : null
   );
 
   const stackCounts = $derived.by(() => {
@@ -439,6 +496,10 @@ export function createFeedPageState(
     }
     if (selectedScoreBucket !== null) {
       result = result.filter((m) => getScoreBucket(getMissionScore(m)) === selectedScoreBucket);
+    }
+    const tjmFloor = selectedTjmMin;
+    if (tjmFloor !== null) {
+      result = result.filter((m) => m.tjm !== null && m.tjm >= tjmFloor);
     }
     if (decisionPreset !== null && decisionPreset !== 'new') {
       const activePreset = decisionPreset;
@@ -702,6 +763,7 @@ export function createFeedPageState(
   });
 
   const visibleCount = $derived(displayMissions.length);
+  const filterSheetPreviewCount = $derived(visibleCount);
   const missionListResetKey = $derived(
     [
       searchQuery.trim(),
@@ -954,6 +1016,9 @@ export function createFeedPageState(
     if (preset === 'remote-compatible') {
       selectedRemote = null;
     }
+    if (preset === 'tjm-negotiation') {
+      selectedTjmMin = null;
+    }
     if (preset === 'new') {
       showNewOnly = false;
     }
@@ -978,6 +1043,58 @@ export function createFeedPageState(
     }
   }
 
+  function committedFilterDraft(): FeedFilterDraft {
+    return {
+      decisionPreset: decisionPreset ?? (showNewOnly ? 'new' : null),
+      selectedScoreBucket,
+      selectedTjmMin,
+      selectedSource,
+      selectedRemote,
+      selectedSeniority,
+      selectedStacks: [...selectedStacks],
+    };
+  }
+
+  function applyFilterDraft(draft: FeedFilterDraft): void {
+    activeSavedViewId = null;
+    decisionPreset = draft.decisionPreset;
+    selectedScoreBucket = draft.selectedScoreBucket;
+    selectedTjmMin = draft.selectedTjmMin;
+    selectedSource = draft.selectedSource;
+    selectedRemote = draft.selectedRemote;
+    selectedSeniority = draft.selectedSeniority;
+    selectedStacks = [...draft.selectedStacks];
+    showNewOnly = false;
+
+    if (decisionPreset === 'new') {
+      enterStableNewQueue();
+    } else {
+      exitStableNewQueue();
+    }
+  }
+
+  function reduceFilterSheet(event: FeedFilterSheetEvent): void {
+    const transition = transitionFeedFilterSheet(filterSheetState, event);
+    filterSheetState = transition.state;
+    if (transition.command.type === 'SYNC_FILTERS') {
+      applyFilterDraft(transition.command.filters);
+    }
+  }
+
+  function openFilterSheet(): void {
+    reduceFilterSheet({ type: 'OPEN', committed: committedFilterDraft() });
+  }
+
+  function editFilterSheet(
+    event: Exclude<FeedFilterSheetEvent, { type: 'OPEN' | 'DISMISS' | 'DISPOSE' }>
+  ): void {
+    reduceFilterSheet(event);
+  }
+
+  function dismissFilterSheet(reason: FeedFilterSheetDismissReason): void {
+    reduceFilterSheet({ type: 'DISMISS', reason });
+  }
+
   function clearAllFilters(): void {
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer);
@@ -990,9 +1107,10 @@ export function createFeedPageState(
     selectedRemote = null;
     selectedSeniority = null;
     selectedScoreBucket = null;
+    selectedTjmMin = null;
     decisionPreset = null;
     showNewOnly = false;
-    showFilters = false;
+    dismissFilterSheet('button');
     exitStableNewQueue();
   }
 
@@ -1085,6 +1203,7 @@ export function createFeedPageState(
     selectedRemote = filters.selectedRemote;
     selectedSeniority = filters.selectedSeniority;
     selectedScoreBucket = filters.selectedScoreBucket;
+    selectedTjmMin = null;
     decisionPreset = filters.decisionPreset ?? null;
     showNewOnly = filters.showNewOnly;
     showFavoritesOnly = filters.showFavoritesOnly;
@@ -1359,7 +1478,7 @@ export function createFeedPageState(
             if (searchQuery) {
               handleSearch('');
             } else if (showFilters) {
-              showFilters = false;
+              dismissFilterSheet('escape');
             }
           },
         },
@@ -1462,6 +1581,7 @@ export function createFeedPageState(
       type: 'PREVIEW_CACHE_DISPOSED',
       reason: 'feed-unmounted',
     });
+    reduceFilterSheet({ type: 'DISPOSE' });
   }
 
   // ============================================================
@@ -1487,6 +1607,12 @@ export function createFeedPageState(
     },
     get showFilters() {
       return showFilters;
+    },
+    get filterSheetDraft() {
+      return filterSheetDraft;
+    },
+    get filterSheetPreviewCount() {
+      return filterSheetPreviewCount;
     },
     get selectedStacks() {
       return selectedStacks;
@@ -1529,6 +1655,9 @@ export function createFeedPageState(
     },
     get profileNeedsCompletion() {
       return profileNeedsCompletion;
+    },
+    get profileTjmMin() {
+      return profileTjmMin;
     },
     get panelSide() {
       return panelSide;
@@ -1680,7 +1809,11 @@ export function createFeedPageState(
 
     // Setters for non-bind cases
     setShowFilters(v: boolean) {
-      showFilters = v;
+      if (v) {
+        openFilterSheet();
+      } else {
+        dismissFilterSheet('button');
+      }
     },
 
     // Actions
@@ -1704,6 +1837,9 @@ export function createFeedPageState(
     setSelectedScoreBucket,
     applyDecisionPreset,
     toggleNewOnly,
+    openFilterSheet,
+    editFilterSheet,
+    dismissFilterSheet,
     saveCurrentView,
     applySavedView,
     deleteSavedView,

@@ -74,6 +74,13 @@
     record: MissionTracking;
   };
 
+  type ActivityOverviewItem = {
+    mission: Mission | null;
+    missionId: string;
+    status: ApplicationStatus;
+    timestamp: number;
+  };
+
   type LoadingProgressStep = {
     label: string;
     detail: string;
@@ -109,6 +116,43 @@
           item.record !== null && item.record.currentStatus !== 'detected'
       )
       .sort((a, b) => getLastActivity(b.record) - getLastActivity(a.record));
+  });
+
+  const overviewActivities = $derived.by<ActivityOverviewItem[]>(() => {
+    const trackingActivities = [...tracking.trackings.values()]
+      .filter((record) => record.currentStatus !== 'detected')
+      .map((record) => ({
+        mission: missions.find((mission) => mission.id === record.missionId) ?? null,
+        missionId: record.missionId,
+        status: record.currentStatus,
+        timestamp: getLastActivity(record),
+      }))
+      .sort((a, b) => b.timestamp - a.timestamp);
+
+    if (trackingActivities.length > 0) {
+      return trackingActivities;
+    }
+
+    return missions
+      .slice()
+      .sort((a, b) => getMissionActivityTimestamp(b) - getMissionActivityTimestamp(a))
+      .slice(0, 7)
+      .map((mission) => ({
+        mission,
+        missionId: mission.id,
+        status: 'detected',
+        timestamp: getMissionActivityTimestamp(mission),
+      }));
+  });
+
+  const todayActivities = $derived.by(() => {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return overviewActivities.filter(({ timestamp }) => timestamp >= oneDayAgo).slice(0, 3);
+  });
+
+  const weekActivities = $derived.by(() => {
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    return overviewActivities.filter(({ timestamp }) => timestamp < oneDayAgo).slice(0, 4);
   });
 
   const selectedMission = $derived(
@@ -251,6 +295,16 @@
     return record.history[record.history.length - 1].timestamp;
   }
 
+  function getMissionActivityTimestamp(mission: Mission): number {
+    const scrapedAt = new Date(mission.scrapedAt).getTime();
+    if (Number.isFinite(scrapedAt)) {
+      return scrapedAt;
+    }
+
+    const publishedAt = mission.publishedAt ? Date.parse(mission.publishedAt) : Number.NaN;
+    return Number.isFinite(publishedAt) ? publishedAt : 0;
+  }
+
   function getNextActionTimestamp(record: MissionTracking): number {
     if (!record.nextActionAt) {
       return Number.POSITIVE_INFINITY;
@@ -280,6 +334,35 @@
       hour: '2-digit',
       minute: '2-digit',
     }).format(new Date(timestamp));
+  }
+
+  function getActivityIcon(status: ApplicationStatus): IconName {
+    const icons: Record<ApplicationStatus, IconName> = {
+      detected: 'briefcase',
+      selected: 'target',
+      application_prepared: 'file-text',
+      applied: 'send',
+      interview: 'calendar-clock',
+      offer: 'mail',
+      accepted: 'check-circle',
+      rejected: 'x-circle',
+      archived: 'briefcase',
+    };
+
+    return icons[status];
+  }
+
+  function getActivityDotClass(status: ApplicationStatus): string {
+    if (status === 'accepted') {
+      return 'bg-blueprint-blue';
+    }
+    if (status === 'rejected' || status === 'archived') {
+      return 'bg-text-muted';
+    }
+    if (status === 'interview') {
+      return 'bg-status-orange';
+    }
+    return 'bg-status-violet';
   }
 
   function formatNextAction(nextActionAt: string | null | undefined): string | null {
@@ -339,6 +422,12 @@
   async function selectMission(missionId: string): Promise<void> {
     selectedMissionId = missionId;
     await loadAssets(missionId);
+  }
+
+  function openActivity(item: ActivityOverviewItem): void {
+    if (item.mission) {
+      void selectMission(item.mission.id);
+    }
   }
 
   function handleApplicationStoryAction(): void {
@@ -519,7 +608,106 @@
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
+  <section
+    class="mb-5"
+    data-testid="application-activity-overview"
+    aria-labelledby="application-activity-title"
+  >
+    <h1 id="application-activity-title" class="text-heading font-medium text-text-primary">
+      Aujourd’hui
+    </h1>
+    <div class="mt-2 overflow-hidden border-y border-border-light bg-surface-white">
+      {#if todayActivities.length > 0}
+        {#each todayActivities as item (item.missionId)}
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
+            onclick={() => openActivity(item)}
+            disabled={!item.mission}
+          >
+            <span
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+            >
+              <Icon name={getActivityIcon(item.status)} size={14} />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-body-lg font-medium text-text-primary">
+                {STATUS_LABELS[item.status]}
+              </span>
+              <span class="mt-0.5 block truncate text-meta text-text-muted">
+                {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
+              </span>
+            </span>
+            <span
+              class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
+              aria-hidden="true"
+            ></span>
+          </button>
+        {/each}
+      {:else}
+        <div class="flex items-center gap-3 px-1 py-4 text-text-muted">
+          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray">
+            <Icon name="activity" size={14} />
+          </span>
+          <p class="text-meta">Aucune nouvelle activité aujourd’hui.</p>
+        </div>
+      {/if}
+    </div>
+
+    <div class="mt-5 flex items-center justify-between gap-3">
+      <h2 class="text-heading font-medium text-text-primary">Cette semaine</h2>
+      <span class="text-meta text-text-muted">
+        {tracking.trackings.size > 0
+          ? `${tracking.trackings.size} suivies`
+          : `${missions.length} à qualifier`}
+      </span>
+    </div>
+    <div class="mt-2 overflow-hidden border-y border-border-light bg-surface-white">
+      {#if weekActivities.length > 0}
+        {#each weekActivities as item (item.missionId)}
+          <button
+            type="button"
+            class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
+            onclick={() => openActivity(item)}
+            disabled={!item.mission}
+          >
+            <span
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+            >
+              <Icon name={getActivityIcon(item.status)} size={14} />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="block truncate text-body-lg font-medium text-text-primary">
+                {STATUS_LABELS[item.status]}
+              </span>
+              <span class="mt-0.5 block truncate text-meta text-text-muted">
+                {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
+              </span>
+            </span>
+            <span
+              class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
+              aria-hidden="true"
+            ></span>
+          </button>
+        {/each}
+      {:else}
+        <div class="flex items-center justify-between gap-3 px-1 py-4">
+          <p class="text-meta text-text-muted">Le reste de votre suivi apparaîtra ici.</p>
+          <button
+            type="button"
+            class="shrink-0 rounded-lg bg-subtle-gray px-3 py-2 text-meta font-medium text-text-primary"
+            onclick={() => onNavigateToFeed?.()}
+          >
+            Voir les missions
+          </button>
+        </div>
+      {/if}
+    </div>
+  </section>
+
+  <div class={overviewActivities.length > 0 ? 'mt-96' : 'mt-8'}>
+    <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
+  </div>
 
   <section class="section-card-strong mt-5 rounded-2xl px-5 py-5">
     <div class="flex items-start justify-between gap-4">
@@ -703,6 +891,7 @@
                 .slice(0, 20)
                 .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item (item.mission.id)}
             <button
+              data-testid="tracked-mission-row"
               class="w-full rounded-lg border px-3 py-3 text-left transition-colors {selectedMissionId ===
               item.mission.id
                 ? 'border-blueprint-blue/30 bg-blueprint-blue/6'

@@ -3,6 +3,8 @@
 Authoritative behavior for side-panel bootstrap, navigation, premium routing,
 and lazy page loading. This model complements `launch-performance.model.md`:
 that document owns timing budgets; this document owns state and recovery.
+`navigation-motion.model.md` owns the visual projection of an accepted route
+into expandable pills and directional page motion.
 
 ## Scope and decisions
 

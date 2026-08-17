@@ -36,6 +36,7 @@
   import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
   import type { FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
   import OperationalStoryCard from '../molecules/OperationalStoryCard.svelte';
+  import FeedFilterSheet from '../organisms/FeedFilterSheet.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import {
     getProfileBannerDismissed,
@@ -46,7 +47,7 @@
     getKbdCheatsheetTipSeen,
     setKbdCheatsheetTipSeen,
   } from '$lib/shell/facades/app-flags.facade';
-  import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
+  import { getConnectorsMeta, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
@@ -58,7 +59,12 @@
   const {
     onNavigateToOnboarding,
     onNavigateToProfile,
-  }: { onNavigateToOnboarding?: () => void; onNavigateToProfile?: () => void } = $props();
+    active = true,
+  }: {
+    onNavigateToOnboarding?: () => void;
+    onNavigateToProfile?: () => void;
+    active?: boolean;
+  } = $props();
 
   // ============================================================
   // Initialization
@@ -66,6 +72,10 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
+  const filterSourceOptions = getConnectorsMeta().map((source) => ({
+    value: source.id as MissionSource,
+    label: source.name,
+  }));
   page.setup();
   onDestroy(() => page.dispose());
   onDestroy(() => {
@@ -126,7 +136,6 @@
   let ConnectorStatusList: typeof import('../molecules/ConnectorStatusList.svelte').default | null =
     $state(null);
   let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
-  let FilterBar: typeof import('../organisms/FilterBar.svelte').default | null = $state(null);
   let KeyboardShortcutsHelp:
     typeof import('../molecules/KeyboardShortcutsHelp.svelte').default | null = $state(null);
   let MissionInvestigationDrawer:
@@ -172,14 +181,6 @@
     if (!LastScanInfo) {
       import('../molecules/LastScanInfo.svelte').then((module) => {
         LastScanInfo = module.default;
-      });
-    }
-  }
-
-  function loadFilterBar(): void {
-    if (!FilterBar) {
-      import('../organisms/FilterBar.svelte').then((module) => {
-        FilterBar = module.default;
       });
     }
   }
@@ -268,25 +269,29 @@
   let feedChromeCompact = $state(false);
   let feedScrollContainer = $state<HTMLDivElement | null>(null);
   let missionFeedSection = $state<HTMLDivElement | null>(null);
+  let feedHeroCard = $state<HTMLElement | null>(null);
   let missionFeedReached = $state(false);
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let showAlertOnly = $state(false);
   let showComparison = $state(false);
   let showAdvancedControls = $state(false);
-  // Tracks whether the advanced panel was opened by the user (vs. auto-expanded
-  // by a broken-connector state). Lets us auto-collapse only the auto-expand.
-  let advancedControlsUserOpened = $state(false);
-  // Tracks whether the user has interacted with the toggle at all. Once true,
-  // the broken-connector auto-expand stops fighting the user's explicit choice
-  // (e.g. they collapsed to "Vue simple" while a connector is broken).
-  let advancedControlsUserInteracted = $state(false);
   let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
+  let filterTrigger = $state<HTMLButtonElement | null>(null);
+  let filterSheetWasOpen = false;
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
   $effect(() => {
-    if (page.showFilters) {
-      loadFilterBar();
+    if (!active && page.showFilters) {
+      page.dismissFilterSheet('page-hidden');
     }
+  });
+
+  $effect(() => {
+    const isOpen = page.showFilters;
+    if (!isOpen && filterSheetWasOpen && active) {
+      void tick().then(() => filterTrigger?.focus());
+    }
+    filterSheetWasOpen = isOpen;
   });
 
   $effect(() => {
@@ -396,6 +401,27 @@
     return getCanonicalMissionScore(mission) ?? 0;
   }
 
+  function formatOverviewSource(source: MissionSource): string {
+    const labels: Record<MissionSource, string> = {
+      'free-work': 'Free-Work',
+      lehibou: 'LeHibou',
+      hiway: 'Hiway',
+      collective: 'Collective',
+      'cherry-pick': 'Cherry Pick',
+      malt: 'Malt',
+    };
+
+    return labels[source];
+  }
+
+  function formatOverviewMeta(mission: Mission): string {
+    const place =
+      mission.remote === 'full'
+        ? 'Remote'
+        : (mission.location ?? (mission.remote === 'hybrid' ? 'Hybride' : 'Sur site'));
+    return `${formatOverviewSource(mission.source)} · ${place} · ${getMissionScore(mission)}%`;
+  }
+
   function missionMatchesAlert(
     mission: (typeof page.displayMissions)[number],
     preferences: ConnectedAlertPreferences
@@ -430,6 +456,7 @@
   const visibleFeedMissions = $derived(showAlertOnly ? alertMissions : page.displayMissions);
   const visibleFeedMissionCount = $derived(visibleFeedMissions.length);
   const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
+  const overviewMissions = $derived(page.displayMissions.slice(0, 3));
   const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
   const feedChromeBusy = $derived(controller.isScanning || feedIsColdLoading);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
@@ -877,18 +904,6 @@
   });
 
   $effect(() => {
-    const hasBroken = brokenConnectors.length > 0;
-    if (hasBroken && !showAdvancedControls && !advancedControlsUserInteracted) {
-      // First time a connector breaks: surface it once. After the user has
-      // touched the toggle, respect their explicit choice (see "Vue simple").
-      showAdvancedControls = true;
-      advancedControlsUserOpened = false;
-    } else if (!hasBroken && showAdvancedControls && !advancedControlsUserOpened) {
-      showAdvancedControls = false;
-    }
-  });
-
-  $effect(() => {
     const container = feedScrollContainer;
     missionFeedSection;
     visibleFeedMissionCount;
@@ -901,7 +916,33 @@
       }
     });
   });
+
+  function handleFilterSheetKeydown(event: KeyboardEvent): void {
+    if (!active || !page.showFilters || event.key !== 'Escape') {
+      return;
+    }
+    event.preventDefault();
+    event.stopPropagation();
+    page.dismissFilterSheet('escape');
+  }
+
+  function toggleOperationalDetails(): void {
+    if (page.showFilters) {
+      page.dismissFilterSheet('button');
+    }
+
+    const nextOpen = !showAdvancedControls;
+    showAdvancedControls = nextOpen;
+
+    if (nextOpen) {
+      void tick().then(() => {
+        feedHeroCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  }
 </script>
+
+<svelte:window onkeydown={handleFilterSheetKeydown} />
 
 <div
   bind:this={feedScrollContainer}
@@ -947,232 +988,181 @@
       ? 'brightness-[0.99]'
       : ''}"
   >
-    <div class="min-h-0 overflow-visible">
+    <section data-testid="mission-overview" class="mb-4" aria-labelledby="mission-overview-title">
+      <div class="flex items-center gap-1.5">
+        <h2 id="mission-overview-title" class="text-heading font-medium text-text-primary">
+          À voir
+        </h2>
+        <Icon name="chevron-down" size={14} class="text-text-subtle" />
+      </div>
+
+      <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
+        <button
+          type="button"
+          class="group min-w-28 flex-1 overflow-hidden rounded-xl border border-border-light bg-surface-white text-left transition-colors hover:border-disabled-gray"
+          onclick={() => page.applyDecisionPreset('priority')}
+        >
+          <span
+            class="flex h-20 items-center justify-center bg-subtle-gray text-text-subtle transition-colors group-hover:bg-disabled-gray/35"
+          >
+            <Icon name="target" size={19} />
+          </span>
+          <span class="block px-3 py-2.5">
+            <span class="block text-body font-medium text-text-primary">Top match</span>
+            <span class="mt-0.5 block text-caption text-text-muted"
+              >{page.dashboardSummary.highScoreCount}</span
+            >
+          </span>
+        </button>
+        <button
+          type="button"
+          class="group min-w-28 flex-1 overflow-hidden rounded-xl border border-border-light bg-surface-white text-left transition-colors hover:border-disabled-gray"
+          onclick={() => page.applyDecisionPreset('remote-compatible')}
+        >
+          <span
+            class="flex h-20 items-center justify-center bg-subtle-gray text-text-subtle transition-colors group-hover:bg-disabled-gray/35"
+          >
+            <Icon name="wifi" size={19} />
+          </span>
+          <span class="block px-3 py-2.5">
+            <span class="block text-body font-medium text-text-primary">Remote</span>
+            <span class="mt-0.5 block text-caption text-text-muted"
+              >{page.insightSummary.remoteMatchCount}</span
+            >
+          </span>
+        </button>
+        <button
+          type="button"
+          class="group min-w-28 flex-1 overflow-hidden rounded-xl border border-border-light bg-surface-white text-left transition-colors hover:border-disabled-gray"
+          onclick={() => page.applyDecisionPreset('new')}
+        >
+          <span
+            class="flex h-20 items-center justify-center bg-subtle-gray text-text-subtle transition-colors group-hover:bg-disabled-gray/35"
+          >
+            <Icon name="sparkles" size={19} />
+          </span>
+          <span class="block px-3 py-2.5">
+            <span class="block text-body font-medium text-text-primary">Nouveautés</span>
+            <span class="mt-0.5 block text-caption text-text-muted"
+              >{page.dashboardSummary.newCount}</span
+            >
+          </span>
+        </button>
+      </div>
+
+      <div class="mt-5 flex items-center justify-between gap-3">
+        <h2 class="text-heading font-medium text-text-primary">Pour vous</h2>
+        <span class="text-meta text-text-muted">{page.visibleCount}</span>
+      </div>
+      <div
+        class="mt-2 overflow-hidden rounded-2xl border border-border-light bg-surface-white shadow-subtle-2"
+      >
+        {#if overviewMissions.length > 0}
+          {#each overviewMissions as mission (mission.id)}
+            <button
+              type="button"
+              class="flex w-full items-center gap-3 border-b border-border-light px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-subtle-gray/45"
+              onclick={() => handleOpenExternalUrl(mission.url)}
+            >
+              <span
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+              >
+                <Icon name="briefcase" size={14} />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="block truncate text-body-lg font-medium text-text-primary"
+                  >{mission.title}</span
+                >
+                <span class="mt-0.5 block truncate text-meta text-text-muted"
+                  >{formatOverviewMeta(mission)}</span
+                >
+              </span>
+              <span class="h-2 w-2 shrink-0 rounded-full bg-blueprint-blue" aria-hidden="true"
+              ></span>
+            </button>
+          {/each}
+        {:else}
+          <div class="flex items-center justify-between gap-4 px-3 py-4">
+            <div>
+              <p class="text-body-lg font-medium text-text-primary">
+                Aucune mission pour l’instant
+              </p>
+              <p class="mt-0.5 text-meta text-text-muted">
+                Lancez un scan pour alimenter votre sélection.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg bg-blueprint-blue px-3 py-2 text-meta font-medium text-white"
+              onclick={handleMissionFeedScanAction}
+              disabled={!page.feedPresentation.actionEnabled}
+            >
+              Scanner
+            </button>
+          </div>
+        {/if}
+      </div>
+    </section>
+
+    <div class="mt-8 min-h-0 overflow-visible">
       <!-- ═══════════════════════════════════════════
            Hero card — greeting + filters unified
            ═══════════════════════════════════════════ -->
       <section
+        bind:this={feedHeroCard}
         data-testid="feed-hero-card"
         class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
           ? 'z-40'
           : ''} {feedChromeCompact ? 'border-blueprint-blue/10 shadow-subtle-3' : ''}"
       >
         <!-- ── Hero header ── -->
-        <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
-          {#if page.heroCompact}
-            <!-- Compact: single row with stats and scan button -->
-            <div class="flex items-center justify-between gap-3">
-              <div class="flex items-center gap-3 min-w-0">
-                <div>
-                  <p
-                    class="text-micro font-semibold uppercase tracking-[0.18em] text-blueprint-blue"
-                  >
-                    MissionPulse
-                  </p>
-                  <div
-                    class="mt-1 flex items-baseline gap-3"
-                    aria-label={`${formatMissionCount(page.visibleCount)} visible${page.visibleCount > 1 ? 's' : ''}`}
-                  >
-                    <span class="text-heading font-semibold text-text-primary"
-                      >{page.visibleCount}</span
+        {#if page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible}
+          <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
+            {#if page.heroCompact}
+              <!-- Compact: single row with stats and scan button -->
+              <div class="flex items-center gap-3">
+                <div class="flex items-center gap-3 min-w-0">
+                  <div>
+                    <p
+                      class="text-micro font-semibold uppercase tracking-[0.18em] text-blueprint-blue"
                     >
-                    <span class="text-micro text-text-muted"
-                      >{page.visibleCount > 1 ? 'missions' : 'mission'}</span
+                      MissionPulse
+                    </p>
+                    <div
+                      class="mt-1 flex items-baseline gap-3"
+                      aria-label={`${formatMissionCount(page.visibleCount)} visible${page.visibleCount > 1 ? 's' : ''}`}
                     >
-                    {#if page.favoriteCount > 0}
-                      <span class="flex items-center gap-1 text-micro text-blueprint-blue">
-                        <Icon name="star" size={10} class="fill-blueprint-blue" />
-                        {page.favoriteCount}
-                      </span>
-                    {/if}
+                      <span class="text-heading font-semibold text-text-primary"
+                        >{page.visibleCount}</span
+                      >
+                      <span class="text-micro text-text-muted"
+                        >{page.visibleCount > 1 ? 'missions' : 'mission'}</span
+                      >
+                      {#if page.favoriteCount > 0}
+                        <span class="flex items-center gap-1 text-micro text-blueprint-blue">
+                          <Icon name="star" size={10} class="fill-blueprint-blue" />
+                          {page.favoriteCount}
+                        </span>
+                      {/if}
+                    </div>
                   </div>
                 </div>
               </div>
-              <div
-                class="flex items-center gap-2"
-                class:flex-row-reverse={page.panelSide === 'left'}
-              >
-                {#if page.isOffline}
-                  <span class="text-micro text-blueprint-blue">
-                    <Icon name="database" size={12} />
-                  </span>
-                {/if}
-                <Tooltip
-                  label={page.feedPresentation.primaryAction === 'cancel'
-                    ? 'Stopper le scan'
-                    : page.isOffline
-                      ? 'Scan indisponible hors ligne'
-                      : 'Lancer le scan'}
-                  description={page.feedPresentation.primaryAction === 'cancel'
-                    ? 'Interrompt le scan en cours et conserve les données déjà chargées.'
-                    : page.isOffline
-                      ? 'Pulse utilise les données en cache jusqu’au retour réseau.'
-                      : 'Raccourci clavier: r. Relance les sources connectées.'}
-                >
-                  <button
-                    class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
-                    onclick={handleMissionFeedScanAction}
-                    disabled={!page.feedPresentation.actionEnabled}
-                    aria-label={page.feedPresentation.primaryAction === 'cancel'
-                      ? 'Stopper le scan en cours'
-                      : page.feedPresentation.primaryAction === 'retry'
-                        ? 'Réessayer le scan des missions'
-                        : 'Lancer le scan des missions'}
-                  >
-                    <Icon
-                      name={page.feedPresentation.primaryAction === 'cancel' ? 'square' : 'play'}
-                      size={12}
-                      class={page.feedPresentation.primaryAction === 'cancel' ? '' : 'ml-0.5'}
-                    />
-                  </button>
-                </Tooltip>
-              </div>
-            </div>
-            <div class="mt-2">
-              <OperationalStoryCard
-                eyebrow="À faire maintenant"
-                title={feedStory.title}
-                description={feedStory.description}
-                severity={feedStory.severity}
-                statusLabel={feedStory.statusLabel}
-                evidence={feedStory.evidence}
-                variant="inline"
-                primaryActionLabel={feedStory.primaryActionLabel}
-                primaryActionIcon={feedStory.primaryActionIcon}
-                onPrimaryAction={handleFeedStoryPrimaryAction}
-              />
-            </div>
-            {#if showAdvancedControls}
-              {#if SourceHealthPanel}
-                <SourceHealthPanel
-                  sources={controller.sourceStatuses as SourceStatus[]}
-                  isChecking={controller.isCheckingSources}
-                  compact={true}
-                  scanResultCounts={page.sourceMissionCounts}
-                  activeSourceFilter={page.selectedSource}
-                  enabledConnectors={controller.enabledConnectorIds}
-                  healthSnapshots={controller.healthSnapshots}
-                  parserHealthRecords={controller.parserHealthRecords}
-                  onRefresh={() => controller.checkSourceSessions()}
-                  onFilterBySource={(id) => {
-                    page.setSelectedSource(id as MissionSource | null);
-                  }}
-                  onToggleConnector={(id) => controller.handleToggleConnector(id)}
-                  onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
-                  onReconnect={handleOpenExternalUrl}
+              <div class="mt-2">
+                <OperationalStoryCard
+                  eyebrow="À faire maintenant"
+                  title={feedStory.title}
+                  description={feedStory.description}
+                  severity={feedStory.severity}
+                  statusLabel={feedStory.statusLabel}
+                  evidence={feedStory.evidence}
+                  variant="inline"
+                  primaryActionLabel={feedStory.primaryActionLabel}
+                  primaryActionIcon={feedStory.primaryActionIcon}
+                  onPrimaryAction={handleFeedStoryPrimaryAction}
                 />
-              {/if}
-              {#if FeedActionDashboard}
-                <FeedActionDashboard
-                  summary={page.dashboardSummary}
-                  insightSummary={page.insightSummary}
-                  scoreDistribution={page.scoreDistribution}
-                  selectedScoreBucket={page.selectedScoreBucket}
-                  showNewOnly={page.showNewOnly}
-                  brokenConnectorCount={brokenConnectors.length}
-                  onToggleNewOnly={page.toggleNewOnly}
-                  onToggleFavorites={page.toggleFavoritesFilter}
-                  onSetScoreBucket={page.setSelectedScoreBucket}
-                />
-              {/if}
-            {/if}
-          {:else}
-            <!-- Full: hero with description, progress, stats -->
-            <div class="relative pr-14">
-              <div class="max-w-[32rem]">
-                <p class="eyebrow text-blueprint-blue">MissionPulse</p>
-                <h2
-                  class="mt-3 font-display text-[clamp(2.75rem,10vw,5.25rem)] font-normal leading-[0.88] tracking-[-0.055em] text-text-primary"
-                >
-                  {page.firstName ? `Bonjour, ${page.firstName}` : 'Radar freelance'}
-                </h2>
-                <p class="mt-6 max-w-[26rem] text-subheading leading-[1.6] text-text-subtle">
-                  Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à
-                  portée de main.
-                </p>
               </div>
-              <div
-                class="absolute right-0 top-0 flex items-center gap-2"
-                class:flex-row-reverse={page.panelSide === 'left'}
-              >
-                {#if page.feedPresentation.primaryAction === 'cancel'}
-                  <Tooltip
-                    label="Stopper le scan"
-                    description="Interrompt le scan en cours et conserve les données déjà chargées."
-                  >
-                    <button
-                      class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
-                      onclick={handleMissionFeedScanAction}
-                      disabled={!page.feedPresentation.actionEnabled}
-                      aria-label="Stopper le scan en cours"
-                    >
-                      <Icon name="square" size={14} />
-                    </button>
-                  </Tooltip>
-                {:else}
-                  <Tooltip
-                    label={page.isOffline
-                      ? 'Scan indisponible hors ligne'
-                      : page.feedPresentation.primaryAction === 'retry'
-                        ? 'Réessayer le scan'
-                        : 'Lancer le scan'}
-                    description={page.isOffline
-                      ? 'Les données en cache restent disponibles.'
-                      : 'Raccourci clavier: r. Relance la détection des missions.'}
-                  >
-                    <button
-                      class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {page.isOffline
-                        ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
-                        : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
-                      onclick={handleMissionFeedScanAction}
-                      disabled={!page.feedPresentation.actionEnabled}
-                      aria-label={page.isOffline
-                        ? 'Scan indisponible hors ligne'
-                        : page.feedPresentation.primaryAction === 'retry'
-                          ? 'Réessayer le scan des missions'
-                          : 'Lancer le scan des missions'}
-                    >
-                      <Icon name="play" size={14} class="ml-0.5" />
-                    </button>
-                  </Tooltip>
-                {/if}
-              </div>
-            </div>
-
-            <ScanProgress
-              isScanning={feedChromeBusy}
-              progress={controller.scanProgress.percent}
-              missionsFound={page.totalMissions}
-              connectorName={controller.scanProgress.connectorName}
-              current={controller.scanProgress.current}
-              total={controller.scanProgress.total}
-              statuses={controller.connectorStatuses}
-            />
-
-            <div class="mt-3">
-              <OperationalStoryCard
-                eyebrow="À faire maintenant"
-                title={feedStory.title}
-                description={feedStory.description}
-                severity={feedStory.severity}
-                statusLabel={feedStory.statusLabel}
-                evidence={feedStory.evidence}
-                primaryActionLabel={feedStory.primaryActionLabel}
-                primaryActionIcon={feedStory.primaryActionIcon}
-                onPrimaryAction={handleFeedStoryPrimaryAction}
-              />
-            </div>
-            {#if showAdvancedControls}
-              {#if ConnectorStatusList}
-                <ConnectorStatusList
-                  statuses={controller.connectorStatuses}
-                  persistedStatuses={controller.persistedStatuses}
-                  isScanning={feedChromeBusy}
-                />
-              {/if}
-
-              {#if !feedIsColdLoading}
+              {#if showAdvancedControls}
                 {#if SourceHealthPanel}
                   <SourceHealthPanel
                     sources={controller.sourceStatuses as SourceStatus[]}
@@ -1192,58 +1182,189 @@
                     onReconnect={handleOpenExternalUrl}
                   />
                 {/if}
-                {#if page.totalMissions > 0}
-                  {#if FeedActionDashboard}
-                    <FeedActionDashboard
-                      summary={page.dashboardSummary}
-                      insightSummary={page.insightSummary}
-                      scoreDistribution={page.scoreDistribution}
-                      selectedScoreBucket={page.selectedScoreBucket}
-                      showNewOnly={page.showNewOnly}
-                      brokenConnectorCount={brokenConnectors.length}
-                      onToggleNewOnly={page.toggleNewOnly}
-                      onToggleFavorites={page.toggleFavoritesFilter}
-                      onSetScoreBucket={page.setSelectedScoreBucket}
+                {#if FeedActionDashboard}
+                  <FeedActionDashboard
+                    summary={page.dashboardSummary}
+                    insightSummary={page.insightSummary}
+                    scoreDistribution={page.scoreDistribution}
+                    selectedScoreBucket={page.selectedScoreBucket}
+                    showNewOnly={page.showNewOnly}
+                    brokenConnectorCount={brokenConnectors.length}
+                    onToggleNewOnly={page.toggleNewOnly}
+                    onToggleFavorites={page.toggleFavoritesFilter}
+                    onSetScoreBucket={page.setSelectedScoreBucket}
+                  />
+                {/if}
+              {/if}
+            {:else}
+              <!-- Full: hero with description, progress, stats -->
+              <div class="relative pr-14">
+                <div class="max-w-[32rem]">
+                  <p class="eyebrow text-blueprint-blue">MissionPulse</p>
+                  <h2
+                    class="mt-3 font-display text-[clamp(2.75rem,10vw,5.25rem)] font-normal leading-[0.88] tracking-[-0.055em] text-text-primary"
+                  >
+                    {page.firstName ? `Bonjour, ${page.firstName}` : 'Radar freelance'}
+                  </h2>
+                  <p class="mt-6 max-w-[26rem] text-subheading leading-[1.6] text-text-subtle">
+                    Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à
+                    portée de main.
+                  </p>
+                </div>
+                <div
+                  class="absolute right-0 top-0 flex items-center gap-2"
+                  class:flex-row-reverse={page.panelSide === 'left'}
+                >
+                  {#if page.feedPresentation.primaryAction === 'cancel'}
+                    <Tooltip
+                      label="Stopper le scan"
+                      description="Interrompt le scan en cours et conserve les données déjà chargées."
+                    >
+                      <button
+                        class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
+                        onclick={handleMissionFeedScanAction}
+                        disabled={!page.feedPresentation.actionEnabled}
+                        aria-label="Stopper le scan en cours"
+                      >
+                        <Icon name="square" size={14} />
+                      </button>
+                    </Tooltip>
+                  {:else}
+                    <Tooltip
+                      label={page.isOffline
+                        ? 'Scan indisponible hors ligne'
+                        : page.feedPresentation.primaryAction === 'retry'
+                          ? 'Réessayer le scan'
+                          : 'Lancer le scan'}
+                      description={page.isOffline
+                        ? 'Les données en cache restent disponibles.'
+                        : 'Raccourci clavier: r. Relance la détection des missions.'}
+                    >
+                      <button
+                        class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
+                    {page.isOffline
+                          ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
+                          : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
+                        onclick={handleMissionFeedScanAction}
+                        disabled={!page.feedPresentation.actionEnabled}
+                        aria-label={page.isOffline
+                          ? 'Scan indisponible hors ligne'
+                          : page.feedPresentation.primaryAction === 'retry'
+                            ? 'Réessayer le scan des missions'
+                            : 'Lancer le scan des missions'}
+                      >
+                        <Icon name="play" size={14} class="ml-0.5" />
+                      </button>
+                    </Tooltip>
+                  {/if}
+                </div>
+              </div>
+
+              <ScanProgress
+                isScanning={feedChromeBusy}
+                progress={controller.scanProgress.percent}
+                missionsFound={page.totalMissions}
+                connectorName={controller.scanProgress.connectorName}
+                current={controller.scanProgress.current}
+                total={controller.scanProgress.total}
+                statuses={controller.connectorStatuses}
+              />
+
+              <div class="mt-3">
+                <OperationalStoryCard
+                  eyebrow="À faire maintenant"
+                  title={feedStory.title}
+                  description={feedStory.description}
+                  severity={feedStory.severity}
+                  statusLabel={feedStory.statusLabel}
+                  evidence={feedStory.evidence}
+                  primaryActionLabel={feedStory.primaryActionLabel}
+                  primaryActionIcon={feedStory.primaryActionIcon}
+                  onPrimaryAction={handleFeedStoryPrimaryAction}
+                />
+              </div>
+              {#if showAdvancedControls}
+                {#if ConnectorStatusList}
+                  <ConnectorStatusList
+                    statuses={controller.connectorStatuses}
+                    persistedStatuses={controller.persistedStatuses}
+                    isScanning={feedChromeBusy}
+                  />
+                {/if}
+
+                {#if !feedIsColdLoading}
+                  {#if SourceHealthPanel}
+                    <SourceHealthPanel
+                      sources={controller.sourceStatuses as SourceStatus[]}
+                      isChecking={controller.isCheckingSources}
+                      compact={true}
+                      scanResultCounts={page.sourceMissionCounts}
+                      activeSourceFilter={page.selectedSource}
+                      enabledConnectors={controller.enabledConnectorIds}
+                      healthSnapshots={controller.healthSnapshots}
+                      parserHealthRecords={controller.parserHealthRecords}
+                      onRefresh={() => controller.checkSourceSessions()}
+                      onFilterBySource={(id) => {
+                        page.setSelectedSource(id as MissionSource | null);
+                      }}
+                      onToggleConnector={(id) => controller.handleToggleConnector(id)}
+                      onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+                      onReconnect={handleOpenExternalUrl}
                     />
                   {/if}
+                  {#if page.totalMissions > 0}
+                    {#if FeedActionDashboard}
+                      <FeedActionDashboard
+                        summary={page.dashboardSummary}
+                        insightSummary={page.insightSummary}
+                        scoreDistribution={page.scoreDistribution}
+                        selectedScoreBucket={page.selectedScoreBucket}
+                        showNewOnly={page.showNewOnly}
+                        brokenConnectorCount={brokenConnectors.length}
+                        onToggleNewOnly={page.toggleNewOnly}
+                        onToggleFavorites={page.toggleFavoritesFilter}
+                        onSetScoreBucket={page.setSelectedScoreBucket}
+                      />
+                    {/if}
+                  {/if}
+                {/if}
+
+                {#if !feedIsColdLoading && controller.lastScanAt}
+                  <div class="mt-2">
+                    {#if LastScanInfo}
+                      <LastScanInfo
+                        lastScanAt={controller.lastScanAt}
+                        missionCount={controller.lastScanMissionCount}
+                      />
+                    {/if}
+                  </div>
                 {/if}
               {/if}
 
-              {#if !feedIsColdLoading && controller.lastScanAt}
-                <div class="mt-2">
-                  {#if LastScanInfo}
-                    <LastScanInfo
-                      lastScanAt={controller.lastScanAt}
-                      missionCount={controller.lastScanMissionCount}
-                    />
-                  {/if}
+              {#if page.isOffline}
+                <div
+                  class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-meta text-blueprint-blue"
+                >
+                  <Icon name="database" size={14} />
+                  <span>Mode hors ligne — Données en cache</span>
                 </div>
+              {/if}
+              {#if page.aiStatus === 'after-download'}
+                <p class="mt-2 text-center text-caption text-text-muted">
+                  Scoring IA en téléchargement...
+                </p>
+              {:else if page.aiStatus === 'no'}
+                <p class="mt-2 text-center text-caption text-text-muted">Scoring IA indisponible</p>
               {/if}
             {/if}
 
-            {#if page.isOffline}
-              <div
-                class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-meta text-blueprint-blue"
-              >
-                <Icon name="database" size={14} />
-                <span>Mode hors ligne — Données en cache</span>
+            {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
+              <div class="mt-3">
+                <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
               </div>
             {/if}
-            {#if page.aiStatus === 'after-download'}
-              <p class="mt-2 text-center text-caption text-text-muted">
-                Scoring IA en téléchargement...
-              </p>
-            {:else if page.aiStatus === 'no'}
-              <p class="mt-2 text-center text-caption text-text-muted">Scoring IA indisponible</p>
-            {/if}
-          {/if}
-
-          {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
-            <div class="mt-3">
-              <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
-            </div>
-          {/if}
-        </div>
+          </div>
+        {/if}
 
         <!-- ── Search + Filter toolbar (condensed-sticky in compact mode) ── -->
         <div
@@ -1292,7 +1413,6 @@
             </div>
           {/if}
 
-          <!-- Row 1: title + search -->
           {#if feedChromeBusy}
             <div class="flex items-center gap-2 text-meta text-text-muted">
               <span
@@ -1301,140 +1421,6 @@
               Collecte...
             </div>
           {/if}
-
-          <div class={feedChromeBusy ? 'mt-2' : ''}>
-            <SearchInput
-              value={page.searchQuery}
-              onSearch={page.handleSearch}
-              bind:inputRef={page.searchInputRef}
-            />
-          </div>
-
-          <!-- Row 2: filter pills -->
-          <div
-            class="mt-2 flex items-center gap-1.5 rounded-xl transition-all duration-200 {activeTourStep?.id ===
-            'filters'
-              ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas px-1 py-1'
-              : ''}"
-          >
-            <Tooltip
-              label={page.showFavoritesOnly ? 'Voir toutes les missions' : 'Filtrer les favoris'}
-              description={`Raccourci clavier: f. ${page.favoriteCount} mission${page.favoriteCount > 1 ? 's' : ''} en favori.`}
-            >
-              <button
-                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
-                {page.showFavoritesOnly
-                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                onclick={page.toggleFavoritesFilter}
-                aria-pressed={page.showFavoritesOnly}
-                aria-label={page.showFavoritesOnly
-                  ? 'Voir toutes les missions'
-                  : 'Filtrer les favoris'}
-              >
-                <Icon
-                  name="star"
-                  size={12}
-                  class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''}
-                />
-                <span class="hidden @[20rem]:inline text-micro font-medium">Favoris</span>
-                {#if page.favoriteCount > 0}
-                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-micro font-medium"
-                    >{page.favoriteCount}</span
-                  >
-                {/if}
-              </button>
-            </Tooltip>
-            <Tooltip
-              label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
-              description={`Raccourci clavier : h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignorée${page.hiddenCount > 1 ? 's' : ''}.`}
-            >
-              <button
-                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
-                {page.showHidden
-                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                onclick={page.toggleHiddenFilter}
-                aria-pressed={page.showHidden}
-                aria-label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
-              >
-                <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
-                <span class="hidden @[20rem]:inline text-micro font-medium">Ignorées</span>
-                {#if page.hiddenCount > 0}
-                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-micro font-medium"
-                    >{page.hiddenCount}</span
-                  >
-                {/if}
-              </button>
-            </Tooltip>
-
-            <div class="h-4 w-px shrink-0 bg-border-light"></div>
-
-            <label class="sr-only" for="sort-select">Trier par</label>
-            <select
-              id="sort-select"
-              class="h-7 min-w-0 cursor-pointer rounded-lg border border-border-light bg-surface-white px-2 text-micro text-text-secondary outline-none transition-colors focus:border-blueprint-blue/30"
-              bind:value={page.sortBy}
-            >
-              <option value="score">Pertinence</option>
-              <option value="date">Date</option>
-              <option value="tjm">TJM</option>
-            </select>
-            <Tooltip
-              label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-              description={page.filterActive
-                ? 'Un filtre est actif sur le feed.'
-                : 'Affinez par stack, source, remote ou seniorite.'}
-            >
-              <button
-                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-micro font-medium transition-all duration-150
-                {page.showFilters || page.filterActive
-                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                onclick={() => page.setShowFilters(!page.showFilters)}
-                aria-expanded={page.showFilters}
-                aria-controls="filter-panel"
-                aria-label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-              >
-                <Icon name="sliders-horizontal" size={12} />
-                <span class="hidden @[20rem]:inline">Filtres</span>
-                {#if page.filterActive}
-                  <span class="h-1.5 w-1.5 rounded-full bg-blueprint-blue"></span>
-                {/if}
-              </button>
-            </Tooltip>
-            <Tooltip
-              label="Raccourcis clavier"
-              description="Ouvre la liste des commandes disponibles. Raccourci: ?."
-            >
-              <button
-                class="soft-ring inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-1.5 font-mono text-meta font-semibold leading-none text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
-                onclick={() => (page.showShortcutsHelp = true)}
-                aria-label="Afficher l'aide des raccourcis clavier"
-                title="Raccourcis clavier (?)"
-              >
-                ?
-              </button>
-            </Tooltip>
-          </div>
-
-          <div class="mt-2 flex justify-end">
-            <button
-              type="button"
-              class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-micro font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
-              onclick={() => {
-                advancedControlsUserInteracted = true;
-                advancedControlsUserOpened = showAdvancedControls ? false : true;
-                showAdvancedControls = !showAdvancedControls;
-              }}
-              aria-expanded={showAdvancedControls}
-              aria-label={showAdvancedControls
-                ? 'Masquer les détails opérationnels'
-                : 'Afficher les détails opérationnels'}
-            >
-              {showAdvancedControls ? 'Vue simple' : 'Détails opérationnels'}
-            </button>
-          </div>
 
           {#if showAdvancedControls}
             <div class="mt-2" aria-label="Presets métier du feed">
@@ -1471,36 +1457,6 @@
                   </button>
                 {/each}
               </div>
-            </div>
-          {/if}
-
-          {#if page.showFilters && FilterBar}
-            <div
-              id="filter-panel"
-              class="absolute left-5 right-5 top-[calc(100%-0.5rem)] z-30 max-h-80 overflow-y-auto rounded-2xl border border-border-light bg-surface-white p-2 shadow-subtle-3"
-              role="group"
-              aria-label="Options de filtrage"
-              transition:slide={{ duration: 160 }}
-            >
-              <FilterBar
-                availableStacks={page.availableStacks}
-                selectedStacks={page.selectedStacks}
-                selectedSource={page.selectedSource}
-                selectedRemote={page.selectedRemote}
-                selectedSeniority={page.selectedSeniority}
-                savedViews={page.savedViews}
-                activeSavedViewId={page.activeSavedViewId}
-                canSaveCurrentView={page.canSaveCurrentView}
-                savedViewLimitReached={page.savedViewLimitReached}
-                onToggleStack={page.toggleStack}
-                onSetSource={page.setSelectedSource}
-                onSetRemote={page.setSelectedRemote}
-                onSetSeniority={page.setSelectedSeniority}
-                onClearAll={page.clearAllFilters}
-                onSaveView={page.saveCurrentView}
-                onApplyView={page.applySavedView}
-                onDeleteView={page.deleteSavedView}
-              />
             </div>
           {/if}
         </div>
@@ -1655,13 +1611,86 @@
         onclick={page.toggleHiddenFilter}
         aria-pressed={page.showHidden}
       >
-        {page.showHidden
-          ? 'Masquer les ignorées'
-          : `Voir les ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} masquée${page.hiddenCount > 1 ? 's' : ''}`}
+        {page.showHidden ? 'Masquer les ignorées' : `Voir les ignorées (${page.hiddenCount})`}
+        <span class="sr-only">Raccourci clavier : h.</span>
       </button>
     {/if}
   </div>
 </div>
+
+{#if active}
+  <div
+    class="absolute inset-x-0 bottom-0 z-40 border-t border-white/90 bg-surface-white/88 shadow-[0_-14px_36px_rgba(28,25,23,0.10),inset_0_1px_0_rgba(255,255,255,0.96)] backdrop-blur-2xl"
+    data-testid="feed-bottom-dock"
+    aria-label="Actions du feed"
+  >
+    <div class="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-3 px-6 py-4">
+      <Tooltip
+        label={page.showFilters ? 'Masquer les filtres' : 'Filtrer les missions'}
+        description="Ouvre la grille de filtres avec mise à jour immédiate du feed."
+      >
+        <button
+          bind:this={filterTrigger}
+          type="button"
+          class="soft-ring relative inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
+          page.filterActive
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue shadow-[0_8px_24px_rgba(11,100,233,0.16)]'
+            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          onclick={() => page.setShowFilters(!page.showFilters)}
+          aria-expanded={page.showFilters}
+          aria-controls="filter-panel"
+          aria-label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+        >
+          <Icon name="sliders-horizontal" size={19} />
+          {#if page.filterActive && !page.showFilters}
+            <span
+              class="absolute right-0.5 top-0.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"
+              aria-hidden="true"
+            ></span>
+          {/if}
+        </button>
+      </Tooltip>
+
+      <SearchInput
+        variant="dock"
+        placeholder="Rechercher une mission…"
+        value={page.searchQuery}
+        onSearch={page.handleSearch}
+        bind:inputRef={page.searchInputRef}
+      />
+
+      <Tooltip
+        label={showAdvancedControls ? 'Masquer les détails' : 'Détails opérationnels'}
+        description="Affiche les sources, métriques et presets du feed."
+      >
+        <button
+          type="button"
+          class="soft-ring inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue'
+            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          onclick={toggleOperationalDetails}
+          aria-expanded={showAdvancedControls}
+          aria-label={showAdvancedControls
+            ? 'Masquer les détails opérationnels'
+            : 'Afficher les détails opérationnels'}
+        >
+          <Icon name="activity" size={19} />
+        </button>
+      </Tooltip>
+    </div>
+  </div>
+{/if}
+
+{#if page.showFilters && page.filterSheetDraft}
+  <FeedFilterSheet
+    draft={page.filterSheetDraft}
+    visibleCount={page.filterSheetPreviewCount}
+    sources={filterSourceOptions}
+    tjmTarget={page.profileTjmMin}
+    onEdit={page.editFilterSheet}
+    onDismiss={page.dismissFilterSheet}
+  />
+{/if}
 
 {#if page.arrivalStackVisible && MissionArrivalStack}
   <MissionArrivalStack
@@ -1714,8 +1743,8 @@
 {#if page.comparisonMissionIds.length > 0 && !arrivalDrawerExpanded}
   <div
     class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
-      ? 'bottom-24'
-      : 'bottom-4'}"
+      ? 'bottom-40'
+      : 'bottom-24'}"
   >
     <span class="text-meta text-text-secondary">
       {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1

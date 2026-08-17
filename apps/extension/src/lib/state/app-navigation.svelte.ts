@@ -17,6 +17,7 @@ import type { UserProfile } from '$lib/core/types/profile';
 export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 export type AppBootStatus = 'bootstrapping' | 'ready' | 'error';
 export type PageLoadStatus = 'loading' | 'ready' | 'error';
+export type PagePosition = 'before' | 'current' | 'after';
 
 export interface PageLoadSnapshot {
   status: PageLoadStatus;
@@ -35,8 +36,19 @@ const PAGE_INDEX: Record<Page, number> = {
   settings: 5,
 };
 
+export function getPagePosition(page: Page, currentPage: Page): PagePosition {
+  const pageIndex = PAGE_INDEX[page];
+  const currentPageIndex = PAGE_INDEX[currentPage];
+
+  if (pageIndex === currentPageIndex) {
+    return 'current';
+  }
+
+  return pageIndex < currentPageIndex ? 'before' : 'after';
+}
+
 export const NAV_ITEMS: { page: Page; label: string; icon: string; ariaLabel?: string }[] = [
-  { page: 'feed', label: 'Feed', icon: 'briefcase' },
+  { page: 'feed', label: 'Missions', icon: 'briefcase' },
   { page: 'profile', label: 'Profil', icon: 'user' },
   { page: 'cv', label: 'CV', icon: 'file-text' },
   { page: 'applications', label: 'Suivi', icon: 'mail' },
@@ -57,6 +69,7 @@ function resolveInitialPage(result: {
 
 export function createAppNavigation() {
   let currentPage = $state<Page>('feed');
+  let previousPage = $state<Page>('feed');
   let hasCompletedOnboarding = $state(false);
   let transitionDirection = $state<1 | -1>(1);
   let bootStatus = $state<AppBootStatus>('bootstrapping');
@@ -101,11 +114,13 @@ export function createAppNavigation() {
 
       if (hasCompletedOnboarding) {
         if (currentPage === 'onboarding') {
+          previousPage = currentPage;
           currentPage = 'feed';
         }
         previousPageIndex = PAGE_INDEX[currentPage];
       } else {
         hasCompletedOnboarding = Boolean(result.profile) || result.onboardingCompleted;
+        previousPage = currentPage;
         currentPage = resolveInitialPage(result);
         previousPageIndex = PAGE_INDEX[currentPage];
       }
@@ -140,12 +155,13 @@ export function createAppNavigation() {
   }
 
   function navigate(page: Page) {
-    if (disposed || bootStatus !== 'ready') {
+    if (disposed || bootStatus !== 'ready' || page === currentPage) {
       return;
     }
 
     const newIndex = PAGE_INDEX[page];
     transitionDirection = newIndex > previousPageIndex ? 1 : -1;
+    previousPage = currentPage;
     previousPageIndex = newIndex;
     currentPage = page;
   }
@@ -181,6 +197,7 @@ export function createAppNavigation() {
 
     hasCompletedOnboarding = true;
     transitionDirection = 1;
+    previousPage = currentPage;
     previousPageIndex = PAGE_INDEX.feed;
     currentPage = 'feed';
     return true;
@@ -194,6 +211,7 @@ export function createAppNavigation() {
     clearOnboardingCompleted().catch(() => {});
     hasCompletedOnboarding = false;
     transitionDirection = -1;
+    previousPage = currentPage;
     previousPageIndex = PAGE_INDEX.onboarding;
     currentPage = 'onboarding';
   }
@@ -213,6 +231,9 @@ export function createAppNavigation() {
     get currentPage() {
       return currentPage;
     },
+    get previousPage() {
+      return previousPage;
+    },
     get hasCompletedOnboarding() {
       return hasCompletedOnboarding;
     },
@@ -224,6 +245,9 @@ export function createAppNavigation() {
     },
     get bootError(): string | null {
       return bootError;
+    },
+    pagePosition(page: Page): PagePosition {
+      return getPagePosition(page, currentPage);
     },
 
     navigate,
