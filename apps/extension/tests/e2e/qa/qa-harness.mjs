@@ -25,7 +25,7 @@ export const VIEWPORT = { width: 400, height: 760 };
 if (!existsSync(SHOTS_DIR)) mkdirSync(SHOTS_DIR, { recursive: true });
 
 const NAV_LABEL = {
-  feed: 'Feed',
+  feed: 'Missions',
   profile: 'Profil',
   cv: 'CV',
   applications: 'Suivi',

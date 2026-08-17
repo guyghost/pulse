@@ -2,13 +2,14 @@ import { test, expect } from '../fixtures';
 import {
   expectMissionCount,
   feedSearchInput,
+  getMissionTotalCount,
   injectMissions,
   missionCards,
-  scanButton,
   clearFeedSearch,
   waitForMissions,
   setFeedState,
   expectFeedEmptyState,
+  triggerScan,
 } from '../helpers';
 
 test.describe('Scan Lifecycle', () => {
@@ -17,10 +18,17 @@ test.describe('Scan Lifecycle', () => {
     await expect(page.getByText(/\d+ missions?/).first()).toBeVisible({ timeout: 10000 });
   });
 
-  test('refresh button is visible and clickable', async ({ page }) => {
-    const refreshBtn = scanButton(page);
-    await expect(refreshBtn).toBeVisible();
-    await expect(refreshBtn).toBeEnabled();
+  test('manual scan is triggerable from a loaded feed', async ({ page }) => {
+    await waitForMissions(page, 1, 10000);
+    const before = await getMissionTotalCount(page);
+    expect(before).toBeGreaterThan(0);
+
+    // Loaded feed → compact hero exposes no scan control; the `r` shortcut
+    // is the manual trigger (see triggerScan).
+    await triggerScan(page);
+
+    // The default dev stub completes scans cleanly: no losses, no duplicates.
+    await expectMissionCount(page, before);
   });
 
   test('injecting missions populates the feed', async ({ page }) => {
@@ -66,7 +74,7 @@ test.describe('Scan Lifecycle', () => {
     await expect(filterToggle).toBeVisible();
     await filterToggle.click();
 
-    const filterPanel = page.getByRole('group', { name: 'Options de filtrage' });
+    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
 
     await page.getByRole('button', { name: 'Masquer les filtres' }).click();

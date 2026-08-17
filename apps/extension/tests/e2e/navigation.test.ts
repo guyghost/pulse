@@ -1,12 +1,12 @@
 import { test, expect } from './fixtures';
 test.describe('Navigation', () => {
   test('navigates between tabs: Feed → TJM → Settings → Feed', async ({ page }) => {
-    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute(
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    // Scope to the nav: the feed also contains a "Missions" heading/section.
+    await expect(nav.getByRole('button', { name: 'Missions' })).toHaveAttribute(
       'aria-current',
       'page'
     );
-
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
 
     await nav.getByRole('button', { name: 'TJM' }).click();
     await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
@@ -17,13 +17,16 @@ test.describe('Navigation', () => {
       'page'
     );
 
-    await nav.getByRole('button', { name: 'Feed' }).click();
-    await expect(nav.getByRole('button', { name: 'Feed' })).toHaveAttribute('aria-current', 'page');
+    await nav.getByRole('button', { name: 'Missions' }).click();
+    await expect(nav.getByRole('button', { name: 'Missions' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   test('active tab is visually highlighted', async ({ page }) => {
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
-    const feedTab = nav.getByRole('button', { name: 'Feed' });
+    const feedTab = nav.getByRole('button', { name: 'Missions' });
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
 
     await nav.getByRole('button', { name: 'TJM' }).click();
@@ -40,7 +43,10 @@ test.describe('Navigation', () => {
     await expect(page.getByRole('heading', { name: 'Analyse TJM' })).toBeVisible();
     await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
 
-    await nav.getByRole('button', { name: 'Feed' }).click();
-    await expect(nav.getByRole('button', { name: 'Feed' })).toHaveAttribute('aria-current', 'page');
+    await nav.getByRole('button', { name: 'Missions' }).click();
+    await expect(nav.getByRole('button', { name: 'Missions' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 });

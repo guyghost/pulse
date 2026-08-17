@@ -1,6 +1,6 @@
 import { test, expect } from '../fixtures';
 import type { Page } from '@playwright/test';
-import { mockConnectorFailure, scanButton } from '../helpers';
+import { mockConnectorFailure, triggerScan } from '../helpers';
 import { generateBalancedDataset } from '../../fixtures/large-dataset';
 
 type ScanProtocolScenario =
@@ -254,9 +254,16 @@ test.describe('Connector Resilience', () => {
     const errorMessage = 'Le connecteur free-work a échoué avec HTTP 500.';
     await mockConnectorFailure(page, 'free-work', 500);
 
-    if (!(await page.getByText(errorMessage, { exact: true }).first().isVisible())) {
-      await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
-      await scanButton(page).click();
+    if (
+      !(await page
+        .getByText(errorMessage, { exact: true })
+        .first()
+        .isVisible()
+        .catch(() => false))
+    ) {
+      // Loaded feed → compact hero exposes no scan control; fall back to the
+      // keyboard shortcut / retry CTA via triggerScan.
+      await triggerScan(page);
     }
 
     await expect(page.getByText(errorMessage, { exact: true }).first()).toBeVisible({
@@ -280,7 +287,9 @@ test.describe('Connector Resilience', () => {
       failedConnectorMessage: 'LeHibou indisponible pendant le scan causal',
     });
 
-    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+    // The persisted-statuses interception suppresses the mount auto-scan
+    // (smartLoad sees a recent done status and skips scanning), so drive a
+    // manual run immediately.
     await page.evaluate(() => {
       const trace = window as unknown as {
         __scanProtocolEmissions?: unknown[];
@@ -289,7 +298,7 @@ test.describe('Connector Resilience', () => {
       trace.__scanProtocolEmissions = [];
       trace.__scanProtocolRequests = [];
     });
-    await scanButton(page).click();
+    await triggerScan(page);
 
     await expect
       .poll(
@@ -362,7 +371,11 @@ test.describe('Connector Resilience', () => {
       });
 
     await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
-    await expect(page.getByText(missionTitle, { exact: true })).toBeVisible({ timeout: 10000 });
+    // `.first()` — le titre peut apparaître à la fois dans la vue d'ensemble
+    // et dans la carte du feed (strict mode).
+    await expect(page.getByText(missionTitle, { exact: true }).first()).toBeVisible({
+      timeout: 10000,
+    });
   });
 
   test('shows typed error message for connector failure', async ({ page }) => {
@@ -436,10 +449,12 @@ test.describe('Connector Resilience', () => {
       .toBe(true);
 
     await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
-    await expect(page.getByText(uniqueMissionTitle, { exact: true })).toBeVisible({
+    await expect(page.getByText(uniqueMissionTitle, { exact: true }).first()).toBeVisible({
       timeout: 5000,
     });
-    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+    await expect(page.getByText('Collecte...', { exact: true })).not.toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('handles network timeout gracefully', async ({ page }) => {
@@ -493,10 +508,10 @@ test.describe('Connector Resilience', () => {
     });
 
     // Relancer le scan
-    await scanButton(page).click();
+    await triggerScan(page);
 
     await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
-    await expect(page.getByText('Mission après retry', { exact: true })).toBeVisible({
+    await expect(page.getByText('Mission après retry', { exact: true }).first()).toBeVisible({
       timeout: 10000,
     });
   });

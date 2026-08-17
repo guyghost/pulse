@@ -5,12 +5,12 @@ import {
   expectMissionCount,
   favoritesToggle,
   favoriteMission,
-  allMissionsToggle,
+  toggleFavoritesFilter,
   feedSearchInput,
   getDisplayedMissionCount,
   injectMissions,
   missionCards,
-  scanButton,
+  triggerScan,
 } from '../helpers';
 
 async function mockMultiBatchPartialScan(page: Page) {
@@ -418,12 +418,10 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
       await favoriteMission(cards.nth(i));
     }
 
-    // Mesurer le temps de bascule du filtre favoris
+    // Mesurer le temps de bascule du filtre favoris (dashboard + toggle)
     const toggleStart = Date.now();
-    await favoritesToggle(page).click();
-
-    // Attendre que l'état du filtre soit appliqué.
-    await expect(allMissionsToggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await toggleFavoritesFilter(page, true);
+    await expectMissionCount(page, 3, 5000);
 
     const toggleTime = Date.now() - toggleStart;
 
@@ -439,7 +437,8 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
     await injectMissions(page, 120);
     await expectMissionCount(page, 120, 5000);
 
-    await scanButton(page).click();
+    // Loaded feed → the `r` shortcut (or any retry CTA) triggers the scan.
+    await triggerScan(page);
 
     const arrivalStack = page.getByTestId('mission-arrival-stack');
     await expect(arrivalStack).not.toBeVisible();
@@ -470,12 +469,12 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
     // Vérifier qu'on a bien scrollé (pas à 0)
     expect(scrollPositionBefore).toBeGreaterThan(0);
 
-    // Changer le filtre (va afficher 0 favoris)
-    await favoritesToggle(page).click();
+    // Activer le filtre favoris (aucun favori → liste vide), puis le couper
+    await toggleFavoritesFilter(page, true);
     await page.waitForTimeout(200);
 
-    // Remettre à toutes
-    await allMissionsToggle(page).click();
+    // Remettre à toutes — le dashboard est ouvert, même bouton
+    await favoritesToggle(page).click();
     await page.waitForTimeout(200);
 
     // Vérifier que la position de scroll est revenue à une valeur valide
