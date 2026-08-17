@@ -66,7 +66,7 @@ test.describe('Settings Flow', () => {
     await profileSection.locator('#profile-keywords-input').fill('Svelte Save');
     await profileSection.getByRole('button', { name: 'Enregistrer le profil' }).click();
 
-    await navButton(page, 'Feed').click();
+    await navButton(page, 'Missions').click();
     await navButton(page, 'Profil').click();
 
     const returnedProfileSection = page
@@ -190,8 +190,8 @@ test.describe('Settings Flow', () => {
     await expect(page.getByRole('heading', { name: 'Paramètres' })).toBeVisible();
 
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
-    await nav.getByRole('button', { name: 'Feed', exact: true }).click();
-    await expect(nav.getByRole('button', { name: 'Feed', exact: true })).toHaveAttribute(
+    await nav.getByRole('button', { name: 'Missions', exact: true }).click();
+    await expect(nav.getByRole('button', { name: 'Missions', exact: true })).toHaveAttribute(
       'aria-current',
       'page'
     );
@@ -212,7 +212,7 @@ test.describe('Settings Flow', () => {
   });
 
   test('refreshes the favorite export count when settings becomes active', async ({ page }) => {
-    await navButton(page, 'Feed').click();
+    await navButton(page, 'Missions').click();
     const firstCard = missionCards(page).first();
     await expect(firstCard).toBeVisible();
 

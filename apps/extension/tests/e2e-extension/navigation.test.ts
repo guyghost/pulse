@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 import { expect, expectNoRuntimeErrors, test } from './fixtures';
 
 interface NavigationSurface {
@@ -8,7 +8,7 @@ interface NavigationSurface {
 }
 
 const navigationSurfaces: NavigationSurface[] = [
-  { ariaLabel: 'Feed', heading: /Radar freelance|Bonjour,/, testId: 'feed-scroll-container' },
+  { ariaLabel: 'Missions', heading: /Feed de missions/, testId: 'feed-scroll-container' },
   {
     ariaLabel: 'Profil',
     heading: /Votre profil MissionPulse|Bonjour /,
@@ -33,6 +33,34 @@ async function assertNoBlankOrLoadError(page: Page): Promise<void> {
   expect(rendered.width).toBeGreaterThan(0);
   expect(rendered.height).toBeGreaterThan(0);
   expect(rendered.text.length).toBeGreaterThan(0);
+}
+
+/**
+ * The feed page registers its global keydown shortcuts from a Svelte $effect
+ * that flushes shortly after the surface paints. A `?` keydown fired before
+ * that registration is silently dropped (no queuing) — see
+ * src/models/keyboard-shortcuts-help.model.md. Mirror an impatient real user:
+ * re-focus the opener and re-press `?` until the dialog reacts. Re-focusing
+ * also keeps the opener the modal-focus source of truth for the restore
+ * assertion below.
+ *
+ * Key synthesis: keyboard.press('?') produces key='?' with shiftKey=false,
+ * but the registry identifier is `shift+?` (SHOW_HELP declares shift: true).
+ * A real keyboard sends Shift+Slash, so synthesize exactly that — otherwise
+ * the handler never matches and the dialog never opens.
+ */
+async function openShortcutsHelp(page: Page, opener: Locator): Promise<void> {
+  const dialog = page.getByRole('dialog', { name: 'Raccourcis clavier' });
+  await expect
+    .poll(
+      async () => {
+        await opener.focus();
+        await page.keyboard.press('Shift+Slash');
+        return dialog.isVisible();
+      },
+      { timeout: 15_000 }
+    )
+    .toBe(true);
 }
 
 async function traverseAllTabs(page: Page): Promise<void> {
@@ -150,7 +178,7 @@ test(
 );
 
 test(
-  'packaged shortcuts modal traps focus and restores its trigger',
+  'packaged shortcuts modal traps focus and restores its opener',
   { annotation: { type: 'scenario-id', description: 'navigation.shortcuts-focus' } },
   async ({ extension }) => {
     await extension.seedStorage({
@@ -163,12 +191,12 @@ test(
     });
 
     const page = await extension.openSidePanel();
-    const trigger = page.getByRole('button', {
-      name: "Afficher l'aide des raccourcis clavier",
-      exact: true,
-    });
-    await expect(trigger).toBeVisible();
-    await trigger.click();
+    // The dedicated help trigger button was removed with the filter-dock
+    // redesign; the dialog now opens from the `?` shortcut. The first-run
+    // toast is suppressed by the kbd_cheatsheet_tip_seen seed.
+    const opener = page.getByRole('button', { name: 'Scanner', exact: true });
+    await expect(opener).toBeVisible();
+    await openShortcutsHelp(page, opener);
 
     const dialog = page.getByRole('dialog', { name: 'Raccourcis clavier' });
     const close = dialog.getByRole('button', { name: 'Fermer', exact: true });
@@ -184,7 +212,8 @@ test(
 
     await page.keyboard.press('Escape');
     await expect(dialog).toHaveCount(0);
-    await expect(trigger).toBeFocused();
+    // modalFocus restores focus to the element focused when the dialog opened.
+    await expect(opener).toBeFocused();
     expectNoRuntimeErrors(extension.diagnostics);
   }
 );

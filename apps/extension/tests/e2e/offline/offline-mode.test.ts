@@ -1,16 +1,16 @@
 import { test, expect } from '../fixtures';
 import {
-  allMissionsToggle,
   expectMissionCount,
   favoriteButton,
-  favoritesToggle,
   feedSearchInput,
+  getMissionTotalCount,
   hideButton,
   clearFeedSearch,
   injectMissions,
   missionCards,
   navButton,
-  scanButton,
+  setFeedState,
+  toggleFavoritesFilter,
   unfavoriteButton,
   waitForMissions,
   toggleOffline,
@@ -22,17 +22,15 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await toggleOffline(page, false);
   });
 
-  test('shows offline indicator when connection is lost', async ({ page }) => {
-    await injectMissions(page, 5);
-    await waitForMissions(page, 5, 5000);
+  test('shows offline banner on the empty-feed hero when connection is lost', async ({ page }) => {
+    // The offline banner lives in the full (empty-feed) hero — the compact
+    // hero has no banner, cached-mission visibility is covered below.
+    await setFeedState(page, 'empty');
 
     await toggleOffline(page, true);
     await page.waitForTimeout(500);
 
-    await expect(page.getByText('Mode hors ligne — Données en cache uniquement')).toBeVisible();
-
-    const cardCount = await missionCards(page).count();
-    expect(cardCount).toBeGreaterThanOrEqual(5);
+    await expect(page.getByText('Mode hors ligne — Données en cache')).toBeVisible();
   });
 
   test('missions remain visible when going offline', async ({ page }) => {
@@ -57,20 +55,25 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
   });
 
   test('scan is disabled when offline', async ({ page }) => {
+    await setFeedState(page, 'empty');
+    // L'auto-scan du mount (SCAN_COMPLETE différé ~800ms) peut rejouer les 10
+    // missions par défaut après la première vidange : laisser passer ce pic
+    // puis re-vidanger pour obtenir un feed déterministiquement vide.
+    await page.waitForTimeout(1200);
+    if ((await getMissionTotalCount(page)) > 0) {
+      await setFeedState(page, 'empty');
+    }
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    const refreshButton = scanButton(page);
-    await expect(refreshButton).toBeVisible();
-
-    const isDisabled = await refreshButton.isDisabled().catch(() => false);
-    if (!isDisabled) {
-      await refreshButton.click();
-      await page.waitForTimeout(500);
-      expect(true).toBe(true);
-    } else {
-      await expect(refreshButton).toBeDisabled();
-    }
+    // Bandeau hors ligne + « Scanner » de la vue d'ensemble désactivé. Le CTA
+    // « Lancer le scan » de l'état vide reste activable : le refus hors ligne
+    // est géré dans le handler (FeedPage.handleFeedStoryPrimaryAction), pas
+    // sur le bouton.
+    await expect(page.getByText('Mode hors ligne — Données en cache')).toBeVisible();
+    const overviewScan = page.getByRole('button', { name: 'Scanner', exact: true });
+    await expect(overviewScan).toBeVisible({ timeout: 10000 });
+    await expect(overviewScan).toBeDisabled();
   });
 
   test('restores connection and allows scan again', async ({ page }) => {
@@ -87,7 +90,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await triggerScan(page);
     await page.waitForTimeout(1000);
 
-    await expect(navButton(page, 'Feed')).toHaveAttribute('aria-current', 'page');
+    await expect(navButton(page, 'Missions')).toHaveAttribute('aria-current', 'page');
   });
 
   test('favorite actions work while offline', async ({ page }) => {
@@ -103,8 +106,8 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await starBtn.click();
 
     await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
-    await favoritesToggle(page).click();
-    await expect(allMissionsToggle(page)).toBeVisible({ timeout: 2000 });
+    await toggleFavoritesFilter(page, true);
+    await expectMissionCount(page, 1, 5000);
   });
 
   test('hide action works while offline', async ({ page }) => {
@@ -119,7 +122,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await expect(hideBtn).toBeVisible();
     await hideBtn.click();
 
-    await expect(page.getByRole('button', { name: /Voir les 1 mission masqu/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les ignorées/ })).toBeVisible();
   });
 
   test('search works with cached missions while offline', async ({ page }) => {
@@ -152,10 +155,14 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
+    // Les badges flottants DEV (right-2 top-14) et QA (left-2 top-14)
+    // recouvrent les boutons de navigation aux deux extrémités. Un click
+    // « force » dispatche quand même aux coordonnées du badge —
+    // dispatchEvent('click') cible l'élément lui-même, sans hit-test.
     await page
       .getByRole('navigation', { name: 'Main navigation' })
       .getByRole('button', { name: 'TJM' })
-      .click();
+      .dispatchEvent('click');
     await expect(
       page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
     ).toHaveAttribute('aria-current', 'page');
@@ -163,7 +170,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await page
       .getByRole('navigation', { name: 'Main navigation' })
       .getByRole('button', { name: 'Settings' })
-      .click();
+      .dispatchEvent('click');
     await expect(
       page
         .getByRole('navigation', { name: 'Main navigation' })
@@ -172,12 +179,12 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
 
     await page
       .getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('button', { name: 'Feed' })
-      .click();
+      .getByRole('button', { name: 'Missions' })
+      .dispatchEvent('click');
     await expect(
       page
         .getByRole('navigation', { name: 'Main navigation' })
-        .getByRole('button', { name: 'Feed' })
+        .getByRole('button', { name: 'Missions' })
     ).toHaveAttribute('aria-current', 'page');
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
       timeout: 3000,
@@ -198,7 +205,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await page.waitForTimeout(500);
 
     const hasOfflineBanner = await page
-      .getByText('Mode hors ligne — Données en cache uniquement')
+      .getByText('Mode hors ligne — Données en cache')
       .isVisible()
       .catch(() => false);
     const hasNavigation = await page

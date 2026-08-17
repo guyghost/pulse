@@ -2,18 +2,22 @@ import { test, expect } from '../fixtures';
 import {
   SIDE_PANEL,
   mockNoProfile,
-  completeOnboarding as _completeOnboarding,
+  clickContinue,
+  connectFirstSource,
   expectFeedReady,
   expectMissionCount,
   copyLinkButton,
   favoriteButton,
-  favoritesToggle,
+  fillPreferencesStep,
+  fillSkillsStep,
   hideButton,
-  allMissionsToggle,
+  onboardingWelcomeHeading,
+  openOperationalDetails,
   injectMissions,
   missionCards,
   navButton,
   openMissionButton,
+  submitOnboardingScan,
   waitForMissions,
   openDevPanel,
   closeDevPanel,
@@ -24,45 +28,52 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    // 1. Navigation sur l'onboarding. The hero heading drifted to "Configurez votre premier scan".
-    await expect(
-      page.getByRole('heading', { name: 'Configurez votre premier scan' })
-    ).toBeVisible();
-
-    // Démarrer explicitement dans le formulaire puis vérifier le flux clavier.
-    await page.locator('#ob-firstname').focus();
-    await expect(page.locator('#ob-firstname')).toBeFocused();
-
-    await page.keyboard.type('Jean');
-
-    // Tab jusqu'au champ job
-    await page.keyboard.press('Tab');
-    await expect(page.locator('#ob-jobtitle')).toBeFocused();
-
-    await page.keyboard.type('Développeur');
-    await page.keyboard.press('Tab');
-    await expect(page.locator('#ob-keywords')).toBeFocused();
-    await page.keyboard.type('React');
+    // 1. Welcome → étape « Connectez vos sources », piloté au clavier.
+    await expect(onboardingWelcomeHeading(page)).toBeVisible();
+    const welcomeStart = page.getByRole('button', { name: 'Commencer', exact: true });
+    await welcomeStart.focus();
     await page.keyboard.press('Enter');
+    await expect(page.getByRole('heading', { name: 'Connectez vos sources' })).toBeVisible();
 
-    // Aller jusqu'au bouton submit sans dépendre d'un nombre fixe de champs optionnels.
-    const submitButton = page.getByRole('button', { name: 'Sauvegarder mon profil' });
+    // Sélection de la première source au clavier (Entrée sur le bouton).
+    const firstSource = page.getByRole('button', { name: 'Free-Work', exact: true });
+    await firstSource.focus();
+    await expect(firstSource).toBeFocused();
+    await page.keyboard.press('Enter');
+    await expect(firstSource).toHaveAttribute('aria-pressed', 'true');
+
+    // Tab jusqu'au bouton « Continuer » sans dépendre d'un nombre fixe de contrôles.
+    const continueButton = page.getByRole('button', { name: 'Continuer', exact: true });
     for (let i = 0; i < 12; i++) {
-      if (await submitButton.evaluate((el) => el === document.activeElement)) {
+      if (await continueButton.evaluate((el) => el === document.activeElement)) {
         break;
       }
       await page.keyboard.press('Tab');
     }
-    await expect(submitButton).toBeFocused();
-
-    // Enter pour soumettre
+    await expect(continueButton).toBeFocused();
     await page.keyboard.press('Enter');
+
+    // Étape identité : saisie clavier puis Tab vers le champ Métier.
+    // Rôle textbox : évite la collision avec le checkbox « Métier » du
+    // CopilotPanel (page Suivi montée en arrière-plan en build rollout CI).
+    await expect(page.getByRole('heading', { name: 'Qui êtes-vous ?' })).toBeVisible();
+    await page.getByLabel('Prénom').focus();
+    await page.keyboard.type('Jean');
+    await page.keyboard.press('Tab');
+    await expect(page.getByRole('textbox', { name: 'Métier', exact: true })).toBeFocused();
+    await page.keyboard.type('Développeur');
+
+    // Terminer les étapes restantes puis rejoindre le feed.
+    await clickContinue(page);
+    await fillPreferencesStep(page);
+    await fillSkillsStep(page, 'React');
+    await submitOnboardingScan(page);
 
     // 2. Navigation sur le feed
     await expectFeedReady(page);
 
     // Partir d'un contrôle connu évite de dépendre du focus initial du navigateur.
-    const feedTab = navButton(page, 'Feed');
+    const feedTab = navButton(page, 'Missions');
     await feedTab.focus();
     await expect(feedTab).toBeFocused();
     await page.keyboard.press('Tab');
@@ -128,14 +139,17 @@ test.describe('Accessibility', () => {
   });
 
   test('aria-pressed on toggle buttons', async ({ page }) => {
-    const favoriteFilter = favoritesToggle(page);
-    await expect(favoriteFilter).toHaveAttribute('aria-pressed', 'false');
+    // The favorites filter moved into the operational dashboard and lost its
+    // aria-pressed; the new-missions quick filter still exposes the state.
+    await openOperationalDetails(page);
+    const newMissionsFilter = page.getByTitle('Filtrer les nouvelles missions');
+    await expect(newMissionsFilter).toHaveAttribute('aria-pressed', 'false');
 
-    await favoriteFilter.click();
-    await expect(allMissionsToggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await newMissionsFilter.click();
+    await expect(newMissionsFilter).toHaveAttribute('aria-pressed', 'true');
 
-    await allMissionsToggle(page).click();
-    await expect(favoritesToggle(page)).toHaveAttribute('aria-pressed', 'false');
+    await newMissionsFilter.click();
+    await expect(newMissionsFilter).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('aria-expanded on collapsible sections', async ({ page }) => {
@@ -150,13 +164,13 @@ test.describe('Accessibility', () => {
     );
 
     // Le panneau doit être visible
-    const filterPanel = page.getByRole('group', { name: 'Options de filtrage' });
+    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
   });
 
   test('aria-current on navigation tabs', async ({ page }) => {
     // Vérifier l'état actif sur Feed
-    const feedTab = navButton(page, 'Feed');
+    const feedTab = navButton(page, 'Missions');
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
 
     // Naviguer vers TJM
@@ -173,8 +187,10 @@ test.describe('Accessibility', () => {
   });
 
   test('heading hierarchy is correct', async ({ page }) => {
-    // Vérifier la hiérarchie des headings
-    const headings = await page.locator('h1, h2, h3').all();
+    // Vérifier la hiérarchie des headings. Requête par rôle : les vues
+    // inactives restent montées mais aria-hidden + inert (App.svelte), donc
+    // seuls les headings exposés à l'AT sont vérifiés.
+    const headings = await page.getByRole('heading').all();
     const headingLevels: number[] = [];
 
     for (const heading of headings) {
@@ -194,36 +210,17 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(
-      page.getByRole('heading', { name: 'Configurez votre premier scan' })
-    ).toBeVisible();
+    await expect(onboardingWelcomeHeading(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Commencer', exact: true }).click();
+    await connectFirstSource(page);
 
-    // Vérifier que les champs ont des labels
-    const firstnameInput = page.locator('#ob-firstname');
-    const jobtitleInput = page.locator('#ob-jobtitle');
-
-    // Vérifier aria-label ou label associé
-    const firstnameLabel = await firstnameInput.evaluate((el) => {
-      const ariaLabel = el.getAttribute('aria-label');
-      const labelId = el.getAttribute('aria-labelledby');
-      const associatedLabel = labelId ? document.getElementById(labelId)?.textContent : null;
-      const parentLabel = el.closest('label')?.textContent;
-      const forLabel = el.id ? document.querySelector(`label[for="${el.id}"]`)?.textContent : null;
-      return ariaLabel || associatedLabel || parentLabel || forLabel;
-    });
-
-    expect(firstnameLabel).toBeTruthy();
-
-    const jobtitleLabel = await jobtitleInput.evaluate((el) => {
-      const ariaLabel = el.getAttribute('aria-label');
-      const labelId = el.getAttribute('aria-labelledby');
-      const associatedLabel = labelId ? document.getElementById(labelId)?.textContent : null;
-      const parentLabel = el.closest('label')?.textContent;
-      const forLabel = el.id ? document.querySelector(`label[for="${el.id}"]`)?.textContent : null;
-      return ariaLabel || associatedLabel || parentLabel || forLabel;
-    });
-
-    expect(jobtitleLabel).toBeTruthy();
+    // Les champs de l'étape identité sont rattachés à leurs labels via des
+    // <label> englobants — le nom accessible (résolu par rôle) n'existe que
+    // si l'association existe. Textbox pour « Métier » : le CopilotPanel de la
+    // page Suivi (rollout CI) expose un checkbox homonyme.
+    await expect(page.getByLabel('Prénom')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Métier', exact: true })).toBeVisible();
+    await expect(page.getByLabel('Localisation (optionnel)')).toBeVisible();
   });
 
   test('focus trap in dev panel', async ({ page }) => {
@@ -334,18 +331,21 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(
-      page.getByRole('heading', { name: 'Configurez votre premier scan' })
-    ).toBeVisible();
+    await expect(onboardingWelcomeHeading(page)).toBeVisible();
+    await page.getByRole('button', { name: 'Commencer', exact: true }).click();
 
-    // Le bouton doit être désactivé tant que les champs sont vides
-    const submitBtn = page.getByRole('button', { name: 'Sauvegarder mon profil' });
+    // « Continuer » reste désactivé tant qu'aucune source n'est connectée.
+    const continueBtn = page.getByRole('button', { name: 'Continuer', exact: true });
+    await expect(continueBtn).toBeVisible();
 
     // Vérifier l'état disabled ou aria-disabled
-    const isDisabled = await submitBtn.isDisabled().catch(() => false);
-    const hasAriaDisabled = (await submitBtn.getAttribute('aria-disabled')) === 'true';
+    const isDisabled = await continueBtn.isDisabled().catch(() => false);
+    const hasAriaDisabled = (await continueBtn.getAttribute('aria-disabled')) === 'true';
 
     expect(isDisabled || hasAriaDisabled).toBe(true);
+
+    await page.getByRole('button', { name: 'Free-Work', exact: true }).click();
+    await expect(continueBtn).toBeEnabled();
   });
 
   test('keyboard accessible dropdowns or selects', async ({ page }) => {

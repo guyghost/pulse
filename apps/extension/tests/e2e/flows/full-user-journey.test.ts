@@ -25,7 +25,7 @@ baseTest.describe('Full User Journey', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByRole('heading', { name: 'Configurez votre premier scan' })).toBeVisible({
+    await expect(page.getByRole('heading', { name: 'Toutes vos missions freelance' })).toBeVisible({
       timeout: 5000,
     });
 
@@ -62,14 +62,17 @@ baseTest.describe('Full User Journey', () => {
     await hideMission(cardToHide);
 
     await expectMissionCount(page, 4, 2000);
-    await expect(page.getByRole('button', { name: /Voir les? \d+ mission.*masqu/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les ignorées/ })).toBeVisible();
 
     await showHiddenMissions(page);
     await expectMissionCount(page, 5, 2000);
 
     await page.reload();
 
-    await expect(page.locator('#ob-firstname')).not.toBeVisible({ timeout: 5000 });
+    // Profil persisté : l'onboarding ne se réaffiche pas après rechargement.
+    await expect(page.getByRole('button', { name: 'Commencer', exact: true })).not.toBeVisible({
+      timeout: 5000,
+    });
     await expectFeedReady(page);
   });
 
@@ -104,7 +107,7 @@ baseTest.describe('Full User Journey', () => {
       await navButton(page, 'Settings').click();
       await expect(navButton(page, 'Settings')).toHaveAttribute('aria-current', 'page');
 
-      await navButton(page, 'Feed').click();
+      await navButton(page, 'Missions').click();
       await expectFeedReady(page);
 
       await expectMissionCount(page, 3, 3000);
@@ -146,7 +149,7 @@ baseTest.describe('Full User Journey', () => {
       }
 
       await expectMissionCount(page, 5, 2000);
-      await expect(page.getByRole('button', { name: /Voir les 3 mission.*masqu/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Voir les ignorées/ })).toBeVisible();
 
       await showHiddenMissions(page);
       await expectMissionCount(page, 8, 2000);

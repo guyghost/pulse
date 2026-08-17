@@ -1,9 +1,9 @@
 import { test, expect } from './fixtures';
 import {
-  allMissionsToggle,
   favoriteButton,
   favoritesToggle,
   missionCards,
+  toggleFavoritesFilter,
   unfavoriteButton,
   waitForMissions,
   expectMissionCount,
@@ -42,22 +42,19 @@ test.describe('Favorites Flow', () => {
     await favoriteButton(card).click();
     await expect(unfavoriteButton(card)).toBeVisible({ timeout: 3000 });
 
-    // Toggle favorites filter
+    // Toggle favorites filter (opens the operational dashboard first)
+    await toggleFavoritesFilter(page, true);
+    await expectMissionCount(page, 1, 5000);
+
+    // Toggle back — the dashboard exposes a single toggle control
     await favoritesToggle(page).click();
-    await page.waitForTimeout(500);
-
-    await expectMissionCount(page, 1);
-
-    // Toggle back
-    await allMissionsToggle(page).click();
     await expectMissionCount(page, initialCount);
   });
 
   test('favorites filter shows zero when no favorites', async ({ page }) => {
     await waitForMissions(page, 5, 10000);
 
-    await favoritesToggle(page).click();
-    await page.waitForTimeout(500);
+    await toggleFavoritesFilter(page, true);
 
     await expectMissionCount(page, 0);
   });

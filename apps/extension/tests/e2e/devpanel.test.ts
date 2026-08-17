@@ -53,10 +53,12 @@ test.describe('DevPanel', () => {
 
     await page.getByRole('button', { name: 'toggle onboarding' }).click();
 
-    // Should show onboarding — heading is now "Configurez votre premier scan".
+    // Should show onboarding — the welcome screen of the machine-driven flow.
+    // ("Configurez votre premier scan" is only the lazy-load fallback shell.)
     await expect(
-      page.getByRole('heading', { name: 'Configurez votre premier scan' })
+      page.getByRole('heading', { name: 'Toutes vos missions freelance' })
     ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Commencer', exact: true })).toBeVisible();
   });
 
   test('set state empty shows "Aucune mission"', async ({ page }) => {

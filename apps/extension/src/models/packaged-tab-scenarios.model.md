@@ -173,7 +173,7 @@ The production claim owned by this model is deliberately narrow:
 > reload, onboarding completion survives a reload, and cached local workflows
 > remain truthful through offline and recovery transitions.
 
-The six tabs are `Feed`, `Profil`, `CV`, `Suivi` (the Candidatures page), `TJM`
+The six tabs are `Missions` (the feed page), `Profil`, `CV`, `Suivi` (the Candidatures page), `TJM`
 and `Réglages`. Onboarding is a separate initial-route workflow, not a seventh
 tab.
 
@@ -582,7 +582,7 @@ or icon order:
 
 | Tab          | Navigation button accessible name | Required page surface                      | Required heading                             |
 | ------------ | --------------------------------- | ------------------------------------------ | -------------------------------------------- |
-| Feed         | `Feed`                            | `feed-scroll-container` and `mission-feed` | `Radar freelance` or `Bonjour, ...`          |
+| Missions     | `Missions`                        | `feed-scroll-container` and `mission-feed` | `Feed de missions` (sr-only h1)              |
 | Profil       | `Profil`                          | `page-profile`                             | `Votre profil MissionPulse` or `Bonjour ...` |
 | CV           | `CV`                              | `page-cv`                                  | `CV & expériences`                           |
 | Candidatures | `Suivi`                           | `page-applications`                        | `Candidatures`                               |
@@ -1211,7 +1211,7 @@ establishes consent through the current release protocol.
 
 ### Checkpoint A1 — Feed favorite and tracking
 
-1. Navigate through the exact `Feed` button and resolve exactly one
+1. Navigate through the exact `Missions` button and resolve exactly one
    `role=article` whose accessible name is
    `Mission Architecte TypeScript Packaged chez Client Preuve` inside
    `mission-feed`. The article root is non-interactive: it has no click or
