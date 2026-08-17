@@ -13,7 +13,7 @@ const REVIEWED_ACTION_PINS = new Map([
   ['actions/checkout', 'de0fac2e4500dabe0009e67214ff5f5447ce83dd'],
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/setup-python', '5fda3b95a4ea91299a34e894583c3862153e4b97'],
-  ['pnpm/action-setup', '0e279bb959325dab635dd2c09392533439d90093'],
+  ['pnpm/action-setup', '0977fd99725f1db4007ccb2928dbb4e90d06cc86'],
   ['actions/attest', 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6'],
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
 ]);
