@@ -1602,7 +1602,7 @@ export const MessageSchemas = {
       errors: z.object({
         summary: z.object({
           total: z.number(),
-          byType: z.record(z.number()),
+          byType: z.record(z.string(), z.number()),
           last24h: z.number(),
         }),
         recent: z.array(
@@ -1771,6 +1771,6 @@ export function validateMessage(raw: unknown):
   return {
     valid: false,
     messageType,
-    errors: result.error.errors.map((e) => `${e.path.join('.')}: ${e.message}`),
+    errors: result.error.issues.map((e) => `${e.path.join('.')}: ${e.message}`),
   };
 }
