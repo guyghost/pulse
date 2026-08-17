@@ -49,7 +49,7 @@ Pins revus : `actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd`,
 `pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093`,
 `actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e`,
 `actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` et
-`actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3`.
+`actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`.
 
 L'admission lie exactement dépôt, branche par défaut, ref, SHA, workflow, event et checkout propre.
 Avec `contents: read`, elle ne peut pas vérifier la protection de branche : revues obligatoires,
