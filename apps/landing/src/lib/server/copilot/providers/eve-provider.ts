@@ -139,7 +139,7 @@ export class EveCopilotProvider implements CopilotProvider {
   async get(_request: CopilotProviderGetRequest): Promise<CopilotProviderGetResult> {
     throw new EveProviderError(
       'EVE_OPERATION_UNSUPPORTED',
-      'Eve 0.26.2 has no public durable job lookup API.',
+      'The Eve provider slice does not use a durable job lookup API.',
       false
     );
   }
@@ -173,7 +173,7 @@ export class EveCopilotProvider implements CopilotProvider {
   ): Promise<CopilotProviderDeleteSessionResult> {
     throw new EveProviderError(
       'EVE_SESSION_DELETION_UNSUPPORTED',
-      'Eve 0.26.2 exposes no public session deletion API.',
+      'The Eve provider slice does not expose session deletion yet.',
       false
     );
   }

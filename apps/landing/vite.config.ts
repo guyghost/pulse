@@ -7,7 +7,7 @@ import { configDefaults } from 'vitest/config';
 export default defineConfig(({ mode }) => ({
   plugins: [
     microfrontends(),
-    ...(mode === 'test' ? [] : [eveSvelteKit({ configureVercelJson: false })]),
+    ...(mode === 'test' ? [] : [eveSvelteKit()]),
     sveltekit(),
   ],
   // adapter-vercel's dependency tracer does not follow Eve's package-internal
