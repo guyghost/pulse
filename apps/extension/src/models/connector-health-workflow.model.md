@@ -726,7 +726,7 @@ The only allowed remote action repository/subpath/SHA tuples are:
 | `pnpm/action-setup`         | `0e279bb959325dab635dd2c09392533439d90093` |
 | `actions/setup-node`        | `48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e` |
 | `actions/upload-artifact`   | `043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` |
-| `actions/download-artifact` | `70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3` |
+| `actions/download-artifact` | `3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c` |
 
 An arbitrary SHA40, repository/subpath drift, mutable tag or extra action is
 rejected. Node is exactly `22.23.1`; pnpm is exactly `10.32.1`; the root
