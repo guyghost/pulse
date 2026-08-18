@@ -1441,7 +1441,7 @@ interface ProducerHostToolMaterialsPolicyV1 {
   runner: 'ubuntu-24.04';
   architecture: 'x64';
   setupNodeAction: 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020';
-  setupPnpmAction: 'pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093';
+  setupPnpmAction: 'pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86';
   node: {
     version: '22.23.1';
     sourceRoot: '/opt/hostedtoolcache/node/22.23.1/x64';
