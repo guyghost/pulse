@@ -59,7 +59,7 @@ jobs:
           cache: pnpm
 
       - name: Setup pinned Python descriptor helper
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -81,7 +81,7 @@ jobs:
           pnpm --filter @pulse/extension verify-manifest --expected-version "$EXPECTED_VERSION"
 
       - name: Verify successful seal-candidate run provenance
-        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3
         env:
           EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
           SOURCE_COMMIT: ${{ inputs.source_commit }}
@@ -206,13 +206,13 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Setup pinned Python descriptor helper
-        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 

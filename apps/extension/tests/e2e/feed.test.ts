@@ -10,11 +10,11 @@ import {
   injectMissions,
   missionCards,
   openMissionButton,
-  scanButton,
+  openOperationalDetails,
   setFeedState,
-  allMissionsToggle,
+  toggleFavoritesFilter,
+  triggerScan,
   unfavoriteButton,
-  expectFeedEmptyState,
   feedRegion,
 } from './helpers';
 
@@ -256,7 +256,23 @@ test.describe('Feed', () => {
 
     await setFeedState(page, 'empty');
 
-    await expectFeedEmptyState(page, 2000);
+    // Sur un runner CI lent, le SCAN_COMPLETE du scan de montage (stub à
+    // ~2,5 s après SCAN_START) peut arriver APRÈS le passage à « empty » et
+    // repeupler le feed : ré-émettre l'événement dev du DevPanel (même
+    // mécanisme que son bouton) jusqu'à ce que l'état vide persiste.
+    await expect
+      .poll(
+        async () => {
+          await page.evaluate(() => {
+            window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: 'empty' }));
+          });
+          return feedRegion(page)
+            .getByText(/Aucune mission/)
+            .isVisible();
+        },
+        { timeout: 10_000 }
+      )
+      .toBe(true);
   });
 
   test('search filters missions', async ({ page }) => {
@@ -421,8 +437,8 @@ test.describe('Feed', () => {
     // Mission count should decrease
     await expectMissionCount(page, 4, 2000);
 
-    // "Voir les masquees" link should appear
-    await expect(page.getByRole('button', { name: /Voir les \d+ mission.*masqu/i })).toBeVisible();
+    // "Voir les ignorées (N)" link should appear
+    await expect(page.getByRole('button', { name: /Voir les ignorées/ })).toBeVisible();
   });
 
   test('favorites toggle filters to favorites only', async ({ page }) => {
@@ -440,13 +456,13 @@ test.describe('Feed', () => {
     await favoriteButton(firstCard).click();
     await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
 
-    await favoritesToggle(page).click();
-    await page.waitForTimeout(300);
+    // Opens the operational dashboard, then clicks the favorites filter
+    await toggleFavoritesFilter(page, true);
 
     // Should show only 1 mission (the favorited one)
     await expectMissionCount(page, 1, 2000);
 
-    await allMissionsToggle(page).click();
+    await favoritesToggle(page).click();
     await expectMissionCount(page, 5, 2000);
   });
 
@@ -458,10 +474,10 @@ test.describe('Feed', () => {
 
     await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
     await expect(missionCards(page)).toHaveCount(10, { timeout: 5000 });
-    await expect(scanButton(page)).toHaveAccessibleName('Lancer le scan des missions');
-    await expect(scanButton(page)).toBeEnabled();
 
-    await scanButton(page).click();
+    // Loaded feed → compact hero exposes no scan control; the `r` shortcut
+    // (or any retry CTA) is the manual trigger.
+    await triggerScan(page);
 
     const arrivalStack = page.getByTestId('mission-arrival-stack');
     await expect(arrivalStack).not.toBeVisible();
@@ -471,7 +487,6 @@ test.describe('Feed', () => {
     const partialCard = missionCards(page).filter({ hasText: 'Partial Scan Action Test' });
     await expect(partialCard).toBeVisible({ timeout: 10000 });
     await expect(missionCards(page)).toHaveCount(1);
-    await expect(scanButton(page)).toHaveAccessibleName('Lancer le scan des missions');
     await expect(arrivalStack).not.toBeVisible();
 
     const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
@@ -508,16 +523,17 @@ test.describe('Feed', () => {
     await expect(cards.first().locator('h3')).toHaveText(firstTitle ?? '');
   });
 
-  test('header star button and refresh button are visible', async ({ page }) => {
+  test('filter dock and operational dashboard controls are visible', async ({ page }) => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
     await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
-    // Favorites filter button — matches aria-label "Filtrer les favoris" or visible text "Favoris"
-    await expect(page.getByRole('button', { name: /favoris/i })).toBeVisible();
-    // Refresh/scan button is visible (title changes based on state)
-    await expect(scanButton(page)).toBeVisible();
+    // Filter dock trigger
+    await expect(page.getByRole('button', { name: 'Afficher les filtres' })).toBeVisible();
+    // Favorites toggle lives in the operational-details dashboard
+    await openOperationalDetails(page);
+    await expect(favoritesToggle(page)).toBeVisible();
   });
 
   test('ARIA attributes for accessibility are properly set', async ({ page }) => {
@@ -529,14 +545,16 @@ test.describe('Feed', () => {
     // Verify feed content exists — check for search input (always visible in feed)
     await expect(feedSearchInput(page)).toBeVisible();
 
-    // Test aria-pressed on favorites toggle — button shows "Favoris" text when not active
-    const favoritesFilter = favoritesToggle(page);
-    await expect(favoritesFilter).toHaveAttribute('aria-pressed', 'false');
-
-    await favoritesFilter.click();
-    await expect(allMissionsToggle(page)).toHaveAttribute('aria-pressed', 'true');
-    await allMissionsToggle(page).click();
-    await expect(favoritesToggle(page)).toHaveAttribute('aria-pressed', 'false');
+    // aria-pressed on the dashboard quick filters (the favorites filter is a
+    // plain toggle without aria-pressed since the filter-dock redesign)
+    await injectMissions(page, 5);
+    await openOperationalDetails(page);
+    const newMissionsFilter = page.getByTitle('Filtrer les nouvelles missions');
+    await expect(newMissionsFilter).toHaveAttribute('aria-pressed', 'false');
+    await newMissionsFilter.click();
+    await expect(newMissionsFilter).toHaveAttribute('aria-pressed', 'true');
+    await newMissionsFilter.click();
+    await expect(newMissionsFilter).toHaveAttribute('aria-pressed', 'false');
 
     // Test aria-expanded on filter toggle
     const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
@@ -548,18 +566,20 @@ test.describe('Feed', () => {
       'aria-expanded',
       'true'
     );
-    // Filter panel uses role="group" with aria-label "Options de filtrage"
-    const filterPanel = page.getByRole('group', { name: /Options de filtrage/ });
+    // Filter panel uses role="group" with aria-label "Filtrer les missions"
+    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
 
     const panelIsTopmost = await filterPanel.evaluate((panel) => {
       const rect = panel.getBoundingClientRect();
-      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 24);
+      // Sonde au centre vertical : le bord supérieur du panneau passe sous la
+      // barre d'outils sticky du feed (z-20), ce qui fausse un probe top+24.
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
       return hit === panel || (hit !== null && panel.contains(hit));
     });
     expect(panelIsTopmost).toBe(true);
 
-    const remoteFilter = filterPanel.getByRole('button', { name: 'Full remote', exact: true });
+    const remoteFilter = filterPanel.getByRole('button', { name: 'Remote', exact: true });
     await remoteFilter.click();
     await expect(remoteFilter).toHaveAttribute('aria-pressed', 'true');
   });

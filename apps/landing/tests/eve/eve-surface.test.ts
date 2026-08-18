@@ -15,9 +15,9 @@ describe('Eve landing surface', () => {
     };
     const svelteConfig = readLandingFile('svelte.config.js');
 
-    expect(packageJson.dependencies.eve).toBe('0.26.2');
-    expect(packageJson.dependencies.ai).toBe('7.0.26');
-    expect(packageJson.dependencies['@vercel/oidc']).toBe('3.5.0');
+    expect(packageJson.dependencies.eve).toBe('0.37.1');
+    expect(packageJson.dependencies.ai).toBe('7.0.65');
+    expect(packageJson.dependencies['@vercel/oidc']).toBe('3.8.4');
     expect(packageJson.engines.node).toBe('24.x');
     expect(svelteConfig).toContain("runtime: 'nodejs24.x'");
     expect(svelteConfig).toContain('maxDuration: 135');
@@ -28,9 +28,7 @@ describe('Eve landing surface', () => {
     expect(viteConfig).toContain('microfrontends()');
     expect(viteConfig.indexOf('eveSvelteKit(')).toBeGreaterThan(-1);
     expect(viteConfig.indexOf('sveltekit()')).toBeGreaterThan(viteConfig.indexOf('eveSvelteKit('));
-    expect(viteConfig).toContain(
-      "mode === 'test' ? [] : [eveSvelteKit({ configureVercelJson: false })]"
-    );
+    expect(viteConfig).toContain("mode === 'test' ? [] : [eveSvelteKit()]");
     expect(viteConfig).toContain("ssr: { noExternal: ['eve'] }");
     expect(viteConfig).toContain("exclude: [...configDefaults.exclude, '.eve/**']");
   });

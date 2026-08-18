@@ -49,36 +49,34 @@ export class EveClientTransport implements EveTransport {
   }
 
   async run<TOutput>(request: EveTurnTransportRequest): Promise<EveTurnTransportResult<TOutput>> {
-    if (request.session !== null && request.session.continuationToken === null) {
-      throw new EveProviderError(
-        'EVE_INVALID_REQUEST',
-        'An Eve follow-up requires a continuation token.',
-        false
-      );
-    }
-
     try {
       const client = this.#createClient();
-      const session = request.session
-        ? client.session({
-            sessionId: request.session.sessionId,
-            continuationToken: request.session.continuationToken ?? undefined,
-            streamIndex: 0,
-          })
-        : client.session();
-      const response = await session.send<TOutput>({
-        message: request.message,
+      // Eve 0.37 sessions are durable and addressed by session ID alone. The
+      // continuation token no longer exists; the contract keeps a vestigial
+      // always-null field for storage compatibility (see
+      // src/models/eve-session-lifecycle.model.md).
+      const turnOptions = {
         clientContext: request.clientContext,
         outputSchema: request.outputSchema,
         signal: AbortSignal.timeout(this.#config.timeoutMs),
-      });
+      };
+      const response = request.session
+        ? await client.sessions
+            .attach(request.session.sessionId, { streamIndex: 0 })
+            .send<TOutput>(request.message, turnOptions)
+        : (
+            await client.sessions.create<TOutput>({
+              message: request.message,
+              ...turnOptions,
+            })
+          ).response;
       const result = await response.result();
 
       return {
         status: result.status,
         data: result.data,
         sessionId: result.sessionId,
-        continuationToken: session.state.continuationToken ?? response.continuationToken ?? null,
+        continuationToken: null,
       };
     } catch (error) {
       if (error instanceof EveProviderError) throw error;
@@ -100,7 +98,7 @@ export class EveClientTransport implements EveTransport {
 
   async cancel(sessionId: string): Promise<EveCancelTransportResult> {
     try {
-      const session = this.#createClient().session({ sessionId, streamIndex: 0 });
+      const session = this.#createClient().sessions.attach(sessionId, { streamIndex: 0 });
       const result = await session.cancel();
       return { status: result.status };
     } catch (error) {
@@ -119,7 +117,6 @@ export class EveClientTransport implements EveTransport {
     return new Client({
       host: this.#config.host,
       redirect: 'error',
-      preserveCompletedSessions: true,
       ...(this.#config.localDevelopment
         ? {}
         : {

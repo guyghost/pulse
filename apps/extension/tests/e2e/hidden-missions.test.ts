@@ -1,12 +1,12 @@
 import { test, expect } from '@playwright/test';
 import {
   showHiddenMissions,
-  allMissionsToggle,
   ensureFeedVisible,
   favoriteButton,
   favoritesToggle,
   hideButton,
   missionCards,
+  toggleFavoritesFilter,
   unfavoriteButton,
   expectMissionCount,
   clearAndInjectMissions,
@@ -35,7 +35,7 @@ test.describe('Hidden Missions Flow', () => {
     await hideButton(card).click();
 
     await expectMissionCount(page, initialCount - 1);
-    await expect(page.getByRole('button', { name: /Voir les 1 mission masqu/i })).toBeVisible({
+    await expect(page.getByRole('button', { name: /Voir les ignorées/ })).toBeVisible({
       timeout: 5000,
     });
   });
@@ -56,9 +56,7 @@ test.describe('Hidden Missions Flow', () => {
   test('hidden missions link is not visible when none are hidden', async ({ page }) => {
     await clearAndInjectMissions(page, 5);
 
-    await expect(
-      page.getByRole('button', { name: /Voir les \d+ mission.*masqu/i })
-    ).not.toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les ignorées/ })).not.toBeVisible();
   });
 
   test('combining hide and favorite filters works', async ({ page }) => {
@@ -76,14 +74,14 @@ test.describe('Hidden Missions Flow', () => {
     await hideButton(cards.nth(1)).click();
     await expectMissionCount(page, initialCount - 1);
 
-    // Show only favorites
-    await favoritesToggle(page).click();
+    // Show only favorites (opens the operational dashboard)
+    await toggleFavoritesFilter(page, true);
     await expectMissionCount(page, 1);
 
-    // Back to all
-    await allMissionsToggle(page).click();
+    // Back to all — same dashboard toggle
+    await favoritesToggle(page).click();
     await expectMissionCount(page, initialCount - 1);
-    await expect(page.getByRole('button', { name: /Voir les 1 mission masqu/i })).toBeVisible({
+    await expect(page.getByRole('button', { name: /Voir les ignorées/ })).toBeVisible({
       timeout: 5000,
     });
   });

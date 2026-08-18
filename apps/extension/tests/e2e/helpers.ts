@@ -4,7 +4,7 @@ import type { UserProfile } from '../../src/lib/core/types/profile';
 import type { Mission } from '../../src/lib/core/types/mission';
 
 export const SIDE_PANEL = '/src/sidepanel/index.html';
-export const FEED_SEARCH_PLACEHOLDER = 'Rechercher une mission, une stack, un client...';
+export const FEED_SEARCH_PLACEHOLDER = 'Rechercher une mission…';
 
 export function feedSearchInput(page: Page): Locator {
   return page.getByRole('textbox', { name: FEED_SEARCH_PLACEHOLDER });
@@ -22,18 +22,43 @@ export function missionCards(page: Page): Locator {
   return page.getByTestId('mission-feed').getByRole('article');
 }
 
+/**
+ * Favorites filter — moved into the operational-details dashboard by the
+ * filter-dock redesign. Anchored by its tooltip title; requires the details
+ * panel to be open (see openOperationalDetails).
+ */
 export function favoritesToggle(page: Page): Locator {
-  return page.getByRole('button', { name: 'Filtrer les favoris' });
+  return page.getByTitle('Filtrer les favoris');
 }
 
+/** Alert-only mode exit button (rendered when the alert filter hides missions). */
 export function allMissionsToggle(page: Page): Locator {
-  return page.getByRole('button', { name: 'Voir toutes les missions' });
+  return page.getByRole('button', { name: 'Afficher toutes les missions' });
 }
 
+/** Hidden-missions toggle — renamed by the filter-dock redesign. */
+export function hiddenMissionsToggle(page: Page): Locator {
+  return page.getByRole('button', { name: /Voir les ignorées|Masquer les ignorées/ });
+}
+
+/**
+ * Hero scan control. Only rendered when the feed is EMPTY (heroCompact is
+ * derived from totalMissions > 0 — with missions present there is no visible
+ * scan control; manual scans go through the `r` shortcut, see triggerScan).
+ */
 export function scanButton(page: Page): Locator {
   return page.getByRole('button', {
-    name: /Lancer le scan des missions|Réessayer le scan des missions|Scan en cours|Scan indisponible hors ligne/,
+    name: /^(Lancer le scan des missions|Réessayer le scan des missions|Stopper le scan en cours|Scan indisponible hors ligne)$/,
   });
+}
+
+/** Opens the operational-details dashboard and waits for its filters. */
+export async function openOperationalDetails(page: Page): Promise<void> {
+  const toggle = page.getByRole('button', { name: /détails opérationnels/i });
+  if ((await toggle.getAttribute('aria-expanded').catch(() => null)) !== 'true') {
+    await toggle.click();
+  }
+  await expect(favoritesToggle(page)).toBeVisible({ timeout: 5000 });
 }
 
 export function favoriteButton(card: Locator): Locator {
@@ -80,7 +105,7 @@ export async function expectFeedReady(page: Page) {
   await expect(page.locator('[data-initial-shell]')).toHaveCount(0, {
     timeout: 10000,
   });
-  await expect(navButton(page, 'Feed')).toHaveAttribute('aria-current', 'page', {
+  await expect(navButton(page, 'Missions')).toHaveAttribute('aria-current', 'page', {
     timeout: 10000,
   });
   await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
@@ -244,42 +269,129 @@ export async function mockNoProfile(page: Page) {
 }
 
 /**
- * Remplit le formulaire d'onboarding avec les données fournies
+ * Onboarding wizard — machine-driven 5-step flow (OnboardingFlow.svelte):
+ * welcome → connecting (sources) → identity → preferences → skills →
+ * notifying → persisting/scanning → completed. Guards live in the flow
+ * machine: ≥1 source, firstName+jobTitle, tjmMin>0 ∧ tjmMax≥tjmMin, ≥1 keyword.
  */
-export async function fillOnboardingForm(page: Page, profile: Partial<UserProfile>) {
-  if (profile.firstName) {
-    await page.locator('#ob-firstname').fill(profile.firstName);
-  }
-  if (profile.jobTitle) {
-    await page.locator('#ob-jobtitle').fill(profile.jobTitle);
-  }
-  if (profile.location) {
-    await page.locator('#ob-location').fill(profile.location);
-  }
-  if (profile.keywords?.[0]) {
-    await page.locator('#ob-keywords').fill(profile.keywords[0]);
-    await page.locator('#ob-keywords + button').click();
-  }
+
+/** Welcome heading of the outcome-led onboarding screen. */
+export function onboardingWelcomeHeading(page: Page): Locator {
+  return page.getByRole('heading', { name: 'Toutes vos missions freelance' });
 }
 
 /**
- * Complète l'onboarding avec un profil complet
+ * Attend exactement un bouton « Continuer » puis le clique. Les transitions
+ * fade (120ms) de Svelte peuvent garder le bouton de l'étape précédente
+ * attaché au DOM — toHaveCount(1) attend la fin de la transition.
+ */
+export async function clickContinue(page: Page) {
+  const button = page.getByRole('button', { name: 'Continuer', exact: true });
+  await expect(button).toHaveCount(1);
+  await button.click();
+}
+
+/**
+ * Passe l'écran d'accueil (outcome-led welcome) et attend l'étape « Connectez
+ * vos sources » (phase `connecting` de la machine d'états).
+ */
+export async function startOnboardingWizard(page: Page) {
+  const connectingHeading = page.getByRole('heading', { name: 'Connectez vos sources' });
+  if (!(await connectingHeading.isVisible().catch(() => false))) {
+    const welcomeStart = page.getByRole('button', { name: 'Commencer', exact: true });
+    // Attendre que l'écran d'accueil soit monté avant de décider de cliquer
+    // (isVisible() immédiat peut courir avant l'hydratation de l'app).
+    await expect(welcomeStart.or(connectingHeading)).toBeVisible({ timeout: 10000 });
+    if (await welcomeStart.isVisible().catch(() => false)) {
+      await welcomeStart.click();
+    }
+  }
+  await expect(connectingHeading).toBeVisible({ timeout: 10000 });
+}
+
+/** Connecte la première source proposée puis passe à l'étape identité. */
+export async function connectFirstSource(page: Page, sourceName = 'Free-Work') {
+  const source = page.getByRole('button', { name: sourceName, exact: true });
+  await expect(source).toBeVisible();
+  await source.click();
+  await expect(source).toHaveAttribute('aria-pressed', 'true');
+  await clickContinue(page);
+  await expect(page.getByRole('heading', { name: 'Qui êtes-vous ?' })).toBeVisible();
+}
+
+/** Remplit l'étape identité (Prénom/Métier obligatoires) puis continue. */
+export async function fillIdentityStep(
+  page: Page,
+  profile: { firstName?: string; jobTitle?: string; location?: string }
+) {
+  if (profile.firstName !== undefined) {
+    await page.getByLabel('Prénom').fill(profile.firstName);
+  }
+  if (profile.jobTitle !== undefined) {
+    // Rôle + textbox : avec VITE_COPILOT_ROLLOUT_ENABLED=true (CI), la page
+    // Suivi montée en arrière-plan expose une case à cocher « Métier »
+    // (CopilotPanel) — getByLabel brut violerait le strict mode. La requête
+    // par rôle ignore aussi le sous-arbre aria-hidden.
+    await page.getByRole('textbox', { name: 'Métier', exact: true }).fill(profile.jobTitle);
+  }
+  if (profile.location !== undefined) {
+    await page.getByLabel('Localisation (optionnel)').fill(profile.location);
+  }
+  await clickContinue(page);
+  await expect(page.getByRole('heading', { name: 'Quels sont vos critères ?' })).toBeVisible();
+}
+
+/** Remplit l'étape critères (TJM) puis continue vers les compétences. */
+export async function fillPreferencesStep(page: Page, tjmMin = 500, tjmMax = 700) {
+  await page.getByLabel('TJM min (€)').fill(String(tjmMin));
+  await page.getByLabel('TJM max (€)').fill(String(tjmMax));
+  await clickContinue(page);
+  await expect(page.getByRole('heading', { name: 'Vos compétences clés' })).toBeVisible();
+}
+
+/** Ajoute un mot-clé (champ + Entrée) puis continue vers les alertes. */
+export async function fillSkillsStep(page: Page, keyword = 'React') {
+  const input = page.locator('#onboarding-skill-input');
+  await expect(input).toBeVisible();
+  await input.fill(keyword);
+  await input.press('Enter');
+  await expect(page.getByRole('button', { name: `Retirer ${keyword}` })).toBeVisible();
+  await clickContinue(page);
+  await expect(page.getByRole('heading', { name: 'Soyez alerté·e' })).toBeVisible();
+}
+
+/**
+ * Lance le premier scan depuis l'étape notifications et attend la
+ * redirection vers le feed (persist → scan → completed → onComplete).
+ */
+export async function submitOnboardingScan(page: Page) {
+  const launch = page.getByRole('button', { name: 'Lancer mon premier scan' });
+  await expect(launch).toBeEnabled({ timeout: 10000 });
+  await launch.click();
+  await expect(navButton(page, 'Missions')).toHaveAttribute('aria-current', 'page', {
+    timeout: 15000,
+  });
+}
+
+/**
+ * Complète l'onboarding avec un profil complet (toutes les étapes).
  */
 export async function completeOnboarding(page: Page, profile: Partial<UserProfile> = {}) {
-  const defaultProfile = {
-    firstName: 'Test',
-    jobTitle: 'Développeur Fullstack',
-    location: 'Paris',
-    keywords: ['React'],
-    ...profile,
-  };
+  const {
+    firstName = 'Test',
+    jobTitle = 'Développeur Fullstack',
+    location = 'Paris',
+    tjmMin = 500,
+    tjmMax = 700,
+  } = profile;
+  const keyword = profile.keywords?.[0] ?? 'React';
 
-  await fillOnboardingForm(page, defaultProfile);
-  const submitButton = page.getByRole('button', {
-    name: /Sauvegarder mon profil|C.est parti|Commencer/,
-  });
-  await expect(submitButton).toBeEnabled({ timeout: 10000 });
-  await submitButton.click();
+  await startOnboardingWizard(page);
+  await connectFirstSource(page);
+  await fillIdentityStep(page, { firstName, jobTitle, location });
+  await fillPreferencesStep(page, tjmMin, tjmMax);
+  await fillSkillsStep(page, keyword);
+  await submitOnboardingScan(page);
 }
 
 /**
@@ -289,10 +401,16 @@ export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile
   await page.goto(SIDE_PANEL);
 
   const navigation = mainNavigation(page);
-  const onboardingFirstName = page.locator('#ob-firstname');
-  await expect(navigation.or(onboardingFirstName)).toBeVisible({ timeout: 10000 });
+  const welcomeStart = page.getByRole('button', { name: 'Commencer', exact: true });
+  const connectingHeading = page.getByRole('heading', { name: 'Connectez vos sources' });
+  await expect(navigation.or(welcomeStart).or(connectingHeading)).toBeVisible({
+    timeout: 10000,
+  });
 
-  if (await onboardingFirstName.isVisible()) {
+  if (
+    (await welcomeStart.isVisible().catch(() => false)) ||
+    (await connectingHeading.isVisible().catch(() => false))
+  ) {
     await completeOnboarding(page, {
       firstName: 'Jean',
       jobTitle: 'Développeur React Senior',
@@ -424,10 +542,36 @@ export async function waitForScanComplete(page: Page, timeout = 10000) {
 }
 
 /**
- * Lance un scan manuel via le bouton refresh
+ * Lance un scan manuel. Prefers any visible scan-start control (empty-feed
+ * hero, overview "Scanner" CTA, feed error retry); falls back to the `r`
+ * keyboard shortcut, which is the ONLY manual affordance once missions are
+ * loaded. The shortcut registers from a mount $effect — retry it a few times
+ * (see src/models/keyboard-shortcuts-help.model.md, OPEN delivery).
  */
+const SCAN_START_BUTTON_NAMES = [
+  'Lancer le scan des missions',
+  'Réessayer le scan des missions',
+  'Scanner',
+  'Relancer le scan',
+  'Réessayer',
+] as const;
+
 export async function triggerScan(page: Page) {
-  await scanButton(page).click();
+  const busy = page.getByText('Collecte...', { exact: true });
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (await busy.isVisible().catch(() => false)) {
+      return;
+    }
+    for (const name of SCAN_START_BUTTON_NAMES) {
+      const button = page.getByRole('button', { name, exact: true }).first();
+      if (await button.isVisible().catch(() => false)) {
+        await button.click();
+        return;
+      }
+    }
+    await page.keyboard.press('r');
+    await page.waitForTimeout(300);
+  }
 }
 
 // ============================================================================
@@ -486,21 +630,21 @@ export async function hideMission(card: Locator) {
 }
 
 /**
- * Active le filtre favoris
+ * Active/désactive le filtre favoris. The dashboard exposes a single toggle
+ * control (no aria-pressed), so both directions click the same button after
+ * making sure the operational-details dashboard is open.
  */
-export async function toggleFavoritesFilter(page: Page, showOnlyFavorites: boolean) {
-  if (showOnlyFavorites) {
-    await favoritesToggle(page).click();
-  } else {
-    await allMissionsToggle(page).click();
-  }
+export async function toggleFavoritesFilter(page: Page, _showOnlyFavorites: boolean) {
+  await openOperationalDetails(page);
+  await favoritesToggle(page).click();
+  await dismissFeedTour(page);
 }
 
 /**
  * Affiche les missions masquées
  */
 export async function showHiddenMissions(page: Page) {
-  const showHiddenBtn = page.getByRole('button', { name: /Voir les \d+ mission.*masqu/i });
+  const showHiddenBtn = hiddenMissionsToggle(page);
   await expect(showHiddenBtn).toBeVisible({ timeout: 5000 });
   await dismissFeedTour(page);
   await showHiddenBtn.click();
@@ -646,13 +790,13 @@ export async function waitForLoadingComplete(page: Page, timeout = 5000) {
  * Récupère le nombre de missions affiché dans le header
  */
 export async function getDisplayedMissionCount(page: Page): Promise<number> {
-  const labels = await page
-    .locator('[aria-label]')
-    .evaluateAll((elements) =>
-      elements
-        .map((el) => el.getAttribute('aria-label'))
-        .filter((label): label is string => Boolean(label?.endsWith('missions visibles')))
-    );
+  const labels = await page.locator('[aria-label]').evaluateAll((elements) =>
+    elements
+      .map((el) => el.getAttribute('aria-label'))
+      // "N missions visibles" / "1 mission visible" — the compact hero
+      // renders both singular and plural forms.
+      .filter((label): label is string => /missions? visibles?$/.test(label ?? ''))
+  );
   const label = labels[0] ?? null;
   if (!label) {
     return 0;
@@ -674,7 +818,10 @@ export async function getMissionTotalCount(page: Page): Promise<number> {
   if (match) {
     return parseInt(match[1], 10);
   }
-  return 0;
+  // Certains états du feed (ex. après un cycle offline/restore) n'affichent
+  // pas la ligne « N/N missions triées » — retomber sur l'aria-label compact
+  // « N missions visibles » du hero.
+  return getDisplayedMissionCount(page);
 }
 
 /**

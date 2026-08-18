@@ -59,7 +59,7 @@ test('consent → generated dossier → review/copy → reopen', async ({ page }
   await panel.getByRole('button', { name: 'Conserver' }).click();
   await expect(panel.getByText('Conservé', { exact: true })).toBeVisible();
 
-  await navigation.getByRole('button', { name: 'Feed' }).click();
+  await navigation.getByRole('button', { name: 'Missions' }).click();
   await navigation.getByRole('button', { name: 'Suivi' }).click();
 
   const reopenedPanel = page

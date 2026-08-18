@@ -18,7 +18,7 @@ shortcuts, grouped by their declared category.
 ```
 States: closed · open
 
-                 OPEN (? or help trigger)
+                 OPEN (? or first-run toast action)
   closed ─────────────────────────────────► open
                                                │
                   CLOSE_BUTTON · CLOSE_BACKDROP · ESCAPE
@@ -37,6 +37,19 @@ States: closed · open
 registered shortcuts themselves continue to be owned by
 `shell/utils/keyboard-shortcuts.ts`; rendering the help must not mutate that
 registry.
+
+`OPEN` delivery is bound to the feed page's shortcut registration: the global
+`?` listener is installed by the feed page's mount effect, and a `?` keydown
+fired before that registration is dropped — there is no queue or replay.
+`OPEN` is therefore eventually-deliverable, never instantly-deliverable:
+scenarios must wait for the registration to be live (re-pressing `?` until the
+dialog appears) before asserting dialog state.
+
+Synthesized delivery note: the registry identifier of the help shortcut is
+`shift+?` (`SHOW_HELP` declares `shift: true`). A real keyboard sends
+Shift+Slash, so automated scenarios must synthesize `Shift+Slash` — a
+synthetic `?` press without the Shift modifier produces the identifier `?`
+and never matches the registry.
 
 ## Readability hierarchy
 
@@ -79,7 +92,7 @@ the scrim's low contrast.
 
 ## Review checklist
 
-- Nominal: opening through `?` or the visible help trigger shows all registered
+- Nominal: opening through `?` or the first-run toast action shows all registered
   categories and shortcuts.
 - Error/empty: an empty registry renders an intentionally empty list area;
   closing still works.
