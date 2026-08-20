@@ -27,8 +27,8 @@ export const BackupDataSchema = z.object({
     customDelayMs: z.number(),
     theme: z.enum(['light', 'dark', 'system']).default('system'),
   }),
-  favorites: z.record(z.number()),
-  hidden: z.record(z.number()),
+  favorites: z.record(z.string(), z.number()),
+  hidden: z.record(z.string(), z.number()),
 });
 
 export type BackupData = z.infer<typeof BackupDataSchema>;

@@ -15,7 +15,7 @@ Observer → Prioriser → Corriger → Vérifier → Publier → Apprendre
 | **Observer**  | `error-analytics`, `parser-health`, `SourceHealthPanel`, export diagnostic | Signaux locaux       |
 | **Prioriser** | OpenSpec (`openspec/changes/`), issues GitHub, rapports QA                 | Proposition ciblée   |
 | **Corriger**  | PR + parsers Core, connecteurs Shell, UI opérationnelle                    | Code + tests         |
-| **Vérifier**  | `pnpm improvement:loop`, CI, health checks cron                            | Rapport vert/rouge   |
+| **Vérifier**  | `pnpm improvement:loop`, CI, health checks locaux                          | Rapport vert/rouge   |
 | **Publier**   | `release.yml` → Chrome Web Store                                           | Version taggée       |
 | **Apprendre** | Changelog, fixtures regression, golden files                               | Base de connaissance |
 
@@ -40,7 +40,7 @@ Les health checks CI s'appuient sur les **fixtures locales** (pas d'appels live 
 - régression golden (`tests/unit/regression/`, `UPDATE_GOLDENS=1` pour régénérer)
 - registre de couverture (`tests/health/connector-registry.ts`)
 
-Le workflow `.github/workflows/connector-health.yml` exécute ces checks chaque jour à 08:00 UTC et crée une issue si un connecteur casse.
+Ces checks sont locaux et font partie de `pnpm improvement:loop`. Ils ne créent aucune issue GitHub automatiquement.
 
 ## Export diagnostic (utilisateur)
 

@@ -15,56 +15,6 @@ The workflow runs format, lint, TypeScript, unit, build, browser E2E, and packag
 
 The complete packaged-MV3 gate must use the committed scenario inventory at `apps/extension/tests/mv3/scenarios.v1.json`. A later local sealer is responsible for binding that exact nonempty inventory, the aggregate result, zero skips/failures/diagnostics, and identical pre/post canonical trees.
 
-## `connector-health.yml`
-
-Ce workflow planifié ou manuel exécute uniquement les fixtures committées des six connecteurs. Il
-n'a accès à aucune session navigateur, aucun cookie, aucun identifiant de production et aucun
-endpoint authentifié de plateforme connecteur. Seul `issue-writer` utilise ensuite l'API GitHub
-authentifiée, après admission d'un échec vérifié. Le registre de santé reste égal au catalogue
-complet, y compris Malt, même si une configuration de build exclut un connecteur.
-
-Permissions exactes :
-
-- `health-capture`: `contents: read` ;
-- `issue-writer`: `actions: read`, `contents: read`, `issues: write` ;
-- `conclusion`: `contents: read`.
-
-Les permissions globales sont `{}`. Le vérificateur local de source et `conclusion` ne reçoivent
-aucun `GITHUB_TOKEN` dans leur environnement. Seul l'acteur admis de `issue-writer` reçoit le token
-pour les lectures d'étiquettes/issues et l'unique POST éventuel. Les actions d'artifact transfèrent
-uniquement l'evidence du run courant : artifact `connector-health-report`, fichier unique
-`connector-health-evidence.v1.json`, conservation 14 jours, sans overwrite.
-
-Chaque job utilise `ubuntu-24.04`, Node `22.23.1`, pnpm `10.32.1`, admet le checkout exact avant
-toute installation, puis vérifie l'identité `packageManager` avec intégrité et exécute
-`pnpm install --frozen-lockfile`. Les entrées principales committées sont :
-
-```text
-pnpm --filter @pulse/extension exec tsx scripts/connector-health/capture.ts
-pnpm --filter @pulse/extension exec tsx scripts/connector-health/issue-writer.ts
-pnpm --filter @pulse/extension exec tsx scripts/connector-health/conclusion-cli.ts
-```
-
-Pins revus : `actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd`,
-`pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093`,
-`actions/setup-node@820762786026740c76f36085b0efc47a31fe5020`,
-`actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a` et
-`actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c`.
-
-L'admission lie exactement dépôt, branche par défaut, ref, SHA, workflow, event et checkout propre.
-Avec `contents: read`, elle ne peut pas vérifier la protection de branche : revues obligatoires,
-protection et checks requis restent des contrôles administrateur hors bande. Le périmètre exécutable
-fait confiance aux scripts/tests/dépendances revus. Les fixtures sont des données hostiles mais non
-exécutables. Le PGID prouve seulement que le groupe contrôlé est vide ; il ne prétend pas contenir
-du code committé malveillant qui ferait `setsid` ou se daemoniserait.
-
-Les terminaux enfants sont `capture_passed`, `capture_failed`,
-`capture_infrastructure_failed`, `issue_settled` et `issue_failed`. Après le marqueur
-`CONCLUSION_ACTOR_STARTED`, les trois seules conclusions sont `passed`, `failed_recorded` et
-`failed_unreported`; les deux dernières sont rouges. Une panne de checkout/setup/install/module ou
-d'input avant le marqueur est `pre_actor_bootstrap_interrupted` : GitHub reste rouge, aucun terminal
-XState n'est fabriqué et aucune conclusion de santé n'est revendiquée.
-
 ## `release.yml`
 
 This workflow is manual and local-first. It accepts:
