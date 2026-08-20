@@ -35,7 +35,7 @@ const __dirname = dirname(__filename);
 
 const ManifestV3Schema = z.object({
   manifest_version: z.literal(3, {
-    errorMap: () => ({ message: 'manifest_version must be 3 for Chrome MV3' }),
+    error: 'manifest_version must be 3 for Chrome MV3',
   }),
   name: z.string().min(1, 'name is required'),
   version: z.string().regex(/^\d+\.\d+\.\d+/, {
@@ -54,7 +54,7 @@ const ManifestV3Schema = z.object({
   action: z
     .object({
       default_title: z.string().optional(),
-      default_icon: z.union([z.string(), z.record(z.string())]).optional(),
+      default_icon: z.union([z.string(), z.record(z.string(), z.string())]).optional(),
       default_popup: z.string().optional(),
     })
     .optional(),

@@ -1,9 +1,37 @@
-import type {
-  ConnectorHealthCheck,
-  ConnectorHealthReportV1,
-} from '../../scripts/connector-health/contracts';
 import { getAllConnectorsMeta } from '../../src/lib/shell/connectors/meta';
 import { CONNECTOR_HEALTH_REGISTRY, validateConnectorHealthRegistry } from './connector-registry';
+
+export type ConnectorHealthCheck = {
+  id: 'unit-tests' | 'regression-fixtures';
+  status: 'pass' | 'fail';
+  code:
+    | 'unit_tests_passed'
+    | 'unit_tests_failed'
+    | 'unit_test_file_missing'
+    | 'regression_fixtures_present'
+    | 'regression_fixture_directory_missing'
+    | 'regression_fixture_set_empty';
+  detail: string | null;
+};
+
+export interface ConnectorHealthReportV1 {
+  schema: 'missionpulse.connector-health-report';
+  version: 1;
+  generatedAt: string;
+  status: 'pass' | 'fail';
+  connectors: Array<{
+    connectorId: string;
+    name: string;
+    status: 'pass' | 'fail';
+    checks: ConnectorHealthCheck[];
+  }>;
+  regression: {
+    id: 'parser-regression';
+    status: 'pass' | 'fail';
+    code: 'parser_regression_passed' | 'parser_regression_failed';
+    detail: string | null;
+  };
+}
 
 export interface ConnectorHealthReportDependencies {
   now: () => Date;

@@ -847,13 +847,18 @@ describe('settings release compatibility coordinator', () => {
           result: null,
         },
       } satisfies SettingsReleaseEnvelopeV1;
-      p.scan.query.mockImplementationOnce(() => new Promise(() => {}));
+      let signalQueryStarted!: () => void;
+      const queryStarted = new Promise<void>((resolve) => {
+        signalQueryStarted = resolve;
+      });
+      p.scan.query.mockImplementationOnce(() => {
+        signalQueryStarted();
+        return new Promise(() => {});
+      });
 
       const coordinator = createSettingsReleaseCoordinator(p);
       const boot = coordinator.boot();
-      for (let turn = 0; turn < 20 && p.scan.query.mock.calls.length === 0; turn += 1) {
-        await vi.advanceTimersByTimeAsync(0);
-      }
+      await queryStarted;
       expect(p.scan.query).toHaveBeenCalledTimes(1);
       await vi.advanceTimersByTimeAsync(10_000);
       await boot;

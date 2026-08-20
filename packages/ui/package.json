@@ -36,14 +36,14 @@
   "devDependencies": {
     "@pulse/tsconfig": "workspace:*",
     "@sveltejs/package": "^2.5.8",
-    "@sveltejs/vite-plugin-svelte": "^7.2.0",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "svelte-check": "^4.7.6",
     "svelte2tsx": "^0.7.61",
     "tailwindcss": "^4.3.3",
-    "typescript": "^5.7.0",
-    "vite": "^8.1.5",
-    "vitest": "^4.1.10"
+    "typescript": "^5.9.3",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
   },
   "peerDependencies": {
     "tailwindcss": "^4.3.3"

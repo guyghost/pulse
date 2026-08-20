@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 
 import { lstatSync, readdirSync, realpathSync } from 'node:fs';
-import { isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
+import { dirname, isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { getAllConnectorsMeta } from '../../src/lib/shell/connectors/meta';
@@ -86,9 +86,10 @@ function main(): void {
   extensionRoot = realpathSync.native(process.cwd());
   verifyRegistryFilesystem();
   const nodeExecutable = realpathSync.native(process.execPath);
-  const vitestModulePath = realpathSync.native(
-    fileURLToPath(import.meta.resolve('vitest/vitest.mjs'))
+  const vitestPackagePath = realpathSync.native(
+    fileURLToPath(import.meta.resolve('vitest/package.json'))
   );
+  const vitestModulePath = realpathSync.native(join(dirname(vitestPackagePath), 'vitest.mjs'));
   const runTestFile = createFixtureTestRunner({
     extensionRoot,
     nodeExecutable,
