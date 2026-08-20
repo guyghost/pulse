@@ -4,7 +4,7 @@
 
 MissionPulse dispose d'une CI solide et d'outils runtime (circuit breaker, parser-health, error-analytics), mais la boucle n'est pas formalisée ni entièrement connectée :
 
-- health checks cron planifiés mais absents du repo
+- health checks sur fixtures disponibles localement
 - error-analytics non exportable par l'utilisateur
 - régression golden limitée à LeHibou
 - pas de commande unique pour l'itération locale
@@ -13,7 +13,7 @@ MissionPulse dispose d'une CI solide et d'outils runtime (circuit breaker, parse
 
 1. **Documentation** : `docs/improvement-loop.md` — cycle Observer → Apprendre
 2. **Script local** : `pnpm improvement:loop` — gate unifiée
-3. **Health checks** : `tests/health/run-health-checks.ts` + workflow cron
+3. **Health checks** : `tests/health/run-health-checks.ts`, exécuté localement
 4. **Export diagnostic** : Settings → JSON local (erreurs + santé connecteurs)
 5. **OpenSpec** : ce proposal comme tracker de l'itération
 
@@ -35,12 +35,12 @@ pnpm --filter @pulse/extension typecheck
 
 Implémenté le 2026-06-30 :
 
-| Livrable                                 | Statut                     |
-| ---------------------------------------- | -------------------------- |
-| `docs/improvement-loop.md`               | ✅                         |
-| `pnpm improvement:loop`                  | ✅                         |
-| `tests/health/run-health-checks.ts`      | ✅ 5 connecteurs           |
-| `.github/workflows/connector-health.yml` | ✅ cron quotidien          |
-| Export diagnostic Settings               | ✅ `GET_DIAGNOSTIC_EXPORT` |
+| Livrable                            | Statut                     |
+| ----------------------------------- | -------------------------- |
+| `docs/improvement-loop.md`          | ✅                         |
+| `pnpm improvement:loop`             | ✅                         |
+| `tests/health/run-health-checks.ts` | ✅ 5 connecteurs           |
+| Workflow Connector Health           | 🗑️ retiré le 2026-08-20    |
+| Export diagnostic Settings          | ✅ `GET_DIAGNOSTIC_EXPORT` |
 
 Prochaines itérations : ~~golden regression pour free-work, hiway, collective, cherry-pick~~ ✅ (7 fixtures, 5 connecteurs).

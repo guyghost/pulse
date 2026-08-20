@@ -28,20 +28,9 @@ CI (`.github/workflows/ci.yml`) runs lint, format, typecheck, test, build, manif
 
 Extension packaging (`.github/workflows/release.yml`) is manual and consumes an already archived seal plus the exact tested `dist/`. It packages and independently re-verifies those bytes, then stops at `package_validated`. It neither changes versions nor submits to Chrome Web Store.
 
-### Santé planifiée des connecteurs
-
-`connector-health.yml` exécute les fixtures des six connecteurs, sans réseau de plateforme ni session
-navigateur. Permissions : `health-capture` a `contents: read`; `issue-writer` a `actions: read`,
-`contents: read`, `issues: write`; `conclusion` a `contents: read`. Seul l'acteur issue admis reçoit
-le token. L'evidence courante est l'unique `connector-health-evidence.v1.json` de l'artifact
-`connector-health-report`, conservé 14 jours.
-
-Le workflow fixe Node `22.23.1`, pnpm `10.32.1`, le graphe gelé et les actions par SHA. Il lie le
-dépôt, la ref de branche par défaut, le SHA et le workflow, mais `contents: read` ne peut pas prouver
-la protection de branche : ce contrôle reste hors bande. Le nettoyage PGID ne revendique que le
-groupe contrôlé, pas le confinement de code committé malveillant. Après
-`CONCLUSION_ACTOR_STARTED`, seuls `passed`, `failed_recorded` et `failed_unreported` existent. Avant
-ce marqueur, `pre_actor_bootstrap_interrupted` signifie rouge sans terminal ni revendication.
+Les vérifications de santé des connecteurs restent disponibles localement via les fixtures et
+`pnpm --filter @pulse/extension health-check`. Aucun workflow planifié ni créateur automatique
+d'issues n'est actif.
 
 ---
 
