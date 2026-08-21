@@ -183,7 +183,7 @@ test.describe('Accessibility', () => {
     await expect(feedTab).not.toHaveAttribute('aria-current', 'page');
 
     // Naviguer vers Settings
-    const settingsTab = navButton(page, 'Settings');
+    const settingsTab = navButton(page, 'Réglages');
     await settingsTab.click();
     await expect(settingsTab).toHaveAttribute('aria-current', 'page');
     await expect(tjmTab).not.toHaveAttribute('aria-current', 'page');
@@ -353,7 +353,7 @@ test.describe('Accessibility', () => {
 
   test('keyboard accessible dropdowns or selects', async ({ page }) => {
     // Naviguer vers Settings
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Réglages' }).click();
 
     // Vérifier les éléments interactifs dans Settings
     const interactiveElements = await page.locator('button, input, select').all();

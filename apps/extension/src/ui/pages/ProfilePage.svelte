@@ -51,7 +51,7 @@
 
   const completionExplanation = $derived.by(() => {
     if (missingProfileItems.length === 0) {
-      return 'Profil complet : MissionPulse peut utiliser toutes vos préférences pour matcher les missions.';
+      return 'Profil complet : MissionPulse peut utiliser toutes vos préférences pour classer les missions.';
     }
 
     const visibleMissingItems = missingProfileItems.slice(0, 2).join(', ');
@@ -110,7 +110,7 @@
           'Les critères essentiels sont renseignés. Gardez ce profil de référence à jour avant de comparer les missions prioritaires.',
         evidence,
         primaryActionLabel: settings.isSavingProfile
-          ? 'Sauvegarde...'
+          ? 'Sauvegarde…'
           : settings.editingProfile
             ? 'Enregistrer'
             : 'Modifier le profil',
@@ -126,7 +126,7 @@
         'Les champs manquants réduisent la précision des requêtes et des suggestions de candidature.',
       evidence,
       primaryActionLabel: settings.isSavingProfile
-        ? 'Sauvegarde...'
+        ? 'Sauvegarde…'
         : settings.editingProfile
           ? 'Enregistrer'
           : 'Modifier le profil',

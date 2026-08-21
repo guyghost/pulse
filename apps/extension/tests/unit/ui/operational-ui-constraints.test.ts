@@ -84,7 +84,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('Skeleton');
     expect(feedSource).toContain('store.experiences.length');
     expect(applicationsSource).toContain('type LoadingProgressStep');
-    expect(applicationsSource).toContain('Chargement candidatures');
+    expect(applicationsSource).toContain('Chargement des candidatures');
     expect(applicationsSource).toContain('Progression du chargement candidatures');
     expect(applicationsSource).toContain('Missions locales');
     expect(applicationsSource).toContain('Statuts de suivi');
@@ -343,7 +343,7 @@ describe('operational UI constraints', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
     expect(source).toContain('primaryActionLabel: settings.isSavingProfile');
-    expect(source).toContain("? 'Sauvegarde...'");
+    expect(source).toContain("? 'Sauvegarde…'");
     expect(source).toContain("? 'Enregistrer'");
     expect(source).toContain(": 'Modifier le profil'");
     expect(source).toContain('if (settings.isSavingProfile)');
@@ -658,7 +658,7 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Le radar ne doit pas être considéré fiable pour cette source.');
     expect(source).toContain('Relancez le diagnostic puis reconnectez si l’échec persiste.');
     expect(source).toContain('Les résultats peuvent être partiels ou retardés.');
-    expect(source).toContain('Filtrez cette source si vous voulez investiguer son volume.');
+    expect(source).toContain('Filtrez cette source si vous voulez examiner son volume.');
     expect(source).toContain("{isEnabled ? 'Relancer' : 'Activer'}");
     expect(source).not.toContain("'Re-check'");
   });

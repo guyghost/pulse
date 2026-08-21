@@ -659,10 +659,10 @@
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
-                  title="Le pipeline candidatures est indisponible"
+                  title="Le suivi des candidatures est indisponible"
                   description="Le suivi ne peut pas être rendu maintenant. Réessayez avant de modifier vos statuts de candidature."
                   severity="incident"
-                  statusLabel="Pipeline interrompu"
+                  statusLabel="Suivi interrompu"
                   icon="triangle-alert"
                   proofLabel="Ecran"
                   proofValue="Candidatures"

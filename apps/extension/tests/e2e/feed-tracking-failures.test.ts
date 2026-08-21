@@ -177,9 +177,9 @@ async function openTrackingAction(page: Page): Promise<ReturnType<Page['getByRol
     .getByRole('article')
     .filter({ hasText: mission.title });
   await expect(card).toBeVisible({ timeout: 10_000 });
-  // `Investiguer →` lives inside the card's quiet disclosure.
+  // `Analyser →` lives inside the card's quiet disclosure.
   await expandMission(card);
-  await card.getByRole('button', { name: /Investiguer/ }).click();
+  await card.getByRole('button', { name: /Analyser/ }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Investigation mission' });
   await expect(dialog).toBeVisible();

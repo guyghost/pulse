@@ -61,12 +61,12 @@ export const STATUS_LABELS: Record<ApplicationStatus, string> = {
   detected: 'Détectée',
   selected: 'Sélectionnée',
   application_prepared: 'Préparée',
-  applied: 'Candidaté',
+  applied: 'Envoyée',
   interview: 'Entretien',
   offer: 'Offre',
-  rejected: 'Refusé',
-  accepted: 'Accepté',
-  archived: 'Archivé',
+  rejected: 'Refusée',
+  accepted: 'Acceptée',
+  archived: 'Archivée',
 };
 
 /**

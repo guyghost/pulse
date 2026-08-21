@@ -587,7 +587,7 @@ or icon order:
 | CV           | `CV`                              | `page-cv`                                  | `CV & expériences`                           |
 | Candidatures | `Suivi`                           | `page-applications`                        | `Candidatures`                               |
 | TJM          | `TJM`                             | `page-tjm`                                 | `Analyse TJM`                                |
-| Réglages     | `Réglages Settings`               | `page-settings`                            | `Paramètres`                                 |
+| Réglages     | `Réglages`                        | `page-settings`                            | `Réglages`                                   |
 
 At every route checkpoint, `.panel-shell` must have non-zero width and height,
 non-empty rendered text, no `bootstrap-error` and no
@@ -1417,7 +1417,7 @@ dropdown selection would violate, not satisfy, this checkpoint.
 
 ### Checkpoint B3 — Réglages mutation and reload
 
-1. Navigate to `Réglages Settings` and read the current confirmed Settings
+1. Navigate to `Réglages` and read the current confirmed Settings
    release snapshot. Resolve exactly one `role=group` named `Apparence`, with
    exactly the three native buttons `Clair`, `Sombre` and `Système`, no fourth
    interactive descendant and `aria-busy=false`. Every button exposes an
