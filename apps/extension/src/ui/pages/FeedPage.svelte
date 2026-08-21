@@ -449,22 +449,10 @@
   const missionFeedResetKey = $derived(
     `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}`
   );
+  // ── Feed story projection ────────────────────────────────────────────
   // The story strip is a surface for states that need a decision. Calm states
   // (feed-ready) stay silent — the mission list is the answer. See
   // src/models/feed-story.model.md.
-  const feedStoryNeedsAttention = $derived(
-    feedStory.severity === 'critical' ||
-      feedStory.severity === 'incident' ||
-      feedStory.severity === 'attention'
-  );
-  // When connector health is the top-severity signal (no error, not offline),
-  // the inline story owns the connector attention and the ConnectorAlertBar
-  // panel must not stack a second strip over the feed. Model:
-  // src/models/feed-story.model.md — « une seule surface d'attention ».
-  const storyCoversConnectors = $derived(
-    feedStoryNeedsAttention && !page.error && !page.isOffline && brokenConnectors.length > 0
-  );
-
   const alertMatchCount = $derived.by(() => {
     if (!alertPreferences.enabled) {
       return 0;
@@ -488,6 +476,26 @@
       totalMissionCount: page.totalMissions,
       searchQuery: page.searchQuery,
     })
+  );
+
+  const feedStoryNeedsAttention = $derived(
+    feedStory.severity === 'critical' ||
+      feedStory.severity === 'incident' ||
+      feedStory.severity === 'attention'
+  );
+  // When connector health is the top-severity signal (no error, not offline),
+  // the inline story owns the connector attention and the ConnectorAlertBar
+  // panel must not stack a second strip over the feed — but only while the
+  // inline story is actually rendered. The story lives inside the hero-content
+  // block; with zero missions and an idle feed that block is skipped, so the
+  // ConnectorAlertBar must stay the canonical surface. Model:
+  // src/models/feed-story.model.md — « une seule surface d'attention ».
+  const storyCoversConnectors = $derived(
+    feedStoryNeedsAttention &&
+      !page.error &&
+      !page.isOffline &&
+      brokenConnectors.length > 0 &&
+      (page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible)
   );
 
   // ── Scan completion delight ──────────────────────────────────────────

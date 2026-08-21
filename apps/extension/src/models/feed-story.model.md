@@ -46,6 +46,14 @@ depuis la story. Le `ConnectorAlertBar` ne rend que lorsqu'un signal de
 précédence supérieure (erreur, offline) masque le signal connecteur : il porte
 alors une information distincte, pas une duplication.
 
+Invariant de couplage rendu : `storyCoversConnectors` n'est vrai **que si la
+story inline est effectivement rendue**, c'est-à-dire quand le bloc hero-content
+est actif (`heroCompact` OU contrôles avancés OU chrome busy OU résumé de scan).
+La story inline ne vit que dans ce bloc ; avec **0 mission et un feed inactif**
+(aucune des quatre conditions), elle n'apparaît pas et le `ConnectorAlertBar`
+redevient la surface canonique — une source cassée ne doit **jamais** produire
+zéro avertissement visible.
+
 ### Rendu inline — ligne calme (2026, inspiration Notion iOS)
 
 La variante `inline` (hero compact du feed) est une **ligne unique discrète**,
