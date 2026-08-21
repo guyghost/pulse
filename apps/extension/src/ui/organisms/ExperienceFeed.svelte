@@ -81,6 +81,7 @@
   import { Button, Icon, Skeleton } from '@pulse/ui';
   import type { CvExperienceStore } from '$lib/state/cv-experience.svelte';
   import type { Experience } from '$lib/core/types/profile';
+  import { groupExperiencesByYear } from '$lib/core/cv/group-experiences';
   import ExperienceCard from '../molecules/ExperienceCard.svelte';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
@@ -118,6 +119,7 @@
   const busyId = $derived(
     store.editStatus === 'saving' || store.editStatus === 'deleting' ? store.editingId : null
   );
+  const yearGroups = $derived(groupExperiencesByYear(store.experiences));
 
   function handleSave(experience: Experience) {
     store.saveExperience(experience);
@@ -217,20 +219,46 @@
       </div>
     {/if}
 
-    {#each store.experiences as experience, i (experience.id)}
-      <div in:fly={{ y: 15, duration: 250, delay: Math.min(i * 40, 240), easing: cubicOut }}>
-        <ExperienceCard
-          {experience}
-          isEditing={isEditing && store.editingId === experience.id}
-          isBusy={busyId === experience.id}
-          draft={store.editingId === experience.id ? store.draft : null}
-          onEdit={() => store.editExperience(experience.id)}
-          onDelete={() => store.deleteExperience(experience.id)}
-          onSave={handleSave}
-          onCancelEdit={() => store.cancelEdit()}
-          onFocusExitRequest={handleFocusExitRequest}
-        />
-      </div>
+    {#each yearGroups as group (group.year)}
+      <section
+        aria-label={group.year === 0 ? 'Expériences sans date' : `Expériences ${group.year}`}
+      >
+        <div
+          class="sticky top-0 z-10 -mt-1 flex items-baseline gap-2 bg-page-canvas/95 py-1.5 backdrop-blur-sm"
+        >
+          <h3 class="text-micro font-semibold tracking-[0.14em] uppercase text-text-subtle">
+            {group.year === 0 ? 'Sans date' : group.year}
+          </h3>
+          <span class="text-micro text-text-muted">
+            {group.experiences.length}
+            {group.experiences.length > 1 ? 'postes' : 'poste'}
+          </span>
+        </div>
+        <ol class="relative ml-1 space-y-3 border-l border-border-light pl-4">
+          {#each group.experiences as experience, i (experience.id)}
+            <li
+              class="relative"
+              in:fly={{ y: 15, duration: 250, delay: Math.min(i * 40, 240), easing: cubicOut }}
+            >
+              <span
+                aria-hidden="true"
+                class="absolute top-6 -left-5 h-2 w-2 rounded-full border border-page-canvas bg-blueprint-blue/70"
+              ></span>
+              <ExperienceCard
+                {experience}
+                isEditing={isEditing && store.editingId === experience.id}
+                isBusy={busyId === experience.id}
+                draft={store.editingId === experience.id ? store.draft : null}
+                onEdit={() => store.editExperience(experience.id)}
+                onDelete={() => store.deleteExperience(experience.id)}
+                onSave={handleSave}
+                onCancelEdit={() => store.cancelEdit()}
+                onFocusExitRequest={handleFocusExitRequest}
+              />
+            </li>
+          {/each}
+        </ol>
+      </section>
     {/each}
 
     {#if store.experiences.length > 0}
