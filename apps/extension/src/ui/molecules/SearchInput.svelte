@@ -57,10 +57,10 @@
     bind:this={inputRef}
     type="text"
     {placeholder}
-    class="soft-ring w-full border border-border-light bg-surface-white pl-10 pr-10 text-body text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200 {variant ===
+    class="soft-ring w-full text-body text-text-primary placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:ring-2 {variant ===
     'dock'
-      ? 'h-12 rounded-full shadow-[0_6px_20px_rgba(28,25,23,0.08)]'
-      : 'rounded-xl py-3'}"
+      ? 'h-11 rounded-full border border-transparent bg-transparent focus:border-blueprint-blue/25 focus:ring-blueprint-blue/15'
+      : 'rounded-xl border border-border-light bg-surface-white py-3 focus:border-blueprint-blue/30 focus:ring-blueprint-blue/15'}"
     value={search.query}
     oninput={search.handleInput}
   />

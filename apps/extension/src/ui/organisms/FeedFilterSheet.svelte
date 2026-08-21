@@ -41,8 +41,8 @@
   let panel = $state<HTMLElement | null>(null);
   const prefersReducedMotion =
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const motionDuration = prefersReducedMotion ? 0 : 360;
-  const scrimDuration = prefersReducedMotion ? 0 : 150;
+  const motionDuration = prefersReducedMotion ? 0 : 240;
+  const scrimDuration = prefersReducedMotion ? 0 : 140;
 
   const tjmOptions = $derived.by(() => {
     const target = tjmTarget && tjmTarget > 0 ? Math.round(tjmTarget / 50) * 50 : 500;
@@ -78,7 +78,7 @@
     void tick().then(() => panel?.focus());
   });
 
-  function genie(
+  function rise(
     _node: Element,
     { duration = motionDuration }: { duration?: number } = {}
   ): {
@@ -89,14 +89,8 @@
     return {
       duration,
       easing: cubicOut,
-      css: (t, u) => {
-        const scaleX = 0.18 + 0.82 * t;
-        const scaleY = 0.06 + 0.94 * t;
-        const translateY = u * 54;
-        const translateX = u * -8;
-        const blur = u * 1.2;
-        return `opacity:${Math.min(1, t * 1.35)};transform:translate3d(${translateX}px,${translateY}px,0) scale(${scaleX},${scaleY});filter:blur(${blur}px);`;
-      },
+      css: (t, u) =>
+        `opacity:${t};transform:translate3d(0,${u * 10}px,0) scale(${0.98 + 0.02 * t});`,
     };
   }
 
@@ -126,7 +120,7 @@
 <div class="pointer-events-none absolute inset-0 z-50" data-testid="feed-filter-sheet-layer">
   <button
     type="button"
-    class="pointer-events-auto absolute inset-x-0 bottom-[5.75rem] top-0 cursor-default bg-text-primary/16 backdrop-blur-[1px]"
+    class="pointer-events-auto absolute inset-x-0 bottom-[4.5rem] top-0 cursor-default bg-text-primary/16 backdrop-blur-[1px]"
     aria-label="Fermer les filtres"
     onclick={() => onDismiss('scrim')}
     transition:fade={{ duration: scrimDuration }}
@@ -135,15 +129,13 @@
   <section
     bind:this={panel}
     id="filter-panel"
-    class="genie-panel pointer-events-auto absolute inset-x-9 bottom-[6.75rem] flex max-h-[calc(100%-8rem)] origin-[2.3rem_calc(100%+5rem)] flex-col overflow-visible rounded-[1.5rem] border border-border-light bg-surface-white/98 px-5 pb-4 pt-4 outline-none shadow-[0_22px_58px_rgba(28,25,23,0.24)] backdrop-blur-xl"
+    class="filter-popover pointer-events-auto absolute inset-x-4 bottom-[5.5rem] flex max-h-[calc(100%-7rem)] flex-col overflow-visible rounded-2xl border border-border-light bg-surface-white/98 px-5 pb-4 pt-4 outline-none shadow-[0_18px_44px_rgba(28,25,23,0.18)] backdrop-blur-xl"
     role="group"
     aria-label="Options de filtrage en direct"
     aria-labelledby="filter-sheet-title"
     tabindex="-1"
-    transition:genie={{ duration: motionDuration }}
+    transition:rise={{ duration: motionDuration }}
   >
-    <span class="genie-tail" aria-hidden="true"></span>
-
     <div class="relative z-10 flex items-center justify-between gap-3">
       <h2 id="filter-sheet-title" class="text-[1rem] font-semibold text-text-primary">
         Filtrer les missions
@@ -279,33 +271,18 @@
 </div>
 
 <style>
-  .genie-panel {
-    transform-origin: 2.3rem calc(100% + 5rem);
+  .filter-popover {
     isolation: isolate;
   }
 
-  .genie-panel:focus,
-  .genie-panel:focus-visible {
+  .filter-popover:focus,
+  .filter-popover:focus-visible {
     outline: none !important;
   }
 
-  .genie-tail {
-    position: absolute;
-    bottom: -3.45rem;
-    left: 0.75rem;
-    z-index: -1;
-    width: 2.35rem;
-    height: 4.1rem;
-    border-radius: 0 0 0 100%;
-    background: rgba(255, 255, 255, 0.94);
-    clip-path: polygon(0 0, 62% 0, 27% 78%, 0 100%);
-    filter: drop-shadow(-2px 6px 6px rgba(28, 25, 23, 0.035));
-  }
-
   @media (prefers-reduced-motion: reduce) {
-    .genie-panel {
+    .filter-popover {
       transform: none !important;
-      filter: none !important;
     }
   }
 </style>

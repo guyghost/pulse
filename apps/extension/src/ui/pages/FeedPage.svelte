@@ -1480,11 +1480,25 @@
 
 {#if active}
   <div
-    class="absolute inset-x-0 bottom-0 z-40 border-t border-white/90 bg-surface-white/88 shadow-[0_-14px_36px_rgba(28,25,23,0.10),inset_0_1px_0_rgba(255,255,255,0.96)] backdrop-blur-2xl"
+    class="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4"
     data-testid="feed-bottom-dock"
-    aria-label="Actions du feed"
   >
-    <div class="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-3 px-6 py-4">
+    <div
+      class="pointer-events-auto flex h-14 w-full max-w-[26rem] items-center gap-1 rounded-full bg-surface-white/94 pr-1.5 pl-1.5 shadow-[0_12px_32px_rgba(28,25,23,0.13),0_2px_8px_rgba(28,25,23,0.05)] backdrop-blur-xl"
+      aria-label="Actions du feed"
+    >
+      <div class="min-w-0 flex-1">
+        <SearchInput
+          variant="dock"
+          placeholder="Rechercher une mission…"
+          value={page.searchQuery}
+          onSearch={page.handleSearch}
+          bind:inputRef={page.searchInputRef}
+        />
+      </div>
+
+      <span class="h-7 w-px shrink-0 bg-border-light" aria-hidden="true"></span>
+
       <Tooltip
         label={page.showFilters ? 'Masquer les filtres' : 'Filtrer les missions'}
         description="Ouvre la grille de filtres avec mise à jour immédiate du feed."
@@ -1492,10 +1506,10 @@
         <button
           bind:this={filterTrigger}
           type="button"
-          class="soft-ring relative inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
+          class="soft-ring relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-95 {page.showFilters ||
           page.filterActive
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue shadow-[0_8px_24px_rgba(11,100,233,0.16)]'
-            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+            ? 'bg-blueprint-blue/10 text-blueprint-blue'
+            : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
           onclick={() => page.setShowFilters(!page.showFilters)}
           aria-expanded={page.showFilters}
           aria-controls="filter-panel"
@@ -1504,20 +1518,12 @@
           <Icon name="sliders-horizontal" size={19} />
           {#if page.filterActive && !page.showFilters}
             <span
-              class="absolute right-0.5 top-0.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"
+              class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"
               aria-hidden="true"
             ></span>
           {/if}
         </button>
       </Tooltip>
-
-      <SearchInput
-        variant="dock"
-        placeholder="Rechercher une mission…"
-        value={page.searchQuery}
-        onSearch={page.handleSearch}
-        bind:inputRef={page.searchInputRef}
-      />
 
       <Tooltip
         label={showAdvancedControls ? 'Masquer les détails' : 'Détails opérationnels'}
@@ -1525,9 +1531,9 @@
       >
         <button
           type="button"
-          class="soft-ring inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue'
-            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          class="soft-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
+            ? 'bg-blueprint-blue/10 text-blueprint-blue'
+            : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
           onclick={toggleOperationalDetails}
           aria-expanded={showAdvancedControls}
           aria-label={showAdvancedControls
