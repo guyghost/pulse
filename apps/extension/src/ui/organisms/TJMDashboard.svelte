@@ -253,7 +253,7 @@
   });
 </script>
 
-<div class="space-y-4">
+<div>
   {#if isLoading}
     <div class="section-card rounded-xl p-5 space-y-4">
       <Skeleton width="40%" height="1rem" />
@@ -275,307 +275,318 @@
       onPrimaryAction={onRetry}
     />
   {:else if analysis}
-    {#if pricingStory}
-      <OperationalStoryCard
-        eyebrow="Décision tarifaire"
-        title={pricingStory.title}
-        description={pricingStory.description}
-        severity={pricingStory.severity}
-        statusLabel={pricingStory.statusLabel}
-        evidence={pricingStory.evidence}
-      />
-    {/if}
-
-    <!-- KPI band: big numbers before detailed metrics (models/tjm-market-overview.model.md) -->
-    <section class="section-card rounded-xl p-5" aria-label="Indicateurs clés du marché">
-      <div class="grid grid-cols-3 gap-3">
-        <div>
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-            Médiane
-          </p>
-          <p class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none text-text-primary">
-            {selectedMarketRange ? formatTJMValue(selectedMarketRange.median) : '—'}
-          </p>
-          <p class="mt-1 text-micro text-text-subtle">
-            {selectedMarketRange ? `${selectedLevelLabel} · marché` : 'Pas de données'}
-          </p>
-        </div>
-        <div>
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-            Votre cible
-          </p>
-          <p
-            class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
-              ? 'text-status-red'
-              : 'text-text-primary'}"
-          >
-            {hasTjmTarget ? `${userTjmMin}–${userTjmMax}€` : '—'}
-          </p>
-          <p class="mt-1 text-micro text-text-subtle">
-            {isTargetInverted
-              ? 'Fourchette inversée'
-              : userTargetDelta !== null
-                ? `${userTargetDelta >= 0 ? '+' : ''}${userTargetDelta}€ vs marché`
-                : 'Non renseignée'}
-          </p>
-        </div>
-        <div>
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-            Tendance
-          </p>
-          <div class="mt-2"><TrendBadge trend={analysis.trend} /></div>
-          <p class="mt-1.5 text-micro text-text-subtle">
-            {analysis.topStacks.length} stacks · {analysis.dataPoints} points
-          </p>
-        </div>
-      </div>
-      {#if seriesPolyline}
-        <div class="mt-4 border-t border-border-light pt-3" aria-hidden="true">
-          <svg viewBox="0 0 100 28" class="h-8 w-full" preserveAspectRatio="none">
-            <polygon
-              points="0,28 {seriesPolyline} 100,28"
-              fill="var(--color-blueprint-blue)"
-              opacity="0.07"
-            ></polygon>
-            <polyline
-              points={seriesPolyline}
-              fill="none"
-              stroke="var(--color-blueprint-blue)"
-              stroke-width="1.5"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-              vector-effect="non-scaling-stroke"
-            ></polyline>
-          </svg>
-          <div class="mt-1 flex items-center justify-between text-micro text-text-muted">
-            <span>{analysis.series[0].date}</span>
-            <span>{analysis.series[analysis.series.length - 1].date}</span>
-          </div>
-        </div>
+    <div class="space-y-4">
+      {#if pricingStory}
+        <OperationalStoryCard
+          eyebrow="Décision tarifaire"
+          title={pricingStory.title}
+          description={pricingStory.description}
+          severity={pricingStory.severity}
+          statusLabel={pricingStory.statusLabel}
+          evidence={pricingStory.evidence}
+        />
       {/if}
-    </section>
 
-    <!-- Trend overview -->
-    <div class="section-card-strong rounded-xl p-5">
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-3">
-          <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blueprint-blue/8">
-            <Icon name="bar-chart-3" size={14} class="text-blueprint-blue" />
+      <!-- KPI band: big numbers before detailed metrics (models/tjm-market-overview.model.md) -->
+      <section class="section-card rounded-xl p-5" aria-label="Indicateurs clés du marché">
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+              Médiane
+            </p>
+            <p class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none text-text-primary">
+              {selectedMarketRange ? formatTJMValue(selectedMarketRange.median) : '—'}
+            </p>
+            <p class="mt-1 text-micro text-text-subtle">
+              {selectedMarketRange ? `${selectedLevelLabel} · marché` : 'Pas de données'}
+            </p>
           </div>
           <div>
-            <p class="text-body-lg font-medium text-text-primary">Vue d'ensemble</p>
-            <p class="text-micro text-text-muted">
-              {analysis.dataPoints} missions · {analysis.topStacks.length} stacks
-            </p>
-          </div>
-        </div>
-        <TrendBadge trend={analysis.trend} />
-      </div>
-      {#if analysis.trendDetail}
-        <p class="mt-3 text-meta leading-relaxed text-text-subtle">{analysis.trendDetail}</p>
-      {/if}
-      <div class="mt-4">
-        <div class="mb-1.5 flex items-center justify-between gap-3">
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-            Confiance
-          </p>
-          <p class="text-micro font-mono tabular-nums text-text-primary">{confidencePct}%</p>
-        </div>
-        <div class="h-1.5 overflow-hidden rounded-full bg-subtle-gray">
-          <div
-            class="h-full rounded-full bg-blueprint-blue transition-all duration-500"
-            style:width="{confidencePct}%"
-          ></div>
-        </div>
-      </div>
-    </div>
-
-    <!-- User positioning -->
-    {#if positioning && userTargetDelta !== null}
-      <div class="section-card rounded-xl p-5">
-        <div class="flex items-start justify-between gap-4">
-          <div class="min-w-0">
             <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Votre positionnement
+              Votre cible
             </p>
-            <p class="mt-1 text-meta leading-relaxed text-text-subtle">
-              Cible {userTjmMin}–{userTjmMax}€ ·
-              {userSeniority
-                ? levels.find((level) => level.key === userSeniority)?.label
-                : 'Confirmé'}
+            <p
+              class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
+                ? 'text-status-red'
+                : 'text-text-primary'}"
+            >
+              {hasTjmTarget ? `${userTjmMin}–${userTjmMax}€` : '—'}
+            </p>
+            <p class="mt-1 text-micro text-text-subtle">
+              {isTargetInverted
+                ? 'Fourchette inversée'
+                : userTargetDelta !== null
+                  ? `${userTargetDelta >= 0 ? '+' : ''}${userTargetDelta}€ vs marché`
+                  : 'Non renseignée'}
             </p>
           </div>
-          <div class="text-right">
-            <p class="text-heading-lg font-semibold tabular-nums text-text-primary">
-              {formatDelta(userTargetDelta)}
+          <div>
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+              Tendance
             </p>
-            <p class="text-micro text-text-muted">vs médiane</p>
+            <div class="mt-2"><TrendBadge trend={analysis.trend} /></div>
+            <p class="mt-1.5 text-micro text-text-subtle">
+              {analysis.topStacks.length} stacks · {analysis.dataPoints} points
+            </p>
           </div>
         </div>
+        {#if seriesPolyline}
+          <div class="mt-4 border-t border-border-light pt-3" aria-hidden="true">
+            <svg viewBox="0 0 100 28" class="h-8 w-full" preserveAspectRatio="none">
+              <polygon
+                points="0,28 {seriesPolyline} 100,28"
+                fill="var(--color-blueprint-blue)"
+                opacity="0.07"
+              ></polygon>
+              <polyline
+                points={seriesPolyline}
+                fill="none"
+                stroke="var(--color-blueprint-blue)"
+                stroke-width="1.5"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                vector-effect="non-scaling-stroke"
+              ></polyline>
+            </svg>
+            <div class="mt-1 flex items-center justify-between text-micro text-text-muted">
+              <span>{analysis.series[0].date}</span>
+              <span>{analysis.series[analysis.series.length - 1].date}</span>
+            </div>
+          </div>
+        {/if}
+      </section>
 
-        <div class="mt-5 space-y-2.5">
+      <!-- Trend overview -->
+      <div class="section-card-strong rounded-xl p-5">
+        <div class="flex items-center justify-between">
           <div class="flex items-center gap-3">
-            <span class="w-16 shrink-0 text-micro text-text-muted">Marché</span>
-            <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
-              <div
-                class="absolute inset-y-0 rounded-full bg-text-muted/35 transition-all duration-500"
-                style:left="{positioning.marketLeft}%"
-                style:width="{positioning.marketWidth}%"
-              ></div>
-              <div
-                class="absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-text-primary transition-all duration-500"
-                style:left="{positioning.medianLeft}%"
-                title="Médiane marché"
-              ></div>
+            <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blueprint-blue/8">
+              <Icon name="bar-chart-3" size={14} class="text-blueprint-blue" />
+            </div>
+            <div>
+              <p class="text-body-lg font-medium text-text-primary">Vue d'ensemble</p>
+              <p class="text-micro text-text-muted">
+                {analysis.dataPoints} missions · {analysis.topStacks.length} stacks
+              </p>
             </div>
           </div>
-          <div class="flex items-center gap-3">
-            <span class="w-16 shrink-0 text-micro text-text-muted">Votre cible</span>
-            <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
-              <div
-                class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-all duration-500"
-                style:left="{positioning.userLeft}%"
-                style:width="{positioning.userWidth}%"
-              ></div>
-            </div>
-          </div>
+          <TrendBadge trend={analysis.trend} />
         </div>
-
-        <div class="mt-2 flex items-center gap-3">
-          <span class="w-16 shrink-0"></span>
-          <p class="flex-1 text-micro leading-relaxed text-text-muted">
-            Trait plein : médiane marché
-            <span class="font-mono tabular-nums text-text-subtle"
-              >{formatTJMValue(positioning.marketMedian)}/j</span
-            >.
-          </p>
+        {#if analysis.trendDetail}
+          <p class="mt-3 text-meta leading-relaxed text-text-subtle">{analysis.trendDetail}</p>
+        {/if}
+        <div class="mt-4">
+          <div class="mb-1.5 flex items-center justify-between gap-3">
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+              Confiance
+            </p>
+            <p class="text-micro font-mono tabular-nums text-text-primary">{confidencePct}%</p>
+          </div>
+          <div class="h-1.5 overflow-hidden rounded-full bg-subtle-gray">
+            <div
+              class="h-full rounded-full bg-blueprint-blue transition-all duration-500"
+              style:width="{confidencePct}%"
+            ></div>
+          </div>
         </div>
       </div>
-    {/if}
 
-    <!-- Level cards -->
-    <div class="space-y-3">
-      {#each levels as level (level)}
-        {@const range = analysis[level.key]}
-        {@const isSelected = userSeniority === level.key}
-        <div
-          class="section-card rounded-xl p-5 transition-shadow {isSelected
-            ? 'ring-2 ring-blueprint-blue/30'
-            : ''}"
-        >
-          <div class="flex items-center justify-between">
-            <div class="flex items-center gap-3">
-              <div
-                class="flex h-8 w-8 items-center justify-center rounded-lg {isSelected
-                  ? 'bg-blueprint-blue/15'
-                  : 'bg-blueprint-blue/8'}"
-              >
-                <Icon name={level.icon} size={14} class="text-blueprint-blue" />
-              </div>
-              <div>
-                <div class="flex items-center gap-2">
-                  <p class="text-meta font-medium text-text-primary">{level.label}</p>
-                  {#if isSelected}
-                    <span
-                      class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.08em] text-blueprint-blue"
-                    >
-                      Vous
-                    </span>
-                  {/if}
-                </div>
-                <p class="text-micro font-mono text-text-muted">{range.min}–{range.max}€</p>
-              </div>
+      <!-- User positioning -->
+      {#if positioning && userTargetDelta !== null}
+        <div class="section-card rounded-xl p-5">
+          <div class="flex items-start justify-between gap-4">
+            <div class="min-w-0">
+              <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+                Votre positionnement
+              </p>
+              <p class="mt-1 text-meta leading-relaxed text-text-subtle">
+                Cible {userTjmMin}–{userTjmMax}€ ·
+                {userSeniority
+                  ? levels.find((level) => level.key === userSeniority)?.label
+                  : 'Confirmé'}
+              </p>
             </div>
             <div class="text-right">
               <p class="text-heading-lg font-semibold tabular-nums text-text-primary">
-                {range.median}<span class="ml-0.5 text-body-lg font-normal text-text-muted">€</span>
+                {formatDelta(userTargetDelta)}
               </p>
-              <p class="text-micro text-text-muted">/jour</p>
+              <p class="text-micro text-text-muted">vs médiane</p>
             </div>
           </div>
+
+          <div class="mt-5 space-y-2.5">
+            <div class="flex items-center gap-3">
+              <span class="w-16 shrink-0 text-micro text-text-muted">Marché</span>
+              <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
+                <div
+                  class="absolute inset-y-0 rounded-full bg-text-muted/35 transition-all duration-500"
+                  style:left="{positioning.marketLeft}%"
+                  style:width="{positioning.marketWidth}%"
+                ></div>
+                <div
+                  class="absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-text-primary transition-all duration-500"
+                  style:left="{positioning.medianLeft}%"
+                  title="Médiane marché"
+                ></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="w-16 shrink-0 text-micro text-text-muted">Votre cible</span>
+              <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
+                <div
+                  class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-all duration-500"
+                  style:left="{positioning.userLeft}%"
+                  style:width="{positioning.userWidth}%"
+                ></div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-2 flex items-center gap-3">
+            <span class="w-16 shrink-0"></span>
+            <p class="flex-1 text-micro leading-relaxed text-text-muted">
+              Trait plein : médiane marché
+              <span class="font-mono tabular-nums text-text-subtle"
+                >{formatTJMValue(positioning.marketMedian)}/j</span
+              >.
+            </p>
+          </div>
         </div>
-      {/each}
+      {/if}
     </div>
 
-    <!-- Top stacks -->
-    {#if analysis.topStacks.length > 0}
-      <div class="section-card rounded-xl p-5">
-        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
-          Stacks suivies
-        </p>
+    <section class="mt-6" aria-label="Détails du marché">
+      <p class="px-1 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+        Détails du marché
+      </p>
+      <div class="mt-3 space-y-4">
+        <!-- Level cards -->
         <div class="space-y-3">
-          {#each analysis.topStacks as stack, i (i)}
-            {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
-            {@const barWidth = Math.max(8, Math.round((stack.average / maxAverage) * 100))}
-            <div>
-              <div class="flex items-center justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="truncate text-meta font-medium text-text-primary">
-                    {formatStackLabel(stack.stack)}
-                  </p>
-                  <p class="text-micro text-text-muted">
-                    {stack.sampleCount} point{stack.sampleCount > 1 ? 's' : ''}
-                  </p>
-                </div>
-                <div class="flex shrink-0 items-center gap-2">
-                  <TrendBadge trend={stack.trend} />
-                  <span class="text-caption font-mono tabular-nums text-text-primary"
-                    >{stack.average}€</span
+          {#each levels as level (level)}
+            {@const range = analysis[level.key]}
+            {@const isSelected = userSeniority === level.key}
+            <div
+              class="section-card rounded-xl p-5 transition-shadow {isSelected
+                ? 'ring-2 ring-blueprint-blue/30'
+                : ''}"
+            >
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <div
+                    class="flex h-8 w-8 items-center justify-center rounded-lg {isSelected
+                      ? 'bg-blueprint-blue/15'
+                      : 'bg-blueprint-blue/8'}"
                   >
+                    <Icon name={level.icon} size={14} class="text-blueprint-blue" />
+                  </div>
+                  <div>
+                    <div class="flex items-center gap-2">
+                      <p class="text-meta font-medium text-text-primary">{level.label}</p>
+                      {#if isSelected}
+                        <span
+                          class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.08em] text-blueprint-blue"
+                        >
+                          Vous
+                        </span>
+                      {/if}
+                    </div>
+                    <p class="text-micro font-mono text-text-muted">{range.min}–{range.max}€</p>
+                  </div>
                 </div>
-              </div>
-              <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
-                <div
-                  class="h-full rounded-full bg-blueprint-blue/45 transition-all duration-500"
-                  style:width="{barWidth}%"
-                ></div>
+                <div class="text-right">
+                  <p class="text-heading-lg font-semibold tabular-nums text-text-primary">
+                    {range.median}<span class="ml-0.5 text-body-lg font-normal text-text-muted"
+                      >€</span
+                    >
+                  </p>
+                  <p class="text-micro text-text-muted">/jour</p>
+                </div>
               </div>
             </div>
           {/each}
         </div>
-      </div>
-    {/if}
 
-    <!-- Region insights -->
-    {#if analysis.regionInsights && analysis.regionInsights.length > 0}
-      <section class="section-card rounded-xl p-5" aria-label="TJM par région">
-        <h3 class="mb-4 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-          TJM par région
-        </h3>
-        <ul class="space-y-3" aria-label="Régions analysées">
-          {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
-            {@const barWidth = Math.max(
-              15,
-              Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
-            )}
-            <li>
-              <div class="flex items-center justify-between">
-                <h4 class="truncate text-meta text-text-primary">{region.label}</h4>
-                <div class="flex shrink-0 items-center gap-2 pl-3">
-                  <span class="text-micro font-mono text-text-muted"
-                    >{region.min}–{region.max}€</span
-                  >
-                  <span class="text-caption font-mono tabular-nums text-text-primary"
-                    >{region.average}€</span
-                  >
+        <!-- Top stacks -->
+        {#if analysis.topStacks.length > 0}
+          <div class="section-card rounded-xl p-5">
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
+              Stacks suivies
+            </p>
+            <div class="space-y-3">
+              {#each analysis.topStacks as stack, i (i)}
+                {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
+                {@const barWidth = Math.max(8, Math.round((stack.average / maxAverage) * 100))}
+                <div>
+                  <div class="flex items-center justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="truncate text-meta font-medium text-text-primary">
+                        {formatStackLabel(stack.stack)}
+                      </p>
+                      <p class="text-micro text-text-muted">
+                        {stack.sampleCount} point{stack.sampleCount > 1 ? 's' : ''}
+                      </p>
+                    </div>
+                    <div class="flex shrink-0 items-center gap-2">
+                      <TrendBadge trend={stack.trend} />
+                      <span class="text-caption font-mono tabular-nums text-text-primary"
+                        >{stack.average}€</span
+                      >
+                    </div>
+                  </div>
+                  <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
+                    <div
+                      class="h-full rounded-full bg-blueprint-blue/45 transition-all duration-500"
+                      style:width="{barWidth}%"
+                    ></div>
+                  </div>
                 </div>
-              </div>
-              <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
-                <div
-                  class="h-full rounded-full transition-all duration-500
+              {/each}
+            </div>
+          </div>
+        {/if}
+
+        <!-- Region insights -->
+        {#if analysis.regionInsights && analysis.regionInsights.length > 0}
+          <section class="section-card rounded-xl p-5" aria-label="TJM par région">
+            <h3 class="mb-4 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+              TJM par région
+            </h3>
+            <ul class="space-y-3" aria-label="Régions analysées">
+              {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
+                {@const barWidth = Math.max(
+                  15,
+                  Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
+                )}
+                <li>
+                  <div class="flex items-center justify-between">
+                    <h4 class="truncate text-meta text-text-primary">{region.label}</h4>
+                    <div class="flex shrink-0 items-center gap-2 pl-3">
+                      <span class="text-micro font-mono text-text-muted"
+                        >{region.min}–{region.max}€</span
+                      >
+                      <span class="text-caption font-mono tabular-nums text-text-primary"
+                        >{region.average}€</span
+                      >
+                    </div>
+                  </div>
+                  <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
+                    <div
+                      class="h-full rounded-full transition-all duration-500
                     {region.trend === 'up'
-                    ? 'bg-blueprint-blue/40'
-                    : region.trend === 'down'
-                      ? 'bg-status-red/30'
-                      : 'bg-text-muted/20'}"
-                  style:width="{barWidth}%"
-                ></div>
-              </div>
-            </li>
-          {/each}
-        </ul>
-      </section>
-    {/if}
+                        ? 'bg-blueprint-blue/40'
+                        : region.trend === 'down'
+                          ? 'bg-status-red/30'
+                          : 'bg-text-muted/20'}"
+                      style:width="{barWidth}%"
+                    ></div>
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </section>
+        {/if}
+      </div>
+    </section>
   {:else}
     <div class="space-y-3">
       <OperationalEmptyState

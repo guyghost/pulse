@@ -3,6 +3,7 @@
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import { Icon } from '@pulse/ui';
   import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import type { TJMAnalysis, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
@@ -197,7 +198,7 @@
   });
 </script>
 
-<div class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4">
+<PageShell>
   <PageHeader eyebrow="Marché" title="Analyse TJM" icon="chart-column" badge="Local uniquement">
     {#snippet actions()}
       <button
@@ -339,4 +340,4 @@
       onOpenFeed={onNavigateToFeed}
     />
   </section>
-</div>
+</PageShell>

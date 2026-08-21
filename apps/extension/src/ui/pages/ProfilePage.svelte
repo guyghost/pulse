@@ -10,6 +10,7 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import {
     buildProfileImpactItems,
@@ -166,7 +167,7 @@
   }
 </script>
 
-<div class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4">
+<PageShell>
   <PageHeader
     eyebrow="Profil freelance"
     title={settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
@@ -206,32 +207,60 @@
         {/if}
       </div>
     </div>
+    {#snippet footer()}
+      {#if isOffline}
+        <OfflineNotice
+          description="Vous pouvez ajuster le profil localement, mais les effets sur les recherches et synchronisations seront visibles au retour réseau."
+          action="Prochaine action : sauvegarder les critères critiques, puis relancer un scan quand la connexion revient."
+        />
+      {/if}
+    {/snippet}
+  </PageHeader>
 
-    <div class="mt-4">
-      <OperationalStoryCard
-        eyebrow="Impact du profil"
-        variant="compact"
-        title={profileStory.title}
-        description={profileStory.description}
-        severity={profileStory.severity}
-        statusLabel={profileStory.statusLabel}
-        evidence={profileStory.evidence}
-        primaryActionLabel={profileStory.primaryActionLabel}
-        primaryActionIcon={profileStory.primaryActionIcon as IconName}
-        onPrimaryAction={() => {
-          if (settings.isSavingProfile) {
-            return;
-          }
-          if (settings.editingProfile) {
-            handleSave();
-            return;
-          }
-          settings.toggleProfileEditing();
-        }}
-      />
-    </div>
+  <ProfileSection
+    bind:firstName={settings.firstName}
+    bind:jobTitle={settings.jobTitle}
+    bind:profileLocation={settings.profileLocation}
+    bind:profileRemote={settings.profileRemote}
+    bind:seniority={settings.seniority}
+    bind:tjmMin={settings.tjmMin}
+    bind:tjmMax={settings.tjmMax}
+    bind:profileKeywords={settings.profileKeywords}
+    bind:keywordInput={settings.keywordInput}
+    editing={settings.editingProfile}
+    isSaving={settings.isSavingProfile}
+    profileSaved={settings.profileSaved}
+    profileError={settings.profileError}
+    onToggleEdit={() => settings.toggleProfileEditing()}
+    onSave={handleSave}
+    onAddKeyword={() => settings.addKeyword()}
+    onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
+  />
 
-    <div class="mt-4 border-t border-border-light pt-4" aria-label="Priorités d’impact profil">
+  <div class="space-y-3">
+    <OperationalStoryCard
+      eyebrow="Impact du profil"
+      variant="compact"
+      title={profileStory.title}
+      description={profileStory.description}
+      severity={profileStory.severity}
+      statusLabel={profileStory.statusLabel}
+      evidence={profileStory.evidence}
+      primaryActionLabel={profileStory.primaryActionLabel}
+      primaryActionIcon={profileStory.primaryActionIcon as IconName}
+      onPrimaryAction={() => {
+        if (settings.isSavingProfile) {
+          return;
+        }
+        if (settings.editingProfile) {
+          handleSave();
+          return;
+        }
+        settings.toggleProfileEditing();
+      }}
+    />
+
+    <section class="section-card rounded-xl p-5" aria-label="Priorités d’impact profil">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <p class="eyebrow text-text-muted">Priorités d’impact</p>
@@ -291,36 +320,6 @@
           <span>Stack, TJM, remote, localisation et mots-clés sont prêts pour le scoring.</span>
         </div>
       {/if}
-    </div>
-    {#snippet footer()}
-      {#if isOffline}
-        <OfflineNotice
-          description="Vous pouvez ajuster le profil localement, mais les effets sur les recherches et synchronisations seront visibles au retour réseau."
-          action="Prochaine action : sauvegarder les critères critiques, puis relancer un scan quand la connexion revient."
-        />
-      {/if}
-    {/snippet}
-  </PageHeader>
-
-  <div class="space-y-4">
-    <ProfileSection
-      bind:firstName={settings.firstName}
-      bind:jobTitle={settings.jobTitle}
-      bind:profileLocation={settings.profileLocation}
-      bind:profileRemote={settings.profileRemote}
-      bind:seniority={settings.seniority}
-      bind:tjmMin={settings.tjmMin}
-      bind:tjmMax={settings.tjmMax}
-      bind:profileKeywords={settings.profileKeywords}
-      bind:keywordInput={settings.keywordInput}
-      editing={settings.editingProfile}
-      isSaving={settings.isSavingProfile}
-      profileSaved={settings.profileSaved}
-      profileError={settings.profileError}
-      onToggleEdit={() => settings.toggleProfileEditing()}
-      onSave={handleSave}
-      onAddKeyword={() => settings.addKeyword()}
-      onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
-    />
+    </section>
   </div>
-</div>
+</PageShell>

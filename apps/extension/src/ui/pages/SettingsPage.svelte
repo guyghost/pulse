@@ -13,6 +13,7 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
   import AlertBuilderCard from '../molecules/AlertBuilderCard.svelte';
   import ThemeSelector from '../molecules/ThemeSelector.svelte';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
@@ -518,10 +519,7 @@
   });
 </script>
 
-<div
-  class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4"
-  aria-busy={dataStatus === 'refreshing'}
->
+<PageShell ariaBusy={dataStatus === 'refreshing'}>
   <PageHeader eyebrow="Configuration" title="Paramètres" icon="settings">
     <OperationalStoryCard
       eyebrow="À vérifier"
@@ -1108,4 +1106,4 @@
       </div>
     {/each}
   </section>
-</div>
+</PageShell>

@@ -17,6 +17,7 @@
   import CvSyncPanel from '../organisms/CvSyncPanel.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
 
   const connection = getConnectionStore();
   const isOffline = $derived(connection.status === 'offline');
@@ -82,7 +83,7 @@
   });
 </script>
 
-<div class="flex h-full min-w-0 flex-col gap-4 overflow-x-hidden overflow-y-auto px-4 pb-5 pt-4">
+<PageShell>
   <PageHeader
     eyebrow="Parcours"
     title="CV &amp; expériences"
@@ -119,4 +120,4 @@
   <CvSyncPanel {store} {platforms} />
 
   <ExperienceFeed {store} />
-</div>
+</PageShell>
