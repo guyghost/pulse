@@ -16,6 +16,7 @@
   import ExperienceFeed from '../organisms/ExperienceFeed.svelte';
   import CvSyncPanel from '../organisms/CvSyncPanel.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import PageHeader from '../molecules/PageHeader.svelte';
 
   const connection = getConnectionStore();
   const isOffline = $derived(connection.status === 'offline');
@@ -82,41 +83,38 @@
 </script>
 
 <div class="flex h-full min-w-0 flex-col gap-4 overflow-x-hidden overflow-y-auto px-4 pb-5 pt-4">
-  {#if isOffline}
-    <OfflineNotice
-      title="Mode hors ligne"
-      description="Vos modifications sont conservées localement. La synchronisation reprendra à la reconnexion."
-    />
-  {/if}
-
-  <section class="section-card-strong shrink-0 rounded-2xl px-5 py-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="min-w-0">
-        <h1 class="text-subheading font-semibold text-text-primary">CV &amp; expériences</h1>
-        <p class="mt-1 max-w-prose text-meta leading-relaxed text-text-secondary">
-          La source canonique de votre parcours. Chaque expérience renseignée ici est synchronisable
-          vers vos plateformes connectées pour garder le même profil partout.
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onclick={handleLinkedInImport}
-          disabled={isImporting || store.isSyncing}
-        >
-          <Icon name="download" size={14} />
-          {isImporting ? 'Import…' : 'Importer LinkedIn'}
+  <PageHeader
+    eyebrow="Parcours"
+    title="CV &amp; expériences"
+    icon="file-text"
+    description="La source canonique de votre parcours. Chaque expérience renseignée ici est synchronisable vers vos plateformes connectées pour garder le même profil partout."
+  >
+    {#snippet actions()}
+      <Button
+        variant="secondary"
+        size="sm"
+        onclick={handleLinkedInImport}
+        disabled={isImporting || store.isSyncing}
+      >
+        <Icon name="download" size={14} />
+        {isImporting ? 'Import…' : 'Importer LinkedIn'}
+      </Button>
+      {#if onNavigateToProfile}
+        <Button variant="secondary" size="sm" onclick={onNavigateToProfile}>
+          <Icon name="sliders-horizontal" size={14} />
+          Profil
         </Button>
-        {#if onNavigateToProfile}
-          <Button variant="secondary" size="sm" onclick={onNavigateToProfile}>
-            <Icon name="sliders-horizontal" size={14} />
-            Profil
-          </Button>
-        {/if}
-      </div>
-    </div>
-  </section>
+      {/if}
+    {/snippet}
+    {#snippet footer()}
+      {#if isOffline}
+        <OfflineNotice
+          title="Mode hors ligne"
+          description="Vos modifications sont conservées localement. La synchronisation reprendra à la reconnexion."
+        />
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   <CvSyncPanel {store} {platforms} />
 

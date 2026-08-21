@@ -271,10 +271,13 @@ const TJMAnalysisSchema = z
   })
   .strict();
 
+const TJMPeriodSchema = z.enum(['7d', '30d', 'all']);
+
 const TJMAnalysisRequestSchema = z
   .object({
     profileStacks: z.array(z.string().min(1).max(120)).max(50).optional(),
     region: TJMRegionSchema.optional(),
+    period: TJMPeriodSchema.optional(),
   })
   .strict();
 

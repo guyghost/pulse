@@ -22,6 +22,7 @@
     analysis = null,
     isLoading = false,
     error = null,
+    emptyDescription = undefined,
     userSeniority = null,
     userTjmMin = 0,
     userTjmMax = 0,
@@ -32,6 +33,8 @@
     analysis?: TJMAnalysis | null;
     isLoading?: boolean;
     error?: string | null;
+    /** Overrides the default empty-state description (e.g. period-specific copy) */
+    emptyDescription?: string | undefined;
     userSeniority?: SeniorityLevel | null;
     userTjmMin?: number;
     userTjmMax?: number;
@@ -67,6 +70,29 @@
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
   const hasTjmTarget = $derived(userTjmMin > 0 && userTjmMax > 0 && !isTargetInverted);
+  const selectedLevelLabel = $derived.by(() => {
+    const key = userSeniority ?? 'confirmed';
+    return levels.find((level) => level.key === key)?.label ?? 'Confirmé';
+  });
+  // Sparkline geometry: normalized to a 100x28 viewBox, only when the series
+  // actually shows a slope (>= 2 points) — models/tjm-market-overview.model.md.
+  const seriesPolyline = $derived.by(() => {
+    const points = analysis?.series ?? [];
+    if (points.length < 2) {
+      return null;
+    }
+    const values = points.map((point) => point.average);
+    const min = Math.min(...values);
+    const max = Math.max(...values);
+    const span = max - min || 1;
+    return points
+      .map((point, index) => {
+        const x = (index / (points.length - 1)) * 100;
+        const y = 25 - ((point.average - min) / span) * 22;
+        return `${x.toFixed(2)},${y.toFixed(2)}`;
+      })
+      .join(' ');
+  });
   // Positioning geometry: projects the market range and the user target onto a
   // shared 0–100 scale so both bars stay comparable in one glance.
   const positioning = $derived.by(() => {
@@ -259,6 +285,75 @@
         evidence={pricingStory.evidence}
       />
     {/if}
+
+    <!-- KPI band: big numbers before detailed metrics (models/tjm-market-overview.model.md) -->
+    <section class="section-card rounded-xl p-5" aria-label="Indicateurs clés du marché">
+      <div class="grid grid-cols-3 gap-3">
+        <div>
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Médiane
+          </p>
+          <p class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none text-text-primary">
+            {selectedMarketRange ? formatTJMValue(selectedMarketRange.median) : '—'}
+          </p>
+          <p class="mt-1 text-micro text-text-subtle">
+            {selectedMarketRange ? `${selectedLevelLabel} · marché` : 'Pas de données'}
+          </p>
+        </div>
+        <div>
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Votre cible
+          </p>
+          <p
+            class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
+              ? 'text-status-red'
+              : 'text-text-primary'}"
+          >
+            {hasTjmTarget ? `${userTjmMin}–${userTjmMax}€` : '—'}
+          </p>
+          <p class="mt-1 text-micro text-text-subtle">
+            {isTargetInverted
+              ? 'Fourchette inversée'
+              : userTargetDelta !== null
+                ? `${userTargetDelta >= 0 ? '+' : ''}${userTargetDelta}€ vs marché`
+                : 'Non renseignée'}
+          </p>
+        </div>
+        <div>
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Tendance
+          </p>
+          <div class="mt-2"><TrendBadge trend={analysis.trend} /></div>
+          <p class="mt-1.5 text-micro text-text-subtle">
+            {analysis.topStacks.length} stacks · {analysis.dataPoints} points
+          </p>
+        </div>
+      </div>
+      {#if seriesPolyline}
+        <div class="mt-4 border-t border-border-light pt-3" aria-hidden="true">
+          <svg viewBox="0 0 100 28" class="h-8 w-full" preserveAspectRatio="none">
+            <polygon
+              points="0,28 {seriesPolyline} 100,28"
+              fill="var(--color-blueprint-blue)"
+              opacity="0.07"
+            ></polygon>
+            <polyline
+              points={seriesPolyline}
+              fill="none"
+              stroke="var(--color-blueprint-blue)"
+              stroke-width="1.5"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              vector-effect="non-scaling-stroke"
+            ></polyline>
+          </svg>
+          <div class="mt-1 flex items-center justify-between text-micro text-text-muted">
+            <span>{analysis.series[0].date}</span>
+            <span>{analysis.series[analysis.series.length - 1].date}</span>
+          </div>
+        </div>
+      {/if}
+    </section>
 
     <!-- Trend overview -->
     <div class="section-card-strong rounded-xl p-5">
@@ -485,7 +580,8 @@
     <div class="space-y-3">
       <OperationalEmptyState
         title="Aucune tendance TJM exploitable"
-        description="Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Suivez les étapes ci-dessous avant de relancer l’analyse."
+        description={emptyDescription ??
+          'Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Suivez les étapes ci-dessous avant de relancer l’analyse.'}
         severity="attention"
         statusLabel="Données absentes"
         icon="bar-chart-3"

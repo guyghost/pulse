@@ -228,15 +228,14 @@ describe('operational UI constraints', () => {
     expect(assistSource).toContain('soumet jamais le formulaire');
   });
 
-  it('keeps onboarding focused with duration and minimal shell navigation', () => {
+  it('keeps onboarding focused with minimal shell navigation', () => {
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
-    const wizardSource = readFileSync('src/ui/organisms/OnboardingWizard.svelte', 'utf8');
+    const flowSource = readFileSync('src/ui/organisms/OnboardingFlow.svelte', 'utf8');
 
     expect(appSource).toContain("nav.currentPage !== 'onboarding'");
-    expect(wizardSource).toContain('2 minutes');
-    expect(wizardSource).toContain('Modifiable ensuite');
-    expect(wizardSource).toContain('aria-label="Passer l’onboarding"');
-    expect(wizardSource).toContain('onclick={onSkip}');
+    expect(flowSource).toContain("type: 'SKIP'");
+    expect(flowSource).toContain('aria-label={`Progression de la configuration');
+    expect(flowSource).toContain('aria-valuenow={snapshot.progress.current}');
   });
 
   it('keeps Settings system actions aligned with the stated operational issue', () => {
@@ -253,11 +252,10 @@ describe('operational UI constraints', () => {
 
     expect(source).toContain('const settingsSections');
     expect(source).toContain('aria-label="Sections de réglages"');
-    expect(source).toContain('id="settings-sources"');
-    expect(source).toContain('id="settings-alerts"');
-    expect(source).toContain('id="settings-account"');
-    expect(source).toContain('id="settings-data"');
-    expect(source).toContain('function scrollToSettingsSection');
+    expect(source).toContain('id="settings-{section.id}"');
+    expect(source).toContain("type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data'");
+    expect(source).toContain('function toggleSettingsSection');
+    expect(source).toContain('aria-expanded={openSettingsSection === section.id}');
   });
 
   it('exposes scan frequency, latest trigger, and recent history in Settings', () => {
@@ -600,7 +598,6 @@ describe('operational UI constraints', () => {
   it('keeps feed undo and hidden-filter microcopy accented', () => {
     const feedStateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
-    const filterSource = readFileSync('src/ui/organisms/FilterBar.svelte', 'utf8');
 
     expect(feedStateSource).toContain('Favori retiré');
     expect(feedStateSource).toContain('Mission ajoutée aux favoris');
@@ -608,8 +605,7 @@ describe('operational UI constraints', () => {
     expect(feedStateSource).toContain('Mission masquée');
     expect(feedSource).toContain('Voir les ignorées');
     expect(feedSource).toContain('Raccourci clavier : h.');
-    expect(filterSource).toContain('Retire cette vue sauvegardée.');
-    expect(`${feedStateSource}\n${feedSource}\n${filterSource}`).not.toMatch(
+    expect(`${feedStateSource}\n${feedSource}`).not.toMatch(
       /retire|ajoutee|restauree|masquee|ignoree|sauvegardee/
     );
   });

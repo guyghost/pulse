@@ -45,6 +45,47 @@
 
   let modalRoot = $state<HTMLElement | null>(null);
   let dialogElement = $state<HTMLElement | null>(null);
+  // Kebab disclosure — UI-local state, see models/drawer-footer-actions.model.md
+  let actionsMenuOpen = $state(false);
+  let kebabButton = $state<HTMLButtonElement | null>(null);
+  let actionsMenuElement = $state<HTMLElement | null>(null);
+
+  function toggleActionsMenu(): void {
+    actionsMenuOpen = !actionsMenuOpen;
+  }
+
+  function handleActionsMenuKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Escape') {
+      actionsMenuOpen = false;
+      kebabButton?.focus();
+    }
+  }
+
+  $effect(() => {
+    if (!actionsMenuOpen) {
+      return;
+    }
+    // Model invariant: opening the menu moves focus to its first enabled
+    // item so the Escape handler (onkeydown on the menu) is reachable.
+    actionsMenuElement?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (!target.closest('[data-actions-menu]')) {
+        actionsMenuOpen = false;
+        // Keep keyboard flow predictable inside the modal: if the outside
+        // click landed on nothing focusable, hand focus back to the kebab.
+        if (
+          !target.closest('button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+        ) {
+          kebabButton?.focus();
+        }
+      }
+    }
+    document.addEventListener('click', handleClickOutside);
+    return () => {
+      document.removeEventListener('click', handleClickOutside);
+    };
+  });
 
   function handleClose(): void {
     if (!requestModalClose(modalRoot, 'explicit')) {
@@ -335,10 +376,10 @@
               </div>
             </div>
 
-            <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
+            <div class="mt-4 flex items-stretch gap-2" data-actions-menu>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-body-lg font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
+                class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-body-lg font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
                 onclick={handleSelectForTracking}
                 disabled={trackingState === 'loading' || (trackingReady && !canSelectForTracking)}
                 aria-label={trackingActionLabel}
@@ -348,33 +389,64 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray"
+                class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blueprint-blue px-3 text-body-lg font-semibold text-surface-white transition-colors hover:bg-blueprint-blue/90"
                 onclick={handleOpenForTracking}
               >
                 <Icon name="external-link" size={14} />
                 Ouvrir pour postuler
               </button>
-              <button
-                type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
-                  ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                  : ''}"
-                onclick={handleToggleCompare}
-                disabled={compareDisabled && !isCompared}
-                aria-pressed={isCompared}
-              >
-                <Icon name="git-compare-arrows" size={14} />
-                {isCompared ? 'Retirer comparaison' : 'Comparer'}
-              </button>
-              <button
-                type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
-                onclick={() => onHide?.()}
-                aria-pressed={isHidden}
-              >
-                <Icon name={isHidden ? 'eye' : 'x-circle'} size={14} />
-                {isHidden ? 'Restaurer' : 'Masquer'}
-              </button>
+              <div class="relative">
+                <button
+                  type="button"
+                  bind:this={kebabButton}
+                  class="inline-flex h-11 w-10 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                  onclick={toggleActionsMenu}
+                  aria-haspopup="menu"
+                  aria-expanded={actionsMenuOpen}
+                  aria-label="Plus d'actions"
+                >
+                  <Icon name="more-vertical" size={16} />
+                </button>
+                {#if actionsMenuOpen}
+                  <div
+                    bind:this={actionsMenuElement}
+                    class="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-border-light bg-surface-white p-1.5 shadow-xl"
+                    role="menu"
+                    aria-label="Actions secondaires"
+                    onkeydown={handleActionsMenuKeydown}
+                  >
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
+                        ? 'text-blueprint-blue'
+                        : ''}"
+                      onclick={() => {
+                        actionsMenuOpen = false;
+                        handleToggleCompare();
+                      }}
+                      disabled={compareDisabled && !isCompared}
+                      role="menuitem"
+                      aria-pressed={isCompared}
+                    >
+                      <Icon name="git-compare-arrows" size={14} />
+                      {isCompared ? 'Retirer comparaison' : 'Comparer'}
+                    </button>
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
+                      onclick={() => {
+                        actionsMenuOpen = false;
+                        onHide?.();
+                      }}
+                      role="menuitem"
+                      aria-pressed={isHidden}
+                    >
+                      <Icon name={isHidden ? 'eye' : 'x-circle'} size={14} />
+                      {isHidden ? 'Restaurer' : 'Masquer'}
+                    </button>
+                  </div>
+                {/if}
+              </div>
             </div>
             {#if trackingState === 'error' && trackingError}
               <p class="mt-2 text-meta leading-5 text-status-red" role="status">{trackingError}</p>

@@ -10,6 +10,7 @@
   import { scoreToGrade } from '$lib/core/types/score';
   import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
+  import { swipe } from '../actions/swipe';
   import Tooltip from '../atoms/Tooltip.svelte';
 
   const {
@@ -62,6 +63,14 @@
 
   let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
+
+  // Swipe-to-triage (models/mission-card-swipe.model.md): presentation
+  // shortcut over the existing favorite/hide callbacks — never a new workflow.
+  const swipeParams = $derived({
+    onSwipeRight: () => onToggleFavorite?.(),
+    onSwipeLeft: () => onHide?.(),
+    enabled: Boolean(onToggleFavorite) && Boolean(onHide) && !isCompared,
+  });
 
   const seniorityLabels: Record<string, string> = {
     junior: 'Junior (0-2 ans)',
@@ -149,10 +158,10 @@
   // Low tier is intentionally de-emphasized (subtle text on a calm neutral block).
   const scoreColor = $derived(
     missionGrade === 'A'
-      ? 'text-text-primary bg-accent-green/15'
+      ? 'bg-accent-green/15 ring-1 ring-inset ring-accent-green/40'
       : missionGrade === 'B'
-        ? 'text-text-primary bg-accent-amber/15'
-        : 'text-text-subtle bg-subtle-gray'
+        ? 'bg-accent-amber/15 ring-1 ring-inset ring-accent-amber/40'
+        : 'bg-subtle-gray ring-1 ring-inset ring-disabled-gray/50'
   );
 
   function barColor(value: number): string {
@@ -228,6 +237,7 @@
 </script>
 
 <article
+  use:swipe={swipeParams}
   use:onVisibleAction={{
     disabled: isSeen,
     onSignal: (signal) => {
@@ -299,14 +309,14 @@
     <div class="flex shrink-0 items-center gap-1.5">
       {#if missionGrade !== null}
         <span
-          class="inline-flex min-w-9 items-center justify-center rounded-lg px-2 py-1 text-center font-mono font-bold leading-none {scoreColor} {tourHighlight ===
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-mono text-heading-lg font-bold leading-none text-text-primary {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
           aria-label={`Note ${missionGrade}`}
           title={`Note ${missionGrade}`}
         >
-          <span class="text-body">{missionGrade}</span>
+          {missionGrade}
         </span>
       {/if}
       <button

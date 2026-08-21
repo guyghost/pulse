@@ -1,7 +1,10 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import { Icon } from '@pulse/ui';
-  import type { TJMAnalysis, TJMRegion } from '$lib/core/types/tjm';
+  import PageHeader from '../molecules/PageHeader.svelte';
+  import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import type { TJMAnalysis, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
@@ -13,9 +16,12 @@
   const {
     onNavigateToProfile,
     onNavigateToFeed,
+    active = true,
   }: {
     onNavigateToProfile?: () => void;
     onNavigateToFeed?: () => void;
+    /** True only while the page is the current navigation target. */
+    active?: boolean;
   } = $props();
 
   let analysis = $state<TJMAnalysis | null>(null);
@@ -26,29 +32,54 @@
   let profileStacks = $state<string[]>([]);
   let userSeniority = $state<SeniorityLevel | null>(null);
   let selectedRegion = $state<TJMRegion | null>(null);
+  let selectedPeriod = $state<TJMPeriod>('all');
+  let hasBeenActive = false;
   let analysisReferenceTime = $state(Date.now());
   // Region options are snapshotted from the unfiltered analysis so the dropdown
   // keeps showing every available region even after a region filter is applied
   // (the filtered analysis would otherwise shrink to a single region).
   let regionOptions = $state<{ region: TJMRegion; label: string }[]>([]);
+  // Monotonic token: rapid period/region switches may overlap in-flight requests;
+  // only the most recent response is applied (last-write-wins, no stale render).
+  let analysisRequestSeq = 0;
   const connection = getConnectionStore();
 
+  const PERIOD_OPTIONS: ReadonlyArray<{ value: TJMPeriod; label: string }> = [
+    { value: '7d', label: '7 jours' },
+    { value: '30d', label: '30 jours' },
+    { value: 'all', label: 'Tout' },
+  ];
+
   async function loadAnalysis() {
+    const requestSeq = ++analysisRequestSeq;
     isLoading = true;
     error = null;
     try {
-      analysis = await getTJMAnalysis(
+      const result = await getTJMAnalysis(
         profileStacks.length > 0 ? profileStacks : undefined,
-        selectedRegion ?? undefined
+        selectedRegion ?? undefined,
+        selectedPeriod
       );
+      if (requestSeq !== analysisRequestSeq) {
+        return;
+      }
+      analysis = result;
       analysisReferenceTime = Date.now();
-      if (!selectedRegion && analysis?.regionInsights) {
+      // Snapshot only from the unfiltered analysis: a 7d/30d period narrows
+      // records before analysis, which would drop regions with only older
+      // data out of the dropdown.
+      if (!selectedRegion && selectedPeriod === 'all' && analysis?.regionInsights) {
         regionOptions = analysis.regionInsights.map(({ region, label }) => ({ region, label }));
       }
     } catch (err) {
+      if (requestSeq !== analysisRequestSeq) {
+        return;
+      }
       error = err instanceof Error ? err.message : 'Impossible de charger les tendances TJM';
     } finally {
-      isLoading = false;
+      if (requestSeq === analysisRequestSeq) {
+        isLoading = false;
+      }
     }
   }
 
@@ -56,6 +87,29 @@
     const value = (event.currentTarget as HTMLSelectElement).value;
     selectedRegion = value ? (value as TJMRegion) : null;
     void loadAnalysis();
+  }
+
+  function handlePeriodChange(period: TJMPeriod) {
+    if (period === selectedPeriod) {
+      return;
+    }
+    selectedPeriod = period;
+    void loadAnalysis();
+  }
+
+  function handlePeriodKeydown(event: KeyboardEvent) {
+    const keys = ['ArrowRight', 'ArrowDown', 'ArrowLeft', 'ArrowUp'];
+    if (!keys.includes(event.key)) {
+      return;
+    }
+    event.preventDefault();
+    const delta = event.key === 'ArrowRight' || event.key === 'ArrowDown' ? 1 : -1;
+    const currentIndex = PERIOD_OPTIONS.findIndex((o) => o.value === selectedPeriod);
+    const nextIndex = (currentIndex + delta + PERIOD_OPTIONS.length) % PERIOD_OPTIONS.length;
+    const next = PERIOD_OPTIONS[nextIndex];
+    handlePeriodChange(next.value);
+    const group = event.currentTarget as HTMLElement;
+    group.querySelector<HTMLButtonElement>(`[data-period-option="${next.value}"]`)?.focus();
   }
 
   async function loadProfileAndAnalysis() {
@@ -90,6 +144,11 @@
   const dataIsStale = $derived(
     dataFreshness?.level === 'stale' || dataFreshness?.level === 'obsolete'
   );
+  const emptyDescription = $derived(
+    selectedPeriod === 'all'
+      ? undefined
+      : `Aucune mission stockée dans les ${selectedPeriod === '7d' ? '7' : '30'} derniers jours pour cette sélection. Élargissez la période ou lancez un scan pour alimenter le marché.`
+  );
 
   let dashboardSection: HTMLElement | undefined = $state(undefined);
 
@@ -100,6 +159,29 @@
 
   $effect(() => {
     loadProfileAndAnalysis();
+  });
+
+  $effect(() => {
+    // Model (tjm-analysis-period): period and region are page-scoped UI state,
+    // reset to their defaults on every activation. Pages stay mounted under
+    // `inert` in App.svelte, so a plain $state initializer would only run once.
+    // The reset only rides the rising edge of `active` — period/region reads
+    // stay untracked so user selections never re-trigger it.
+    if (!active) {
+      hasBeenActive = false;
+      return;
+    }
+    if (hasBeenActive) {
+      return;
+    }
+    hasBeenActive = true;
+    untrack(() => {
+      if (selectedPeriod !== 'all' || selectedRegion !== null) {
+        selectedPeriod = 'all';
+        selectedRegion = null;
+        void loadAnalysis();
+      }
+    });
   });
 
   $effect(() => {
@@ -115,28 +197,9 @@
   });
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <!-- Hero -->
-  <section class="section-card-strong rounded-2xl px-5 py-4" aria-busy={isLoading}>
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
-        >
-          <Icon name="chart-column" size={16} class="text-blueprint-blue" />
-        </div>
-        <div>
-          <p class="eyebrow text-blueprint-blue">Marché</p>
-          <div class="mt-1 flex flex-wrap items-center gap-2">
-            <h1 class="text-subheading font-semibold text-text-primary">Analyse TJM</h1>
-            <span
-              class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
-            >
-              Local uniquement
-            </span>
-          </div>
-        </div>
-      </div>
+<div class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4">
+  <PageHeader eyebrow="Marché" title="Analyse TJM" icon="chart-column" badge="Local uniquement">
+    {#snippet actions()}
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:opacity-40"
         onclick={() => loadAnalysis()}
@@ -148,30 +211,20 @@
           <Icon name="refresh-cw" size={13} />
         </span>
       </button>
-    </div>
-
+    {/snippet}
     {#if analysis && !isLoading}
-      <p class="mt-3 text-caption text-text-muted" class:text-status-orange={dataIsStale}>
+      <p class="text-caption text-text-muted" class:text-status-orange={dataIsStale}>
         Mis à jour le {lastUpdatedLabel}{#if dataIsStale && dataFreshness?.ageDays !== null}
           · Données anciennes ({dataFreshness.ageDays} jour{dataFreshness.ageDays > 1 ? 's' : ''})
         {/if}
       </p>
     {:else if isLoading}
-      <p class="mt-3 text-caption text-text-muted">Chargement…</p>
+      <p class="text-caption text-text-muted">Chargement…</p>
     {/if}
 
     <p class="mt-2 text-caption leading-5 text-text-muted">
       Tendances tirées des missions stockées localement, croisées avec votre fourchette cible.
     </p>
-
-    {#if isOffline}
-      <div
-        class="mt-3 flex items-center gap-2 rounded-xl border border-status-orange/25 bg-status-orange/8 px-3 py-2 text-meta text-status-orange"
-      >
-        <Icon name="triangle-alert" size={14} />
-        <span><span>Mode hors ligne</span> — tendances calculées sur le cache local.</span>
-      </div>
-    {/if}
 
     <div class="mt-4 flex flex-wrap items-center gap-2">
       <span
@@ -219,34 +272,65 @@
       {/if}
     </div>
 
-    <div class="mt-3 flex items-center gap-2">
-      <label
-        for="tjm-region-filter"
-        class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted"
+    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
+      <div
+        class="inline-flex items-center gap-2"
+        role="radiogroup"
+        aria-label="Période d'analyse"
+        onkeydown={handlePeriodKeydown}
       >
-        Région
-      </label>
-      <select
-        id="tjm-region-filter"
-        class="rounded-lg border border-border-light bg-surface-white px-2 py-1 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
-        value={selectedRegion ?? ''}
-        onchange={handleRegionChange}
-        aria-label="Filtrer les tendances TJM par région"
-      >
-        <option value="">Toutes les régions</option>
-        {#each regionOptions as option, i (i)}
-          <option value={option.region}>{option.label}</option>
+        {#each PERIOD_OPTIONS as option, i (option.value)}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={selectedPeriod === option.value}
+            tabindex={selectedPeriod === option.value ? 0 : -1}
+            data-period-option={option.value}
+            onclick={() => handlePeriodChange(option.value)}
+            class="rounded-md px-2.5 py-1 text-meta font-medium transition-colors {selectedPeriod ===
+            option.value
+              ? 'bg-surface-white text-text-primary shadow-sm ring-1 ring-border-light'
+              : 'text-text-muted hover:text-text-primary'}"
+          >
+            {option.label}
+          </button>
         {/each}
-      </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <label
+          for="tjm-region-filter"
+          class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted"
+        >
+          Région
+        </label>
+        <select
+          id="tjm-region-filter"
+          class="rounded-lg border border-border-light bg-surface-white px-2 py-1 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+          value={selectedRegion ?? ''}
+          onchange={handleRegionChange}
+          aria-label="Filtrer les tendances TJM par région"
+        >
+          <option value="">Toutes les régions</option>
+          {#each regionOptions as option, i (i)}
+            <option value={option.region}>{option.label}</option>
+          {/each}
+        </select>
+      </div>
     </div>
-  </section>
+    {#snippet footer()}
+      {#if isOffline}
+        <OfflineNotice description="Tendances calculées sur le cache local." />
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   <!-- Dashboard -->
-  <section class="mt-4" tabindex="-1" bind:this={dashboardSection}>
+  <section tabindex="-1" bind:this={dashboardSection}>
     <TJMDashboard
       {analysis}
       {isLoading}
       {error}
+      {emptyDescription}
       {userSeniority}
       {userTjmMin}
       {userTjmMax}

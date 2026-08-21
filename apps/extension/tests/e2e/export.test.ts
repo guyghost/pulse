@@ -3,11 +3,17 @@ test.describe('Export Flow', () => {
   test('export section is accessible from settings', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
 
+    // Expand the "Données" accordion section to reveal the Export section
+    await page.getByRole('button', { name: /Exports et sécurité/ }).click();
+
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
   });
 
   test('all three export format buttons are visible and enabled', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
+
+    // Expand the "Données" accordion section to reveal the export buttons
+    await page.getByRole('button', { name: /Exports et sécurité/ }).click();
 
     const jsonBtn = page.getByRole('button', { name: 'JSON' });
     const csvBtn = page.getByRole('button', { name: 'CSV' });
@@ -24,6 +30,9 @@ test.describe('Export Flow', () => {
 
   test('export JSON with no favorites shows error toast', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
+
+    // Expand the "Données" accordion section
+    await page.getByRole('button', { name: /Exports et sécurité/ }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
     await page.getByRole('button', { name: 'JSON' }).click();
@@ -37,6 +46,9 @@ test.describe('Export Flow', () => {
 
   test('export CSV with no favorites shows error toast', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
+
+    // Expand the "Données" accordion section
+    await page.getByRole('button', { name: /Exports et sécurité/ }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
     await page.getByRole('button', { name: 'CSV' }).click();
@@ -48,6 +60,9 @@ test.describe('Export Flow', () => {
 
   test('export Markdown with no favorites shows error toast', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
+
+    // Expand the "Données" accordion section
+    await page.getByRole('button', { name: /Exports et sécurité/ }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
     await page.getByRole('button', { name: 'Markdown' }).click();
@@ -59,6 +74,9 @@ test.describe('Export Flow', () => {
 
   test('export buttons remain enabled after failed export', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
+
+    // Expand the "Données" accordion section
+    await page.getByRole('button', { name: /Exports et sécurité/ }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
     await page.getByRole('button', { name: 'JSON' }).click();

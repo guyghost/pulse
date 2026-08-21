@@ -77,7 +77,7 @@
   ]);
 </script>
 
-<div class="mt-4 space-y-3">
+<div class="space-y-3">
   <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
     {#each insightCards as card, i (i)}
       <div

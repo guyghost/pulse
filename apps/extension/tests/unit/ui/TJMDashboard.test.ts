@@ -36,6 +36,12 @@ const analysis: TJMAnalysis = {
       trend: 'stable',
     },
   ],
+  series: [
+    { date: '2026-05-16', average: 610 },
+    { date: '2026-05-18', average: 625 },
+    { date: '2026-05-20', average: 618 },
+    { date: '2026-05-22', average: 640 },
+  ],
 };
 
 function mountDashboard(props: Record<string, unknown> = {}) {
