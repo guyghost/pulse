@@ -25,6 +25,7 @@
     isDueFollowUp,
     isTerminalStatus,
   } from '$lib/core/tracking/pipeline-summary';
+  import { buildKanbanBoard, getTrackingLastActivity } from '$lib/core/tracking/kanban-projection';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import AvailabilityPanel from '../organisms/AvailabilityPanel.svelte';
   import CopilotPanel from '../organisms/CopilotPanel.svelte';
@@ -179,6 +180,11 @@
     summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
   );
 
+  const kanbanColumns = $derived(buildKanbanBoard(missions, [...tracking.trackings.values()]));
+  const kanbanActiveCount = $derived(
+    kanbanColumns.reduce((sum, column) => sum + column.cards.length, 0)
+  );
+
   const recommendedTrackedMission = $derived.by(() => {
     const now = Date.now();
     // Terminal missions (accepted/rejected/archived) are outcomes, not actionable
@@ -290,10 +296,7 @@
   });
 
   function getLastActivity(record: MissionTracking | null): number {
-    if (!record || record.history.length === 0) {
-      return 0;
-    }
-    return record.history[record.history.length - 1].timestamp;
+    return getTrackingLastActivity(record);
   }
 
   function getMissionActivityTimestamp(mission: Mission): number {
@@ -880,6 +883,75 @@
       />
     </div>
   {:else}
+    {#if kanbanActiveCount > 0}
+      <section
+        data-testid="application-kanban"
+        class="section-card rounded-xl p-4"
+        aria-label="Pipeline par étape"
+      >
+        <div class="flex items-center justify-between gap-3 pb-3">
+          <div>
+            <h3 class="text-body-lg font-medium text-text-primary">Pipeline</h3>
+            <p class="mt-0.5 text-meta text-text-subtle">
+              {kanbanActiveCount} dossiers actifs, de la sélection à l’offre.
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-3 overflow-x-auto pb-1">
+          {#each kanbanColumns as column (column.status)}
+            <div class="flex w-44 shrink-0 flex-col gap-2">
+              <div class="flex items-center justify-between gap-2 px-1">
+                <span class="truncate text-caption font-medium text-text-subtle">
+                  {column.label}
+                </span>
+                <span
+                  class="shrink-0 rounded-md bg-subtle-gray px-1.5 py-0.5 text-micro font-semibold text-text-subtle"
+                >
+                  {column.cards.length}
+                </span>
+              </div>
+              <div class="flex flex-col gap-2">
+                {#each column.cards.slice(0, 4) as card (card.missionId)}
+                  <button
+                    type="button"
+                    class="w-full rounded-lg border border-border-light bg-surface-white px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/30 hover:bg-blueprint-blue/4 {selectedMissionId ===
+                    card.missionId
+                      ? 'border-blueprint-blue/40 bg-blueprint-blue/6'
+                      : ''}"
+                    onclick={() => selectMission(card.missionId)}
+                  >
+                    <span class="block truncate text-body font-medium text-text-primary">
+                      {card.title}
+                    </span>
+                    {#if card.client}
+                      <span class="mt-0.5 block truncate text-caption text-text-muted">
+                        {card.client}
+                      </span>
+                    {/if}
+                    <span class="mt-1.5 block text-caption text-text-subtle">
+                      {card.lastActivityAt > 0 ? formatDate(card.lastActivityAt) : '—'}
+                    </span>
+                  </button>
+                {/each}
+                {#if column.cards.length > 4}
+                  <p class="px-1 text-caption text-text-muted">
+                    +{column.cards.length - 4} autres
+                  </p>
+                {/if}
+                {#if column.cards.length === 0}
+                  <p
+                    class="rounded-lg border border-dashed border-border-light px-3 py-2.5 text-caption text-text-muted"
+                  >
+                    Aucun dossier
+                  </p>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
     <div class="grid items-start gap-4 lg:grid-cols-[0.85fr_1.15fr]">
       <section class="section-card rounded-xl p-3">
         <div class="flex items-center justify-between px-2 pb-2">
