@@ -270,7 +270,6 @@
   let feedScrollContainer = $state<HTMLDivElement | null>(null);
   let missionFeedSection = $state<HTMLDivElement | null>(null);
   let feedHeroCard = $state<HTMLElement | null>(null);
-  let missionFeedReached = $state(false);
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let showAlertOnly = $state(false);
   let showComparison = $state(false);
@@ -401,27 +400,6 @@
     return getCanonicalMissionScore(mission) ?? 0;
   }
 
-  function formatOverviewSource(source: MissionSource): string {
-    const labels: Record<MissionSource, string> = {
-      'free-work': 'Free-Work',
-      lehibou: 'LeHibou',
-      hiway: 'Hiway',
-      collective: 'Collective',
-      'cherry-pick': 'Cherry Pick',
-      malt: 'Malt',
-    };
-
-    return labels[source];
-  }
-
-  function formatOverviewMeta(mission: Mission): string {
-    const place =
-      mission.remote === 'full'
-        ? 'Remote'
-        : (mission.location ?? (mission.remote === 'hybrid' ? 'Hybride' : 'Sur site'));
-    return `${formatOverviewSource(mission.source)} · ${place} · ${getMissionScore(mission)}%`;
-  }
-
   function missionMatchesAlert(
     mission: (typeof page.displayMissions)[number],
     preferences: ConnectedAlertPreferences
@@ -456,7 +434,6 @@
   const visibleFeedMissions = $derived(showAlertOnly ? alertMissions : page.displayMissions);
   const visibleFeedMissionCount = $derived(visibleFeedMissions.length);
   const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
-  const overviewMissions = $derived(page.displayMissions.slice(0, 3));
   const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
   const feedChromeBusy = $derived(controller.isScanning || feedIsColdLoading);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
@@ -472,10 +449,10 @@
   const missionFeedResetKey = $derived(
     `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}`
   );
-  const showMissionScrollCue = $derived(
-    feedChromeCompact && hasVisibleFeedMissions && !missionFeedReached && !feedIsColdLoading
-  );
-
+  // ── Feed story projection ────────────────────────────────────────────
+  // The story strip is a surface for states that need a decision. Calm states
+  // (feed-ready) stay silent — the mission list is the answer. See
+  // src/models/feed-story.model.md.
   const alertMatchCount = $derived.by(() => {
     if (!alertPreferences.enabled) {
       return 0;
@@ -499,6 +476,26 @@
       totalMissionCount: page.totalMissions,
       searchQuery: page.searchQuery,
     })
+  );
+
+  const feedStoryNeedsAttention = $derived(
+    feedStory.severity === 'critical' ||
+      feedStory.severity === 'incident' ||
+      feedStory.severity === 'attention'
+  );
+  // When connector health is the top-severity signal (no error, not offline),
+  // the inline story owns the connector attention and the ConnectorAlertBar
+  // panel must not stack a second strip over the feed — but only while the
+  // inline story is actually rendered. The story lives inside the hero-content
+  // block; with zero missions and an idle feed that block is skipped, so the
+  // ConnectorAlertBar must stay the canonical surface. Model:
+  // src/models/feed-story.model.md — « une seule surface d'attention ».
+  const storyCoversConnectors = $derived(
+    feedStoryNeedsAttention &&
+      !page.error &&
+      !page.isOffline &&
+      brokenConnectors.length > 0 &&
+      (page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible)
   );
 
   // ── Scan completion delight ──────────────────────────────────────────
@@ -580,17 +577,6 @@
     return `${count} mission${count > 1 ? 's' : ''}`;
   }
 
-  function updateMissionFeedReached(container: HTMLElement): void {
-    if (!missionFeedSection) {
-      missionFeedReached = false;
-      return;
-    }
-
-    const containerRect = container.getBoundingClientRect();
-    const sectionRect = missionFeedSection.getBoundingClientRect();
-    missionFeedReached = sectionRect.top <= containerRect.bottom - 48;
-  }
-
   async function scrollToMissionFeed(): Promise<void> {
     await tick();
 
@@ -616,7 +602,12 @@
     }
 
     if (brokenConnectors.length > 0) {
-      controller.recheckConnector(brokenConnectors[0].connectorId);
+      // The story is the single attention surface for broken sources: recheck
+      // every broken connector. Disabled connectors stay disabled — enabling
+      // is a deliberate user transition (health panel / settings), never implicit.
+      for (const broken of brokenConnectors) {
+        void controller.recheckConnector(broken.connectorId);
+      }
       return;
     }
 
@@ -876,7 +867,6 @@
     const scrollingDown = nextScrollTop > missionScrollTop;
 
     missionScrollTop = nextScrollTop;
-    updateMissionFeedReached(target);
 
     if (scrollingDown && nextScrollTop > 12) {
       feedChromeCompact = true;
@@ -901,20 +891,6 @@
         missionFeedSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     }
-  });
-
-  $effect(() => {
-    const container = feedScrollContainer;
-    missionFeedSection;
-    visibleFeedMissionCount;
-    page.showFilters;
-    showAlertOnly;
-
-    void tick().then(() => {
-      if (container) {
-        updateMissionFeedReached(container);
-      }
-    });
   });
 
   function handleFilterSheetKeydown(event: KeyboardEvent): void {
@@ -952,159 +928,13 @@
   onscroll={handleMissionScroll}
 >
   <h1 class="sr-only">Feed de missions MissionPulse</h1>
-  {#if showMissionScrollCue}
-    <div
-      class="pointer-events-none sticky top-[calc(100%-5.5rem)] z-40 px-4"
-      data-testid="mission-scroll-cue-layer"
-    >
-      <button
-        data-testid="mission-scroll-cue"
-        class="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white/95 px-4 py-3 text-left text-blueprint-blue shadow-subtle-3 backdrop-blur-sm transition-all duration-200 hover:border-blueprint-blue/30 hover:bg-blueprint-blue/5 focus:outline-none focus:ring-2 focus:ring-blueprint-blue/25"
-        type="button"
-        onclick={scrollToMissionFeed}
-        aria-label={`Faire défiler vers ${visibleFeedMissionLabel}`}
-        transition:slide={{ duration: 160 }}
-      >
-        <span class="min-w-0">
-          <span class="block text-caption font-semibold text-text-primary"
-            >Missions proposées plus bas</span
-          >
-          <span class="mt-0.5 block text-micro leading-4 text-text-subtle"
-            >{visibleFeedMissionLabel} selon vos filtres. Continuez pour les comparer.</span
-          >
-        </span>
-        <span
-          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blueprint-blue/8 text-blueprint-blue"
-          aria-hidden="true"
-        >
-          <Icon name="chevron-down" size={14} />
-        </span>
-      </button>
-    </div>
-  {/if}
 
   <div
     class="px-4 pt-4 transition-[filter] duration-200 ease-out {feedChromeCompact
       ? 'brightness-[0.99]'
       : ''}"
   >
-    <section data-testid="mission-overview" class="mb-4" aria-labelledby="mission-overview-title">
-      <div class="flex items-center gap-1.5">
-        <h2 id="mission-overview-title" class="text-heading font-medium text-text-primary">
-          À voir
-        </h2>
-        <Icon name="chevron-down" size={14} class="text-text-subtle" />
-      </div>
-
-      <div class="mt-3 flex gap-2 overflow-x-auto pb-1">
-        <button
-          type="button"
-          class="group min-w-28 flex-1 overflow-hidden rounded-xl border border-border-light bg-surface-white text-left transition-colors hover:border-disabled-gray"
-          onclick={() => page.applyDecisionPreset('priority')}
-        >
-          <span
-            class="flex h-20 items-center justify-center bg-subtle-gray text-text-subtle transition-colors group-hover:bg-disabled-gray/35"
-          >
-            <Icon name="target" size={19} />
-          </span>
-          <span class="block px-3 py-2.5">
-            <span class="block text-body font-medium text-text-primary">Top match</span>
-            <span class="mt-0.5 block text-caption text-text-muted"
-              >{page.dashboardSummary.highScoreCount}</span
-            >
-          </span>
-        </button>
-        <button
-          type="button"
-          class="group min-w-28 flex-1 overflow-hidden rounded-xl border border-border-light bg-surface-white text-left transition-colors hover:border-disabled-gray"
-          onclick={() => page.applyDecisionPreset('remote-compatible')}
-        >
-          <span
-            class="flex h-20 items-center justify-center bg-subtle-gray text-text-subtle transition-colors group-hover:bg-disabled-gray/35"
-          >
-            <Icon name="wifi" size={19} />
-          </span>
-          <span class="block px-3 py-2.5">
-            <span class="block text-body font-medium text-text-primary">Remote</span>
-            <span class="mt-0.5 block text-caption text-text-muted"
-              >{page.insightSummary.remoteMatchCount}</span
-            >
-          </span>
-        </button>
-        <button
-          type="button"
-          class="group min-w-28 flex-1 overflow-hidden rounded-xl border border-border-light bg-surface-white text-left transition-colors hover:border-disabled-gray"
-          onclick={() => page.applyDecisionPreset('new')}
-        >
-          <span
-            class="flex h-20 items-center justify-center bg-subtle-gray text-text-subtle transition-colors group-hover:bg-disabled-gray/35"
-          >
-            <Icon name="sparkles" size={19} />
-          </span>
-          <span class="block px-3 py-2.5">
-            <span class="block text-body font-medium text-text-primary">Nouveautés</span>
-            <span class="mt-0.5 block text-caption text-text-muted"
-              >{page.dashboardSummary.newCount}</span
-            >
-          </span>
-        </button>
-      </div>
-
-      <div class="mt-5 flex items-center justify-between gap-3">
-        <h2 class="text-heading font-medium text-text-primary">Pour vous</h2>
-        <span class="text-meta text-text-muted">{page.visibleCount}</span>
-      </div>
-      <div
-        class="mt-2 overflow-hidden rounded-2xl border border-border-light bg-surface-white shadow-subtle-2"
-      >
-        {#if overviewMissions.length > 0}
-          {#each overviewMissions as mission (mission.id)}
-            <button
-              type="button"
-              class="flex w-full items-center gap-3 border-b border-border-light px-3 py-3 text-left transition-colors last:border-b-0 hover:bg-subtle-gray/45"
-              onclick={() => handleOpenExternalUrl(mission.url)}
-            >
-              <span
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
-              >
-                <Icon name="briefcase" size={14} />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="block truncate text-body-lg font-medium text-text-primary"
-                  >{mission.title}</span
-                >
-                <span class="mt-0.5 block truncate text-meta text-text-muted"
-                  >{formatOverviewMeta(mission)}</span
-                >
-              </span>
-              <span class="h-2 w-2 shrink-0 rounded-full bg-blueprint-blue" aria-hidden="true"
-              ></span>
-            </button>
-          {/each}
-        {:else}
-          <div class="flex items-center justify-between gap-4 px-3 py-4">
-            <div>
-              <p class="text-body-lg font-medium text-text-primary">
-                Aucune mission pour l’instant
-              </p>
-              <p class="mt-0.5 text-meta text-text-muted">
-                Lancez un scan pour alimenter votre sélection.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="shrink-0 rounded-lg bg-blueprint-blue px-3 py-2 text-meta font-medium text-white"
-              onclick={handleMissionFeedScanAction}
-              disabled={!page.feedPresentation.actionEnabled}
-            >
-              Scanner
-            </button>
-          </div>
-        {/if}
-      </div>
-    </section>
-
-    <div class="mt-8 min-h-0 overflow-visible">
+    <div class="min-h-0 overflow-visible">
       <!-- ═══════════════════════════════════════════
            Hero card — greeting + filters unified
            ═══════════════════════════════════════════ -->
@@ -1116,52 +946,129 @@
           : ''} {feedChromeCompact ? 'border-blueprint-blue/10 shadow-subtle-3' : ''}"
       >
         <!-- ── Hero header ── -->
+        {#snippet scanControl()}
+          {#if page.feedPresentation.primaryAction === 'cancel'}
+            <Tooltip
+              label="Stopper le scan"
+              description="Interrompt le scan en cours et conserve les données déjà chargées."
+            >
+              <button
+                class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
+                onclick={handleMissionFeedScanAction}
+                disabled={!page.feedPresentation.actionEnabled}
+                aria-label="Stopper le scan en cours"
+              >
+                <Icon name="square" size={14} />
+              </button>
+            </Tooltip>
+          {:else}
+            <Tooltip
+              label={page.isOffline
+                ? 'Scan indisponible hors ligne'
+                : page.feedPresentation.primaryAction === 'retry'
+                  ? 'Réessayer le scan'
+                  : 'Lancer le scan'}
+              description={page.isOffline
+                ? 'Les données en cache restent disponibles.'
+                : 'Raccourci clavier: r. Relance la détection des missions.'}
+            >
+              <button
+                class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
+                    {page.isOffline
+                  ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
+                  : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
+                onclick={handleMissionFeedScanAction}
+                disabled={!page.feedPresentation.actionEnabled}
+                aria-label={page.isOffline
+                  ? 'Scan indisponible hors ligne'
+                  : page.feedPresentation.primaryAction === 'retry'
+                    ? 'Réessayer le scan des missions'
+                    : 'Lancer le scan des missions'}
+              >
+                <Icon name="play" size={14} class="ml-0.5" />
+              </button>
+            </Tooltip>
+          {/if}
+        {/snippet}
         {#if page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible}
-          <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
+          <div class="px-5 {page.heroCompact ? 'pt-3 pb-1.5' : 'pt-4 pb-0'}">
             {#if page.heroCompact}
-              <!-- Compact: single row with stats and scan button -->
-              <div class="flex items-center gap-3">
-                <div class="flex items-center gap-3 min-w-0">
-                  <div>
-                    <p
-                      class="text-micro font-semibold uppercase tracking-[0.18em] text-blueprint-blue"
+              <!-- Compact: quiet title row — the missions lead, chrome follows -->
+              <div class="flex items-center justify-between gap-3">
+                <h2
+                  class="min-w-0 text-heading font-semibold leading-tight tracking-[-0.01em] text-text-primary"
+                >
+                  Missions
+                  <span
+                    class="ml-1.5 align-baseline font-geist text-[0.6em] font-normal tabular-nums tracking-normal text-text-subtle"
+                    aria-label={`${formatMissionCount(page.visibleCount)} visible${page.visibleCount > 1 ? 's' : ''}`}
+                  >
+                    {page.visibleCount}
+                  </span>
+                  {#if page.favoriteCount > 0}
+                    <span
+                      class="ml-1.5 inline-flex items-center gap-1 align-baseline text-[0.6em] font-normal tracking-normal text-blueprint-blue"
                     >
-                      MissionPulse
-                    </p>
-                    <div
-                      class="mt-1 flex items-baseline gap-3"
-                      aria-label={`${formatMissionCount(page.visibleCount)} visible${page.visibleCount > 1 ? 's' : ''}`}
-                    >
-                      <span class="text-heading font-semibold text-text-primary"
-                        >{page.visibleCount}</span
-                      >
-                      <span class="text-micro text-text-muted"
-                        >{page.visibleCount > 1 ? 'missions' : 'mission'}</span
-                      >
-                      {#if page.favoriteCount > 0}
-                        <span class="flex items-center gap-1 text-micro text-blueprint-blue">
-                          <Icon name="star" size={10} class="fill-blueprint-blue" />
-                          {page.favoriteCount}
-                        </span>
-                      {/if}
-                    </div>
-                  </div>
+                      <Icon name="star" size={10} class="fill-blueprint-blue" />
+                      {page.favoriteCount}
+                    </span>
+                  {/if}
+                </h2>
+                <div class="flex shrink-0 items-center gap-2">
+                  {@render scanControl()}
                 </div>
               </div>
-              <div class="mt-2">
-                <OperationalStoryCard
-                  eyebrow="À faire maintenant"
-                  title={feedStory.title}
-                  description={feedStory.description}
-                  severity={feedStory.severity}
-                  statusLabel={feedStory.statusLabel}
-                  evidence={feedStory.evidence}
-                  variant="inline"
-                  primaryActionLabel={feedStory.primaryActionLabel}
-                  primaryActionIcon={feedStory.primaryActionIcon}
-                  onPrimaryAction={handleFeedStoryPrimaryAction}
-                />
-              </div>
+
+              {#if hasVisibleFeedMissions && !feedIsColdLoading}
+                <!-- Decision presets — primary triage shortcuts, quiet chips -->
+                <div class="mt-2.5" aria-label="Presets métier du feed">
+                  <div class="flex gap-1.5 overflow-x-auto pb-0.5">
+                    {#each page.decisionPresets as preset (preset.id)}
+                      <button
+                        type="button"
+                        class="inline-flex h-7.5 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-micro font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                          ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                          : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:text-text-primary'}"
+                        onclick={() => page.applyDecisionPreset(preset.id)}
+                        aria-pressed={preset.active}
+                        disabled={preset.count === 0 && !preset.active}
+                        title={preset.description}
+                      >
+                        <span>{preset.label}</span>
+                        <span class="rounded-full bg-page-canvas px-1 py-px tabular-nums">
+                          {preset.count}
+                        </span>
+                      </button>
+                    {/each}
+                    {#if page.decisionPreset}
+                      <button
+                        type="button"
+                        class="inline-flex h-7.5 shrink-0 items-center rounded-full px-2 text-micro font-medium text-blueprint-blue transition-colors hover:text-blueprint-blue/80"
+                        onclick={page.clearAllFilters}
+                      >
+                        Tout
+                      </button>
+                    {/if}
+                  </div>
+                </div>
+              {/if}
+
+              {#if feedStoryNeedsAttention}
+                <div class="mt-1.5">
+                  <OperationalStoryCard
+                    eyebrow="À faire maintenant"
+                    title={feedStory.title}
+                    description={feedStory.description}
+                    severity={feedStory.severity}
+                    statusLabel={feedStory.statusLabel}
+                    evidence={feedStory.evidence}
+                    variant="inline"
+                    primaryActionLabel={feedStory.primaryActionLabel}
+                    primaryActionIcon={feedStory.primaryActionIcon}
+                    onPrimaryAction={handleFeedStoryPrimaryAction}
+                  />
+                </div>
+              {/if}
               {#if showAdvancedControls}
                 {#if SourceHealthPanel}
                   <SourceHealthPanel
@@ -1202,7 +1109,7 @@
                 <div class="max-w-[32rem]">
                   <p class="eyebrow text-blueprint-blue">MissionPulse</p>
                   <h2
-                    class="mt-3 font-display text-[clamp(2.75rem,10vw,5.25rem)] font-normal leading-[0.88] tracking-[-0.055em] text-text-primary"
+                    class="mt-3 font-display text-[clamp(2.75rem,10vw,4rem)] font-normal leading-[0.94] tracking-[-0.03em] text-text-primary"
                   >
                     {page.firstName ? `Bonjour, ${page.firstName}` : 'Radar freelance'}
                   </h2>
@@ -1215,48 +1122,7 @@
                   class="absolute right-0 top-0 flex items-center gap-2"
                   class:flex-row-reverse={page.panelSide === 'left'}
                 >
-                  {#if page.feedPresentation.primaryAction === 'cancel'}
-                    <Tooltip
-                      label="Stopper le scan"
-                      description="Interrompt le scan en cours et conserve les données déjà chargées."
-                    >
-                      <button
-                        class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
-                        onclick={handleMissionFeedScanAction}
-                        disabled={!page.feedPresentation.actionEnabled}
-                        aria-label="Stopper le scan en cours"
-                      >
-                        <Icon name="square" size={14} />
-                      </button>
-                    </Tooltip>
-                  {:else}
-                    <Tooltip
-                      label={page.isOffline
-                        ? 'Scan indisponible hors ligne'
-                        : page.feedPresentation.primaryAction === 'retry'
-                          ? 'Réessayer le scan'
-                          : 'Lancer le scan'}
-                      description={page.isOffline
-                        ? 'Les données en cache restent disponibles.'
-                        : 'Raccourci clavier: r. Relance la détection des missions.'}
-                    >
-                      <button
-                        class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {page.isOffline
-                          ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
-                          : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
-                        onclick={handleMissionFeedScanAction}
-                        disabled={!page.feedPresentation.actionEnabled}
-                        aria-label={page.isOffline
-                          ? 'Scan indisponible hors ligne'
-                          : page.feedPresentation.primaryAction === 'retry'
-                            ? 'Réessayer le scan des missions'
-                            : 'Lancer le scan des missions'}
-                      >
-                        <Icon name="play" size={14} class="ml-0.5" />
-                      </button>
-                    </Tooltip>
-                  {/if}
+                  {@render scanControl()}
                 </div>
               </div>
 
@@ -1270,19 +1136,21 @@
                 statuses={controller.connectorStatuses}
               />
 
-              <div class="mt-3">
-                <OperationalStoryCard
-                  eyebrow="À faire maintenant"
-                  title={feedStory.title}
-                  description={feedStory.description}
-                  severity={feedStory.severity}
-                  statusLabel={feedStory.statusLabel}
-                  evidence={feedStory.evidence}
-                  primaryActionLabel={feedStory.primaryActionLabel}
-                  primaryActionIcon={feedStory.primaryActionIcon}
-                  onPrimaryAction={handleFeedStoryPrimaryAction}
-                />
-              </div>
+              {#if feedStoryNeedsAttention}
+                <div class="mt-3">
+                  <OperationalStoryCard
+                    eyebrow="À faire maintenant"
+                    title={feedStory.title}
+                    description={feedStory.description}
+                    severity={feedStory.severity}
+                    statusLabel={feedStory.statusLabel}
+                    evidence={feedStory.evidence}
+                    primaryActionLabel={feedStory.primaryActionLabel}
+                    primaryActionIcon={feedStory.primaryActionIcon}
+                    onPrimaryAction={handleFeedStoryPrimaryAction}
+                  />
+                </div>
+              {/if}
               {#if showAdvancedControls}
                 {#if ConnectorStatusList}
                   <ConnectorStatusList
@@ -1462,7 +1330,7 @@
         </div>
       </section>
 
-      {#if brokenConnectors.length > 0 && ConnectorAlertBar}
+      {#if brokenConnectors.length > 0 && !storyCoversConnectors && ConnectorAlertBar}
         <ConnectorAlertBar
           {brokenConnectors}
           onRecheck={(connectorId) => controller.recheckConnector(connectorId)}
@@ -1620,11 +1488,25 @@
 
 {#if active}
   <div
-    class="absolute inset-x-0 bottom-0 z-40 border-t border-white/90 bg-surface-white/88 shadow-[0_-14px_36px_rgba(28,25,23,0.10),inset_0_1px_0_rgba(255,255,255,0.96)] backdrop-blur-2xl"
+    class="pointer-events-none absolute inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-4"
     data-testid="feed-bottom-dock"
-    aria-label="Actions du feed"
   >
-    <div class="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-3 px-6 py-4">
+    <div
+      class="pointer-events-auto flex w-full max-w-[26rem] items-center gap-2.5"
+      aria-label="Actions du feed"
+    >
+      <div
+        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 bg-surface-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 focus-within:border-blueprint-blue/40"
+      >
+        <SearchInput
+          variant="dock"
+          placeholder="Rechercher une mission…"
+          value={page.searchQuery}
+          onSearch={page.handleSearch}
+          bind:inputRef={page.searchInputRef}
+        />
+      </div>
+
       <Tooltip
         label={page.showFilters ? 'Masquer les filtres' : 'Filtrer les missions'}
         description="Ouvre la grille de filtres avec mise à jour immédiate du feed."
@@ -1632,10 +1514,10 @@
         <button
           bind:this={filterTrigger}
           type="button"
-          class="soft-ring relative inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
+          class="soft-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
           page.filterActive
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue shadow-[0_8px_24px_rgba(11,100,233,0.16)]'
-            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+            ? 'border-blueprint-blue/30 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_28px_rgba(28,25,23,0.13)]'
+            : 'border-white/70 bg-surface-white/55 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] hover:bg-surface-white/80 hover:text-text-primary'}"
           onclick={() => page.setShowFilters(!page.showFilters)}
           aria-expanded={page.showFilters}
           aria-controls="filter-panel"
@@ -1644,20 +1526,12 @@
           <Icon name="sliders-horizontal" size={19} />
           {#if page.filterActive && !page.showFilters}
             <span
-              class="absolute right-0.5 top-0.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"
+              class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"
               aria-hidden="true"
             ></span>
           {/if}
         </button>
       </Tooltip>
-
-      <SearchInput
-        variant="dock"
-        placeholder="Rechercher une mission…"
-        value={page.searchQuery}
-        onSearch={page.handleSearch}
-        bind:inputRef={page.searchInputRef}
-      />
 
       <Tooltip
         label={showAdvancedControls ? 'Masquer les détails' : 'Détails opérationnels'}
@@ -1665,9 +1539,9 @@
       >
         <button
           type="button"
-          class="soft-ring inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue'
-            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          class="soft-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {showAdvancedControls
+            ? 'border-blueprint-blue/30 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_28px_rgba(28,25,23,0.13)]'
+            : 'border-white/70 bg-surface-white/55 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] hover:bg-surface-white/80 hover:text-text-primary'}"
           onclick={toggleOperationalDetails}
           aria-expanded={showAdvancedControls}
           aria-label={showAdvancedControls

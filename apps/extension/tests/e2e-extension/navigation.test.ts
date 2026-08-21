@@ -192,9 +192,14 @@ test(
 
     const page = await extension.openSidePanel();
     // The dedicated help trigger button was removed with the filter-dock
-    // redesign; the dialog now opens from the `?` shortcut. The first-run
-    // toast is suppressed by the kbd_cheatsheet_tip_seen seed.
-    const opener = page.getByRole('button', { name: 'Scanner', exact: true });
+    // redesign; the dialog now opens from the `?` shortcut. Seed focus on a
+    // navigation tab: unlike the hero scan CTA, its accessible name does not
+    // flip with the scan lifecycle (probe alarms can auto-start a scan after
+    // seeding and rename the CTA to "Stopper le scan en cours"). The
+    // first-run toast is suppressed by the kbd_cheatsheet_tip_seen seed.
+    const opener = page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'Profil' });
     await expect(opener).toBeVisible();
     await openShortcutsHelp(page, opener);
 

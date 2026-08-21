@@ -154,23 +154,23 @@ describe('operational UI constraints', () => {
     expect(toastCollectionSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
   });
 
-  it('guides users from the feed summary to missions below the fold', () => {
+  it('leads with missions — no scroll-cue scaffolding between header and feed', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const storySource = readFileSync('src/lib/core/feed/build-feed-story.ts', 'utf8');
 
-    expect(source).toContain('data-testid="mission-scroll-cue"');
+    // Content-first: the feed section stays focusable and story CTAs deep-link to it.
     expect(source).toContain('data-testid="mission-feed-anchor"');
     expect(source).toContain('function scrollToMissionFeed()');
     expect(source).toContain(
       "missionFeedSection.scrollIntoView({ behavior: 'smooth', block: 'start' })"
     );
-    expect(source).toContain('Missions proposées plus bas');
-    expect(source).toContain('Missions proposées');
     // buildFeedStory was extracted to the functional core (pure presentation
     // logic); the new-mission cue string now lives there, not in FeedPage.
     expect(storySource).toContain('Voir les ${newCount} nouvelles missions');
     expect(source).toContain('visibleFeedMissionLabel');
-    expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
+    // The below-the-fold cue layer is gone: missions start in the first viewport.
+    expect(source).not.toContain('mission-scroll-cue');
+    expect(source).not.toContain('missionFeedReached');
   });
 
   it('keeps the primary navigation labels localized for the French product surface', () => {
@@ -193,13 +193,21 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('NAV_ITEMS.filter');
   });
 
-  it('keeps the selected Missions and Suivi overview content above the operational detail', () => {
+  it('keeps the missions list as the primary surface, with counts inline in the header', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
 
-    expect(feedSource).toContain('data-testid="mission-overview"');
-    expect(feedSource).toContain('À voir');
-    expect(feedSource).toContain('Pour vous');
+    // Content-first restructure: the "À voir" / "Pour vous" overview was removed;
+    // the compact header carries the mission count inline instead.
+    expect(feedSource).not.toContain('data-testid="mission-overview"');
+    expect(feedSource).not.toContain('Pour vous');
+    expect(feedSource).toContain('formatMissionCount(page.visibleCount)');
+    expect(feedSource).toContain('{page.visibleCount}');
+    // Decision presets sit in the header, before the feed — triage is one tap away.
+    const presetsIdx = feedSource.indexOf('aria-label="Presets métier du feed"');
+    const feedIdx = feedSource.indexOf('data-testid="mission-feed-anchor"');
+    expect(presetsIdx).toBeGreaterThan(-1);
+    expect(presetsIdx).toBeLessThan(feedIdx);
     expect(applicationsSource).toContain('data-testid="application-activity-overview"');
     expect(applicationsSource).toContain('Aujourd’hui');
     expect(applicationsSource).toContain('Cette semaine');
@@ -476,12 +484,14 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('{@render feedActionQueueBlock(true)}');
     expect(source).not.toContain('{@render feedActionQueueBlock(false)}');
 
-    // Business presets stay available but move off the critical path,
-    // gated behind "Détails opérationnels" (progressive disclosure).
-    const presetsIdx = source.indexOf('aria-label="Presets métier du feed"');
-    const advancedIdx = source.lastIndexOf('{#if showAdvancedControls}', presetsIdx);
-    expect(advancedIdx).toBeGreaterThan(-1);
-    expect(advancedIdx).toBeLessThan(presetsIdx);
+    // Business presets stay one tap from the top as quiet header chips
+    // (content-first: triage shortcuts ride along, they don't lead).
+    expect(source).toContain('aria-label="Presets métier du feed"');
+    expect(source).toContain('page.applyDecisionPreset(preset.id)');
+    // The story strip only renders when the feed needs attention (calm states
+    // project to no strip — see feed-story.model.md).
+    expect(source).toContain('{#if feedStoryNeedsAttention}');
+    expect(source).not.toContain('feedActionQueue');
   });
 
   it('keeps the compact feed story aligned and unclipped at side-panel width', () => {
@@ -490,7 +500,10 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
     expect(storySource).toContain('data-testid="operational-story-inline"');
-    expect(storySource).toContain('grid-cols-[auto_auto_minmax(0,1fr)]');
+    // Quiet single-line row: icon | truncated title | action. No tinted box,
+    // no badge chip — severity rides on the leading icon (feed-story.model.md).
+    expect(storySource).toContain('grid-cols-[auto_minmax(0,1fr)_auto]');
+    expect(storySource).toContain('inlineIconClass');
     expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
     expect(badgeSource).toContain('whitespace-nowrap');
     expect(feedSource).toContain('data-testid="feed-hero-card"');

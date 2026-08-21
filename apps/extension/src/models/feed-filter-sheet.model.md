@@ -89,19 +89,25 @@ Preset normalization is deterministic:
 
 - `closed`: the popover and scrim do not exist; the filter trigger reports
   `aria-expanded="false"`.
-- `open`: the trigger reports `aria-expanded="true"`; the feed is softly dimmed
-  and a structured popover floats above the dock. Three quick-filter pills sit
-  above explicit rows for minimum grade, minimum TJM and source.
-- The popover visually originates from the left dock button. Its intro and
-  outro use the same bottom-left transform origin, producing a reversible
-  genie-like scale/translate deformation.
-- The dock is a persistent full-width frosted shelf separated from the scrolling
-  feed by a hairline and upward shadow. It remains visible in both states.
+- `open`: the trigger reports `aria-expanded="true"`; the feed behind the
+  floating cluster is softly dimmed and a structured popover rises above it.
+  Three quick-filter pills sit above explicit rows for minimum grade, minimum
+  TJM and source.
+- The bottom controls are a transparent floating cluster centered over the
+  scrolling feed — never a full-width shelf: no hairline, no upward shadow wall,
+  no bar background, no container surface. Each control (search input, filter
+  trigger, operational details trigger) is its own separated liquid-glass pill:
+  translucent background, backdrop blur with saturation, hairline light border,
+  one inner top highlight and one soft offset shadow. Feed content scrolls
+  beneath the cluster; the cluster floats above — never divides — the content.
+- The popover intro and outro share one reversible rise: opacity with a 10px
+  lift and a 0.98→1 scale over ~240ms, ease-out. No blur deformation, no tail,
+  no directional transform origin.
 - Initial focus moves to the outline-free popover container. Closing returns
-  focus to the dock trigger when it remains connected.
+  focus to the floating filter trigger when it remains connected.
 - `Escape`, the explicit `Terminer` action, the close icon, a scrim click and a
   hidden Feed page dispatch `DISMISS`.
-- Reduced motion sets the scrim and genie durations to zero without changing
+- Reduced motion sets the scrim and rise durations to zero without changing
   state, focus or filter results.
 
 ## Side effects and ownership
@@ -112,8 +118,8 @@ Preset normalization is deterministic:
 - The explicit TJM selector filters missions at or above its selected value.
   The existing `tjm-negotiation` preset remains available as a distinct quick
   decision preset and cannot be active at the same time.
-- Search is owned by the center dock input. Operational details are owned by
-  the right dock action. Neither is decided by this model.
+- Search is owned by the glass search pill. Operational details are owned by the
+  trailing glass action. Neither is decided by this model.
 - The popover never starts a scan, changes a connector, persists a view or opens
   an external URL.
 
@@ -149,7 +155,8 @@ Preset normalization is deterministic:
 4. Exactly one `SYNC_FILTERS` command is emitted per accepted edit or reset.
 5. Every dismissal path emits `NONE`.
 6. Conflicting preset and explicit-filter authorities are normalized.
-7. The dock remains operable and visually separated from feed content.
+7. The transparent glass cluster remains operable in both states and floats
+   above — never divides — the feed content.
 8. The model, not component copy, animation timing or an LLM, decides filtering.
 
 ## Review result

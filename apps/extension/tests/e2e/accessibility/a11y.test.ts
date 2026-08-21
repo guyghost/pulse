@@ -11,6 +11,7 @@ import {
   fillPreferencesStep,
   fillSkillsStep,
   hideButton,
+  expandMission,
   onboardingWelcomeHeading,
   openOperationalDetails,
   injectMissions,
@@ -120,6 +121,8 @@ test.describe('Accessibility', () => {
     const favoriteBtn = favoriteButton(firstCard);
     await expect(favoriteBtn).toBeVisible();
 
+    // The remaining actions sit behind the card's quiet disclosure.
+    await expandMission(firstCard);
     const hideBtn = hideButton(firstCard);
     await expect(hideBtn).toBeVisible();
 
