@@ -500,7 +500,10 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
     expect(storySource).toContain('data-testid="operational-story-inline"');
-    expect(storySource).toContain('grid-cols-[auto_auto_minmax(0,1fr)]');
+    // Quiet single-line row: icon | truncated title | action. No tinted box,
+    // no badge chip — severity rides on the leading icon (feed-story.model.md).
+    expect(storySource).toContain('grid-cols-[auto_minmax(0,1fr)_auto]');
+    expect(storySource).toContain('inlineIconClass');
     expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
     expect(badgeSource).toContain('whitespace-nowrap');
     expect(feedSource).toContain('data-testid="feed-hero-card"');

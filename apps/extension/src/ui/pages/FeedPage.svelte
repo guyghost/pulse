@@ -1046,7 +1046,7 @@
               {/if}
 
               {#if feedStoryNeedsAttention}
-                <div class="mt-2">
+                <div class="mt-1.5">
                   <OperationalStoryCard
                     eyebrow="À faire maintenant"
                     title={feedStory.title}

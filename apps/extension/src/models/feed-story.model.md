@@ -46,6 +46,22 @@ depuis la story. Le `ConnectorAlertBar` ne rend que lorsqu'un signal de
 précédence supérieure (erreur, offline) masque le signal connecteur : il porte
 alors une information distincte, pas une duplication.
 
+### Rendu inline — ligne calme (2026, inspiration Notion iOS)
+
+La variante `inline` (hero compact du feed) est une **ligne unique discrète**,
+pas une carte :
+
+- pas de boîte teintée, pas de bordure, pas de badge chip ;
+- la sévérité est portée par l'icône de tête (forme + teinte, contraste
+  graphique ≥3:1 sur la surface blanche du hero) ;
+- le titre tient sur une ligne (`truncate`) ; le `statusLabel` n'est pas
+  affiché — il reste annoncé au lecteur d'écran via l'`aria-label` ;
+- l'action primaire est un bouton texte discret (bleu blueprint, cible
+  tactile ≥28px).
+
+Invariant : hauteur de la ligne ≤ ~32px en état replié ; les états calmes ne
+rendent aucune ligne (gating par sévérité, ci-dessus).
+
 ## États de présentation
 
 Six états distincts, avec **précédence stricte** (de haut en bas) :

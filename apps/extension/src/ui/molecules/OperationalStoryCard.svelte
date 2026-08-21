@@ -86,6 +86,19 @@
           : 'radar'
   );
 
+  // Inline (feed hero) is a quiet Notion-style row: severity rides on the
+  // leading icon's shape and hue — no tinted box, no badge chip. Graphics
+  // contrast stays ≥3:1 on the white hero surface.
+  const inlineIconClass = $derived(
+    severity === 'success'
+      ? 'text-accent-green'
+      : severity === 'attention' || severity === 'incident'
+        ? 'text-status-orange'
+        : severity === 'critical'
+          ? 'text-status-red'
+          : 'text-text-subtle'
+  );
+
   function evidenceClass(itemSeverity: OperationalSeverity | undefined): string {
     // Severity hue is carried by the card border/background and the leading icon
     // chip; the evidence value stays in neutral ink so the figure stays legible
@@ -95,31 +108,23 @@
 </script>
 
 {#if resolvedVariant === 'inline'}
-  <!-- Compact decision strip: icon + stable status + flexible action. -->
+  <!-- Quiet single-line attention row: icon + one-line title + quiet action. -->
   <section
     data-testid="operational-story-inline"
-    aria-label={eyebrow ? `${eyebrow} : ${title}` : title}
-    class="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2 transition-colors {containerClass}"
+    aria-label={`${eyebrow ? `${eyebrow} : ` : ''}${title}${statusLabel ? ` (${statusLabel})` : ''}`}
+    class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-1 transition-colors hover:bg-subtle-gray/60"
   >
-    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md {iconClass}">
-      <Icon name={iconName} size={13} />
-    </div>
-    {#if statusLabel}
-      <OperationalStatusBadge label={statusLabel} {severity} />
-    {:else}
-      <p class="truncate text-meta font-medium text-text-primary">{title}</p>
-    {/if}
+    <Icon name={iconName} size={14} class="shrink-0 {inlineIconClass}" />
+    <p class="min-w-0 truncate text-caption font-medium text-text-secondary">{title}</p>
     {#if primaryActionLabel}
       <button
-        class="inline-flex min-w-0 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-meta font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
+        class="inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-meta font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
         onclick={onPrimaryAction}
         type="button"
       >
         <span class="min-w-0 truncate">{primaryActionLabel}</span>
         <Icon name={primaryActionIcon} size={12} class="shrink-0" />
       </button>
-    {:else if statusLabel}
-      <p class="min-w-0 truncate text-meta font-medium text-text-primary">{title}</p>
     {/if}
   </section>
 {:else}
