@@ -63,7 +63,7 @@
     <dl class="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
       {#each summary.evidence as row (row.label)}
         <div class="rounded-lg bg-page-canvas px-2 py-1 text-center">
-          <dt class="text-micro uppercase tracking-[0.1em] text-text-muted">{row.label}</dt>
+          <dt class="eyebrow">{row.label}</dt>
           <dd class="mt-0.5 text-meta font-semibold tabular-nums font-mono {valueClass(row.tone)}">
             {row.value}
           </dd>

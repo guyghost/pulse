@@ -91,7 +91,7 @@
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
+            <p class="eyebrow eyebrow--caption eyebrow--subtle">
               {card.label}
             </p>
             <p class="mt-1 text-heading font-semibold tabular-nums text-text-primary">
@@ -120,9 +120,7 @@
 
   <div class="rounded-xl border border-border-light bg-surface-white p-3">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
-        Avancement
-      </p>
+      <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--subtle">Avancement</p>
       {#if summary.bottleneck}
         <p class="flex items-center gap-1 text-caption text-text-subtle">
           <Icon name="traffic-cone" size={11} />

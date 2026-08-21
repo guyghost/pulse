@@ -1126,7 +1126,7 @@
               <!-- Full: hero with description, progress, stats -->
               <div class="relative pr-14">
                 <div class="max-w-[32rem]">
-                  <p class="eyebrow text-blueprint-blue">MissionPulse</p>
+                  <p class="eyebrow eyebrow--blue">MissionPulse</p>
                   <h2
                     class="mt-3 font-display text-[clamp(2.75rem,10vw,4rem)] font-normal leading-[0.94] tracking-[-0.03em] text-text-primary"
                   >
@@ -1312,9 +1312,7 @@
             {#if showAdvancedControls}
               <div class="mt-2" aria-label="Presets métier du feed">
                 <div class="mb-1 flex items-center justify-between gap-2">
-                  <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
-                    Presets métier
-                  </p>
+                  <p class="eyebrow">Presets métier</p>
                   {#if page.decisionPreset}
                     <button
                       type="button"
@@ -1410,9 +1408,7 @@
         class="mb-3 flex items-end justify-between gap-3 border-t border-border-light pt-4"
       >
         <div class="min-w-0">
-          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Missions
-          </p>
+          <p class="eyebrow eyebrow--strong">Missions</p>
           <h2 id="mission-feed-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Missions à examiner
           </h2>

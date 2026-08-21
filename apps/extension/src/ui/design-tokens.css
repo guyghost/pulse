@@ -6,17 +6,6 @@
 @import '@pulse/ui/app.css';
 
 /* ================================================
- * Compatibility aliases for existing extension UI classes
- * These stay local to the extension until all references are migrated.
- * ================================================ */
-
-@theme {
-  --color-accent-blue: #0b64e9;
-  --color-accent-emerald: #0b64e9;
-  --color-accent-red: #f24149;
-}
-
-/* ================================================
  * Base Styles (extension-specific)
  * ================================================ */
 
@@ -64,58 +53,6 @@ textarea:focus-visible,
   min-height: 100vh;
   width: 100%;
   overflow-x: hidden;
-}
-
-/* ================================================
- * Card Container
- * ================================================ */
-
-.card {
-  background: var(--color-surface-white);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: var(--spacing-16);
-}
-
-/* ================================================
- * Status Tags
- * ================================================ */
-
-.tag {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--spacing-4);
-  padding: var(--spacing-4) var(--spacing-8);
-  border-radius: var(--radius-md);
-  font-family: var(--font-system);
-  font-size: var(--text-meta);
-  font-weight: 400;
-  line-height: var(--text-meta--line-height);
-}
-
-.tag--red {
-  background: var(--color-status-red);
-  color: #ffffff;
-}
-.tag--orange {
-  background: var(--color-status-orange);
-  color: #ffffff;
-}
-.tag--yellow {
-  background: var(--color-status-yellow);
-  color: #ffffff;
-}
-.tag--violet {
-  background: var(--color-status-violet);
-  color: #ffffff;
-}
-.tag--blue {
-  background: var(--color-blueprint-blue);
-  color: #ffffff;
-}
-.tag--gray {
-  background: var(--color-subtle-gray);
-  color: var(--color-text-secondary);
 }
 
 /* ================================================

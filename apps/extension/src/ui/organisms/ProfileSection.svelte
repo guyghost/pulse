@@ -131,9 +131,7 @@
       </datalist>
       <div class="grid grid-cols-2 gap-2">
         <label class="space-y-1">
-          <span class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
-            Remote
-          </span>
+          <span class="eyebrow"> Remote </span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={profileRemote}
@@ -147,9 +145,7 @@
           </span>
         </label>
         <label class="space-y-1">
-          <span class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
-            Séniorité
-          </span>
+          <span class="eyebrow"> Séniorité </span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={seniority}
@@ -187,7 +183,7 @@
       </div>
 
       <div class="space-y-2">
-        <p class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">Mots-clés</p>
+        <p class="eyebrow">Mots-clés</p>
         <div class="flex gap-2">
           <input
             type="text"
@@ -242,15 +238,13 @@
       <p class="text-text-subtle">{profileLocation || 'Localisation non renseignée'}</p>
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
+          <p class="eyebrow">Remote</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {remoteOptions.find((option) => option.value === profileRemote)?.label ?? 'Indifférent'}
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Séniorité
-          </p>
+          <p class="eyebrow">Séniorité</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {seniorityOptions.find((option) => option.value === seniority)?.label ?? 'Senior'}
           </p>

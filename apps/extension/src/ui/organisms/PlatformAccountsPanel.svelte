@@ -90,9 +90,7 @@
 >
   <div class="flex items-start justify-between gap-3">
     <div>
-      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-        Multi-compte
-      </p>
+      <p class="eyebrow eyebrow--strong eyebrow--blue">Multi-compte</p>
       <h3 id="platform-accounts-title" class="mt-1 text-sm font-semibold text-text-primary">
         Comptes plateforme
       </h3>
@@ -152,7 +150,7 @@
     <div class="mt-4 space-y-3">
       {#each groupedBindings as group (group.id)}
         <div>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+          <p class="eyebrow eyebrow--strong">
             {group.label}
           </p>
           <div class="mt-1 space-y-1.5">

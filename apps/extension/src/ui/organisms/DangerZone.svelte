@@ -85,9 +85,7 @@
       </div>
     {:else if showResetConfirm}
       <div class="rounded-xl border border-status-red/20 bg-status-red/6 px-3 py-2.5">
-        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-primary">
-          Suppression irréversible
-        </p>
+        <p class="eyebrow eyebrow--strong text-text-primary">Suppression irréversible</p>
         <p class="mt-1.5 text-meta leading-4 text-text-primary">
           Impact : profil, missions, favoris, masquées, vues et caches IA supprimés de cet appareil.
         </p>

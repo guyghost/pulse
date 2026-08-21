@@ -171,9 +171,7 @@
                 <Icon name="target" size={16} />
               </span>
               <div class="min-w-0 flex-1">
-                <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-                  Décision recommandée
-                </p>
+                <p class="eyebrow eyebrow--strong eyebrow--blue">Décision recommandée</p>
                 <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
                   {recommendationTitle}
                 </h3>
@@ -183,9 +181,7 @@
                       <span
                         class="inline-flex items-baseline gap-1 rounded-md bg-blueprint-blue/10 px-2 py-0.5 text-meta text-blueprint-blue"
                       >
-                        <span class="text-micro uppercase tracking-[0.12em] opacity-70"
-                          >{evidence.label}</span
-                        >
+                        <span class="eyebrow opacity-70">{evidence.label}</span>
                         <span class="font-semibold tabular-nums">{evidence.value}</span>
                       </span>
                     {/each}
@@ -205,7 +201,7 @@
         class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
-        <div class="text-caption uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
+        <div class="eyebrow eyebrow--caption self-end">Mission</div>
         {#each missions as mission (mission.id)}
           <div
             class="px-2 {mission.id === recommendedMission?.id
@@ -230,7 +226,7 @@
         class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
-        <div class="text-caption uppercase tracking-[0.15em] text-text-muted">Stack</div>
+        <div class="eyebrow eyebrow--caption">Stack</div>
         {#each missions as mission (mission.id)}
           <div
             class="flex flex-wrap gap-1 px-2 {mission.id === recommendedMission?.id
@@ -256,7 +252,7 @@
           class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
-          <div class="text-caption uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
+          <div class="eyebrow eyebrow--caption">{field.label}</div>
           {#each missions as mission (mission.id)}
             <div
               class="px-2 text-meta text-text-primary {mission.id === recommendedMission?.id
@@ -296,7 +292,7 @@
               class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
               style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
             >
-              <div class="text-caption uppercase tracking-[0.15em] text-text-muted">
+              <div class="eyebrow eyebrow--caption">
                 {field.label}
               </div>
               {#each missions as mission (mission.id)}

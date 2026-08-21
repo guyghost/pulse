@@ -387,7 +387,7 @@
       {/if}
 
       <div class="mt-2 flex items-center justify-between">
-        <span class="text-micro uppercase tracking-wide text-text-muted">{sourceLabel}</span>
+        <span class="eyebrow">{sourceLabel}</span>
         {#if snapshot.context.input.isBusy}
           <span class="inline-flex items-center gap-1 text-micro text-text-muted">
             <Icon name="loader-2" size={11} class="animate-spin" />
@@ -407,7 +407,7 @@
         {/if}
       </div>
       <div class="mt-2 flex items-center justify-between">
-        <span class="text-micro uppercase tracking-wide text-text-muted">{sourceLabel}</span>
+        <span class="eyebrow">{sourceLabel}</span>
         {#if snapshot.context.input.isBusy}
           <span class="inline-flex items-center gap-1 text-micro text-text-muted">
             <Icon name="loader-2" size={11} class="animate-spin" />

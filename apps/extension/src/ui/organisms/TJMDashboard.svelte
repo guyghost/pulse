@@ -291,9 +291,7 @@
       <section class="section-card rounded-xl p-5" aria-label="Indicateurs clés du marché">
         <div class="grid grid-cols-3 gap-3">
           <div>
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Médiane
-            </p>
+            <p class="eyebrow eyebrow--strong">Médiane</p>
             <p class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none text-text-primary">
               {selectedMarketRange ? formatTJMValue(selectedMarketRange.median) : '—'}
             </p>
@@ -302,9 +300,7 @@
             </p>
           </div>
           <div>
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Votre cible
-            </p>
+            <p class="eyebrow eyebrow--strong">Votre cible</p>
             <p
               class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
                 ? 'text-status-red'
@@ -321,9 +317,7 @@
             </p>
           </div>
           <div>
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Tendance
-            </p>
+            <p class="eyebrow eyebrow--strong">Tendance</p>
             <div class="mt-2"><TrendBadge trend={analysis.trend} /></div>
             <p class="mt-1.5 text-micro text-text-subtle">
               {analysis.topStacks.length} stacks · {analysis.dataPoints} points
@@ -377,9 +371,7 @@
         {/if}
         <div class="mt-4">
           <div class="mb-1.5 flex items-center justify-between gap-3">
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Confiance
-            </p>
+            <p class="eyebrow eyebrow--strong">Confiance</p>
             <p class="text-micro font-mono tabular-nums text-text-primary">{confidencePct}%</p>
           </div>
           <div class="h-1.5 overflow-hidden rounded-full bg-subtle-gray">
@@ -396,9 +388,7 @@
         <div class="section-card rounded-xl p-5">
           <div class="flex items-start justify-between gap-4">
             <div class="min-w-0">
-              <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-                Votre positionnement
-              </p>
+              <p class="eyebrow eyebrow--strong">Votre positionnement</p>
               <p class="mt-1 text-meta leading-relaxed text-text-subtle">
                 Cible {userTjmMin}–{userTjmMax}€ ·
                 {userSeniority
@@ -456,9 +446,7 @@
     </div>
 
     <section class="mt-6" aria-label="Détails du marché">
-      <p class="px-1 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-        Détails du marché
-      </p>
+      <p class="px-1 eyebrow eyebrow--strong">Détails du marché</p>
       <div class="mt-3 space-y-4">
         <!-- Level cards -->
         <div class="space-y-3">
@@ -484,7 +472,7 @@
                       <p class="text-meta font-medium text-text-primary">{level.label}</p>
                       {#if isSelected}
                         <span
-                          class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.08em] text-blueprint-blue"
+                          class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 eyebrow eyebrow--strong eyebrow--blue"
                         >
                           Vous
                         </span>
@@ -509,9 +497,7 @@
         <!-- Top stacks -->
         {#if analysis.topStacks.length > 0}
           <div class="section-card rounded-xl p-5">
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
-              Stacks suivies
-            </p>
+            <p class="eyebrow eyebrow--strong mb-4">Stacks suivies</p>
             <div class="space-y-3">
               {#each analysis.topStacks as stack, i (i)}
                 {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
@@ -548,9 +534,7 @@
         <!-- Region insights -->
         {#if analysis.regionInsights && analysis.regionInsights.length > 0}
           <section class="section-card rounded-xl p-5" aria-label="TJM par région">
-            <h3 class="mb-4 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              TJM par région
-            </h3>
+            <h3 class="mb-4 eyebrow eyebrow--strong">TJM par région</h3>
             <ul class="space-y-3" aria-label="Régions analysées">
               {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
                 {@const barWidth = Math.max(
@@ -609,7 +593,7 @@
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="eyebrow text-blueprint-blue">3 étapes</p>
+            <p class="eyebrow eyebrow--blue">3 étapes</p>
             <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
               Alimenter le radar TJM
             </h3>

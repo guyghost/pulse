@@ -37,9 +37,7 @@
         </p>
 
         <div class="mt-3 rounded-xl border border-status-red/15 bg-surface-white/70 px-3 py-2">
-          <p class="text-micro font-semibold uppercase tracking-[0.14em] text-status-red">
-            Impact opérationnel
-          </p>
+          <p class="eyebrow eyebrow--strong text-status-red">Impact opérationnel</p>
           <p class="mt-1 text-caption leading-4 text-text-secondary">
             Pulse peut sous-estimer les nouvelles missions tant que
             {brokenConnectors.length === 1

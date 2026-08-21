@@ -101,11 +101,7 @@
       >
         <div class="flex items-start justify-between gap-4 border-b border-border-light px-4 py-3">
           <div class="min-w-0">
-            <p
-              class="mb-1 text-micro font-semibold uppercase tracking-[0.14em] text-blueprint-blue"
-            >
-              En attente
-            </p>
+            <p class="mb-1 eyebrow eyebrow--strong eyebrow--blue">En attente</p>
             <h2
               id="arrival-drawer-title"
               class="text-body-lg font-semibold text-text-primary outline-none"

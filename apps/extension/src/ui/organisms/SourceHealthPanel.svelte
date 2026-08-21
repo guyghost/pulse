@@ -286,9 +286,7 @@
       <div class="px-4 pt-3 pb-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Sources
-            </p>
+            <p class="eyebrow eyebrow--strong">Sources</p>
             {#if !isChecking}
               <span
                 class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium
@@ -532,7 +530,7 @@
 
       {#if unhealthySnapshots.length > 0}
         <div class="border-t border-border-light px-4 py-3">
-          <p class="text-micro uppercase tracking-[0.15em] text-text-muted mb-2">Santé détaillée</p>
+          <p class="eyebrow mb-2">Santé détaillée</p>
           <div class="space-y-2">
             {#each unhealthySnapshots as item (item.connectorId)}
               <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />

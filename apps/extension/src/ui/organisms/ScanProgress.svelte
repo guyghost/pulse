@@ -95,17 +95,17 @@
     {#if entries.length > 0}
       <div class="mt-2 grid grid-cols-3 gap-1.5">
         <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-          <p class="text-micro uppercase tracking-[0.12em] text-text-muted">Actifs</p>
+          <p class="eyebrow">Actifs</p>
           <p class="mt-0.5 text-meta font-semibold tabular-nums text-blueprint-blue">
             {activeCount}
           </p>
         </div>
         <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-          <p class="text-micro uppercase tracking-[0.12em] text-text-muted">Terminés</p>
+          <p class="eyebrow">Terminés</p>
           <p class="mt-0.5 text-meta font-semibold tabular-nums text-accent-green">{doneCount}</p>
         </div>
         <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-          <p class="text-micro uppercase tracking-[0.12em] text-text-muted">Erreurs</p>
+          <p class="eyebrow">Erreurs</p>
           <p
             class="mt-0.5 text-meta font-semibold tabular-nums {errorCount > 0
               ? 'text-status-red'
