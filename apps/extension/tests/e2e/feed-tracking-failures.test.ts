@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { dismissFeedTour, SIDE_PANEL } from './helpers';
+import { dismissFeedTour, expandMission, SIDE_PANEL } from './helpers';
 
 const mission = {
   id: 'feed-tracking-failure-proof',
@@ -177,6 +177,8 @@ async function openTrackingAction(page: Page): Promise<ReturnType<Page['getByRol
     .getByRole('article')
     .filter({ hasText: mission.title });
   await expect(card).toBeVisible({ timeout: 10_000 });
+  // `Investiguer →` lives inside the card's quiet disclosure.
+  await expandMission(card);
   await card.getByRole('button', { name: /Investiguer/ }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Investigation mission' });

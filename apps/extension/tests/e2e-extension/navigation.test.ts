@@ -192,9 +192,10 @@ test(
 
     const page = await extension.openSidePanel();
     // The dedicated help trigger button was removed with the filter-dock
-    // redesign; the dialog now opens from the `?` shortcut. The first-run
-    // toast is suppressed by the kbd_cheatsheet_tip_seen seed.
-    const opener = page.getByRole('button', { name: 'Scanner', exact: true });
+    // redesign; the dialog now opens from the `?` shortcut with focus seeded
+    // on the empty-feed scan CTA. The first-run toast is suppressed by the
+    // kbd_cheatsheet_tip_seen seed.
+    const opener = page.getByRole('button', { name: 'Lancer le scan', exact: true });
     await expect(opener).toBeVisible();
     await openShortcutsHelp(page, opener);
 

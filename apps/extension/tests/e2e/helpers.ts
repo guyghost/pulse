@@ -73,6 +73,24 @@ export function hideButton(card: Locator): Locator {
   return card.getByRole('button', { name: 'Masquer la mission' });
 }
 
+export function missionDetailsToggle(card: Locator): Locator {
+  return card.getByRole('button', { name: /les détails de la mission/ });
+}
+
+/**
+ * Ouvre le disclosure de la carte pour exposer les actions (masquer,
+ * comparer, copier, ouvrir, investiguer). Le content-first redesign garde
+ * ces actions dans la zone de détails repliée par défaut.
+ */
+export async function expandMission(card: Locator) {
+  const toggle = missionDetailsToggle(card);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
+}
+
 export function copyLinkButton(card: Locator): Locator {
   return card.getByRole('button', { name: 'Copier le lien de la mission' });
 }
@@ -624,6 +642,7 @@ export async function unfavoriteMission(card: Locator) {
  * Masque une mission
  */
 export async function hideMission(card: Locator) {
+  await expandMission(card);
   const hideBtn = hideButton(card);
   await expect(hideBtn).toBeVisible();
   await hideBtn.click();
