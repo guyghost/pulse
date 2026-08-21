@@ -498,6 +498,25 @@
       (page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible)
   );
 
+  // The toolbar under the hero only carries auxiliary chrome (refinement
+  // banner, checklist pill, busy indicator, presets) — the search/filter
+  // controls now live in the floating capsule. When every piece is hidden the
+  // container must not render at all, otherwise it leaves an empty bordered
+  // strip inside the section card.
+  const feedToolbarVisible = $derived(
+    feedChromeBusy ||
+      showAdvancedControls ||
+      (showRefinementBanner &&
+        Boolean(ProfileRefinementBanner) &&
+        !controller.isScanning &&
+        page.profileLoaded &&
+        page.profileNeedsCompletion) ||
+      (!checklistPillDismissed &&
+        page.profileLoaded &&
+        page.profileCompletion < 100 &&
+        Boolean(ProfileChecklistPill))
+  );
+
   // ── Scan completion delight ──────────────────────────────────────────
   // Quiet, confident terminal summary shown the moment a scan finishes.
   // Pure projection of scan-lifecycle terminal facts — introduces no state
@@ -1234,100 +1253,101 @@
           </div>
         {/if}
 
-        <!-- ── Search + Filter toolbar (condensed-sticky in compact mode) ── -->
-        <div
-          class="border-t border-border-light px-5 {page.heroCompact
-            ? 'sticky top-0 z-20 rounded-b-2xl bg-surface-white/90 py-2 backdrop-blur-md'
-            : 'rounded-b-2xl py-3'}"
-        >
-          <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-            {#if feedChromeBusy}Chargement des missions en cours{/if}
-          </div>
-
-          {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion && ProfileRefinementBanner}
-            <ProfileRefinementBanner
-              completion={page.profileCompletion}
-              missingItems={page.missingProfileItems}
-              onSetupProfile={() => {
-                showRefinementBanner = false;
-                if (onNavigateToProfile) {
-                  onNavigateToProfile();
-                  return;
-                }
-                onNavigateToOnboarding?.();
-              }}
-            />
-          {/if}
-
-          {#if !checklistPillDismissed && page.profileLoaded && page.profileCompletion < 100 && ProfileChecklistPill}
-            <div class="flex justify-center">
-              <ProfileChecklistPill
+        <!-- ── Auxiliary toolbar (condensed-sticky in compact mode) ── -->
+        <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {#if feedChromeBusy}Chargement des missions en cours{/if}
+        </div>
+        {#if feedToolbarVisible}
+          <div
+            class="border-t border-border-light px-5 {page.heroCompact
+              ? 'sticky top-0 z-20 rounded-b-2xl bg-surface-white/90 py-2 backdrop-blur-md'
+              : 'rounded-b-2xl py-3'}"
+          >
+            {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion && ProfileRefinementBanner}
+              <ProfileRefinementBanner
                 completion={page.profileCompletion}
-                onOpenProfile={() => {
+                missingItems={page.missingProfileItems}
+                onSetupProfile={() => {
+                  showRefinementBanner = false;
                   if (onNavigateToProfile) {
                     onNavigateToProfile();
                     return;
                   }
                   onNavigateToOnboarding?.();
                 }}
-                onDismiss={() => {
-                  checklistPillDismissed = true;
-                  // Persist: the pill and the refinement banner share the same
-                  // profile-completion nudge, so one dismiss state covers both.
-                  showRefinementBanner = false;
-                  void setProfileBannerDismissed().catch(() => {});
-                }}
               />
-            </div>
-          {/if}
+            {/if}
 
-          {#if feedChromeBusy}
-            <div class="flex items-center gap-2 text-meta text-text-muted">
-              <span
-                class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"
-              ></span>
-              Collecte...
-            </div>
-          {/if}
+            {#if !checklistPillDismissed && page.profileLoaded && page.profileCompletion < 100 && ProfileChecklistPill}
+              <div class="flex justify-center">
+                <ProfileChecklistPill
+                  completion={page.profileCompletion}
+                  onOpenProfile={() => {
+                    if (onNavigateToProfile) {
+                      onNavigateToProfile();
+                      return;
+                    }
+                    onNavigateToOnboarding?.();
+                  }}
+                  onDismiss={() => {
+                    checklistPillDismissed = true;
+                    // Persist: the pill and the refinement banner share the same
+                    // profile-completion nudge, so one dismiss state covers both.
+                    showRefinementBanner = false;
+                    void setProfileBannerDismissed().catch(() => {});
+                  }}
+                />
+              </div>
+            {/if}
 
-          {#if showAdvancedControls}
-            <div class="mt-2" aria-label="Presets métier du feed">
-              <div class="mb-1 flex items-center justify-between gap-2">
-                <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
-                  Presets métier
-                </p>
-                {#if page.decisionPreset}
-                  <button
-                    type="button"
-                    class="text-micro font-medium text-blueprint-blue hover:text-blueprint-blue/80"
-                    onclick={page.clearAllFilters}
-                  >
-                    Réinitialiser
-                  </button>
-                {/if}
+            {#if feedChromeBusy}
+              <div class="flex items-center gap-2 text-meta text-text-muted">
+                <span
+                  class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"
+                ></span>
+                Collecte...
               </div>
-              <div class="flex gap-1.5 overflow-x-auto pb-1">
-                {#each page.decisionPresets as preset (preset.id)}
-                  <button
-                    type="button"
-                    class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-micro font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
-                      ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                      : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                    onclick={() => page.applyDecisionPreset(preset.id)}
-                    aria-pressed={preset.active}
-                    disabled={preset.count === 0 && !preset.active}
-                    title={preset.description}
-                  >
-                    <span>{preset.label}</span>
-                    <span class="rounded-md bg-page-canvas px-1 py-0.5 text-micro">
-                      {preset.count}
-                    </span>
-                  </button>
-                {/each}
+            {/if}
+
+            {#if showAdvancedControls}
+              <div class="mt-2" aria-label="Presets métier du feed">
+                <div class="mb-1 flex items-center justify-between gap-2">
+                  <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+                    Presets métier
+                  </p>
+                  {#if page.decisionPreset}
+                    <button
+                      type="button"
+                      class="text-micro font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                      onclick={page.clearAllFilters}
+                    >
+                      Réinitialiser
+                    </button>
+                  {/if}
+                </div>
+                <div class="flex gap-1.5 overflow-x-auto pb-1">
+                  {#each page.decisionPresets as preset (preset.id)}
+                    <button
+                      type="button"
+                      class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-micro font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                        ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                        : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                      onclick={() => page.applyDecisionPreset(preset.id)}
+                      aria-pressed={preset.active}
+                      disabled={preset.count === 0 && !preset.active}
+                      title={preset.description}
+                    >
+                      <span>{preset.label}</span>
+                      <span class="rounded-md bg-page-canvas px-1 py-0.5 text-micro">
+                        {preset.count}
+                      </span>
+                    </button>
+                  {/each}
+                </div>
               </div>
-            </div>
-          {/if}
-        </div>
+            {/if}
+          </div>
+        {/if}
       </section>
 
       {#if brokenConnectors.length > 0 && !storyCoversConnectors && ConnectorAlertBar}
