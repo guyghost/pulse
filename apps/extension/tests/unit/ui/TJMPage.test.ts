@@ -46,6 +46,10 @@ const analysis: TJMAnalysis = {
       trend: 'stable',
     },
   ],
+  series: [
+    { date: '2026-05-20', average: 640 },
+    { date: '2026-05-22', average: 655 },
+  ],
 };
 
 function flush() {

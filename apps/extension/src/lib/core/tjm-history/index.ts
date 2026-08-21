@@ -14,6 +14,7 @@ import type {
   TJMRecord,
   TJMRegion,
   TJMRegionInsight,
+  TJMSeriesPoint,
   TJMStackInsight,
   TJMStats,
   TJMTrend,
@@ -387,6 +388,66 @@ export const getDominantTrendForMission = (history: TJMHistory, mission: Mission
 
 const clampConfidence = (value: number): number => Math.max(0, Math.min(1, value));
 
+/**
+ * Aggregate records into a chronological market sparkline series.
+ *
+ * Groups records by date (sample-weighted average across stacks), sorts
+ * ascending, then resamples into at most `bucketCount` contiguous buckets so
+ * long histories stay readable at sparkline size.
+ *
+ * Invariants (models/tjm-market-overview.model.md): chronologically sorted,
+ * empty for empty input, every average > 0, at most one point per bucket.
+ */
+export const buildTJMSeries = (records: TJMRecord[], bucketCount = 12): TJMSeriesPoint[] => {
+  if (records.length === 0 || bucketCount < 1) {
+    return [];
+  }
+
+  const byDate = new Map<string, { total: number; weight: number }>();
+  for (const record of records) {
+    if (record.average <= 0 || record.sampleCount <= 0) {
+      continue;
+    }
+    const bucket = byDate.get(record.date) ?? { total: 0, weight: 0 };
+    bucket.total += record.average * record.sampleCount;
+    bucket.weight += record.sampleCount;
+    byDate.set(record.date, bucket);
+  }
+
+  const daily = [...byDate.entries()]
+    .map(([date, { total, weight }]): TJMSeriesPoint => ({
+      date,
+      average: Math.round(total / weight),
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (daily.length <= bucketCount) {
+    return daily;
+  }
+
+  // Resample into contiguous buckets of (roughly) equal size, preserving order.
+  const perBucket = daily.length / bucketCount;
+  const series: TJMSeriesPoint[] = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const start = Math.floor(i * perBucket);
+    const end = i === bucketCount - 1 ? daily.length : Math.floor((i + 1) * perBucket);
+    const slice = daily.slice(start, Math.max(end, start + 1));
+    if (slice.length === 0) {
+      continue;
+    }
+    let total = 0;
+    for (const point of slice) {
+      total += point.average;
+    }
+    series.push({
+      // Bucket key = last date of the slice, so the point anchors the period end.
+      date: slice[slice.length - 1].date,
+      average: Math.round(total / slice.length),
+    });
+  }
+  return series;
+};
+
 const medianOf = (values: number[]): number => {
   if (values.length === 0) {
     return 0;
@@ -737,5 +798,6 @@ export const analyzeTJMHistory = (history: TJMHistory, now?: Date): TJMAnalysis 
     lastUpdated,
     topStacks,
     regionInsights: buildRegionInsights(history),
+    series: buildTJMSeries(history.records),
   };
 };

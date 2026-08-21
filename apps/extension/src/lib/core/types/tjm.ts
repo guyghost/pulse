@@ -107,6 +107,16 @@ export interface TJMAnalysis {
   topStacks: TJMStackInsight[];
   /** Per-region TJM insights, sorted by average descending */
   regionInsights: TJMRegionInsight[];
+  /** Aggregated market sparkline, chronological, see models/tjm-market-overview.model.md */
+  series: TJMSeriesPoint[];
+}
+
+/** Sparkline point: weighted average of all records at a given date. */
+export interface TJMSeriesPoint {
+  /** ISO 8601 date-only string */
+  date: string;
+  /** Sample-weighted average TJM across stacks for this date */
+  average: number;
 }
 
 /** History of TJM records, indexed by stack */
