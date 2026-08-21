@@ -36,8 +36,10 @@ stateDiagram-v2
 - `SELECT` invoque exactement les callbacks props existants (`onToggleCompare`,
   `onHide`) : le kebab est une **réorganisation de présentation**, pas un nouveau
   workflow. Aucune nouvelle transition métier n'est introduite.
-- Focus : à l'ouverture, focus sur le premier item ; `Échap` restitue le focus au
-  bouton kebab ; le menu se ferme à la fermeture du drawer (montage/démontage).
+- Focus : à l'ouverture, focus sur le premier item actif ; `Échap` restitue le
+  focus au bouton kebab ; un clic hors menu qui n'atterrit sur aucun élément
+  focusable restitue également le focus au kebab ; le menu se ferme à la
+  fermeture du drawer (montage/démontage).
 
 ## Invariants
 

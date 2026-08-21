@@ -34,6 +34,12 @@ stateDiagram-v2
   48px — la résistance est purement visuelle et n'affecte pas la validation.
 - Feedback : icône de destination (cœur / œil barré) qui apparaît en fond
   selon le sens, opacité proportionnelle à la progression vers le seuil.
+  L'icône est mémoïsée par sens (rebuild uniquement au changement de
+  direction), le padding appliqué à un seul côté à la fois.
+- Capture du pointeur : `setPointerCapture` sur la carte dès que l'intention
+  horizontale est verrouillée, libérée sur `POINTER_UP` / `POINTER_CANCEL` /
+  désactivation — le geste survit à un pointeur qui quitte les limites de la
+  carte, et un pointeur orphelin ne bloque pas les gestes suivants.
 - Post-détection de clic : un `POINTER_UP` sous le seuil est traité comme clic
   normal (ouverture du détail) — jamais comme tri accidentel. Un `POINTER_UP`
   après intention horizontale verrouillée supprime le clic qui suit.

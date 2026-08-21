@@ -48,6 +48,7 @@
   // Kebab disclosure — UI-local state, see models/drawer-footer-actions.model.md
   let actionsMenuOpen = $state(false);
   let kebabButton = $state<HTMLButtonElement | null>(null);
+  let actionsMenuElement = $state<HTMLElement | null>(null);
 
   function toggleActionsMenu(): void {
     actionsMenuOpen = !actionsMenuOpen;
@@ -64,10 +65,20 @@
     if (!actionsMenuOpen) {
       return;
     }
+    // Model invariant: opening the menu moves focus to its first enabled
+    // item so the Escape handler (onkeydown on the menu) is reachable.
+    actionsMenuElement?.querySelector<HTMLElement>('button:not([disabled])')?.focus();
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement;
       if (!target.closest('[data-actions-menu]')) {
         actionsMenuOpen = false;
+        // Keep keyboard flow predictable inside the modal: if the outside
+        // click landed on nothing focusable, hand focus back to the kebab.
+        if (
+          !target.closest('button, a, input, select, textarea, [tabindex]:not([tabindex="-1"])')
+        ) {
+          kebabButton?.focus();
+        }
       }
     }
     document.addEventListener('click', handleClickOutside);
@@ -398,6 +409,7 @@
                 </button>
                 {#if actionsMenuOpen}
                   <div
+                    bind:this={actionsMenuElement}
                     class="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-border-light bg-surface-white p-1.5 shadow-xl"
                     role="menu"
                     aria-label="Actions secondaires"

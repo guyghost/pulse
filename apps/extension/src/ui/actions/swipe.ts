@@ -48,6 +48,9 @@ export function swipe(node: HTMLElement, options: SwipeOptions) {
   let horizontal = false;
   let currentDx = 0; // raw pointer delta, used for threshold validation
   let suppressNextClick = false;
+  // Overlay memoization: rebuild the icon only when the direction flips,
+  // not on every pointermove (avoids innerHTML churn mid-gesture).
+  let overlayDirection: 'heart' | 'eye-off' | null = null;
 
   const overlay = document.createElement('div');
   overlay.setAttribute('aria-hidden', 'true');
@@ -59,22 +62,34 @@ export function swipe(node: HTMLElement, options: SwipeOptions) {
   `;
   node.appendChild(overlay);
 
+  function releasePointerCapture(id: number | null): void {
+    if (id === null) {
+      return;
+    }
+    try {
+      if (node.hasPointerCapture?.(id)) {
+        node.releasePointerCapture(id);
+      }
+    } catch {
+      // Pointer already released — nothing to do.
+    }
+  }
+
   function render(dx: number) {
     const progress = Math.min(Math.abs(dx) / threshold(), 1);
     node.style.transform = `translateX(${dx}px)`;
     node.style.transition = 'none';
-    if (dx > 0) {
-      overlay.style.justifyContent = 'flex-start';
-      overlay.style.paddingLeft = '20px';
-      overlay.innerHTML = iconSvg('heart');
-      overlay.style.color = 'rgba(11,100,233,0.9)';
-    } else if (dx < 0) {
-      overlay.style.justifyContent = 'flex-end';
-      overlay.style.paddingRight = '20px';
-      overlay.innerHTML = iconSvg('eye-off');
-      overlay.style.color = 'rgba(242,65,73,0.9)';
-    } else {
-      overlay.innerHTML = '';
+    const direction: 'heart' | 'eye-off' | null = dx > 0 ? 'heart' : dx < 0 ? 'eye-off' : null;
+    if (direction !== overlayDirection) {
+      overlayDirection = direction;
+      overlay.innerHTML = direction ? iconSvg(direction) : '';
+      overlay.style.justifyContent =
+        direction === 'heart' ? 'flex-start' : direction === 'eye-off' ? 'flex-end' : 'center';
+      // Set exactly one side; clearing the other keeps mid-gesture
+      // direction reversals from accumulating both paddings.
+      overlay.style.paddingLeft = direction === 'heart' ? '20px' : '';
+      overlay.style.paddingRight = direction === 'eye-off' ? '20px' : '';
+      overlay.style.color = direction === 'heart' ? 'rgba(11,100,233,0.9)' : 'rgba(242,65,73,0.9)';
     }
     overlay.style.opacity = String(progress * 0.85);
   }
@@ -115,12 +130,21 @@ export function swipe(node: HTMLElement, options: SwipeOptions) {
       }
       if (Math.abs(dx) <= Math.abs(dy)) {
         // Vertical intent: release the gesture, scroll stays master.
+        releasePointerCapture(pointerId);
         reset(false);
         pointerId = null;
         dragging = false;
         return;
       }
       horizontal = true;
+      // Capture the pointer once horizontal intent is locked so the gesture
+      // keeps receiving move/up events even if the pointer leaves the card
+      // (mouse dragging outside the node bounds).
+      try {
+        node.setPointerCapture?.(pointerId);
+      } catch {
+        // Capture is best-effort; the gesture still works without it.
+      }
     }
 
     event.preventDefault();
@@ -136,6 +160,7 @@ export function swipe(node: HTMLElement, options: SwipeOptions) {
     if (event.pointerId !== pointerId) {
       return;
     }
+    releasePointerCapture(pointerId);
     pointerId = null;
     if (horizontal) {
       suppressNextClick = true;
@@ -160,6 +185,7 @@ export function swipe(node: HTMLElement, options: SwipeOptions) {
     if (event.pointerId !== pointerId) {
       return;
     }
+    releasePointerCapture(pointerId);
     pointerId = null;
     reset();
   }
@@ -175,6 +201,8 @@ export function swipe(node: HTMLElement, options: SwipeOptions) {
     update(newOptions: SwipeOptions) {
       currentOptions = newOptions;
       if (newOptions.enabled === false) {
+        releasePointerCapture(pointerId);
+        pointerId = null;
         reset();
       }
     },

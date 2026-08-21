@@ -89,6 +89,14 @@ describe('buildKanbanBoard', () => {
     const offer = columns.find((column) => column.status === 'offer');
     expect(offer?.cards[0].title).toBe('Dossier suivi');
     expect(offer?.cards[0].client).toBeNull();
+    expect(offer?.cards[0].missionMissing).toBe(true);
+  });
+
+  it('flags resolved missions as not missing', () => {
+    const columns = buildKanbanBoard([makeMission('m1')], [makeTracking('m1', 'applied', 2)]);
+
+    const applied = columns.find((column) => column.status === 'applied');
+    expect(applied?.cards[0].missionMissing).toBe(false);
   });
 
   it('keeps the card total equal to the number of active tracked dossiers', () => {

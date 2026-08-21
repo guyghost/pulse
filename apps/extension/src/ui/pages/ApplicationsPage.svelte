@@ -917,10 +917,24 @@
                     class="w-full rounded-lg border border-border-light bg-surface-white px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/30 hover:bg-blueprint-blue/4 {selectedMissionId ===
                     card.missionId
                       ? 'border-blueprint-blue/40 bg-blueprint-blue/6'
+                      : ''} {card.missionMissing
+                      ? 'cursor-default opacity-60 hover:border-border-light hover:bg-surface-white'
                       : ''}"
-                    onclick={() => selectMission(card.missionId)}
+                    onclick={() => {
+                      if (!card.missionMissing) {
+                        selectMission(card.missionId);
+                      }
+                    }}
+                    disabled={card.missionMissing}
+                    title={card.missionMissing
+                      ? 'Mission source introuvable dans le feed local'
+                      : undefined}
                   >
-                    <span class="block truncate text-body font-medium text-text-primary">
+                    <span
+                      class="block truncate text-body font-medium {card.missionMissing
+                        ? 'text-text-subtle italic'
+                        : 'text-text-primary'}"
+                    >
                       {card.title}
                     </span>
                     {#if card.client}

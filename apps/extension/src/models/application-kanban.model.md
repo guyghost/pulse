@@ -27,6 +27,10 @@ PIPELINE_COLUMNS = ['selected', 'application_prepared', 'applied', 'interview', 
 - Compteur par colonne = nombre de suivis `currentStatus === colonne`.
 - Cartes : titre mission, plateforme, ancienneté du dernier changement
   (relatif, calculé côté shell/state avec `now` injecté).
+- Carte orpheline (`missionMissing`) : suivi actif dont la mission source
+  n'existe plus dans le feed local. Titre de repli « Dossier suivi », rendu
+  désactivé (non focusable, non cliquable) — elle ne peut pas déclencher
+  `OPEN_CARD` ni sélectionner une mission par erreur.
 
 ## Interactions
 
@@ -47,3 +51,5 @@ Le kanban est une **vue** du state machine, jamais un second point de décision.
 3. Ordre des colonnes fixe = ordre du cycle (aucun re-ordonnancement utilisateur).
 4. Colonne vide → état vide explicite ; le rail horizontal reste scrollable
    (`overflow-x-auto`, snap par colonne).
+5. `OPEN_CARD` n'est émis que pour une carte dont la mission existe
+   (`!missionMissing`) — jamais de repli implicite vers une autre mission.

@@ -14,6 +14,7 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
 }));
 
 import TJMPage from '../../../src/ui/pages/TJMPage.svelte';
+import TJMPageActivationStub from './TJMPageActivationStub.svelte';
 
 const analysis: TJMAnalysis = {
   trend: 'up',
@@ -134,5 +135,33 @@ describe('TJMPage region filter (TJM-01)', () => {
     await tick();
 
     expect(getTJMAnalysis.mock.calls.length).toBe(callCountBefore);
+  });
+
+  it('resets period and region to their defaults when the page becomes active again', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const stub = mount(TJMPageActivationStub, { target });
+    await tick();
+    await flush();
+
+    const group = target.querySelector('[role="radiogroup"][aria-label*="Période"]');
+    group.querySelector('[data-period-option="7d"]')?.click();
+    await flush();
+    await tick();
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d');
+
+    // Pages stay mounted under `inert`; leaving and coming back must restore
+    // the default period (models/tjm-analysis-period.model.md).
+    stub.setActive(false);
+    await tick();
+    stub.setActive(true);
+    await tick();
+    await flush();
+
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all');
+    expect(
+      group.querySelector('[data-period-option="all"]')?.getAttribute('aria-checked'),
+      'period resets to "Tout" on re-activation'
+    ).toBe('true');
   });
 });

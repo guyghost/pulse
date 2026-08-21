@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import { Icon } from '@pulse/ui';
   import PageHeader from '../molecules/PageHeader.svelte';
@@ -15,9 +16,12 @@
   const {
     onNavigateToProfile,
     onNavigateToFeed,
+    active = true,
   }: {
     onNavigateToProfile?: () => void;
     onNavigateToFeed?: () => void;
+    /** True only while the page is the current navigation target. */
+    active?: boolean;
   } = $props();
 
   let analysis = $state<TJMAnalysis | null>(null);
@@ -29,6 +33,7 @@
   let userSeniority = $state<SeniorityLevel | null>(null);
   let selectedRegion = $state<TJMRegion | null>(null);
   let selectedPeriod = $state<TJMPeriod>('all');
+  let hasBeenActive = false;
   let analysisReferenceTime = $state(Date.now());
   // Region options are snapshotted from the unfiltered analysis so the dropdown
   // keeps showing every available region even after a region filter is applied
@@ -154,6 +159,29 @@
 
   $effect(() => {
     loadProfileAndAnalysis();
+  });
+
+  $effect(() => {
+    // Model (tjm-analysis-period): period and region are page-scoped UI state,
+    // reset to their defaults on every activation. Pages stay mounted under
+    // `inert` in App.svelte, so a plain $state initializer would only run once.
+    // The reset only rides the rising edge of `active` — period/region reads
+    // stay untracked so user selections never re-trigger it.
+    if (!active) {
+      hasBeenActive = false;
+      return;
+    }
+    if (hasBeenActive) {
+      return;
+    }
+    hasBeenActive = true;
+    untrack(() => {
+      if (selectedPeriod !== 'all' || selectedRegion !== null) {
+        selectedPeriod = 'all';
+        selectedRegion = null;
+        void loadAnalysis();
+      }
+    });
   });
 
   $effect(() => {

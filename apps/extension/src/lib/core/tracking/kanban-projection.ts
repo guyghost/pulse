@@ -14,6 +14,12 @@ export interface KanbanCard {
   status: ApplicationStatus;
   /** Timestamp (epoch ms) of the latest tracking history entry, 0 when none. */
   lastActivityAt: number;
+  /**
+   * True when the tracked dossier has no matching mission in the local feed
+   * (data cleared, expired, or from another source). Orphan cards render as
+   * placeholders and must never trigger mission selection.
+   */
+  missionMissing: boolean;
 }
 
 export interface KanbanColumn {
@@ -63,6 +69,7 @@ export function buildKanbanBoard(
       client: mission?.client ?? null,
       status: record.currentStatus,
       lastActivityAt: getTrackingLastActivity(record),
+      missionMissing: mission === undefined,
     });
   }
 

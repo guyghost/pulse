@@ -550,6 +550,7 @@
             }}
           >
             <TJMPage
+              active={nav.currentPage === 'tjm'}
               onNavigateToProfile={() => nav.navigate('profile')}
               onNavigateToFeed={() => nav.navigate('feed')}
             />
