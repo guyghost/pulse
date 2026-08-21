@@ -59,7 +59,7 @@
     {placeholder}
     class="soft-ring w-full text-body text-text-primary placeholder:text-text-muted transition-all duration-200 focus:outline-none focus:ring-2 {variant ===
     'dock'
-      ? 'h-11 rounded-full border border-transparent bg-transparent focus:border-blueprint-blue/25 focus:ring-blueprint-blue/15'
+      ? 'h-12 rounded-full bg-transparent focus:ring-blueprint-blue/15'
       : 'rounded-xl border border-border-light bg-surface-white py-3 focus:border-blueprint-blue/30 focus:ring-blueprint-blue/15'}"
     value={search.query}
     oninput={search.handleInput}

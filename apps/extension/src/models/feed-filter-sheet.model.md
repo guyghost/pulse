@@ -93,10 +93,13 @@ Preset normalization is deterministic:
   floating cluster is softly dimmed and a structured popover rises above it.
   Three quick-filter pills sit above explicit rows for minimum grade, minimum
   TJM and source.
-- The bottom controls are a floating capsule centered over the scrolling feed —
-  never a full-width shelf: no hairline, no upward shadow wall, no bar
-  background. It hosts the search input, the filter trigger and the operational
-  details trigger; feed content scrolls beneath it.
+- The bottom controls are a transparent floating cluster centered over the
+  scrolling feed — never a full-width shelf: no hairline, no upward shadow wall,
+  no bar background, no container surface. Each control (search input, filter
+  trigger, operational details trigger) is its own separated liquid-glass pill:
+  translucent background, backdrop blur with saturation, hairline light border,
+  one inner top highlight and one soft offset shadow. Feed content scrolls
+  beneath the cluster; the cluster floats above — never divides — the content.
 - The popover intro and outro share one reversible rise: opacity with a 10px
   lift and a 0.98→1 scale over ~240ms, ease-out. No blur deformation, no tail,
   no directional transform origin.
@@ -115,8 +118,8 @@ Preset normalization is deterministic:
 - The explicit TJM selector filters missions at or above its selected value.
   The existing `tjm-negotiation` preset remains available as a distinct quick
   decision preset and cannot be active at the same time.
-- Search is owned by the capsule search input. Operational details are owned by
-  the trailing capsule action. Neither is decided by this model.
+- Search is owned by the glass search pill. Operational details are owned by the
+  trailing glass action. Neither is decided by this model.
 - The popover never starts a scan, changes a connector, persists a view or opens
   an external URL.
 
@@ -152,8 +155,8 @@ Preset normalization is deterministic:
 4. Exactly one `SYNC_FILTERS` command is emitted per accepted edit or reset.
 5. Every dismissal path emits `NONE`.
 6. Conflicting preset and explicit-filter authorities are normalized.
-7. The floating capsule remains operable in both states and floats above —
-   never divides — the feed content.
+7. The transparent glass cluster remains operable in both states and floats
+   above — never divides — the feed content.
 8. The model, not component copy, animation timing or an LLM, decides filtering.
 
 ## Review result

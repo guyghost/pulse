@@ -1484,10 +1484,12 @@
     data-testid="feed-bottom-dock"
   >
     <div
-      class="pointer-events-auto flex h-14 w-full max-w-[26rem] items-center gap-1 rounded-full bg-surface-white/94 pr-1.5 pl-1.5 shadow-[0_12px_32px_rgba(28,25,23,0.13),0_2px_8px_rgba(28,25,23,0.05)] backdrop-blur-xl"
+      class="pointer-events-auto flex w-full max-w-[26rem] items-center gap-2.5"
       aria-label="Actions du feed"
     >
-      <div class="min-w-0 flex-1">
+      <div
+        class="flex h-12 min-w-0 flex-1 items-center overflow-hidden rounded-full border border-white/70 bg-surface-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 focus-within:border-blueprint-blue/30"
+      >
         <SearchInput
           variant="dock"
           placeholder="Rechercher une mission…"
@@ -1497,8 +1499,6 @@
         />
       </div>
 
-      <span class="h-7 w-px shrink-0 bg-border-light" aria-hidden="true"></span>
-
       <Tooltip
         label={page.showFilters ? 'Masquer les filtres' : 'Filtrer les missions'}
         description="Ouvre la grille de filtres avec mise à jour immédiate du feed."
@@ -1506,10 +1506,10 @@
         <button
           bind:this={filterTrigger}
           type="button"
-          class="soft-ring relative inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-95 {page.showFilters ||
+          class="soft-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
           page.filterActive
-            ? 'bg-blueprint-blue/10 text-blueprint-blue'
-            : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+            ? 'border-blueprint-blue/30 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_28px_rgba(28,25,23,0.13)]'
+            : 'border-white/70 bg-surface-white/55 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] hover:bg-surface-white/80 hover:text-text-primary'}"
           onclick={() => page.setShowFilters(!page.showFilters)}
           aria-expanded={page.showFilters}
           aria-controls="filter-panel"
@@ -1531,9 +1531,9 @@
       >
         <button
           type="button"
-          class="soft-ring inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full transition-[background-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
-            ? 'bg-blueprint-blue/10 text-blueprint-blue'
-            : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+          class="soft-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {showAdvancedControls
+            ? 'border-blueprint-blue/30 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_28px_rgba(28,25,23,0.13)]'
+            : 'border-white/70 bg-surface-white/55 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] hover:bg-surface-white/80 hover:text-text-primary'}"
           onclick={toggleOperationalDetails}
           aria-expanded={showAdvancedControls}
           aria-label={showAdvancedControls
