@@ -35,6 +35,7 @@
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import FormAssistPanel from '../organisms/FormAssistPanel.svelte';
 
@@ -615,7 +616,7 @@
   void loadApplications();
 </script>
 
-<div class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4">
+<PageShell>
   <PageHeader
     eyebrow="Suivi"
     title="Candidatures"
@@ -635,53 +636,6 @@
       primaryActionIcon={applicationStory.primaryActionIcon as IconName}
       onPrimaryAction={handleApplicationStoryAction}
     />
-
-    {#if !isLoading}
-      <section class="mt-4 rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-caption font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-              Dossier recommandé
-            </p>
-            {#if recommendedTrackedMission}
-              <h3 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
-                {recommendedTrackedMission.mission.title}
-              </h3>
-              <p class="mt-1 text-meta leading-5 text-text-subtle">
-                {getRecommendedDossierReason(recommendedTrackedMission)}
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span
-                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
-                >
-                  {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
-                </span>
-                {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                  <span class="text-caption text-text-subtle">
-                    Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                  </span>
-                {/if}
-              </div>
-            {:else}
-              <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
-                Aucun dossier suivi pour l’instant
-              </h3>
-              <p class="mt-1 text-meta leading-5 text-text-subtle">
-                Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
-              </p>
-            {/if}
-          </div>
-          <button
-            type="button"
-            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
-            onclick={openRecommendedDossier}
-          >
-            <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
-            {recommendedTrackedMission ? 'Ouvrir le dossier' : 'Aller au feed'}
-          </button>
-        </div>
-      </section>
-    {/if}
     {#snippet footer()}
       {#if isOffline}
         <OfflineNotice
@@ -691,6 +645,53 @@
       {/if}
     {/snippet}
   </PageHeader>
+
+  {#if !isLoading}
+    <section class="rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="text-caption font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+            Dossier recommandé
+          </p>
+          {#if recommendedTrackedMission}
+            <h2 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
+              {recommendedTrackedMission.mission.title}
+            </h2>
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
+              {getRecommendedDossierReason(recommendedTrackedMission)}
+            </p>
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
+              >
+                {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
+              </span>
+              {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                <span class="text-caption text-text-subtle">
+                  Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                </span>
+              {/if}
+            </div>
+          {:else}
+            <h2 class="mt-1 text-body-lg font-semibold text-text-primary">
+              Aucun dossier suivi pour l’instant
+            </h2>
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
+              Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
+            </p>
+          {/if}
+        </div>
+        <button
+          type="button"
+          class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
+          onclick={openRecommendedDossier}
+        >
+          <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
+          {recommendedTrackedMission ? 'Ouvrir le dossier' : 'Aller au feed'}
+        </button>
+      </div>
+    </section>
+  {/if}
 
   <ApplicationPipelineSummary summary={pipelineSummary} />
 
@@ -1223,4 +1224,4 @@
       </section>
     </div>
   {/if}
-</div>
+</PageShell>
