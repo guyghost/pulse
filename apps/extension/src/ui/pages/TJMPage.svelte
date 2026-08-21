@@ -60,7 +60,10 @@
       }
       analysis = result;
       analysisReferenceTime = Date.now();
-      if (!selectedRegion && analysis?.regionInsights) {
+      // Snapshot only from the unfiltered analysis: a 7d/30d period narrows
+      // records before analysis, which would drop regions with only older
+      // data out of the dropdown.
+      if (!selectedRegion && selectedPeriod === 'all' && analysis?.regionInsights) {
         regionOptions = analysis.regionInsights.map(({ region, label }) => ({ region, label }));
       }
     } catch (err) {

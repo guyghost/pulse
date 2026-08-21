@@ -28,6 +28,22 @@ describe('buildTJMSeries', () => {
     expect(series).toEqual([{ date: '2026-04-01', average: 525 }]);
   });
 
+  it('resamples buckets with a sample-weighted average, not a flat mean of days', () => {
+    // 3 days: two low-sample days at 400 (weight 1 each) and one high-sample
+    // day at 700 (weight 10), forced into a single bucket.
+    const series = buildTJMSeries(
+      [
+        makeRecord({ date: '2026-04-01', average: 400, sampleCount: 1 }),
+        makeRecord({ date: '2026-04-02', average: 400, sampleCount: 1 }),
+        makeRecord({ date: '2026-04-03', average: 700, sampleCount: 10 }),
+      ],
+      1
+    );
+
+    // Flat mean of days would give 500; weighted gives (400+400+7000)/12 = 650.
+    expect(series).toEqual([{ date: '2026-04-03', average: 650 }]);
+  });
+
   it('sorts the series chronologically regardless of input order', () => {
     const series = buildTJMSeries([
       makeRecord({ date: '2026-04-03' }),

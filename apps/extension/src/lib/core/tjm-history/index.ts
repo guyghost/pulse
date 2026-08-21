@@ -414,15 +414,18 @@ export const buildTJMSeries = (records: TJMRecord[], bucketCount = 12): TJMSerie
     byDate.set(record.date, bucket);
   }
 
-  const daily = [...byDate.entries()]
-    .map(([date, { total, weight }]): TJMSeriesPoint => ({
+  // Carry each day's total weight so buckets resample with a sample-weighted
+  // average (model invariant), not a flat mean of daily averages.
+  const daily: Array<TJMSeriesPoint & { weight: number }> = [...byDate.entries()]
+    .map(([date, { total, weight }]) => ({
       date,
       average: Math.round(total / weight),
+      weight,
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
 
   if (daily.length <= bucketCount) {
-    return daily;
+    return daily.map(({ date, average }) => ({ date, average }));
   }
 
   // Resample into contiguous buckets of (roughly) equal size, preserving order.
@@ -436,13 +439,15 @@ export const buildTJMSeries = (records: TJMRecord[], bucketCount = 12): TJMSerie
       continue;
     }
     let total = 0;
+    let weight = 0;
     for (const point of slice) {
-      total += point.average;
+      total += point.average * point.weight;
+      weight += point.weight;
     }
     series.push({
       // Bucket key = last date of the slice, so the point anchors the period end.
       date: slice[slice.length - 1].date,
-      average: Math.round(total / slice.length),
+      average: Math.round(total / weight),
     });
   }
   return series;
