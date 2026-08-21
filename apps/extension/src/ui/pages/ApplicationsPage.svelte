@@ -153,8 +153,12 @@
   });
 
   const weekActivities = $derived.by(() => {
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    return overviewActivities.filter(({ timestamp }) => timestamp < oneDayAgo).slice(0, 4);
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    return overviewActivities
+      .filter(({ timestamp }) => timestamp < oneDayAgo && timestamp >= sevenDaysAgo)
+      .slice(0, 4);
   });
 
   const selectedMission = $derived(

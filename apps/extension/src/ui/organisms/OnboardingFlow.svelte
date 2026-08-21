@@ -295,7 +295,7 @@
                 min="0"
                 step="50"
                 bind:value={tjmMin}
-                onchange={() => patch({ tjmMin: Math.max(0, Number.parseInt(tjmMin, 10) || 0) })}
+                oninput={() => patch({ tjmMin: Math.max(0, Number.parseInt(tjmMin, 10) || 0) })}
                 class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
               />
             </label>
@@ -307,7 +307,7 @@
                 min="0"
                 step="50"
                 bind:value={tjmMax}
-                onchange={() => patch({ tjmMax: Math.max(0, Number.parseInt(tjmMax, 10) || 0) })}
+                oninput={() => patch({ tjmMax: Math.max(0, Number.parseInt(tjmMax, 10) || 0) })}
                 class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
               />
             </label>
