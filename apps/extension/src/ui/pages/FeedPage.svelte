@@ -507,10 +507,14 @@
     feedChromeBusy ||
       showAdvancedControls ||
       (showRefinementBanner &&
+        Boolean(ProfileRefinementBanner) &&
         !controller.isScanning &&
         page.profileLoaded &&
         page.profileNeedsCompletion) ||
-      (!checklistPillDismissed && page.profileLoaded && page.profileCompletion < 100)
+      (!checklistPillDismissed &&
+        page.profileLoaded &&
+        page.profileCompletion < 100 &&
+        Boolean(ProfileChecklistPill))
   );
 
   // ── Scan completion delight ──────────────────────────────────────────
@@ -1250,16 +1254,15 @@
         {/if}
 
         <!-- ── Auxiliary toolbar (condensed-sticky in compact mode) ── -->
+        <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
+          {#if feedChromeBusy}Chargement des missions en cours{/if}
+        </div>
         {#if feedToolbarVisible}
           <div
             class="border-t border-border-light px-5 {page.heroCompact
               ? 'sticky top-0 z-20 rounded-b-2xl bg-surface-white/90 py-2 backdrop-blur-md'
               : 'rounded-b-2xl py-3'}"
           >
-            <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-              {#if feedChromeBusy}Chargement des missions en cours{/if}
-            </div>
-
             {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion && ProfileRefinementBanner}
               <ProfileRefinementBanner
                 completion={page.profileCompletion}
