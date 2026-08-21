@@ -181,7 +181,7 @@
                       <span
                         class="inline-flex items-baseline gap-1 rounded-md bg-blueprint-blue/10 px-2 py-0.5 text-meta text-blueprint-blue"
                       >
-                        <span class="eyebrow opacity-70">{evidence.label}</span>
+                        <span class="eyebrow eyebrow--inherit opacity-70">{evidence.label}</span>
                         <span class="font-semibold tabular-nums">{evidence.value}</span>
                       </span>
                     {/each}

@@ -17,6 +17,7 @@ Mission Pulse exudes a focused, data-driven clarity, presenting complex financia
 | Text Secondary | `#1c1917` | `--color-text-secondary` | Subheadings, supporting text, and less emphasized information, a subtle step lighter than primary text but still high contrast.                     |
 | Text Muted     | `#6b6561` | `--color-text-muted`     | Placeholder text, minor labels, and supplementary details, providing a softer visual presence.                                                      |
 | Text Subtle    | `#57534d` | `--color-text-subtle`    | Less prominent text like captions or descriptions, visually receding while remaining legible.                                                       |
+| Text On Bright | `#0c0a09` | `--color-text-on-bright` | Text on saturated status/accent fills (grade badges, tags). Never flips in dark theme since its fills keep their light-mode values.                 |
 | Subtle Gray    | `#ececea` | `--color-subtle-gray`    | Backgrounds for subtle containers like badges or minor card elements, offering a hint of differentiation.                                           |
 | Border Light   | `#f0efef` | `--color-border-light`   | Distinguishes UI elements with a subtle border, especially for form fields and interactive elements.                                                |
 | Disabled Gray  | `#d4d2d1` | `--color-disabled-gray`  | Used for disabled states of interactive components, indicating non-interactability.                                                                 |
@@ -170,7 +171,7 @@ FH Total Display Regular, 183px, lineHeight 0.8, color #1c1917, typically follow
 
 The canonical micro-label above or beside content. System font, micro size (10px), weight 500, uppercase, 0.15em letter-spacing, Text Muted (#a6a09b). Defined once in `@pulse/ui` as `.eyebrow` (components layer).
 
-Modifiers: `.eyebrow--caption` (12px caption size, for lower-density contexts), `.eyebrow--strong` (weight 600), `.eyebrow--subtle` (Text Subtle #57534d), `.eyebrow--blue` (Blueprint Blue #0b64e9, for section markers under page headers).
+Modifiers: `.eyebrow--caption` (12px caption size, for lower-density contexts), `.eyebrow--strong` (weight 600), `.eyebrow--subtle` (Text Subtle #57534d), `.eyebrow--blue` (Blueprint Blue #0b64e9, for section markers under page headers), `.eyebrow--inherit` (`color: inherit`, for labels inside tinted containers whose tone must follow the ancestor instead of the muted default).
 
 Rare one-off tones (status colors, translucent blues) are applied as call-site color utilities layered over the base — they override the component color because utilities outrank the components layer.
 
@@ -247,6 +248,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
   --color-text-secondary: #1c1917;
   --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
+  --color-text-on-bright: #0c0a09;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;
   --color-disabled-gray: #d4d2d1;
@@ -360,6 +362,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
   --color-text-secondary: #1c1917;
   --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
+  --color-text-on-bright: #0c0a09;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;
   --color-disabled-gray: #d4d2d1;

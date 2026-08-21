@@ -114,7 +114,7 @@
         <span class="relative inline-flex h-2 w-2 rounded-full {statusConfig.color}"></span>
       </span>
       <Icon name={statusConfig.icon} size={12} />
-      <span class="eyebrow">{statusConfig.label}</span>
+      <span class="eyebrow eyebrow--inherit">{statusConfig.label}</span>
     </button>
 
     {#if showDetails}

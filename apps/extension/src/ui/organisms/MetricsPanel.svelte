@@ -423,7 +423,7 @@
       <section class="rounded-2xl border p-4 {toneClasses(operationalSummary.tone)}">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div class="min-w-0">
-            <p class="eyebrow eyebrow--strong">
+            <p class="eyebrow eyebrow--strong eyebrow--inherit">
               {operationalSummary.statusLabel}
             </p>
             <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">

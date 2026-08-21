@@ -432,11 +432,11 @@
             {@const grade = scoreToGrade(line.value)}
             {@const color =
               grade === 'A'
-                ? 'bg-accent-green text-text-primary'
+                ? 'bg-accent-green text-text-on-bright'
                 : grade === 'B'
-                  ? 'bg-accent-amber text-text-primary'
+                  ? 'bg-accent-amber text-text-on-bright'
                   : grade === 'C'
-                    ? 'bg-status-orange text-text-primary'
+                    ? 'bg-status-orange text-text-on-bright'
                     : 'bg-disabled-gray text-text-secondary'}
             <div class="flex items-center gap-2.5 py-0.5">
               <span class="text-caption text-text-subtle flex-1">{line.label}</span>
@@ -484,7 +484,7 @@
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
       <div class="rounded-lg border px-3 py-2.5 {decisionInsight.tone}">
-        <p class="eyebrow eyebrow--strong">{decisionInsight.label}</p>
+        <p class="eyebrow eyebrow--strong eyebrow--inherit">{decisionInsight.label}</p>
         <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
       </div>
 

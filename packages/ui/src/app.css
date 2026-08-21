@@ -121,6 +121,12 @@
   .eyebrow--blue {
     color: var(--color-blueprint-blue);
   }
+
+  /* Tone comes from an ancestor (e.g. a tinted pill or status container);
+   * use when the label must follow that context instead of the muted default. */
+  .eyebrow--inherit {
+    color: inherit;
+  }
 }
 
 /* ================================================
