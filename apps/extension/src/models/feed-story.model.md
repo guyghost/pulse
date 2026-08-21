@@ -19,6 +19,33 @@ Card opérationnelle affichée en haut du feed (slot hero). Réagit aux états d
 feed : erreurs, offline, sources cassées, nouvelles missions, prioritaires,
 empty states. **Jamais** un widget permanent — c'est un call-to-action contextuel.
 
+### Projection visuelle — gating par sévérité (2026 restructuration content-first)
+
+La story card ne s'affiche **que si la sévérité projetée nécessite une action** :
+
+| Sévérités projetées                            | Strip rendu ? | Justification                                                      |
+| ---------------------------------------------- | ------------- | ------------------------------------------------------------------ |
+| `critical`, `incident`, `attention`            | **Oui**       | Une action est requise : la story a sa place en tête du feed       |
+| `success`, `neutral` (états calmes, feed prêt) | **Non**       | Le contenu (missions) parle ; le compte vit dans l'en-tête compact |
+
+Le gating vit dans `FeedPage.svelte` (`feedStoryNeedsAttention`, dérivé pur de
+`feedStory.severity`). `buildFeedStory()` continue de projeter **tous** les
+états — c'est la couche présentation qui filtre les états calmes. Le hero
+compact porte le compte de missions (`visibleCount`) inline : pas de strip
+redondant pour dire « tout va bien ».
+
+### Une seule surface d'attention connecteurs
+
+Quand `broken-sources` est le **signal de sévérité le plus élevé** (pas
+d'erreur produit, pas de mode hors ligne), la story inline est la surface
+canonique : le panneau détaillé `ConnectorAlertBar` ne rend **pas** en dessous
+(`storyCoversConnectors` dans `FeedPage.svelte`). L'action primaire de la story
+re-checke **tous** les connecteurs cassés. Ré-activer un connecteur désactivé
+reste une transition délibérée (panneau de santé / réglages) — jamais implicite
+depuis la story. Le `ConnectorAlertBar` ne rend que lorsqu'un signal de
+précédence supérieure (erreur, offline) masque le signal connecteur : il porte
+alors une information distincte, pas une duplication.
+
 ## États de présentation
 
 Six états distincts, avec **précédence stricte** (de haut en bas) :

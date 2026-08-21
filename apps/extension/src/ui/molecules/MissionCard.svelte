@@ -237,7 +237,7 @@
       }
     },
   }}
-  class="group relative rounded-xl border border-border-light bg-surface-white p-5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
+  class="group relative rounded-xl border border-border-light bg-surface-white px-4 py-3.5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
@@ -257,7 +257,7 @@
           />
           {#if trackingUpdatedLabel}
             <span
-              class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-micro font-medium text-text-muted"
+              class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-micro font-medium text-text-subtle"
             >
               Modifié {trackingUpdatedLabel}
             </span>
@@ -296,7 +296,7 @@
         </p>
       {/if}
     </div>
-    <div class="flex shrink-0 items-center gap-2">
+    <div class="flex shrink-0 items-center gap-1.5">
       {#if missionGrade !== null}
         <span
           class="inline-flex min-w-9 items-center justify-center rounded-lg px-2 py-1 text-center font-mono font-bold leading-none {scoreColor} {tourHighlight ===
@@ -309,6 +309,20 @@
           <span class="text-body">{missionGrade}</span>
         </span>
       {/if}
+      <button
+        type="button"
+        class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {isFavorite
+          ? 'text-blueprint-blue hover:text-blueprint-blue'
+          : ''}"
+        onclick={handleToggleFavorite}
+        disabled={isFavoritePending}
+        aria-label={isFavorite
+          ? 'Retirer la mission des favoris'
+          : 'Ajouter la mission aux favoris'}
+        aria-pressed={isFavorite}
+      >
+        <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
+      </button>
       <button
         type="button"
         class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
@@ -330,7 +344,7 @@
   </div>
 
   <!-- Tags -->
-  <div class="mt-3 flex flex-wrap gap-1.5">
+  <div class="mt-2 flex flex-wrap gap-1.5">
     {#each mission.stack.slice(0, 3) as tech (tech)}
       <Badge label={tech} variant="tech" />
     {/each}
@@ -346,31 +360,20 @@
     {/if}
   </div>
 
-  {#if mission.description && !expanded}
-    <p class="mt-3 line-clamp-2 text-meta leading-relaxed text-text-subtle">
-      {mission.description}
-    </p>
-  {/if}
-
-  <div class="mt-3 rounded-lg border px-3 py-2 {decisionInsight.tone}">
-    <p class="text-micro font-semibold uppercase tracking-[0.13em]">{decisionInsight.label}</p>
-    <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
-  </div>
-
   {#if hasScoreDetails}
     <button
       type="button"
-      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-caption font-medium text-text-subtle transition-colors hover:bg-page-canvas hover:text-blueprint-blue"
+      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
       onclick={handleScoreDetailsToggle}
       onkeydown={(e) => e.stopPropagation()}
       aria-expanded={scoreDetailsOpen}
       aria-controls={scoreDetailsId}
     >
-      <Icon name="help-circle" size={13} />
+      <Icon name="help-circle" size={12} />
       <span>Pourquoi cette note ?</span>
       <Icon
         name="chevron-down"
-        size={12}
+        size={11}
         class="transition-transform duration-150 {scoreDetailsOpen ? 'rotate-180' : ''}"
       />
     </button>
@@ -469,13 +472,18 @@
       id={missionDetailsId}
       role="region"
       aria-label={`Détails de la mission ${mission.title}`}
-      class="mt-4 border-t border-border-light pt-4"
+      class="mt-3 border-t border-border-light pt-3"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
-      <div class="grid grid-cols-2 gap-2 text-meta">
+      <div class="rounded-lg border px-3 py-2.5 {decisionInsight.tone}">
+        <p class="text-micro font-semibold uppercase tracking-[0.13em]">{decisionInsight.label}</p>
+        <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
+      </div>
+
+      <div class="mt-3 grid grid-cols-2 gap-2 text-meta">
         {#if mission.tjm !== null}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">TJM</p>
             <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
               {formatTJMValue(mission.tjm)}<span class="text-text-muted">/j</span>
             </p>
@@ -483,137 +491,117 @@
         {/if}
         {#if mission.location}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Zone</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Zone</p>
             <p class="mt-1 truncate text-text-primary">{mission.location}</p>
           </div>
         {/if}
         {#if mission.duration}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Durée</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Durée</p>
             <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
           </div>
         {/if}
         {#if mission.startDate}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Début</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Début</p>
             <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
           </div>
         {/if}
         {#if seniorityLabel}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">
               Séniorité
             </p>
             <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
           </div>
         {/if}
         <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Source</p>
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Source</p>
           <p class="mt-1 truncate text-text-primary">{mission.source}</p>
         </div>
       </div>
       {#if mission.description}
-        <div class="mt-4 border-t border-border-light pt-4">
+        <div class="mt-3 border-t border-border-light pt-3">
           <p class="text-meta leading-relaxed text-text-subtle">{mission.description}</p>
         </div>
       {/if}
+
+      <!-- Actions — inside the disclosure, quiet until hover -->
+      <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
+        <div class="flex gap-1">
+          <Tooltip
+            label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
+            description={isHidden
+              ? 'La mission reviendra dans le feed actif.'
+              : 'Retirez cette opportunité du flux décisionnel.'}
+          >
+            <button
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+              onclick={handleHide}
+              aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
+            >
+              <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
+            </button>
+          </Tooltip>
+          <Tooltip
+            label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
+            description={compareDisabled && !isCompared
+              ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
+              : 'Ajoutez cette mission à la sélection pour départager les opportunités.'}
+          >
+            <button
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
+                ? 'bg-blueprint-blue/8 text-blueprint-blue'
+                : ''}"
+              onclick={handleToggleCompare}
+              disabled={compareDisabled && !isCompared}
+              aria-label={isCompared
+                ? 'Retirer la mission de la comparaison'
+                : 'Ajouter la mission à la comparaison'}
+              aria-pressed={isCompared}
+            >
+              <Icon name="git-compare-arrows" size={13} />
+            </button>
+          </Tooltip>
+          <Tooltip
+            label={copied ? 'Lien copié' : 'Copier le lien'}
+            description="Partagez ou archivez la mission sans ouvrir la plateforme."
+          >
+            <button
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+              onclick={handleCopyLink}
+              aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+            >
+              <Icon
+                name={copied ? 'check' : 'link'}
+                size={13}
+                class={copied ? 'text-blueprint-blue' : ''}
+              />
+            </button>
+          </Tooltip>
+          <Tooltip
+            label="Ouvrir la mission"
+            description="Passez à la plateforme source pour vérifier ou postuler."
+          >
+            <button
+              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+              onclick={handleOpenLink}
+              aria-label="Ouvrir la mission sur la plateforme source"
+            >
+              <Icon name="external-link" size={13} />
+            </button>
+          </Tooltip>
+        </div>
+        <button
+          type="button"
+          class="text-caption font-medium text-text-subtle transition-colors hover:text-blueprint-blue"
+          onclick={handleInvestigate}
+        >
+          Investiguer →
+        </button>
+      </div>
     </div>
   {/if}
-
-  <!-- Actions — always visible, subtle until hover -->
-  <div class="mt-3 flex items-center justify-between">
-    <div class="flex gap-1">
-      <Tooltip
-        label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
-        description={isFavorite
-          ? 'La mission ne sera plus priorisée dans vos vues.'
-          : 'Gardez cette mission dans les opportunités à suivre.'}
-      >
-        <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
-            ? 'text-blueprint-blue hover:text-blueprint-blue'
-            : ''}"
-          onclick={handleToggleFavorite}
-          disabled={isFavoritePending}
-          aria-label={isFavorite
-            ? 'Retirer la mission des favoris'
-            : 'Ajouter la mission aux favoris'}
-          aria-pressed={isFavorite}
-        >
-          <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
-        </button>
-      </Tooltip>
-      <Tooltip
-        label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
-        description={isHidden
-          ? 'La mission reviendra dans le feed actif.'
-          : 'Retirez cette opportunité du flux décisionnel.'}
-      >
-        <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
-          onclick={handleHide}
-          aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
-        >
-          <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
-        </button>
-      </Tooltip>
-      <Tooltip
-        label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
-        description={compareDisabled && !isCompared
-          ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
-          : 'Ajoutez cette mission à la sélection pour départager les opportunités.'}
-      >
-        <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
-            ? 'bg-blueprint-blue/8 text-blueprint-blue'
-            : ''}"
-          onclick={handleToggleCompare}
-          disabled={compareDisabled && !isCompared}
-          aria-label={isCompared
-            ? 'Retirer la mission de la comparaison'
-            : 'Ajouter la mission à la comparaison'}
-          aria-pressed={isCompared}
-        >
-          <Icon name="git-compare-arrows" size={13} />
-        </button>
-      </Tooltip>
-      <Tooltip
-        label={copied ? 'Lien copié' : 'Copier le lien'}
-        description="Partagez ou archivez la mission sans ouvrir la plateforme."
-      >
-        <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-          onclick={handleCopyLink}
-          aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
-        >
-          <Icon
-            name={copied ? 'check' : 'link'}
-            size={13}
-            class={copied ? 'text-blueprint-blue' : ''}
-          />
-        </button>
-      </Tooltip>
-      <Tooltip
-        label="Ouvrir la mission"
-        description="Passez à la plateforme source pour vérifier ou postuler."
-      >
-        <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-          onclick={handleOpenLink}
-          aria-label="Ouvrir la mission sur la plateforme source"
-        >
-          <Icon name="external-link" size={13} />
-        </button>
-      </Tooltip>
-    </div>
-    <button
-      type="button"
-      class="text-caption font-medium text-text-muted transition-colors hover:text-blueprint-blue"
-      onclick={handleInvestigate}
-    >
-      Investiguer →
-    </button>
-  </div>
 
   {#if trackingStatus}
     <div
