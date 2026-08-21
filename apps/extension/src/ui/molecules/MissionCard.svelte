@@ -10,6 +10,7 @@
   import { scoreToGrade } from '$lib/core/types/score';
   import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
+  import { swipe } from '../actions/swipe';
   import Tooltip from '../atoms/Tooltip.svelte';
 
   const {
@@ -62,6 +63,14 @@
 
   let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
+
+  // Swipe-to-triage (models/mission-card-swipe.model.md): presentation
+  // shortcut over the existing favorite/hide callbacks — never a new workflow.
+  const swipeParams = $derived({
+    onSwipeRight: () => onToggleFavorite?.(),
+    onSwipeLeft: () => onHide?.(),
+    enabled: Boolean(onToggleFavorite) && Boolean(onHide) && !isCompared,
+  });
 
   const seniorityLabels: Record<string, string> = {
     junior: 'Junior (0-2 ans)',
@@ -228,6 +237,7 @@
 </script>
 
 <article
+  use:swipe={swipeParams}
   use:onVisibleAction={{
     disabled: isSeen,
     onSignal: (signal) => {
