@@ -17,7 +17,7 @@ const navigationSurfaces: NavigationSurface[] = [
   { ariaLabel: 'CV', heading: /CV & expériences/, testId: 'page-cv' },
   { ariaLabel: 'Suivi', heading: /Candidatures/, testId: 'page-applications' },
   { ariaLabel: 'TJM', heading: /Analyse TJM/, testId: 'page-tjm' },
-  { ariaLabel: 'Réglages Settings', heading: /Paramètres/, testId: 'page-settings' },
+  { ariaLabel: 'Réglages', heading: /Réglages/, testId: 'page-settings' },
 ];
 
 async function assertNoBlankOrLoadError(page: Page): Promise<void> {
