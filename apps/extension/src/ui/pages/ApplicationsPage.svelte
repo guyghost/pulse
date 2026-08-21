@@ -98,7 +98,7 @@
     },
     {
       label: 'Statuts de suivi',
-      detail: 'Reprise des relances, étapes et notes enregistrées dans le pipeline.',
+      detail: 'Reprise des relances, étapes et notes enregistrées dans le suivi.',
       icon: 'activity',
     },
     {
@@ -239,7 +239,7 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Indisponible',
-        title: 'Le pipeline candidatures ne peut pas être chargé',
+        title: 'Le suivi des candidatures ne peut pas être chargé',
         description: loadError,
         evidence,
         primaryActionLabel: 'Réessayer',
@@ -279,7 +279,7 @@
         statusLabel: 'Aucun suivi',
         title: 'Aucune candidature active pour le moment',
         description:
-          'Qualifiez une mission depuis le Feed pour transformer la veille en pipeline actionnable.',
+          'Qualifiez une mission depuis le Feed pour transformer la veille en candidatures suivies.',
         evidence,
         primaryActionLabel: 'Préparer une mission',
         primaryActionIcon: 'briefcase',
@@ -288,12 +288,12 @@
 
     return {
       severity: 'success' as const,
-      statusLabel: 'Pipeline sain',
+      statusLabel: 'Suivi à jour',
       title: `${pipelineSummary.activeCount} dossier${pipelineSummary.activeCount > 1 ? 's' : ''} actif${pipelineSummary.activeCount > 1 ? 's' : ''}, aucune relance en retard`,
       description:
         pipelineSummary.bottleneck !== null
-          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
-          : 'Le pipeline est sous contrôle. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
+          ? `L’étape la plus chargée est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
+          : 'Le suivi est à jour. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
       evidence,
       primaryActionLabel: 'Ouvrir le dossier',
       primaryActionIcon: 'arrow-right',
@@ -463,11 +463,11 @@
 
   function getRecommendedDossierReason(item: TrackedMission): string {
     if (isDueFollowUp(item.record, Date.now())) {
-      return 'Relance échue: reprenez ce dossier avant de parcourir le reste du pipeline.';
+      return 'Relance échue : reprenez ce dossier avant de parcourir les autres dossiers.';
     }
 
     if (item.record.currentStatus === 'application_prepared') {
-      return 'Kit prêt: finalisez l’envoi ou changez le statut pour garder le pipeline propre.';
+      return 'Kit prêt : finalisez l’envoi ou changez le statut pour garder le suivi à jour.';
     }
 
     return 'Dossier actif: continuez par la dernière mission suivie avant de créer un nouveau dossier.';
@@ -511,7 +511,7 @@
 
   function formatDecisionTransition(transition: StatusTransition): string {
     if (transition.from === null) {
-      return `Entrée dans le pipeline: ${STATUS_LABELS[transition.to]}`;
+      return `Entrée dans le suivi : ${STATUS_LABELS[transition.to]}`;
     }
 
     return `${STATUS_LABELS[transition.from]} vers ${STATUS_LABELS[transition.to]}`;
@@ -639,7 +639,7 @@
     {#snippet footer()}
       {#if isOffline}
         <OfflineNotice
-          description="Le pipeline local reste modifiable. Les ouvertures de mission et générations de messages peuvent attendre le retour réseau."
+          description="Le suivi local reste modifiable. Les ouvertures de mission et générations de messages peuvent attendre le retour réseau."
           action="Prochaine action : mettre à jour les relances dues et préparer les prochaines actions."
         />
       {/if}
@@ -668,7 +668,9 @@
               </span>
               {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
                 <span class="text-caption text-text-subtle">
-                  Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                  Prochaine action : {formatNextAction(
+                    recommendedTrackedMission.record.nextActionAt
+                  )}
                 </span>
               {/if}
             </div>
@@ -819,10 +821,10 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
-            Chargement candidatures
+            Chargement des candidatures
           </p>
           <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
-            Reconstruction du pipeline local
+            Reconstruction du suivi local
           </h3>
           <p class="mt-1 text-meta leading-5 text-text-subtle">
             Pulse relie les missions, statuts et contenus générés avant de recommander le prochain
@@ -858,12 +860,12 @@
   {:else if loadError}
     <div>
       <OperationalEmptyState
-        title="Le pipeline candidatures ne peut pas être chargé"
+        title="Le suivi des candidatures ne peut pas être chargé"
         description="Les statuts locaux sont indisponibles pour le moment. Réessayez avant de modifier un dossier ou de générer un kit."
         severity="critical"
         statusLabel="Incident"
         icon="triangle-alert"
-        proofLabel="Pipeline"
+        proofLabel="Suivi"
         proofValue="Indisponible"
         primaryActionLabel="Réessayer"
         primaryActionIcon="refresh-cw"
@@ -876,9 +878,9 @@
     <div>
       <OperationalEmptyState
         title="Aucune mission ne peut encore devenir candidature"
-        description="Le pipeline démarre quand une mission existe dans le feed. Lancez ou consultez le radar, puis revenez préparer un dossier."
+        description="Le suivi démarre quand une mission existe dans le feed. Lancez ou consultez le radar, puis revenez préparer un dossier."
         severity="attention"
-        statusLabel="Pipeline vide"
+        statusLabel="Suivi vide"
         icon="briefcase"
         proofLabel="Missions disponibles"
         proofValue="0"
@@ -892,11 +894,11 @@
       <section
         data-testid="application-kanban"
         class="section-card rounded-xl p-4"
-        aria-label="Pipeline par étape"
+        aria-label="Candidatures par étape"
       >
         <div class="flex items-center justify-between gap-3 pb-3">
           <div>
-            <h3 class="text-body-lg font-medium text-text-primary">Pipeline</h3>
+            <h3 class="text-body-lg font-medium text-text-primary">Candidatures</h3>
             <p class="mt-0.5 text-meta text-text-subtle">
               {kanbanActiveCount} dossiers actifs, de la sélection à l’offre.
             </p>
@@ -954,7 +956,7 @@
                 {/each}
                 {#if column.cards.length > 4}
                   <p class="px-1 text-caption text-text-muted">
-                    +{column.cards.length - 4} autres
+                    +{column.cards.length - 4} autres dossiers
                   </p>
                 {/if}
                 {#if column.cards.length === 0}
@@ -1037,7 +1039,7 @@
                     class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2 py-1 text-caption font-medium text-blueprint-blue"
                   >
                     <Icon name="calendar-clock" size={12} />
-                    Prochaine action {formatNextAction(selectedTracking?.nextActionAt)}
+                    Prochaine action : {formatNextAction(selectedTracking?.nextActionAt)}
                   </p>
                 {/if}
               </div>
@@ -1067,7 +1069,7 @@
             <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
               {#if selectedFollowUpTerminal}
                 <p class="text-meta leading-5 text-text-subtle">
-                  Le suivi de relance est terminé pour ce statut.
+                  Aucune relance à planifier : ce dossier a atteint un statut final.
                 </p>
               {:else}
                 <label

@@ -102,7 +102,7 @@
       icon: 'user',
     },
     {
-      label: 'Cache',
+      label: 'Scores IA',
       value: 'Scores conservés 7 jours, vidés quand le profil change',
       icon: 'database',
     },
@@ -336,7 +336,7 @@
       statusLabel: 'Sauvegardable',
       title: 'Une archive locale peut être créée',
       description:
-        'La sauvegarde capture profil, réglages, favoris et missions masquées. L’import reste désactivé tant que sa transaction multi-stockage n’est pas prouvée.',
+        'La sauvegarde capture profil, réglages, favoris et missions masquées. L’import reste désactivé tant que sa fiabilité n’est pas pleinement validée.',
       evidence,
       primaryActionLabel: 'Créer une sauvegarde',
       primaryActionIcon: 'download',
@@ -381,7 +381,7 @@
         statusLabel: 'Actif',
         title: 'L’analyse locale peut préciser le classement',
         description:
-          'Pulse analysera les premières missions du scan, puis utilisera le cache pour éviter les recalculs inutiles.',
+          'Pulse analysera les premières missions du scan, puis réutilisera ces analyses pour éviter tout recalcul.',
         evidence,
         primaryActionLabel: null,
         primaryActionIcon: 'play',
@@ -470,7 +470,7 @@
         statusLabel: 'Local uniquement',
         title: 'Pulse fonctionne, mais la synchronisation dashboard est inactive',
         description:
-          'Les scans restent disponibles dans Chrome. Connectez le compte pour consolider snapshots, candidatures, CV et préférences.',
+          'Les scans restent disponibles dans Chrome. Connectez le compte pour consolider l’historique des scans, les candidatures, le CV et les préférences.',
         evidence,
         primaryActionLabel: 'Connecter mon compte',
         primaryActionIcon: 'user',
@@ -480,7 +480,7 @@
     if (pendingTotal > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'Sync en attente',
+        statusLabel: 'Synchronisation en attente',
         title: `${pendingTotal} opération${pendingTotal > 1 ? 's' : ''} de synchronisation en file`,
         description:
           'Le dashboard connecté peut afficher un état légèrement en retard tant que la file locale n’est pas vide.',
@@ -520,7 +520,7 @@
 </script>
 
 <PageShell ariaBusy={dataStatus === 'refreshing'}>
-  <PageHeader eyebrow="Configuration" title="Paramètres" icon="settings">
+  <PageHeader eyebrow="Configuration" title="Réglages" icon="settings">
     <OperationalStoryCard
       eyebrow="À vérifier"
       variant="compact"
@@ -644,8 +644,8 @@
             <div>
               <h3 class="text-body-lg font-medium text-text-primary">Compte et synchronisation</h3>
               <p class="mt-1 text-meta leading-5 text-text-subtle">
-                Le scan reste local. Le compte MissionPulse sert à synchroniser les snapshots vers
-                le dashboard connecté.
+                Le scan reste local. Le compte MissionPulse sert à synchroniser les données vers le
+                dashboard connecté.
               </p>
             </div>
             <span

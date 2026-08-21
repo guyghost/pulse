@@ -543,7 +543,7 @@
             label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
             description={isHidden
               ? 'La mission reviendra dans le feed actif.'
-              : 'Retirez cette opportunité du flux décisionnel.'}
+              : 'Retirez cette mission du flux de décision.'}
           >
             <button
               class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
@@ -557,7 +557,7 @@
             label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
             description={compareDisabled && !isCompared
               ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
-              : 'Ajoutez cette mission à la sélection pour départager les opportunités.'}
+              : 'Ajoutez cette mission à la sélection pour départager les missions.'}
           >
             <button
               class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
@@ -607,7 +607,7 @@
           class="text-caption font-medium text-text-subtle transition-colors hover:text-blueprint-blue"
           onclick={handleInvestigate}
         >
-          Investiguer →
+          Analyser →
         </button>
       </div>
     </div>

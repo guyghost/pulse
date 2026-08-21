@@ -417,7 +417,7 @@ export class SettingsPageController {
     }
     if (this.isConnectedAccount) {
       return this.connectedLastSyncAt
-        ? `Dernière synchro ${this.connectedLastSyncAt}`
+        ? `Dernière synchronisation ${this.connectedLastSyncAt}`
         : 'Compte connecté, première synchronisation en attente.';
     }
     if (this.extensionAccountState === 'awaiting_user_approval') {

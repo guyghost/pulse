@@ -182,7 +182,7 @@ describe('ApplicationsPage next-action toast', () => {
       'Impossible de charger le suivi des candidatures.',
       'error'
     );
-    expect(target.textContent).toContain('Le pipeline candidatures ne peut pas être chargé');
+    expect(target.textContent).toContain('Le suivi des candidatures ne peut pas être chargé');
     expect(target.textContent).not.toContain('Aucune candidature active pour le moment');
   });
 
@@ -222,7 +222,7 @@ describe('ApplicationsPage next-action toast', () => {
       'Impossible de charger le suivi des candidatures.',
       'error'
     );
-    expect(target.textContent).toContain('Le pipeline candidatures ne peut pas être chargé');
+    expect(target.textContent).toContain('Le suivi des candidatures ne peut pas être chargé');
   });
 
   it('shows a success toast when the next action is saved', async () => {
@@ -337,7 +337,7 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
     await flush();
 
-    clickButton(target, 'Candidaté');
+    clickButton(target, 'Envoyée');
     await flush();
     await tick();
 
@@ -420,7 +420,7 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
     await flush();
 
-    clickButton(target, 'Candidaté');
+    clickButton(target, 'Envoyée');
     await flush();
     const action = showToastAction.mock.calls.at(-1)?.[2] as { onClick: () => void } | undefined;
     expect(action).toBeDefined();
@@ -463,7 +463,7 @@ describe('ApplicationsPage next-action toast', () => {
       await flush();
 
       expect(target.querySelector('#application-next-action')).toBeNull();
-      expect(target.textContent).toContain('Le suivi de relance est terminé');
+      expect(target.textContent).toContain('Aucune relance à planifier');
     }
   );
 

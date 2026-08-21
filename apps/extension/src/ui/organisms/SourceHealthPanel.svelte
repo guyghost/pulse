@@ -149,7 +149,7 @@
     return {
       statusLabel: 'Signal exploitable',
       impact: 'Les missions de cette source peuvent alimenter la décision.',
-      action: 'Filtrez cette source si vous voulez investiguer son volume.',
+      action: 'Filtrez cette source si vous voulez examiner son volume.',
       severity: 'success',
     };
   }
@@ -404,7 +404,9 @@
               <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro">
                 <span class="text-text-muted">{formatMissionCount(missionCount)} dernier scan</span>
                 {#if source.lastSyncAt}
-                  <span class="text-text-muted">Sync {getRelativeTime(source.lastSyncAt)}</span>
+                  <span class="text-text-muted"
+                    >Synchronisé {getRelativeTime(source.lastSyncAt)}</span
+                  >
                 {/if}
                 {#if snap?.lastSuccessAt}
                   <span class="text-accent-green">Succès {getRelativeTime(snap.lastSuccessAt)}</span

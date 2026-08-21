@@ -226,7 +226,7 @@
 
       <div class="pt-1">
         <Button variant="secondary" onclick={onSave} loading={isSaving}>
-          {isSaving ? 'Sauvegarde...' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
+          {isSaving ? 'Sauvegarde…' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
         </Button>
       </div>
       {#if profileError}

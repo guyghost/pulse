@@ -76,13 +76,13 @@
     <div class="flex items-center justify-between gap-3 text-caption text-text-secondary">
       <p class="transition-opacity duration-300">
         {#if connectorName}
-          Collecte {connectorName}... ({current}/{total})
+          Collecte {connectorName}… ({current}/{total})
         {:else if missionsFound > 0}
-          {missionsFound} mission{missionsFound > 1 ? 's' : ''} reperee{missionsFound > 1
+          {missionsFound} mission{missionsFound > 1 ? 's' : ''} repérée{missionsFound > 1
             ? 's'
             : ''} pendant le scan
         {:else}
-          Demarrage du scan...
+          Démarrage du scan…
         {/if}
       </p>
       {#if entries.length > 0}

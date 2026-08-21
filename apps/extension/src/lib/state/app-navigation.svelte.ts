@@ -53,7 +53,7 @@ export const NAV_ITEMS: { page: Page; label: string; icon: string; ariaLabel?: s
   { page: 'cv', label: 'CV', icon: 'file-text' },
   { page: 'applications', label: 'Suivi', icon: 'mail' },
   { page: 'tjm', label: 'TJM', icon: 'chart-column' },
-  { page: 'settings', label: 'Réglages', ariaLabel: 'Réglages Settings', icon: 'settings' },
+  { page: 'settings', label: 'Réglages', icon: 'settings' },
 ];
 
 function resolveInitialPage(result: {

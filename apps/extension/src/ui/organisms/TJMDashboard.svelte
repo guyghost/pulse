@@ -168,11 +168,11 @@
         severity: analysis.dataPoints >= 20 ? 'success' : 'attention',
       },
       {
-        label: 'Ecart',
+        label: 'Écart',
         value: isTargetInverted
           ? 'Invalide'
           : userTargetDelta === null
-            ? 'A calibrer'
+            ? 'À calibrer'
             : formatDelta(userTargetDelta),
         icon: 'badge-euro',
         severity: isTargetInverted

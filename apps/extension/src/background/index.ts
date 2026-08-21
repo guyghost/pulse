@@ -2793,7 +2793,7 @@ chrome.action.onUserSettingsChanged?.addListener(async (change) => {
         type: 'basic',
         iconUrl: 'static/icons/icon-128.svg',
         title: 'MissionPulse',
-        message: 'Activez le scan automatique dans les parametres pour ne rater aucune mission.',
+        message: 'Activez le scan automatique dans les paramètres pour ne rater aucune mission.',
       });
     } catch {
       // Notifications permission not available

@@ -201,7 +201,7 @@
     {:else}
       <OperationalEmptyState
         title="Lancez un premier scan pour voir vos missions"
-        description="Aucune mission n’est encore stockée. Lancez un scan pour récupérer les missions depuis vos sources connectées."
+        description="Aucune mission n’est encore disponible. Lancez un scan pour récupérer les missions depuis vos sources connectées."
         severity="neutral"
         statusLabel="Aucune donnée"
         icon="radar"

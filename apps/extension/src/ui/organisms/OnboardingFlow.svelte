@@ -483,7 +483,7 @@
     </h2>
     <p class="mt-2 max-w-xs text-sm text-text-secondary">
       {scanningPartial
-        ? 'Profil partiel — on lance quand même un scan par défaut pour vous montrer la valeur.'
+        ? 'Profil partiel — un scan par défaut est lancé pour découvrir les premières missions.'
         : 'Pulse récupère et note vos missions. Cela prend quelques secondes.'}
     </p>
   </section>
@@ -500,7 +500,7 @@
       <Icon name={navFailed ? 'alert-triangle' : 'check'} class="h-8 w-8" />
     </div>
     <h2 class="mt-5 text-heading-lg font-semibold text-text-primary">
-      {navFailed ? 'Finalisation impossible' : snapshot.error ? 'Presque terminé' : "C'est prêt"}
+      {navFailed ? 'Finalisation impossible' : snapshot.error ? 'Presque terminé' : 'C’est prêt'}
     </h2>
     <p class="mt-2 max-w-xs text-sm text-text-secondary">
       {navFailed

@@ -38,7 +38,7 @@
       label: 'Relances',
       value: summary.dueFollowUps,
       icon: 'calendar-clock',
-      stateLabel: summary.dueFollowUps > 0 ? 'À traiter' : 'Normal',
+      stateLabel: summary.dueFollowUps > 0 ? 'À traiter' : 'À jour',
       hint: summary.dueFollowUps > 0 ? 'Ouvrir la relance échue.' : 'Aucune échéance dépassée.',
       severity: summary.dueFollowUps > 0 ? 'attention' : 'success',
     },
@@ -46,7 +46,7 @@
       label: 'Prêtes',
       value: summary.preparedNotApplied,
       icon: 'send',
-      stateLabel: summary.preparedNotApplied > 0 ? 'À envoyer' : 'Fluide',
+      stateLabel: summary.preparedNotApplied > 0 ? 'À envoyer' : 'À jour',
       hint:
         summary.preparedNotApplied > 0
           ? 'Finaliser l’envoi ou changer le statut.'

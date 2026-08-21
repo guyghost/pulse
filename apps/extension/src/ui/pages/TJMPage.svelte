@@ -148,7 +148,7 @@
   const emptyDescription = $derived(
     selectedPeriod === 'all'
       ? undefined
-      : `Aucune mission stockée dans les ${selectedPeriod === '7d' ? '7' : '30'} derniers jours pour cette sélection. Élargissez la période ou lancez un scan pour alimenter le marché.`
+      : `Aucune mission stockée dans les ${selectedPeriod === '7d' ? '7' : '30'} derniers jours pour cette sélection. Élargissez la période ou lancez un scan pour alimenter le radar.`
   );
 
   let dashboardSection: HTMLElement | undefined = $state(undefined);

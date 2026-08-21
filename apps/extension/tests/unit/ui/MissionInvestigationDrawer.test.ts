@@ -32,7 +32,7 @@ describe('MissionInvestigationDrawer modal focus', () => {
 
   it('focuses close, traps backwards Tab, closes on Escape and restores the trigger', async () => {
     const trigger = document.createElement('button');
-    trigger.textContent = 'Investiguer';
+    trigger.textContent = 'Analyser';
     document.body.appendChild(trigger);
     trigger.focus();
 

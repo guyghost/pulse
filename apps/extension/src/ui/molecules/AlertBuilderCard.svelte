@@ -484,6 +484,6 @@
     onclick={save}
   >
     <Icon name={isSaving ? 'loader' : 'save'} size={13} class={isSaving ? 'animate-spin' : ''} />
-    {isSaving ? 'Sauvegarde...' : "Enregistrer l'alerte"}
+    {isSaving ? 'Sauvegarde…' : "Enregistrer l'alerte"}
   </button>
 </section>
