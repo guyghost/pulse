@@ -298,7 +298,7 @@
         {/each}
       </div>
       <div class="flex items-center gap-2">
-        <label for="tjm-region-filter" class="eyebrow"> Région </label>
+        <label for="tjm-region-filter" class="eyebrow">Région</label>
         <select
           id="tjm-region-filter"
           class="rounded-lg border border-border-light bg-surface-white px-2 py-1 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"

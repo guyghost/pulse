@@ -447,7 +447,7 @@
       </summary>
       <div class="border-t border-border-light p-3">
         <fieldset>
-          <legend class="eyebrow eyebrow--caption eyebrow--subtle"> Mission </legend>
+          <legend class="eyebrow eyebrow--caption eyebrow--subtle">Mission</legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
             {#each store.missionFieldOptions as field (field)}
               <label class="flex items-center gap-2 text-caption text-text-secondary">
@@ -464,7 +464,7 @@
         </fieldset>
 
         <fieldset class="mt-4">
-          <legend class="eyebrow eyebrow--caption eyebrow--subtle"> Profil </legend>
+          <legend class="eyebrow eyebrow--caption eyebrow--subtle">Profil</legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
             {#each store.profileFieldOptions as field (field)}
               <label class="flex items-center gap-2 text-caption text-text-secondary">

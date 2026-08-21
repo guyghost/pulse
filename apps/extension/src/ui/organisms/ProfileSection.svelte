@@ -131,7 +131,7 @@
       </datalist>
       <div class="grid grid-cols-2 gap-2">
         <label class="space-y-1">
-          <span class="eyebrow"> Remote </span>
+          <span class="eyebrow">Remote</span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={profileRemote}
@@ -145,7 +145,7 @@
           </span>
         </label>
         <label class="space-y-1">
-          <span class="eyebrow"> Séniorité </span>
+          <span class="eyebrow">Séniorité</span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={seniority}

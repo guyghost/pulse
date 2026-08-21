@@ -322,7 +322,7 @@
         />
       </label>
       <label class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-        <span class="block eyebrow"> Max résultats </span>
+        <span class="block eyebrow">Max résultats</span>
         <input
           type="number"
           min="1"
