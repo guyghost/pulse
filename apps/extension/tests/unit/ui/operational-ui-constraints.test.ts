@@ -253,11 +253,10 @@ describe('operational UI constraints', () => {
 
     expect(source).toContain('const settingsSections');
     expect(source).toContain('aria-label="Sections de réglages"');
-    expect(source).toContain('id="settings-sources"');
-    expect(source).toContain('id="settings-alerts"');
-    expect(source).toContain('id="settings-account"');
-    expect(source).toContain('id="settings-data"');
-    expect(source).toContain('function scrollToSettingsSection');
+    expect(source).toContain('id="settings-{section.id}"');
+    expect(source).toContain("type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data'");
+    expect(source).toContain('function toggleSettingsSection');
+    expect(source).toContain('aria-expanded={openSettingsSection === section.id}');
   });
 
   it('exposes scan frequency, latest trigger, and recent history in Settings', () => {

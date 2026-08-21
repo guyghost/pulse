@@ -9,6 +9,7 @@
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import PageHeader from '../molecules/PageHeader.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import {
     buildProfileImpactItems,
@@ -165,24 +166,14 @@
   }
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <section class="section-card-strong rounded-2xl px-5 py-4">
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0">
-        <p class="eyebrow text-blueprint-blue">Profil freelance</p>
-        <h1 class="mt-1 text-subheading font-semibold text-text-primary">
-          {settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
-        </h1>
-        <p class="mt-1 text-meta leading-5 text-text-subtle">{targetSummary}</p>
-      </div>
-      <div
-        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
-      >
-        <Icon name="user" size={18} class="text-blueprint-blue" />
-      </div>
-    </div>
-
-    <div class="mt-4 grid grid-cols-[1fr_auto] items-center gap-3">
+<div class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4">
+  <PageHeader
+    eyebrow="Profil freelance"
+    title={settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
+    icon="user"
+    description={targetSummary}
+  >
+    <div class="grid grid-cols-[1fr_auto] items-center gap-3">
       <div
         class="h-2 overflow-hidden rounded-full bg-subtle-gray"
         role="progressbar"
@@ -301,17 +292,17 @@
         </div>
       {/if}
     </div>
-    {#if isOffline}
-      <div class="mt-3">
+    {#snippet footer()}
+      {#if isOffline}
         <OfflineNotice
           description="Vous pouvez ajuster le profil localement, mais les effets sur les recherches et synchronisations seront visibles au retour réseau."
           action="Prochaine action : sauvegarder les critères critiques, puis relancer un scan quand la connexion revient."
         />
-      </div>
-    {/if}
-  </section>
+      {/if}
+    {/snippet}
+  </PageHeader>
 
-  <div class="mt-4 space-y-4">
+  <div class="space-y-4">
     <ProfileSection
       bind:firstName={settings.firstName}
       bind:jobTitle={settings.jobTitle}

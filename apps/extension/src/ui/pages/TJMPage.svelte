@@ -1,6 +1,8 @@
 <script lang="ts">
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import { Icon } from '@pulse/ui';
+  import PageHeader from '../molecules/PageHeader.svelte';
+  import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import type { TJMAnalysis, TJMRegion } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
@@ -115,28 +117,9 @@
   });
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <!-- Hero -->
-  <section class="section-card-strong rounded-2xl px-5 py-4" aria-busy={isLoading}>
-    <div class="flex items-center justify-between gap-3">
-      <div class="flex items-center gap-3">
-        <div
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
-        >
-          <Icon name="chart-column" size={16} class="text-blueprint-blue" />
-        </div>
-        <div>
-          <p class="eyebrow text-blueprint-blue">Marché</p>
-          <div class="mt-1 flex flex-wrap items-center gap-2">
-            <h1 class="text-subheading font-semibold text-text-primary">Analyse TJM</h1>
-            <span
-              class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
-            >
-              Local uniquement
-            </span>
-          </div>
-        </div>
-      </div>
+<div class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4">
+  <PageHeader eyebrow="Marché" title="Analyse TJM" icon="chart-column" badge="Local uniquement">
+    {#snippet actions()}
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:opacity-40"
         onclick={() => loadAnalysis()}
@@ -148,30 +131,20 @@
           <Icon name="refresh-cw" size={13} />
         </span>
       </button>
-    </div>
-
+    {/snippet}
     {#if analysis && !isLoading}
-      <p class="mt-3 text-caption text-text-muted" class:text-status-orange={dataIsStale}>
+      <p class="text-caption text-text-muted" class:text-status-orange={dataIsStale}>
         Mis à jour le {lastUpdatedLabel}{#if dataIsStale && dataFreshness?.ageDays !== null}
           · Données anciennes ({dataFreshness.ageDays} jour{dataFreshness.ageDays > 1 ? 's' : ''})
         {/if}
       </p>
     {:else if isLoading}
-      <p class="mt-3 text-caption text-text-muted">Chargement…</p>
+      <p class="text-caption text-text-muted">Chargement…</p>
     {/if}
 
     <p class="mt-2 text-caption leading-5 text-text-muted">
       Tendances tirées des missions stockées localement, croisées avec votre fourchette cible.
     </p>
-
-    {#if isOffline}
-      <div
-        class="mt-3 flex items-center gap-2 rounded-xl border border-status-orange/25 bg-status-orange/8 px-3 py-2 text-meta text-status-orange"
-      >
-        <Icon name="triangle-alert" size={14} />
-        <span><span>Mode hors ligne</span> — tendances calculées sur le cache local.</span>
-      </div>
-    {/if}
 
     <div class="mt-4 flex flex-wrap items-center gap-2">
       <span
@@ -239,10 +212,15 @@
         {/each}
       </select>
     </div>
-  </section>
+    {#snippet footer()}
+      {#if isOffline}
+        <OfflineNotice description="Tendances calculées sur le cache local." />
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   <!-- Dashboard -->
-  <section class="mt-4" tabindex="-1" bind:this={dashboardSection}>
+  <section tabindex="-1" bind:this={dashboardSection}>
     <TJMDashboard
       {analysis}
       {isLoading}

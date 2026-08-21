@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { Button, Icon, Toggle } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
   import ScanSettings from '../organisms/ScanSettings.svelte';
@@ -12,6 +12,7 @@
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import PageHeader from '../molecules/PageHeader.svelte';
   import AlertBuilderCard from '../molecules/AlertBuilderCard.svelte';
   import ThemeSelector from '../molecules/ThemeSelector.svelte';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
@@ -220,15 +221,17 @@
     }
   }
 
-  function focusAiSettings() {
-    aiSettingsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    aiSettingsSection?.focus({ preventScroll: true });
+  let openSettingsSection = $state<SettingsSectionId | null>('sources');
+
+  function toggleSettingsSection(sectionId: SettingsSectionId) {
+    openSettingsSection = openSettingsSection === sectionId ? null : sectionId;
   }
 
-  function scrollToSettingsSection(sectionId: SettingsSectionId) {
-    document
-      .getElementById(`settings-${sectionId}`)
-      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  async function focusAiSettings() {
+    openSettingsSection = 'account';
+    await tick();
+    aiSettingsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    aiSettingsSection?.focus({ preventScroll: true });
   }
 
   async function handleExportDiagnostic() {
@@ -516,673 +519,593 @@
 </script>
 
 <div
-  class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4"
+  class="flex h-full min-w-0 flex-col gap-4 overflow-y-auto px-4 pb-5 pt-4"
   aria-busy={dataStatus === 'refreshing'}
 >
-  <!-- Hero -->
-  <section class="section-card-strong rounded-2xl px-5 py-4">
-    <div class="flex items-center gap-3">
-      <div
-        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
-      >
-        <Icon name="settings" size={16} class="text-blueprint-blue" />
-      </div>
-      <div>
-        <p class="eyebrow text-blueprint-blue">Configuration</p>
-        <h1 class="mt-1 text-subheading font-semibold text-text-primary">Paramètres</h1>
-      </div>
-    </div>
-
-    <div class="mt-4">
-      <OperationalStoryCard
-        eyebrow="À vérifier"
-        variant="compact"
-        title={settingsStory.title}
-        description={settingsStory.description}
-        severity={settingsStory.severity}
-        statusLabel={settingsStory.statusLabel}
-        evidence={settingsStory.evidence}
-        primaryActionLabel={settingsStory.primaryActionLabel}
-        primaryActionIcon={settingsStory.primaryActionIcon as IconName}
-        onPrimaryAction={handleSettingsStoryAction}
-      />
-    </div>
-    {#if isOffline}
-      <div class="mt-3">
+  <PageHeader eyebrow="Configuration" title="Paramètres" icon="settings">
+    <OperationalStoryCard
+      eyebrow="À vérifier"
+      variant="compact"
+      title={settingsStory.title}
+      description={settingsStory.description}
+      severity={settingsStory.severity}
+      statusLabel={settingsStory.statusLabel}
+      evidence={settingsStory.evidence}
+      primaryActionLabel={settingsStory.primaryActionLabel}
+      primaryActionIcon={settingsStory.primaryActionIcon as IconName}
+      onPrimaryAction={handleSettingsStoryAction}
+    />
+    {#snippet footer()}
+      {#if isOffline}
         <OfflineNotice
           description="Les réglages locaux restent accessibles. Le centre de compte, les dashboards connectés et certaines restaurations peuvent être indisponibles."
           action="Prochaine action : ajuster les alertes locales, puis vérifier le compte au retour réseau."
         />
-      </div>
-    {/if}
-  </section>
-
-  <section class="section-card rounded-xl p-4" aria-label="Sections de réglages">
-    <div class="grid gap-2 sm:grid-cols-2">
-      {#each settingsSections as section (section.id)}
-        <button
-          type="button"
-          class="flex min-h-20 items-start gap-3 rounded-lg border border-border-light bg-page-canvas p-3 text-left transition-colors hover:border-blueprint-blue/25 hover:bg-blueprint-blue/6 focus:outline-none focus:ring-2 focus:ring-blueprint-blue/30"
-          onclick={() => scrollToSettingsSection(section.id)}
-        >
-          <span
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-blueprint-blue"
-          >
-            <Icon name={section.icon} size={14} />
-          </span>
-          <span class="min-w-0">
-            <span
-              class="block text-micro font-semibold uppercase tracking-[0.15em] text-text-muted"
-            >
-              {section.label}
-            </span>
-            <span class="mt-1 block text-meta font-medium text-text-primary">{section.title}</span>
-            <span class="mt-1 block text-caption leading-4 text-text-subtle">
-              {section.description}
-            </span>
-          </span>
-        </button>
-      {/each}
-    </div>
-  </section>
-
-  <div class="mt-4 space-y-4">
-    <section
-      id="settings-sources"
-      class="scroll-mt-4 space-y-4"
-      aria-labelledby="settings-sources-title"
-    >
-      <div class="flex items-start gap-3 px-1">
-        <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
-        >
-          <Icon name="radar" size={14} class="text-blueprint-blue" />
-        </div>
-        <div>
-          <p class="eyebrow text-text-muted">Sources</p>
-          <h3 id="settings-sources-title" class="mt-1 text-body-lg font-semibold text-text-primary">
-            Choisir les sources à scanner
-          </h3>
-          <p class="mt-1 text-meta leading-5 text-text-subtle">
-            Cadence, notifications et historique source alimentent les missions visibles.
-          </p>
-        </div>
-      </div>
-
-      <ScanSettings
-        autoScan={settings.autoScan}
-        scanInterval={settings.scanInterval}
-        notifications={settings.notifications}
-        lastScanLabel={settings.lastScanLabel}
-        scanHistoryLabel={settings.scanHistoryLabel}
-        nextScanLabel={settings.nextScanLabel}
-        scanHistoryTone={settings.scanHistoryTone}
-        onToggleAutoScan={() => settings.toggleAutoScan()}
-        onToggleNotifications={() => settings.toggleNotifications()}
-        onScanIntervalChange={handleScanIntervalChange}
-      />
-
-      <div class="section-card space-y-3 rounded-xl p-4">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-meta font-semibold text-text-primary">
-              Sources incluses dans cette version
-            </p>
-            <p class="mt-1 text-caption leading-4 text-text-muted">
-              Seules les plateformes réellement livrées avec l’extension peuvent être activées.
-            </p>
-          </div>
-          <span
-            class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
-          >
-            {settings.connectorSources.filter((source) => source.enabled).length}/{settings
-              .connectorSources.length} actives
-          </span>
-        </div>
-
-        <div
-          class="divide-y divide-border-light rounded-lg border border-border-light bg-surface-white"
-        >
-          {#each settings.connectorSources as source (source.id)}
-            <div class="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
-              <div class="flex min-w-0 items-center gap-2.5">
-                <span
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
-                >
-                  <Icon name="database" size={13} />
-                </span>
-                <span class="min-w-0">
-                  <span class="block truncate text-meta font-medium text-text-primary">
-                    {source.name}
-                  </span>
-                  <span class="mt-0.5 block text-micro text-text-muted">
-                    {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
-                  </span>
-                </span>
-              </div>
-
-              <Toggle
-                checked={source.enabled}
-                disabled={settings.isSavingSettings}
-                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
-                onclick={() => settings.toggleConnector(source.id)}
-              />
-            </div>
-          {/each}
-        </div>
-      </div>
-
-      {#if settings.settingsError}
-        <p
-          class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red"
-          role="alert"
-        >
-          {settings.settingsError}. La dernière configuration confirmée reste active.
-        </p>
-      {:else if settings.isSavingSettings}
-        <p class="px-1 text-caption text-text-muted" role="status">Enregistrement…</p>
       {/if}
-    </section>
+    {/snippet}
+  </PageHeader>
 
-    <section
-      id="settings-alerts"
-      class="scroll-mt-4 space-y-4"
-      aria-labelledby="settings-alerts-title"
-    >
-      <div class="flex items-start gap-3 px-1">
+  {#snippet sourcesPanel()}
+    <ScanSettings
+      autoScan={settings.autoScan}
+      scanInterval={settings.scanInterval}
+      notifications={settings.notifications}
+      lastScanLabel={settings.lastScanLabel}
+      scanHistoryLabel={settings.scanHistoryLabel}
+      nextScanLabel={settings.nextScanLabel}
+      scanHistoryTone={settings.scanHistoryTone}
+      onToggleAutoScan={() => settings.toggleAutoScan()}
+      onToggleNotifications={() => settings.toggleNotifications()}
+      onScanIntervalChange={handleScanIntervalChange}
+    />
+
+    <div class="section-card space-y-3 rounded-xl p-5">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-meta font-semibold text-text-primary">
+            Sources incluses dans cette version
+          </p>
+          <p class="mt-1 text-caption leading-4 text-text-muted">
+            Seules les plateformes réellement livrées avec l’extension peuvent être activées.
+          </p>
+        </div>
+        <span
+          class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
+        >
+          {settings.connectorSources.filter((source) => source.enabled).length}/{settings
+            .connectorSources.length} actives
+        </span>
+      </div>
+
+      <div
+        class="divide-y divide-border-light rounded-lg border border-border-light bg-surface-white"
+      >
+        {#each settings.connectorSources as source (source.id)}
+          <div class="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
+            <div class="flex min-w-0 items-center gap-2.5">
+              <span
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+              >
+                <Icon name="database" size={13} />
+              </span>
+              <span class="min-w-0">
+                <span class="block truncate text-meta font-medium text-text-primary">
+                  {source.name}
+                </span>
+                <span class="mt-0.5 block text-micro text-text-muted">
+                  {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
+                </span>
+              </span>
+            </div>
+
+            <Toggle
+              checked={source.enabled}
+              disabled={settings.isSavingSettings}
+              aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
+              onclick={() => settings.toggleConnector(source.id)}
+            />
+          </div>
+        {/each}
+      </div>
+    </div>
+
+    {#if settings.settingsError}
+      <p
+        class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red"
+        role="alert"
+      >
+        {settings.settingsError}. La dernière configuration confirmée reste active.
+      </p>
+    {:else if settings.isSavingSettings}
+      <p class="px-1 text-caption text-text-muted" role="status">Enregistrement…</p>
+    {/if}
+  {/snippet}
+
+  {#snippet alertsPanel()}
+    <AlertBuilderCard
+      preferences={alertPreferences}
+      availableStacks={settings.profileKeywords}
+      previewMissions={alertPreviewMissions}
+      seenMissionIds={alertPreviewSeenIds}
+      history={alertHistory}
+      isSaving={isSavingAlertPreferences}
+      onSave={handleSaveAlertPreferences}
+    />
+  {/snippet}
+
+  {#snippet accountPanel()}
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div class="flex items-start gap-3">
         <div
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
         >
-          <Icon name="bell" size={14} class="text-blueprint-blue" />
+          <Icon name="database" size={14} class="text-blueprint-blue" />
         </div>
-        <div>
-          <p class="eyebrow text-text-muted">Alertes</p>
-          <h3 id="settings-alerts-title" class="mt-1 text-body-lg font-semibold text-text-primary">
-            Choisir les missions qui méritent une alerte
-          </h3>
-          <p class="mt-1 text-meta leading-5 text-text-subtle">
-            Ajustez les conditions avant d’autoriser une notification prioritaire.
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-body-lg font-medium text-text-primary">Compte et synchronisation</h3>
+              <p class="mt-1 text-meta leading-5 text-text-subtle">
+                Le scan reste local. Le compte MissionPulse sert à synchroniser les snapshots vers
+                le dashboard connecté.
+              </p>
+            </div>
+            <span
+              class="rounded-md border px-2 py-1 text-micro font-medium {settings.isConnectedAccount
+                ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                : 'border-border-light bg-page-canvas text-text-subtle'}"
+            >
+              {settings.accountStatusLabel}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid gap-2 sm:grid-cols-2">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.connectedAccountEmail ?? 'Non connecté'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.premiumEnabled ? 'Premium — 10 € TTC/an' : 'Gratuit'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Appareil</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.connectedDeviceLabel}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.connectedPendingUploads} envoi · {settings.connectedPendingDownloads}
+            réception
           </p>
         </div>
       </div>
 
-      <AlertBuilderCard
-        preferences={alertPreferences}
-        availableStacks={settings.profileKeywords}
-        previewMissions={alertPreviewMissions}
-        seenMissionIds={alertPreviewSeenIds}
-        history={alertHistory}
-        isSaving={isSavingAlertPreferences}
-        onSave={handleSaveAlertPreferences}
-      />
-    </section>
+      <p
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta leading-5 text-text-subtle"
+      >
+        {settings.syncStatusText}
+      </p>
 
-    <section
-      id="settings-account"
-      class="scroll-mt-4 space-y-4"
-      aria-labelledby="settings-account-title"
-    >
-      <div class="flex items-start gap-3 px-1">
+      {#if settings.isConnectedAccount}
+        <PlatformAccountsPanel />
+      {/if}
+
+      <div class="flex flex-wrap gap-2">
+        <button
+          class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
+          onclick={() => settings.openAccountCenter()}
+        >
+          <Icon name="user" size={13} />
+          {settings.isConnectedAccount
+            ? 'Gérer mon compte'
+            : settings.extensionAccountState === 'awaiting_user_approval'
+              ? 'Vérifier la connexion'
+              : 'Connecter mon compte'}
+        </button>
+        {#if settings.isConnectedAccount}
+          <button
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            onclick={() => settings.disconnectExtensionAccount()}
+          >
+            <Icon name="log-out" size={13} />
+            Déconnecter cette extension
+          </button>
+        {/if}
+        <button
+          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+          onclick={() => settings.openConnectedDashboard()}
+        >
+          <Icon name="external-link" size={13} />
+          Ouvrir le dashboard connecté
+        </button>
+      </div>
+
+      <p class="text-caption leading-5 text-text-muted">
+        Les sessions Free-Work, LeHibou, Hiway, Collective et Cherry Pick restent dans Chrome; seuls
+        les résultats normalisés, les candidatures, le CV et les préférences peuvent être
+        synchronisés.
+      </p>
+    </div>
+
+    <div class="section-card rounded-xl p-5 space-y-3" bind:this={aiSettingsSection} tabindex="-1">
+      <div class="flex items-start gap-3">
         <div
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
         >
           <Icon name="cpu" size={14} class="text-blueprint-blue" />
         </div>
         <div>
-          <p class="eyebrow text-text-muted">Compte & IA</p>
-          <h3 id="settings-account-title" class="mt-1 text-body-lg font-semibold text-text-primary">
-            Synchroniser et enrichir
-          </h3>
-          <p class="mt-1 text-meta leading-5 text-text-subtle">
-            Le dashboard connecté et l’analyse locale restent optionnels, mais clarifient le
-            pilotage.
+          <h3 class="text-body-lg font-medium text-text-primary">IA locale</h3>
+          <p class="mt-1 text-meta text-text-subtle">
+            L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.
           </p>
         </div>
       </div>
-
-      <div class="section-card rounded-xl p-5 space-y-4">
-        <div class="flex items-start gap-3">
-          <div
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
-          >
-            <Icon name="database" size={14} class="text-blueprint-blue" />
+      <OperationalStoryCard
+        eyebrow="Analyse locale"
+        variant="compact"
+        title={aiStory.title}
+        description={aiStory.description}
+        severity={aiStory.severity}
+        statusLabel={aiStory.statusLabel}
+        evidence={aiStory.evidence}
+        primaryActionLabel={aiStory.primaryActionLabel}
+        primaryActionIcon={aiStory.primaryActionIcon as IconName}
+        onPrimaryAction={() => settings.openAiHelp()}
+      />
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.aiAvailability === 'available'
+              ? 'Disponible'
+              : settings.aiAvailability === 'after-download'
+                ? 'Téléchargement requis'
+                : 'Indisponible'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
+            Missions / scan
+          </p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.maxSemanticPerScan}
+          </p>
+        </div>
+      </div>
+      <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+        <div class="flex items-start gap-2">
+          <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+          <div class="min-w-0">
+            <p class="text-meta font-medium text-text-primary">Données utilisées par l'IA locale</p>
+            <p class="mt-1 text-caption leading-5 text-text-subtle">
+              Gemini Nano reçoit uniquement le contexte utile au score de mission. Le résultat reste
+              local avec le score et une raison courte.
+            </p>
           </div>
-          <div class="min-w-0 flex-1">
-            <div class="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 class="text-body-lg font-medium text-text-primary">
-                  Compte et synchronisation
-                </h3>
-                <p class="mt-1 text-meta leading-5 text-text-subtle">
-                  Le scan reste local. Le compte MissionPulse sert à synchroniser les snapshots vers
-                  le dashboard connecté.
+        </div>
+        <div class="mt-3 grid gap-2 sm:grid-cols-2">
+          {#each aiTransparencyItems as item, i (i)}
+            <div class="rounded-md bg-surface-white px-2.5 py-2">
+              <div class="flex items-center gap-1.5">
+                <Icon name={item.icon} size={12} class="text-blueprint-blue" />
+                <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  {item.label}
                 </p>
               </div>
-              <span
-                class="rounded-md border px-2 py-1 text-micro font-medium {settings.isConnectedAccount
-                  ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-page-canvas text-text-subtle'}"
-              >
-                {settings.accountStatusLabel}
-              </span>
+              <p class="mt-1 text-caption leading-4 text-text-secondary">{item.value}</p>
             </div>
-          </div>
-        </div>
-
-        <div class="grid gap-2 sm:grid-cols-2">
-          <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
-            <p class="mt-1 text-meta font-medium text-text-primary">
-              {settings.connectedAccountEmail ?? 'Non connecté'}
-            </p>
-          </div>
-          <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
-            <p class="mt-1 text-meta font-medium text-text-primary">
-              {settings.premiumEnabled ? 'Premium — 10 € TTC/an' : 'Gratuit'}
-            </p>
-          </div>
-          <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-              Appareil
-            </p>
-            <p class="mt-1 text-meta font-medium text-text-primary">
-              {settings.connectedDeviceLabel}
-            </p>
-          </div>
-          <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
-            <p class="mt-1 text-meta font-medium text-text-primary">
-              {settings.connectedPendingUploads} envoi · {settings.connectedPendingDownloads}
-              réception
-            </p>
-          </div>
-        </div>
-
-        <p
-          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta leading-5 text-text-subtle"
-        >
-          {settings.syncStatusText}
-        </p>
-
-        {#if settings.isConnectedAccount}
-          <PlatformAccountsPanel />
-        {/if}
-
-        <div class="flex flex-wrap gap-2">
-          <button
-            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
-            onclick={() => settings.openAccountCenter()}
-          >
-            <Icon name="user" size={13} />
-            {settings.isConnectedAccount
-              ? 'Gérer mon compte'
-              : settings.extensionAccountState === 'awaiting_user_approval'
-                ? 'Vérifier la connexion'
-                : 'Connecter mon compte'}
-          </button>
-          {#if settings.isConnectedAccount}
-            <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
-              onclick={() => settings.disconnectExtensionAccount()}
-            >
-              <Icon name="log-out" size={13} />
-              Déconnecter cette extension
-            </button>
-          {/if}
-          <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
-            onclick={() => settings.openConnectedDashboard()}
-          >
-            <Icon name="external-link" size={13} />
-            Ouvrir le dashboard connecté
-          </button>
-        </div>
-
-        <p class="text-caption leading-5 text-text-muted">
-          Les sessions Free-Work, LeHibou, Hiway, Collective et Cherry Pick restent dans Chrome;
-          seuls les résultats normalisés, les candidatures, le CV et les préférences peuvent être
-          synchronisés.
-        </p>
-      </div>
-
-      <div
-        class="section-card rounded-xl p-5 space-y-3"
-        bind:this={aiSettingsSection}
-        tabindex="-1"
-      >
-        <div class="flex items-start gap-3">
-          <div
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
-          >
-            <Icon name="cpu" size={14} class="text-blueprint-blue" />
-          </div>
-          <div>
-            <h3 class="text-body-lg font-medium text-text-primary">IA locale</h3>
-            <p class="mt-1 text-meta text-text-subtle">
-              L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API
-              externe.
-            </p>
-          </div>
-        </div>
-        <OperationalStoryCard
-          eyebrow="Analyse locale"
-          variant="compact"
-          title={aiStory.title}
-          description={aiStory.description}
-          severity={aiStory.severity}
-          statusLabel={aiStory.statusLabel}
-          evidence={aiStory.evidence}
-          primaryActionLabel={aiStory.primaryActionLabel}
-          primaryActionIcon={aiStory.primaryActionIcon as IconName}
-          onPrimaryAction={() => settings.openAiHelp()}
-        />
-        <div class="grid grid-cols-2 gap-2">
-          <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
-            <p class="mt-1 text-meta font-medium text-text-primary">
-              {settings.aiAvailability === 'available'
-                ? 'Disponible'
-                : settings.aiAvailability === 'after-download'
-                  ? 'Téléchargement requis'
-                  : 'Indisponible'}
-            </p>
-          </div>
-          <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-              Missions / scan
-            </p>
-            <p class="mt-1 text-meta font-medium text-text-primary">
-              {settings.maxSemanticPerScan}
-            </p>
-          </div>
-        </div>
-        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
-          <div class="flex items-start gap-2">
-            <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
-            <div class="min-w-0">
-              <p class="text-meta font-medium text-text-primary">
-                Données utilisées par l'IA locale
-              </p>
-              <p class="mt-1 text-caption leading-5 text-text-subtle">
-                Gemini Nano reçoit uniquement le contexte utile au score de mission. Le résultat
-                reste local avec le score et une raison courte.
-              </p>
-            </div>
-          </div>
-          <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            {#each aiTransparencyItems as item, i (i)}
-              <div class="rounded-md bg-surface-white px-2.5 py-2">
-                <div class="flex items-center gap-1.5">
-                  <Icon name={item.icon} size={12} class="text-blueprint-blue" />
-                  <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
-                    {item.label}
-                  </p>
-                </div>
-                <p class="mt-1 text-caption leading-4 text-text-secondary">{item.value}</p>
-              </div>
-            {/each}
-          </div>
+          {/each}
         </div>
       </div>
+    </div>
 
-      <!-- Form Assistant (Machine D — src/models/form-assistant.model.md) -->
-      <div class="section-card rounded-xl p-5 space-y-3">
-        <div class="flex items-start gap-3">
-          <div
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
-          >
-            <Icon name="file-text" size={14} class="text-blueprint-blue" />
-          </div>
-          <div class="min-w-0 flex-1">
-            <h3 class="text-body-lg font-medium text-text-primary">Assistant de candidature</h3>
-            <p class="mt-1 text-meta text-text-subtle">
-              Au focus sur un champ d'un formulaire de candidature, propose une valeur issue de
-              votre profil. Vous restez seul à valider l'insertion (rien n'est jamais rempli
-              automatiquement).
-            </p>
-          </div>
-          <Toggle
-            checked={settings.formAssistEnabled}
-            disabled={settings.formAssistStatus === 'loading'}
-            aria-label="Activer l'assistant de candidature"
-            onclick={() => settings.toggleFormAssist()}
-          />
-        </div>
-        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
-          <div class="flex items-start gap-2">
-            <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
-            <div class="min-w-0">
-              <p class="text-meta font-medium text-text-primary">Périmètre et confidentialité</p>
-              <p class="mt-1 text-caption leading-5 text-text-subtle">
-                Actif uniquement sur les plateformes connecteurs compatibles (Free-Work pour la
-                phase pilote). La génération utilise Gemini Nano en local ; aucune donnée de page
-                n'est envoyée à un serveur.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <section id="settings-data" class="scroll-mt-4 space-y-4" aria-labelledby="settings-data-title">
-      <div class="flex items-start gap-3 px-1">
+    <!-- Form Assistant (Machine D — src/models/form-assistant.model.md) -->
+    <div class="section-card rounded-xl p-5 space-y-3">
+      <div class="flex items-start gap-3">
         <div
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
         >
-          <Icon name="database" size={14} class="text-blueprint-blue" />
+          <Icon name="file-text" size={14} class="text-blueprint-blue" />
         </div>
-        <div>
-          <p class="eyebrow text-text-muted">Données</p>
-          <h3 id="settings-data-title" class="mt-1 text-body-lg font-semibold text-text-primary">
-            Sorties et nettoyage
-          </h3>
-          <p class="mt-1 text-meta leading-5 text-text-subtle">
-            Les actions qui modifient ou exportent l’espace local sont regroupées ici.
-          </p>
-        </div>
-      </div>
-
-      <div class="section-card rounded-xl p-5 space-y-4">
-        <div>
-          <h3 class="text-body-lg font-medium text-text-primary">Apparence</h3>
-          <p class="mt-1 text-meta text-text-subtle">Choisir le thème de l'interface.</p>
-        </div>
-        <ThemeSelector
-          theme={settings.theme}
-          busy={settings.isSavingSettings}
-          onSelect={(theme) => void settings.updateTheme(theme)}
-        />
-      </div>
-
-      <div class="section-card rounded-xl p-5 space-y-4">
-        <div>
-          <h3 class="text-body-lg font-medium text-text-primary">Export</h3>
+        <div class="min-w-0 flex-1">
+          <h3 class="text-body-lg font-medium text-text-primary">Assistant de candidature</h3>
           <p class="mt-1 text-meta text-text-subtle">
-            Préparer une shortlist partageable ou sortir les données brutes.
+            Au focus sur un champ d'un formulaire de candidature, propose une valeur issue de votre
+            profil. Vous restez seul à valider l'insertion (rien n'est jamais rempli
+            automatiquement).
           </p>
         </div>
-        <OperationalStoryCard
-          eyebrow="Décision"
-          variant="compact"
-          title={exportStory.title}
-          description={exportStory.description}
-          severity={exportStory.severity}
-          statusLabel={exportStory.statusLabel}
-          evidence={exportStory.evidence}
-          primaryActionLabel={exportStory.primaryActionLabel}
-          primaryActionIcon={exportStory.primaryActionIcon as IconName}
-          onPrimaryAction={handleExportStoryAction}
+        <Toggle
+          checked={settings.formAssistEnabled}
+          disabled={settings.formAssistStatus === 'loading'}
+          aria-label="Activer l'assistant de candidature"
+          onclick={() => settings.toggleFormAssist()}
         />
-        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
-          <div class="flex items-start gap-2">
-            <Icon name="file-text" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
-            <div class="min-w-0">
-              <p class="text-meta font-medium text-text-primary">Rapport shortlist</p>
-              <p class="mt-1 text-caption leading-5 text-text-subtle">
-                Le Markdown inclut synthèse, critères visibles, signaux de score, liens sources et
-                rappel de confidentialité locale.
-              </p>
-            </div>
-          </div>
-          <div class="mt-3 grid grid-cols-3 gap-2 text-center">
-            <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
-                {favoriteExportCount}
-              </p>
-              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Favoris</p>
-            </div>
-            <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="text-body-lg font-semibold text-text-primary">MD</p>
-              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Rapport</p>
-            </div>
-            <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="text-body-lg font-semibold text-text-primary">Local</p>
-              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Sessions</p>
-            </div>
+      </div>
+      <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+        <div class="flex items-start gap-2">
+          <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+          <div class="min-w-0">
+            <p class="text-meta font-medium text-text-primary">Périmètre et confidentialité</p>
+            <p class="mt-1 text-caption leading-5 text-text-subtle">
+              Actif uniquement sur les plateformes connecteurs compatibles (Free-Work pour la phase
+              pilote). La génération utilise Gemini Nano en local ; aucune donnée de page n'est
+              envoyée à un serveur.
+            </p>
           </div>
         </div>
-        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-            Formats secondaires
-          </p>
-          <div class="mt-2 flex flex-wrap gap-2">
-            <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
-              onclick={() => handleExportFavorites('json')}
-              disabled={settings.isExporting}
-            >
-              <Icon name="file-json" size={14} class="text-blueprint-blue" />
-              JSON
-            </button>
-            <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
-              onclick={() => handleExportFavorites('csv')}
-              disabled={settings.isExporting}
-            >
-              <Icon name="file-spreadsheet" size={14} class="text-blueprint-blue" />
-              CSV
-            </button>
-            <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
-              onclick={() => handleExportFavorites('markdown')}
-              disabled={settings.isExporting}
-            >
-              <Icon name="file-text" size={14} class="text-blueprint-blue" />
-              Markdown
-            </button>
+      </div>
+    </div>
+  {/snippet}
+
+  {#snippet dataPanel()}
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-body-lg font-medium text-text-primary">Apparence</h3>
+        <p class="mt-1 text-meta text-text-subtle">Choisir le thème de l'interface.</p>
+      </div>
+      <ThemeSelector
+        theme={settings.theme}
+        busy={settings.isSavingSettings}
+        onSelect={(theme) => void settings.updateTheme(theme)}
+      />
+    </div>
+
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-body-lg font-medium text-text-primary">Export</h3>
+        <p class="mt-1 text-meta text-text-subtle">
+          Préparer une shortlist partageable ou sortir les données brutes.
+        </p>
+      </div>
+      <OperationalStoryCard
+        eyebrow="Décision"
+        variant="compact"
+        title={exportStory.title}
+        description={exportStory.description}
+        severity={exportStory.severity}
+        statusLabel={exportStory.statusLabel}
+        evidence={exportStory.evidence}
+        primaryActionLabel={exportStory.primaryActionLabel}
+        primaryActionIcon={exportStory.primaryActionIcon as IconName}
+        onPrimaryAction={handleExportStoryAction}
+      />
+      <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+        <div class="flex items-start gap-2">
+          <Icon name="file-text" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+          <div class="min-w-0">
+            <p class="text-meta font-medium text-text-primary">Rapport shortlist</p>
+            <p class="mt-1 text-caption leading-5 text-text-subtle">
+              Le Markdown inclut synthèse, critères visibles, signaux de score, liens sources et
+              rappel de confidentialité locale.
+            </p>
           </div>
         </div>
-        {#if settings.exportSuccess && settings.lastExportSummary}
-          <div
-            class="rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-2"
-            role="status"
-            aria-live="polite"
+        <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+          <div class="rounded-md bg-surface-white px-2 py-2">
+            <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
+              {favoriteExportCount}
+            </p>
+            <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Favoris</p>
+          </div>
+          <div class="rounded-md bg-surface-white px-2 py-2">
+            <p class="text-body-lg font-semibold text-text-primary">MD</p>
+            <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Rapport</p>
+          </div>
+          <div class="rounded-md bg-surface-white px-2 py-2">
+            <p class="text-body-lg font-semibold text-text-primary">Local</p>
+            <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Sessions</p>
+          </div>
+        </div>
+      </div>
+      <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+          Formats secondaires
+        </p>
+        <div class="mt-2 flex flex-wrap gap-2">
+          <button
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+            onclick={() => handleExportFavorites('json')}
+            disabled={settings.isExporting}
           >
-            <div class="flex items-start gap-2">
-              <Icon name="check-circle" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
-              <div class="min-w-0">
-                <p class="text-meta font-medium text-text-primary">Export prêt à partager</p>
-                <p class="mt-0.5 text-caption leading-4 text-text-subtle">
-                  {settings.lastExportSummary}
-                </p>
-              </div>
+            <Icon name="file-json" size={14} class="text-blueprint-blue" />
+            JSON
+          </button>
+          <button
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+            onclick={() => handleExportFavorites('csv')}
+            disabled={settings.isExporting}
+          >
+            <Icon name="file-spreadsheet" size={14} class="text-blueprint-blue" />
+            CSV
+          </button>
+          <button
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+            onclick={() => handleExportFavorites('markdown')}
+            disabled={settings.isExporting}
+          >
+            <Icon name="file-text" size={14} class="text-blueprint-blue" />
+            Markdown
+          </button>
+        </div>
+      </div>
+      {#if settings.exportSuccess && settings.lastExportSummary}
+        <div
+          class="rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-2"
+          role="status"
+          aria-live="polite"
+        >
+          <div class="flex items-start gap-2">
+            <Icon name="check-circle" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+            <div class="min-w-0">
+              <p class="text-meta font-medium text-text-primary">Export prêt à partager</p>
+              <p class="mt-0.5 text-caption leading-4 text-text-subtle">
+                {settings.lastExportSummary}
+              </p>
             </div>
+          </div>
+        </div>
+      {/if}
+    </div>
+
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-body-lg font-medium text-text-primary">Sauvegarde</h3>
+        <p class="mt-1 text-meta text-text-subtle">
+          Exporter une archive de vos données (profil, paramètres, favoris).
+        </p>
+      </div>
+      <OperationalStoryCard
+        eyebrow="Continuité"
+        variant="compact"
+        title={backupStory.title}
+        description={backupStory.description}
+        severity={backupStory.severity}
+        statusLabel={backupStory.statusLabel}
+        evidence={backupStory.evidence}
+        primaryActionLabel={null}
+        primaryActionIcon={backupStory.primaryActionIcon as IconName}
+      />
+      <div class="flex flex-wrap gap-2">
+        <Button variant="secondary" onclick={handleCreateBackup}>
+          <Icon name="download" size={14} class="mr-1" />
+          Créer une sauvegarde
+        </Button>
+      </div>
+    </div>
+
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-body-lg font-medium text-text-primary">Diagnostic</h3>
+        <p class="mt-1 text-meta text-text-subtle">
+          Exportez un rapport local pour signaler un problème de connecteur ou de scan. Aucune
+          session ni cookie n'est inclus.
+        </p>
+      </div>
+      <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+        <div class="flex items-start gap-2">
+          <Icon name="activity" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+          <div class="min-w-0">
+            <p class="text-meta font-medium text-text-primary">Rapport technique</p>
+            <p class="mt-1 text-caption leading-5 text-text-subtle">
+              Erreurs récentes, état des connecteurs et version Chrome. À joindre aux issues GitHub
+              si un scan échoue de façon répétée.
+            </p>
+          </div>
+        </div>
+        <div class="mt-3">
+          <button
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            onclick={handleExportDiagnostic}
+          >
+            <Icon name="file-json" size={14} class="text-blueprint-blue" />
+            Exporter le diagnostic
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-body-lg font-medium text-text-primary">Onboarding</h3>
+        <p class="mt-1 text-meta text-text-subtle">
+          Rejouer l'accompagnement initial ou relancer le tour du feed.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <Button variant="secondary" onclick={() => settings.restartOnboarding()}>
+          <Icon name="star" size={14} class="mr-1" />
+          Rejouer l'onboarding
+        </Button>
+        <Button variant="ghost" onclick={() => settings.replayFeedTour()}>
+          <Icon name="play" size={14} class="mr-1" />
+          Revoir le tour du feed
+        </Button>
+      </div>
+    </div>
+
+    {#if settings.localDataResetAvailability.status === 'available'}
+      <DangerZone
+        showResetConfirm={settings.showResetConfirm}
+        resetAvailability={settings.localDataResetAvailability}
+        resetError={settings.resetError}
+        onShowConfirm={() => {
+          settings.showResetConfirm = true;
+        }}
+        onCancelConfirm={() => {
+          settings.showResetConfirm = false;
+        }}
+        onConfirmReset={() => settings.resetAll()}
+        onCreateBackup={handleCreateBackup}
+      />
+    {/if}
+  {/snippet}
+
+  <section class="section-card overflow-hidden rounded-xl" aria-label="Sections de réglages">
+    {#each settingsSections as section, sectionIndex (section.id)}
+      <div
+        id="settings-{section.id}"
+        class="scroll-mt-4 {sectionIndex > 0 ? 'border-t border-border-light' : ''}"
+      >
+        <h2>
+          <button
+            type="button"
+            id="settings-trigger-{section.id}"
+            class="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-subtle-gray/40"
+            onclick={() => toggleSettingsSection(section.id)}
+            aria-expanded={openSettingsSection === section.id}
+            aria-controls="settings-panel-{section.id}"
+          >
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+            >
+              <Icon name={section.icon} size={14} />
+            </span>
+            <span class="min-w-0 flex-1">
+              <span class="eyebrow block text-text-muted">{section.label}</span>
+              <span class="mt-0.5 block text-body-lg font-semibold leading-5 text-text-primary">
+                {section.title}
+              </span>
+            </span>
+            <Icon
+              name="chevron-down"
+              size={14}
+              class="shrink-0 text-text-muted transition-transform duration-200 {openSettingsSection ===
+              section.id
+                ? 'rotate-180'
+                : ''}"
+            />
+          </button>
+        </h2>
+        {#if openSettingsSection === section.id}
+          <div
+            id="settings-panel-{section.id}"
+            role="region"
+            aria-labelledby="settings-trigger-{section.id}"
+            class="space-y-4 border-t border-border-light bg-page-canvas/50 px-4 py-4"
+          >
+            {#if section.id === 'sources'}
+              {@render sourcesPanel()}
+            {:else if section.id === 'alerts'}
+              {@render alertsPanel()}
+            {:else if section.id === 'account'}
+              {@render accountPanel()}
+            {:else}
+              {@render dataPanel()}
+            {/if}
           </div>
         {/if}
       </div>
-
-      <div class="section-card rounded-xl p-5 space-y-4">
-        <div>
-          <h3 class="text-body-lg font-medium text-text-primary">Sauvegarde</h3>
-          <p class="mt-1 text-meta text-text-subtle">
-            Exporter une archive de vos données (profil, paramètres, favoris).
-          </p>
-        </div>
-        <OperationalStoryCard
-          eyebrow="Continuité"
-          variant="compact"
-          title={backupStory.title}
-          description={backupStory.description}
-          severity={backupStory.severity}
-          statusLabel={backupStory.statusLabel}
-          evidence={backupStory.evidence}
-          primaryActionLabel={null}
-          primaryActionIcon={backupStory.primaryActionIcon as IconName}
-        />
-        <div class="flex flex-wrap gap-2">
-          <Button variant="secondary" onclick={handleCreateBackup}>
-            <Icon name="download" size={14} class="mr-1" />
-            Créer une sauvegarde
-          </Button>
-        </div>
-      </div>
-
-      <div class="section-card rounded-xl p-5 space-y-4">
-        <div>
-          <h3 class="text-body-lg font-medium text-text-primary">Diagnostic</h3>
-          <p class="mt-1 text-meta text-text-subtle">
-            Exportez un rapport local pour signaler un problème de connecteur ou de scan. Aucune
-            session ni cookie n'est inclus.
-          </p>
-        </div>
-        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
-          <div class="flex items-start gap-2">
-            <Icon name="activity" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
-            <div class="min-w-0">
-              <p class="text-meta font-medium text-text-primary">Rapport technique</p>
-              <p class="mt-1 text-caption leading-5 text-text-subtle">
-                Erreurs récentes, état des connecteurs et version Chrome. À joindre aux issues
-                GitHub si un scan échoue de façon répétée.
-              </p>
-            </div>
-          </div>
-          <div class="mt-3">
-            <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
-              onclick={handleExportDiagnostic}
-            >
-              <Icon name="file-json" size={14} class="text-blueprint-blue" />
-              Exporter le diagnostic
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="section-card rounded-xl p-5 space-y-4">
-        <div>
-          <h3 class="text-body-lg font-medium text-text-primary">Onboarding</h3>
-          <p class="mt-1 text-meta text-text-subtle">
-            Rejouer l'accompagnement initial ou relancer le tour du feed.
-          </p>
-        </div>
-        <div class="flex flex-wrap gap-2">
-          <Button variant="secondary" onclick={() => settings.restartOnboarding()}>
-            <Icon name="star" size={14} class="mr-1" />
-            Rejouer l'onboarding
-          </Button>
-          <Button variant="ghost" onclick={() => settings.replayFeedTour()}>
-            <Icon name="play" size={14} class="mr-1" />
-            Revoir le tour du feed
-          </Button>
-        </div>
-      </div>
-
-      {#if settings.localDataResetAvailability.status === 'available'}
-        <DangerZone
-          showResetConfirm={settings.showResetConfirm}
-          resetAvailability={settings.localDataResetAvailability}
-          resetError={settings.resetError}
-          onShowConfirm={() => {
-            settings.showResetConfirm = true;
-          }}
-          onCancelConfirm={() => {
-            settings.showResetConfirm = false;
-          }}
-          onConfirmReset={() => settings.resetAll()}
-          onCreateBackup={handleCreateBackup}
-        />
-      {/if}
-    </section>
-  </div>
+    {/each}
+  </section>
 </div>
