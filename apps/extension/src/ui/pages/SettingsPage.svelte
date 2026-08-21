@@ -381,7 +381,7 @@
         statusLabel: 'Actif',
         title: 'L’analyse locale peut préciser le classement',
         description:
-          'Pulse analysera les premières missions du scan, puis réutilisera ces analyses pour éviter tout recalcul.',
+          'Pulse analysera les premières missions du scan, puis réutilisera ces analyses pour éviter les recalculs inutiles.',
         evidence,
         primaryActionLabel: null,
         primaryActionIcon: 'play',
