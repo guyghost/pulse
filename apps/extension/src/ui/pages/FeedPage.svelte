@@ -1488,7 +1488,7 @@
       aria-label="Actions du feed"
     >
       <div
-        class="flex h-12 min-w-0 flex-1 items-center overflow-hidden rounded-full border border-white/70 bg-surface-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 focus-within:border-blueprint-blue/30"
+        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 bg-surface-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 focus-within:border-blueprint-blue/40"
       >
         <SearchInput
           variant="dock"
