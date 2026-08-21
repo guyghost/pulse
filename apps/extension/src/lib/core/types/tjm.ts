@@ -70,6 +70,9 @@ export interface TJMRange {
   median: number;
 }
 
+/** Analysis window preset for the TJM dashboard (see models/tjm-analysis-period.model.md) */
+export type TJMPeriod = '7d' | '30d' | 'all';
+
 /** Highlighted stack in the TJM dashboard. */
 export interface TJMStackInsight {
   stack: string;

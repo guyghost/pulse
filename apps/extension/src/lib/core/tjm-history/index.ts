@@ -9,6 +9,7 @@ import type { SeniorityLevel } from '../types/profile';
 import type {
   TJMAnalysis,
   TJMHistory,
+  TJMPeriod,
   TJMRange,
   TJMRecord,
   TJMRegion,
@@ -181,6 +182,45 @@ export const addRecords = (history: TJMHistory, newRecords: TJMRecord[]): TJMHis
  * Create an empty TJM history.
  */
 export const emptyHistory = (): TJMHistory => ({ records: [] });
+
+// ---------------------------------------------------------------------------
+// Period windowing (pure) — see models/tjm-analysis-period.model.md
+// ---------------------------------------------------------------------------
+
+/** Ordered presets exposed by the TJM dashboard, from narrowest to widest. */
+export const TJM_PERIODS: readonly TJMPeriod[] = ['7d', '30d', 'all'];
+
+/** Number of days each finite period preset covers. */
+const PERIOD_DAYS: Readonly<Record<Exclude<TJMPeriod, 'all'>, number>> = {
+  '7d': 7,
+  '30d': 30,
+};
+
+const toDateOnlyISO = (date: Date): string => date.toISOString().slice(0, 10);
+
+/**
+ * Keep only records dated within the period window ending at `now` (inclusive).
+ * 'all' returns the history unchanged (identity — never a copy).
+ *
+ * Pure: `now` is injected; record dates are ISO date-only strings, so lexical
+ * comparison matches chronological order.
+ */
+export const filterTJMHistoryByPeriod = (
+  history: TJMHistory,
+  period: TJMPeriod,
+  now: Date
+): TJMHistory => {
+  if (period === 'all') {
+    return history;
+  }
+
+  const cutoffMs = now.getTime() - PERIOD_DAYS[period] * MS_PER_DAY;
+  const cutoff = toDateOnlyISO(new Date(cutoffMs));
+
+  return {
+    records: history.records.filter((record) => record.date >= cutoff),
+  };
+};
 
 // ---------------------------------------------------------------------------
 // Statistics & Trend analysis (pure)

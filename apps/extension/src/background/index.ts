@@ -18,8 +18,8 @@ import type {
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
-import { analyzeTJMHistory } from '../lib/core/tjm-history';
-import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
+import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '../lib/core/tjm-history';
+import type { TJMHistory, TJMPeriod, TJMRegion } from '../lib/core/types/tjm';
 import {
   getFeedSavedViews,
   getFeedSortBy,
@@ -168,31 +168,34 @@ function buildTJMAnalysis(
   history: TJMHistory,
   profileStacks: string[] | undefined,
   region: TJMRegion | undefined,
+  period: TJMPeriod | undefined,
   now: Date
 ) {
   const hasStackFilter = profileStacks !== undefined && profileStacks.length > 0;
   const hasRegionFilter = region !== undefined;
-
-  if (!hasStackFilter && !hasRegionFilter) {
-    return analyzeTJMHistory(history, now);
-  }
-
   const normalizedStacks = hasStackFilter
     ? new Set(profileStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean))
     : null;
 
+  const filteredByStackAndRegion =
+    !hasStackFilter && !hasRegionFilter
+      ? history
+      : {
+          records: history.records.filter((record) => {
+            if (normalizedStacks && !normalizedStacks.has(record.stack)) {
+              return false;
+            }
+            if (hasRegionFilter && record.region !== region) {
+              return false;
+            }
+            return true;
+          }),
+        };
+
+  // Period windowing is applied last so dataPoints reflects the window
+  // (see models/tjm-analysis-period.model.md).
   return analyzeTJMHistory(
-    {
-      records: history.records.filter((record) => {
-        if (normalizedStacks && !normalizedStacks.has(record.stack)) {
-          return false;
-        }
-        if (hasRegionFilter && record.region !== region) {
-          return false;
-        }
-        return true;
-      }),
-    },
+    filterTJMHistoryByPeriod(filteredByStackAndRegion, period ?? 'all', now),
     now
   );
 }
@@ -1441,6 +1444,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
                 history,
                 message.payload?.profileStacks,
                 message.payload?.region,
+                message.payload?.period,
                 new Date()
               ),
             },

@@ -1,6 +1,6 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
-import { analyzeTJMHistory } from '$lib/core/tjm-history';
-import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
+import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '$lib/core/tjm-history';
+import type { TJMHistory, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
 import {
@@ -1126,13 +1126,13 @@ function createChromeStubs() {
           case 'GET_TJM_ANALYSIS': {
             const history = storage.tjm_history as TJMHistory | undefined;
             const payload = message.payload as
-              { profileStacks?: string[]; region?: TJMRegion } | undefined;
+              { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod } | undefined;
             const normalizedStacks =
               payload?.profileStacks && payload.profileStacks.length > 0
                 ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))
                 : null;
             const records = history?.records ?? [];
-            const filteredRecords = records.filter((record) => {
+            const filteredByStackAndRegion = records.filter((record) => {
               if (normalizedStacks && !normalizedStacks.has(record.stack.toLowerCase().trim())) {
                 return false;
               }
@@ -1145,7 +1145,16 @@ function createChromeStubs() {
             return {
               type: 'TJM_ANALYSIS_RESULT',
               payload: {
-                analysis: analyzeTJMHistory({ records: filteredRecords }, new Date()),
+                analysis: analyzeTJMHistory(
+                  {
+                    records: filterTJMHistoryByPeriod(
+                      { records: filteredByStackAndRegion },
+                      payload?.period ?? 'all',
+                      new Date()
+                    ).records,
+                  },
+                  new Date()
+                ),
               },
             };
           }

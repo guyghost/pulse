@@ -22,6 +22,7 @@
     analysis = null,
     isLoading = false,
     error = null,
+    emptyDescription = undefined,
     userSeniority = null,
     userTjmMin = 0,
     userTjmMax = 0,
@@ -32,6 +33,8 @@
     analysis?: TJMAnalysis | null;
     isLoading?: boolean;
     error?: string | null;
+    /** Overrides the default empty-state description (e.g. period-specific copy) */
+    emptyDescription?: string | undefined;
     userSeniority?: SeniorityLevel | null;
     userTjmMin?: number;
     userTjmMax?: number;
@@ -485,7 +488,8 @@
     <div class="space-y-3">
       <OperationalEmptyState
         title="Aucune tendance TJM exploitable"
-        description="Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Suivez les étapes ci-dessous avant de relancer l’analyse."
+        description={emptyDescription ??
+          'Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Suivez les étapes ci-dessous avant de relancer l’analyse.'}
         severity="attention"
         statusLabel="Données absentes"
         icon="bar-chart-3"
