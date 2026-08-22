@@ -132,7 +132,9 @@ test.describe('applications pipeline', () => {
     await expect(nav).toBeVisible();
     await nav.getByRole('button', { name: 'Suivi' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Candidatures' })).toBeVisible();
+    // Le titre "Candidatures" apparaît deux fois : le header de page (h1) et la
+    // colonne kanban du même nom (h3). On cible le niveau 1 pour lever l'ambiguïté.
+    await expect(page.getByRole('heading', { name: 'Candidatures', level: 1 })).toBeVisible();
     // The mission title appears in both the "Dossier recommandé" section and the selected dossier
     // detail. Use .first() to disambiguate (they show the same mission here).
     await expect(

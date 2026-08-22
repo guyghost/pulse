@@ -4,6 +4,7 @@ import {
   favoriteButton,
   missionCards,
   navButton,
+  openSettingsSection,
   unfavoriteButton,
 } from './helpers';
 
@@ -166,6 +167,7 @@ test.describe('Settings Flow', () => {
   test('local AI status section is present', async ({ page }) => {
     await page.getByRole('button', { name: 'Réglages' }).click();
 
+    await openSettingsSection(page, 'account');
     await expect(page.getByRole('heading', { name: 'IA locale' })).toBeVisible();
     await expect(
       page.getByText(
@@ -205,6 +207,7 @@ test.describe('Settings Flow', () => {
   test('settings page shows export section', async ({ page }) => {
     await page.getByRole('button', { name: 'Réglages' }).click();
 
+    await openSettingsSection(page, 'data');
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByRole('button', { name: 'JSON' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'CSV' })).toBeVisible();
@@ -225,6 +228,7 @@ test.describe('Settings Flow', () => {
     }
 
     await page.getByRole('button', { name: 'Réglages' }).click();
+    await openSettingsSection(page, 'data');
     await expect(page.getByText('1 mission prête à partager', { exact: true })).toBeVisible({
       timeout: 3000,
     });
@@ -234,6 +238,7 @@ test.describe('Settings Flow', () => {
   test('settings page shows backup section', async ({ page }) => {
     await page.getByRole('button', { name: 'Réglages' }).click();
 
+    await openSettingsSection(page, 'data');
     await expect(page.getByText('Sauvegarde').first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('Créer une sauvegarde')).toBeVisible();
     await expect(page.getByText('Import', { exact: true })).toBeVisible();
