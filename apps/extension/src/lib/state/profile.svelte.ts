@@ -156,8 +156,13 @@ export function createProfileStore(deps: ProfileStoreDeps): ProfileStore {
         return;
       }
       case 'PROFILE_UPDATED': {
+        // External sync (another writer saved). From `editing`, refresh the
+        // persisted truth but never clobber the user's unsaved draft
+        // (invariant 5 — profile-state.model.md).
         currentProfile = event.profile;
-        draftProfile = event.profile;
+        if (status !== 'editing') {
+          draftProfile = event.profile;
+        }
         profileError = null;
         notify();
         return;

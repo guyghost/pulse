@@ -184,6 +184,14 @@ export class SettingsPageController {
     try {
       return subscribeMessages((message) => {
         if (message.type === 'PROFILE_UPDATED') {
+          // Invariant 5 (profile-state.model.md): an external profile must
+          // never revert fields the user is editing or that are being saved.
+          // Only the actor's `current` refreshes (fresh merge base); the form
+          // fields are the user's draft surface.
+          if (this.editingProfile || this.isSavingProfile) {
+            this.profileActor.send({ type: 'PROFILE_UPDATED', profile: message.payload });
+            return;
+          }
           this.applyProfile(message.payload);
         }
       });
@@ -516,7 +524,9 @@ export class SettingsPageController {
     this.profileSaved = false;
 
     try {
-      const current = await getProfile();
+      // Merge base: the actor's cached current is kept fresh by
+      // PROFILE_UPDATED broadcasts — no extra bridge roundtrip before submit.
+      const current = this.currentProfile ?? (await getProfile());
       const nextKeywords = appendUniqueNormalized(this.profileKeywords, this.keywordInput);
       const nextTjmMin = normalizeDailyRate(this.tjmMin);
       const nextTjmMax = normalizeDailyRate(this.tjmMax);

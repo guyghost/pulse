@@ -24,7 +24,8 @@ editing ──CANCEL──► ready
 editing ──SUBMIT──► saving
 error   ──RETRY (hasDraft)──► saving
 error   ──EDIT───► editing
-*       ──PROFILE_UPDATED──► ready (external sync)
+ready   ──PROFILE_UPDATED──► ready (external sync)
+editing ──PROFILE_UPDATED──► editing (external sync, draft preserved)
 *       ──LOAD──► loading (except from `saving`)
 ```
 
@@ -42,7 +43,7 @@ error   ──EDIT───► editing
 | ------------ | ------- | --------------- | ------------- | -------------- | -------------------- | ----------------------- |
 | `loading`    | -       | -               | -             | saving\*       | ready (ext)          | -                       |
 | `missing`    | loading | -               | -             | saving\*       | ready (ext)          | -                       |
-| `editing`    | -       | -               | ready (draft) | saving\*       | ready (ext)          | -                       |
+| `editing`    | -       | -               | ready (draft) | saving\*       | editing (ext, draft) | -                       |
 | `ready`      | loading | editing (draft) | -             | saving\*       | ready (ext, no move) | -                       |
 | `error`      | loading | editing (clear) | -             | saving\*       | ready (ext)          | saving (guard hasDraft) |
 | `saving`     | ignored | ignored         | ignored       | ignored        | ignored              | ignored                 |
@@ -51,6 +52,12 @@ error   ──EDIT───► editing
 `saving`, and invokes `deps.saveProfile(profile)`.
 
 `(ext)` = `setExternalProfile`: `current = draft = event.profile; error = null`.
+
+`(ext, draft)` = external sync while editing: `current = event.profile` only.
+The user's unsaved `draft` is **preserved** — an external writer (LinkedIn
+import, availability sync, another panel saving) must never silently revert
+fields the user is typing (e.g. `jobTitle`). A later CANCEL returns to the
+freshest external truth.
 
 ## Side effects
 
@@ -66,12 +73,35 @@ error   ──EDIT───► editing
 The store auto-loads on creation (mirrors the machine's `initial: 'loading'`
 with an invoked `loadProfile` actor).
 
+## Service worker SAVE_PROFILE ordering
+
+The save contract spans the bridge. The service worker handler MUST order its
+side effects so the ack never waits on post-commit projections:
+
+1. `saveProfile(payload)` — persist to IndexedDB (clears the semantic cache).
+2. `sendResponse(PROFILE_RESULT)` — **ack immediately**. The side panel's
+   save button and the actor's `saving → ready` transition depend on it.
+3. Broadcast `PROFILE_UPDATED` — depends only on persistence success.
+4. Post-commit projection: `rescoreStoredMissions` (full-mission rescore,
+   Gemini Nano semantic scoring) → broadcast `MISSIONS_UPDATED`. Failures are
+   logged and non-blocking: scores simply refresh on the next scan.
+
+This mirrors the scan-flow precedent (ack before suspendable projections).
+The reverse order blocks the UI for the whole rescore and, combined with
+broadcasts from other writers, races the editor.
+
 ## Invariants
 
 1. `error` is non-null iff `status === 'error'`.
 2. `saving` always has a non-null `draft` (RETRY is guarded by `hasDraft`).
 3. `saving` ignores all events until the save settles (no re-entrancy).
 4. `PROFILE_UPDATED` from `saving` is dropped (never clobbers an in-flight save).
+5. An external `PROFILE_UPDATED` never discards unsaved edits: from `editing`
+   it refreshes `current` only, and consumers (SettingsPage) must not mirror
+   an external payload into form fields while `editingProfile` or a save is
+   in flight.
+6. The save ack (`PROFILE_RESULT`) is sent as soon as persistence succeeds —
+   never after the post-commit rescore.
 
 ## Public API (consumed by OnboardingPage + SettingsPage)
 

@@ -1349,6 +1349,16 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         try {
           await saveProfile(message.payload);
 
+          // Ack + broadcast depend only on persistence success. The rescore
+          // is a post-commit projection and must never delay the save ack
+          // (invariant 6 — profile-state.model.md, scan-flow precedent).
+          sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
+          chrome.runtime
+            .sendMessage({ type: 'PROFILE_UPDATED', payload: message.payload })
+            .catch(() => {
+              // Side panel not open, ignore
+            });
+
           try {
             const rescored = await rescoreStoredMissions(
               message.payload,
@@ -1360,13 +1370,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               console.warn('[MissionPulse] Profile saved but mission rescore failed:', err);
             }
           }
-
-          sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
-          chrome.runtime
-            .sendMessage({ type: 'PROFILE_UPDATED', payload: message.payload })
-            .catch(() => {
-              // Side panel not open, ignore
-            });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', message);

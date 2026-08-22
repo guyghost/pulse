@@ -121,6 +121,34 @@ describe('profile store', () => {
     expect(snapshot.context.current).toEqual(profile);
   });
 
+  it('keeps the editing draft when an external PROFILE_UPDATED arrives', async () => {
+    // Invariant 5 (profile-state.model.md): an external sync refreshes the
+    // persisted truth but never reverts the user's unsaved draft.
+    const saveProfile = vi.fn().mockImplementation(async (saved: UserProfile) => saved);
+    const store = createProfileStore({
+      loadProfile: vi.fn().mockResolvedValue(profile),
+      saveProfile,
+    });
+
+    await waitForSnapshot(store, (s) => s.matches('ready'));
+    store.send({ type: 'EDIT' });
+    expect(store.snapshot.matches('editing')).toBe(true);
+
+    const external: UserProfile = { ...profile, jobTitle: 'Imported Title' };
+    store.send({ type: 'PROFILE_UPDATED', profile: external });
+
+    expect(store.snapshot.matches('editing')).toBe(true);
+    expect(store.snapshot.context.current).toEqual(external);
+    expect(store.snapshot.context.draft).toEqual(profile);
+
+    // The user's submit wins over the external write.
+    const edited: UserProfile = { ...profile, jobTitle: 'Edited Title' };
+    store.send({ type: 'SUBMIT_PROFILE', profile: edited });
+    const snapshot = await waitForSnapshot(store, (s) => s.matches('ready'));
+    expect(saveProfile).toHaveBeenCalledWith(edited);
+    expect(snapshot.context.current).toEqual(edited);
+  });
+
   it('does not retry from error when there is no draft', async () => {
     const saveProfile = vi.fn();
     const store = createProfileStore({

@@ -2149,6 +2149,33 @@ describe('background auto-scan notifications', () => {
     expect(sendResponse).toHaveBeenCalledWith({ type: 'PROFILE_RESULT', payload: profile });
   });
 
+  it('acks SAVE_PROFILE before the rescore completes', async () => {
+    // Invariant 6 (profile-state.model.md): the save ack depends only on
+    // persistence; the rescore is a post-commit projection and must never
+    // delay PROFILE_RESULT (scan-flow precedent).
+    expect(messageListener).toBeTypeOf('function');
+    let resolveRescore: (missions: Mission[]) => void = () => {};
+    rescoreStoredMissions.mockImplementationOnce(
+      () => new Promise<Mission[]>((resolve) => (resolveRescore = resolve))
+    );
+
+    const sendResponse = vi.fn();
+    const handled = messageListener?.({ type: 'SAVE_PROFILE', payload: profile }, {}, sendResponse);
+
+    await vi.waitFor(() =>
+      expect(sendResponse).toHaveBeenCalledWith({ type: 'PROFILE_RESULT', payload: profile })
+    );
+    await vi.waitFor(() => expect(rescoreStoredMissions).toHaveBeenCalled());
+
+    resolveRescore([]);
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'MISSIONS_UPDATED' })
+      )
+    );
+    expect(handled).toBe(true);
+  });
+
   it('routes profile page verification through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
