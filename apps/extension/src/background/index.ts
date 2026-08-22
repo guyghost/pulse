@@ -151,9 +151,11 @@ import { createCopilotBridgeHandler } from '../lib/shell/copilot/background-hand
 import { generateAsset } from '../lib/shell/ai/mission-generator';
 import { generateFieldProposal } from '../lib/shell/form-assistant/local-generator';
 import { getFormAssistSettings, setFormAssistEnabled } from '../lib/shell/form-assistant/settings';
-// NOTE: pas d'import dynamique ici — `import()` est interdit dans un service
-// worker MV3 (spec HTML, w3c/ServiceWorker#1356) et échoue silencieusement
-// en build packagé. Tout module du worker doit être importé statiquement.
+// NOTE: pas d'import dynamique *runtime* (`await import()`) ici — interdit
+// dans un service worker MV3 (spec HTML, w3c/ServiceWorker#1356) et l'échec
+// est masqué en build packagé. Les références de types `import('...').T` sont
+// effacées à la compilation et donc sans effet. Tout module du worker doit
+// être importé statiquement.
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
