@@ -49,14 +49,19 @@ export async function extractLinkedInExperiencesFromDom(
   const placeConnectorPattern = /^(?:and|de|des|du|et|la|le|les|of|the)$/i;
   const isLikelyLocationLine = (line: string): boolean => {
     const value = cleanLine(line);
-    const workModeSuffix = value.match(/(?:^|\s+[·•]\s+)([^·•]+)$/)?.[1] ?? '';
-    if (workModeSuffix && workModePattern.test(workModeSuffix)) {
+    if (workModePattern.test(value)) {
       return true;
     }
 
-    const placeSegments = value.split(/\s*,\s*/);
+    const workModeSuffixMatch = value.match(/^(.+?)\s+[·•]\s+([^·•]+)$/);
+    if (workModeSuffixMatch && !workModePattern.test(workModeSuffixMatch[2] ?? '')) {
+      return false;
+    }
+
+    const placeValue = workModeSuffixMatch?.[1] ?? value;
+    const placeSegments = placeValue.split(/\s*,\s*/);
     return (
-      value.length <= 120 &&
+      placeValue.length <= 120 &&
       placeSegments.length >= 2 &&
       placeSegments.every((segment) =>
         segment

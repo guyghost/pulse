@@ -791,7 +791,7 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences[0]?.description).toBe('Pilotage de la plateforme de paiement.');
   });
 
-  it('does not turn prose mentioning remote work into a location', async () => {
+  it('does not turn prose ending with a work-mode marker into a location', async () => {
     render(`
       <main data-testid="experience-detail-root">
         <section id="experience">
@@ -801,7 +801,7 @@ describe('extractLinkedInExperiencesFromDom', () => {
               <span aria-hidden="true">Example Corp · CDI</span>
               <span aria-hidden="true">janv. 2022 – aujourd’hui</span>
               <div class="pvs-entity__sub-components">
-                <p class="text-body-small">Remote collaboration across three product teams.</p>
+                <p class="text-body-small">Led distributed teams · Remote</p>
               </div>
             </li>
           </ul>
@@ -815,9 +815,7 @@ describe('extractLinkedInExperiencesFromDom', () => {
       throw new Error('expected ready');
     }
     expect(snapshot.experiences[0]?.location).toBeUndefined();
-    expect(snapshot.experiences[0]?.description).toBe(
-      'Remote collaboration across three product teams.'
-    );
+    expect(snapshot.experiences[0]?.description).toBe('Led distributed teams · Remote');
   });
 
   it('splits aria-hidden paragraphs and drops the expanded show-less action', async () => {

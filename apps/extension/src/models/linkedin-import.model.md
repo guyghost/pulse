@@ -319,9 +319,10 @@ Invariants:
   structural (accessibility or fallback) lines. `location` prefers the first
   structural line after the date. LinkedIn may wrap that same field in a prose
   block in some DOM variants; only a prose line with a strict geographic shape
-  (comma-delimited place or an explicit remote/hybrid/on-site marker) may be
-  used as the location fallback. Other prose-family lines only feed
-  `description` and `skills`.
+  (a comma-delimited place, optionally followed by a remote/hybrid/on-site
+  marker, or a standalone work-mode marker) may be used as the location
+  fallback. A work-mode suffix never makes an arbitrary prose prefix a
+  location. Other prose-family lines only feed `description` and `skills`.
 - A description that LinkedIn renders collapsed keeps its truncated visible
   text; the untruncated accessibility duplicate inside `.visually-hidden` is
   not merged (hidden duplicates are removed, never preferred).
@@ -336,8 +337,8 @@ Field assignment follows these deterministic signals:
   localized current-role marker (`Present`, `aujourd’hui`, `en cours`);
 - `location`: first non-duration structural line immediately after the date
   line; when absent, the first post-date prose line that satisfies the strict
-  geographic fallback contract (comma-delimited place or explicit
-  remote/hybrid/on-site marker);
+  geographic fallback contract (comma-delimited place with an optional work
+  mode, or a standalone remote/hybrid/on-site marker);
 - `description`: remaining prose after structural/action/skill labels;
 - `skills`: values from a whole-line `Compétences` / `Skills` label, either the
   label alone or the label followed by a colon and inline values. The label
@@ -475,7 +476,9 @@ extracting → merging` sequence.
 23. A prose-wrapped LinkedIn location is never persisted in `description`:
     structural location wins; otherwise only the strict geographic fallback
     can consume one prose line, and prose that does not match that contract
-    remains description content.
+    remains description content. In particular, `Remote` is a location while
+    `Led distributed teams · Remote` remains a description; a work-mode suffix
+    is accepted only after a valid comma-delimited place.
 
 ## Error and recovery matrix
 
