@@ -226,7 +226,7 @@
         <div
           class="sticky top-0 z-10 -mt-1 flex items-baseline gap-2 bg-page-canvas/95 py-1.5 backdrop-blur-sm"
         >
-          <h3 class="text-micro font-semibold tracking-[0.14em] uppercase text-text-subtle">
+          <h3 class="eyebrow eyebrow--strong eyebrow--subtle">
             {group.year === 0 ? 'Sans date' : group.year}
           </h3>
           <span class="text-micro text-text-muted">

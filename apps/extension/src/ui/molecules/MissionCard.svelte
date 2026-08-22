@@ -275,13 +275,13 @@
         {/if}
         {#if !isSeen}
           <span
-            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 text-micro font-medium uppercase tracking-wider text-blueprint-blue"
+            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 eyebrow eyebrow--blue"
           >
             Nouveau
           </span>
         {:else if showSeenStatus}
           <span
-            class="inline-flex items-center rounded-full bg-subtle-gray px-2 py-0.5 text-micro font-medium uppercase tracking-wider text-text-subtle"
+            class="inline-flex items-center rounded-full bg-subtle-gray px-2 py-0.5 eyebrow eyebrow--subtle"
           >
             Vu
           </span>
@@ -397,9 +397,7 @@
     >
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-            Note expliquée
-          </p>
+          <p class="eyebrow eyebrow--strong eyebrow--blue">Note expliquée</p>
           <p class="mt-1 text-caption leading-4 text-text-secondary">
             {#if missionGrade !== null}
               Note finale {missionGrade}, calculée depuis le profil, l’annonce et les critères
@@ -434,11 +432,11 @@
             {@const grade = scoreToGrade(line.value)}
             {@const color =
               grade === 'A'
-                ? 'bg-accent-green text-[#0c0a09]'
+                ? 'bg-accent-green text-text-on-bright'
                 : grade === 'B'
-                  ? 'bg-accent-amber text-[#0c0a09]'
+                  ? 'bg-accent-amber text-text-on-bright'
                   : grade === 'C'
-                    ? 'bg-status-orange text-[#0c0a09]'
+                    ? 'bg-status-orange text-text-on-bright'
                     : 'bg-disabled-gray text-text-secondary'}
             <div class="flex items-center gap-2.5 py-0.5">
               <span class="text-caption text-text-subtle flex-1">{line.label}</span>
@@ -486,14 +484,14 @@
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
       <div class="rounded-lg border px-3 py-2.5 {decisionInsight.tone}">
-        <p class="text-micro font-semibold uppercase tracking-[0.13em]">{decisionInsight.label}</p>
+        <p class="eyebrow eyebrow--strong eyebrow--inherit">{decisionInsight.label}</p>
         <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
       </div>
 
       <div class="mt-3 grid grid-cols-2 gap-2 text-meta">
         {#if mission.tjm !== null}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">TJM</p>
+            <p class="eyebrow eyebrow--subtle">TJM</p>
             <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
               {formatTJMValue(mission.tjm)}<span class="text-text-muted">/j</span>
             </p>
@@ -501,32 +499,30 @@
         {/if}
         {#if mission.location}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Zone</p>
+            <p class="eyebrow eyebrow--subtle">Zone</p>
             <p class="mt-1 truncate text-text-primary">{mission.location}</p>
           </div>
         {/if}
         {#if mission.duration}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Durée</p>
+            <p class="eyebrow eyebrow--subtle">Durée</p>
             <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
           </div>
         {/if}
         {#if mission.startDate}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Début</p>
+            <p class="eyebrow eyebrow--subtle">Début</p>
             <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
           </div>
         {/if}
         {#if seniorityLabel}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">
-              Séniorité
-            </p>
+            <p class="eyebrow eyebrow--subtle">Séniorité</p>
             <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
           </div>
         {/if}
         <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-subtle">Source</p>
+          <p class="eyebrow eyebrow--subtle">Source</p>
           <p class="mt-1 truncate text-text-primary">{mission.source}</p>
         </div>
       </div>

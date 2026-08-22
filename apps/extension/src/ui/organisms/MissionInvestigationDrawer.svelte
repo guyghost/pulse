@@ -293,9 +293,7 @@
     >
       <div class="mx-auto flex w-full max-w-6xl items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-            Investigation
-          </p>
+          <p class="eyebrow eyebrow--strong">Investigation</p>
           <h2 class="mt-1 max-w-4xl text-heading-lg font-semibold leading-tight text-text-primary">
             {mission.title}
           </h2>
@@ -460,9 +458,7 @@
             <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {#each missionFacts as fact, i (i)}
                 <div class="rounded-lg bg-page-canvas px-3 py-3">
-                  <p
-                    class="flex items-center gap-1.5 text-micro uppercase tracking-[0.13em] text-text-muted"
-                  >
+                  <p class="flex items-center gap-1.5 eyebrow">
                     <Icon name={fact.icon} size={11} />
                     {fact.label}
                   </p>

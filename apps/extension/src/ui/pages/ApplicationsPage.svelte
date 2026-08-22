@@ -650,9 +650,7 @@
     <section class="rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="text-caption font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-            Dossier recommandé
-          </p>
+          <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--blue">Dossier recommandé</p>
           {#if recommendedTrackedMission}
             <h2 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
               {recommendedTrackedMission.mission.title}
@@ -703,7 +701,7 @@
         <Icon name="activity" size={14} class="text-blueprint-blue" />
       </div>
       <div class="min-w-0">
-        <p class="eyebrow text-text-muted">Journal</p>
+        <p class="eyebrow">Journal</p>
         <h2
           id="application-activity-title"
           class="mt-1 text-body-lg font-semibold text-text-primary"
@@ -820,7 +818,7 @@
     <div class="section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
+          <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--subtle">
             Chargement des candidatures
           </p>
           <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
@@ -1025,7 +1023,7 @@
           <div class="section-card rounded-xl p-5">
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
-                <p class="text-caption font-medium uppercase tracking-[0.15em] text-blueprint-blue">
+                <p class="eyebrow eyebrow--caption eyebrow--blue">
                   {STATUS_LABELS[selectedStatus]}
                 </p>
                 <h3 class="mt-1 text-subheading font-semibold text-text-primary">
@@ -1074,7 +1072,7 @@
               {:else}
                 <label
                   for="application-next-action"
-                  class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle"
+                  class="eyebrow eyebrow--caption eyebrow--subtle"
                 >
                   Prochaine action
                 </label>
@@ -1112,9 +1110,7 @@
                 aria-label="Historique des décisions"
               >
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
-                    Historique des décisions
-                  </p>
+                  <p class="eyebrow eyebrow--caption eyebrow--subtle">Historique des décisions</p>
                   <span class="text-caption text-text-subtle">
                     {selectedTracking?.history.length ?? 0} événement{(selectedTracking?.history
                       .length ?? 0) > 1

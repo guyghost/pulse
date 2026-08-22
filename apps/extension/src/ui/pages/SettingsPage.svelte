@@ -661,25 +661,25 @@
 
       <div class="grid gap-2 sm:grid-cols-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
+          <p class="eyebrow">Compte</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {settings.connectedAccountEmail ?? 'Non connecté'}
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
+          <p class="eyebrow">Plan</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {settings.premiumEnabled ? 'Premium — 10 € TTC/an' : 'Gratuit'}
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Appareil</p>
+          <p class="eyebrow">Appareil</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {settings.connectedDeviceLabel}
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
+          <p class="eyebrow">File</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {settings.connectedPendingUploads} envoi · {settings.connectedPendingDownloads}
             réception
@@ -762,7 +762,7 @@
       />
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
+          <p class="eyebrow">Statut</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {settings.aiAvailability === 'available'
               ? 'Disponible'
@@ -772,9 +772,7 @@
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Missions / scan
-          </p>
+          <p class="eyebrow">Missions / scan</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {settings.maxSemanticPerScan}
           </p>
@@ -796,7 +794,7 @@
             <div class="rounded-md bg-surface-white px-2.5 py-2">
               <div class="flex items-center gap-1.5">
                 <Icon name={item.icon} size={12} class="text-blueprint-blue" />
-                <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
+                <p class="eyebrow eyebrow--strong">
                   {item.label}
                 </p>
               </div>
@@ -894,22 +892,20 @@
             <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
               {favoriteExportCount}
             </p>
-            <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Favoris</p>
+            <p class="mt-0.5 eyebrow">Favoris</p>
           </div>
           <div class="rounded-md bg-surface-white px-2 py-2">
             <p class="text-body-lg font-semibold text-text-primary">MD</p>
-            <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Rapport</p>
+            <p class="mt-0.5 eyebrow">Rapport</p>
           </div>
           <div class="rounded-md bg-surface-white px-2 py-2">
             <p class="text-body-lg font-semibold text-text-primary">Local</p>
-            <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Sessions</p>
+            <p class="mt-0.5 eyebrow">Sessions</p>
           </div>
         </div>
       </div>
       <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
-        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-          Formats secondaires
-        </p>
+        <p class="eyebrow eyebrow--strong">Formats secondaires</p>
         <div class="mt-2 flex flex-wrap gap-2">
           <button
             class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
@@ -1070,7 +1066,7 @@
               <Icon name={section.icon} size={14} />
             </span>
             <span class="min-w-0 flex-1">
-              <span class="eyebrow block text-text-muted">{section.label}</span>
+              <span class="eyebrow block">{section.label}</span>
               <span class="mt-0.5 block text-body-lg font-semibold leading-5 text-text-primary">
                 {section.title}
               </span>

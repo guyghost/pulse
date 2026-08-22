@@ -33,7 +33,7 @@
       </div>
     {/if}
     <div class="min-w-0 flex-1">
-      <p class="eyebrow text-blueprint-blue">{eyebrow}</p>
+      <p class="eyebrow eyebrow--blue">{eyebrow}</p>
       <div class="mt-1 flex flex-wrap items-center gap-2">
         <h1 class="text-subheading font-semibold text-text-primary">{title}</h1>
         {#if badge}

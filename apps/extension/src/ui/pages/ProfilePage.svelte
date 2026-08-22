@@ -263,7 +263,7 @@
     <section class="section-card rounded-xl p-5" aria-label="Priorités d’impact profil">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="eyebrow text-text-muted">Priorités d’impact</p>
+          <p class="eyebrow">Priorités d’impact</p>
           <h3 class="mt-1 text-body-lg font-semibold leading-5 text-text-primary">
             {profileImpactSimulation.title}
           </h3>
@@ -274,7 +274,7 @@
         <div
           class="shrink-0 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2.5 py-1.5 text-right"
         >
-          <p class="text-micro uppercase tracking-[0.13em] text-text-muted">Gain</p>
+          <p class="eyebrow">Gain</p>
           <p class="font-mono text-body-lg font-semibold text-blueprint-blue">
             {profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0'}
           </p>

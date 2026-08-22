@@ -144,7 +144,7 @@
 {:else if snapshot.phase === 'connecting'}
   <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
     <div class="flex-1">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+      <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total}
       </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
@@ -222,7 +222,7 @@
     </div>
 
     <div class="flex-1 pt-5">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+      <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total} · {stepLabel}
       </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
@@ -317,9 +317,7 @@
             aria-label="Aperçu de correspondance"
             class="rounded-2xl border border-border-light bg-surface-white p-4"
           >
-            <p class="text-xs font-medium uppercase tracking-[0.12em] text-text-muted">
-              Aperçu en direct
-            </p>
+            <p class="eyebrow eyebrow--caption">Aperçu en direct</p>
             <div class="mt-2 flex items-center gap-3">
               <span
                 class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {previewGradeClass} text-heading font-semibold"
@@ -419,7 +417,7 @@
   <!-- Bottom-sheet style notify step: benefit-first, native Toggle. -->
   <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
     <div class="flex-1">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+      <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total}
       </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">

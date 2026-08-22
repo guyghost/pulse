@@ -144,9 +144,7 @@
     <!-- Content -->
     {#if error}
       <div class="mb-5 rounded-2xl border border-status-red/20 bg-status-red/8 p-4">
-        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-status-red">
-          Restauration bloquée
-        </p>
+        <p class="eyebrow eyebrow--strong text-status-red">Restauration bloquée</p>
         <p class="mt-2 text-body-lg leading-5 text-text-primary">{getErrorMessage(error)}</p>
         <p class="mt-2 text-meta leading-5 text-text-subtle">
           Choisissez un autre fichier ou recréez une sauvegarde depuis cet appareil.
@@ -168,9 +166,7 @@
 
       <div class="mb-5 grid grid-cols-2 gap-2">
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Profil
-          </span>
+          <span class="eyebrow"> Profil </span>
           <span class="mt-1 block truncate text-body-lg font-medium text-text-primary">
             {stats.profileName || 'Non renseigné'}
             {#if stats.jobTitle}
@@ -180,9 +176,7 @@
         </div>
 
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Favoris
-          </span>
+          <span class="eyebrow"> Favoris </span>
           <span
             class="mt-1 block font-mono text-body-lg font-semibold tabular-nums text-blueprint-blue"
             >{stats.favoritesCount} mission(s)</span
@@ -190,9 +184,7 @@
         </div>
 
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Masquées
-          </span>
+          <span class="eyebrow"> Masquées </span>
           <span
             class="mt-1 block font-mono text-body-lg font-semibold tabular-nums text-text-primary"
           >
@@ -201,9 +193,7 @@
         </div>
 
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Version
-          </span>
+          <span class="eyebrow"> Version </span>
           <span class="mt-1 block font-mono text-body-lg font-semibold text-text-primary">
             v{stats.version}
           </span>
@@ -211,9 +201,7 @@
       </div>
 
       <div class="mb-4 rounded-2xl border border-status-orange/25 bg-status-orange/8 p-4">
-        <p
-          class="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.15em] text-status-orange"
-        >
+        <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-orange">
           <Icon name="alert-triangle" size={13} class="shrink-0" />
           Décision requise
         </p>
@@ -247,9 +235,7 @@
           role="alert"
           aria-live="assertive"
         >
-          <p
-            class="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.15em] text-status-red"
-          >
+          <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-red">
             <Icon name="alert-circle" size={13} class="shrink-0" />
             Restauration échouée
           </p>

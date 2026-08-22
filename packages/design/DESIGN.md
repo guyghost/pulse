@@ -17,6 +17,7 @@ Mission Pulse exudes a focused, data-driven clarity, presenting complex financia
 | Text Secondary | `#1c1917` | `--color-text-secondary` | Subheadings, supporting text, and less emphasized information, a subtle step lighter than primary text but still high contrast.                     |
 | Text Muted     | `#6b6561` | `--color-text-muted`     | Placeholder text, minor labels, and supplementary details, providing a softer visual presence.                                                      |
 | Text Subtle    | `#57534d` | `--color-text-subtle`    | Less prominent text like captions or descriptions, visually receding while remaining legible.                                                       |
+| Text On Bright | `#0c0a09` | `--color-text-on-bright` | Text on saturated status/accent fills (grade badges, tags). Never flips in dark theme since its fills keep their light-mode values.                 |
 | Subtle Gray    | `#ececea` | `--color-subtle-gray`    | Backgrounds for subtle containers like badges or minor card elements, offering a hint of differentiation.                                           |
 | Border Light   | `#f0efef` | `--color-border-light`   | Distinguishes UI elements with a subtle border, especially for form fields and interactive elements.                                                |
 | Disabled Gray  | `#d4d2d1` | `--color-disabled-gray`  | Used for disabled states of interactive components, indicating non-interactability.                                                                 |
@@ -164,17 +165,17 @@ Typically Geist font, weight 400, size 14px, #6b6561 text transforming to #00000
 
 FH Total Display Regular, 183px, lineHeight 0.8, color #1c1917, typically followed by a muted equivalent at 106px in #d4d2d1, creating a layered, emphasized headline effect for hero sections.
 
-### Card Container
+### Eyebrow Label
 
-**Role:** Content grouping
+**Role:** Section/field categorization label
 
-Surface White background (#ffffff) with a subtle shadow (rgba(0, 0, 0, 0.06) 0px 2px 4px 0px or rgba(0, 0, 0, 0.1) 0px 1px 2px 0px). Default border radius is 6px. Padding for content is not explicitly defined but visually appears to be around 16px.
+The canonical micro-label above or beside content. System font, micro size (10px), weight 500, uppercase, 0.15em letter-spacing, Text Muted (#a6a09b). Defined once in `@pulse/ui` as `.eyebrow` (components layer).
 
-### Status Tag
+Modifiers: `.eyebrow--caption` (12px caption size, for lower-density contexts), `.eyebrow--strong` (weight 600), `.eyebrow--subtle` (Text Subtle #57534d), `.eyebrow--blue` (Blueprint Blue #0b64e9, for section markers under page headers), `.eyebrow--inherit` (`color: inherit`, for labels inside tinted containers whose tone must follow the ancestor instead of the muted default).
 
-**Role:** Categorization/Label
+Rare one-off tones (status colors, translucent blues) are applied as call-site color utilities layered over the base — they override the component color because utilities outrank the components layer.
 
-Small text (system-ui, 12px, weight 400), with varied background colors like Status Red (#f24149), Orange (#f97006), Yellow (#f9b703), or Violet (#6b4aff). Likely has small padding and a 6px border radius, similar to buttons.
+**Never** hand-roll the combo with utilities (`text-micro uppercase tracking-[0.15em] …`) — use the class so tracking, weight, and size stay governed in one place.
 
 ## Do's and Don'ts
 
@@ -247,6 +248,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
   --color-text-secondary: #1c1917;
   --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
+  --color-text-on-bright: #0c0a09;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;
   --color-disabled-gray: #d4d2d1;
@@ -360,6 +362,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
   --color-text-secondary: #1c1917;
   --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
+  --color-text-on-bright: #0c0a09;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;
   --color-disabled-gray: #d4d2d1;

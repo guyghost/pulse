@@ -218,9 +218,7 @@
 <section class="section-card rounded-xl p-5">
   <div class="flex items-start justify-between gap-4">
     <div class="min-w-0">
-      <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-        Alerte prioritaire
-      </p>
+      <p class="eyebrow eyebrow--strong">Alerte prioritaire</p>
       <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
         Définir ce qui mérite une action
       </h3>
@@ -314,7 +312,7 @@
 
     <div class="grid grid-cols-2 gap-2">
       <label class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-        <span class="block text-micro uppercase tracking-[0.13em] text-text-muted">TJM min</span>
+        <span class="block eyebrow">TJM min</span>
         <input
           type="number"
           min="0"
@@ -324,9 +322,7 @@
         />
       </label>
       <label class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-        <span class="block text-micro uppercase tracking-[0.13em] text-text-muted">
-          Max résultats
-        </span>
+        <span class="block eyebrow">Max résultats</span>
         <input
           type="number"
           min="1"
@@ -412,19 +408,19 @@
         <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
           {alertPreview.totalMissions}
         </p>
-        <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Locales</p>
+        <p class="mt-0.5 eyebrow">Locales</p>
       </div>
       <div class="rounded-md bg-surface-white px-2 py-2">
         <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
           {alertPreview.matchingCount}
         </p>
-        <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Éligibles</p>
+        <p class="mt-0.5 eyebrow">Éligibles</p>
       </div>
       <div class="rounded-md bg-surface-white px-2 py-2">
         <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
           {alertPreview.notifyCount}
         </p>
-        <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Notifiées</p>
+        <p class="mt-0.5 eyebrow">Notifiées</p>
       </div>
     </div>
     {#if alertPreview.seenCount > 0}
