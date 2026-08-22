@@ -100,7 +100,10 @@ import {
 } from '../lib/shell/storage/tracking';
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
 import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
-import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
+import {
+  getGeneratedAssetsForMission,
+  saveGeneratedAsset,
+} from '../lib/shell/storage/generated-assets';
 import { isMissionTrackingPayload, validateMessage } from '../lib/shell/messaging/schemas';
 import {
   createSerializedApplicationTrackingError,
@@ -145,6 +148,14 @@ import { createCopilotCheckpointRepository } from '../lib/shell/copilot/checkpoi
 import { createCopilotTransport } from '../lib/shell/copilot/transport';
 import { getCopilotOrigins, isCopilotRolloutEnabled } from '../lib/shell/copilot/config';
 import { createCopilotBridgeHandler } from '../lib/shell/copilot/background-handler';
+import { generateAsset } from '../lib/shell/ai/mission-generator';
+import { generateFieldProposal } from '../lib/shell/form-assistant/local-generator';
+import { getFormAssistSettings, setFormAssistEnabled } from '../lib/shell/form-assistant/settings';
+// NOTE: pas d'import dynamique *runtime* (`await import()`) ici — interdit
+// dans un service worker MV3 (spec HTML, w3c/ServiceWorker#1356) et l'échec
+// est masqué en build packagé. Les références de types `import('...').T` sont
+// effacées à la compilation et donc sans effet. Tout module du worker doit
+// être importé statiquement.
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -2203,13 +2214,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       const { missionId, generationType } = message.payload;
 
       // The local Gemini Nano kit is free in every legacy premium-flag state.
-      // Its module remains lazy-loaded so the worker pays the AI cost only when
-      // the user explicitly requests local generation.
       (async () => {
         try {
-          const { generateAsset } = await import('../lib/shell/ai/mission-generator');
-          const { saveGeneratedAsset } = await import('../lib/shell/storage/generated-assets');
-
           // Reuse the worker's existing mission/profile read paths (same
           // accessors as GET_FEED_MISSIONS / GET_PROFILE). Only a getAll
           // mission accessor is available, so filter by id.
@@ -2264,8 +2270,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // Source de vérité : src/models/form-assistant.model.md (Machine B).
     // Phase 1 : chemin local uniquement. Le moteur remote (Eve/Vercel) est Phase 2.
     if (message.type === 'FORM_ASSIST_STATUS') {
-      import('../lib/shell/form-assistant/settings')
-        .then(({ getFormAssistSettings }) => getFormAssistSettings())
+      getFormAssistSettings()
         .then((settings) => {
           sendResponse({
             type: 'FORM_ASSIST_STATUS_RESULT',
@@ -2284,8 +2289,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
     if (message.type === 'FORM_ASSIST_ENABLE') {
       const { enabled } = message.payload;
-      import('../lib/shell/form-assistant/settings')
-        .then(({ setFormAssistEnabled }) => setFormAssistEnabled(enabled))
+      setFormAssistEnabled(enabled)
         .then((settings) => {
           const enabledMessage = {
             type: 'FORM_ASSIST_ENABLED',
@@ -2333,9 +2337,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
       (async () => {
         try {
-          const { generateFieldProposal } =
-            await import('../lib/shell/form-assistant/local-generator');
-          const { getFormAssistSettings } = await import('../lib/shell/form-assistant/settings');
           const profile = await getProfile();
 
           const settings = await getFormAssistSettings();
