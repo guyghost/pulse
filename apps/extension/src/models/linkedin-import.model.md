@@ -315,9 +315,13 @@ Invariants:
 - Prose sources never suppress the whole-text fallback: a row falls back to
   whole-text extraction whenever it exposes no accessibility leaf, and the
   fallback excludes blocks owned by prose sources (no double read).
-- Structural fields (`title`, `company`, `dateRange`, `location`) are assigned
-  only from structural (accessibility or fallback) lines; prose-family lines
-  only feed `description` and `skills`.
+- Structural fields (`title`, `company`, `dateRange`) are assigned only from
+  structural (accessibility or fallback) lines. `location` prefers the first
+  structural line after the date. LinkedIn may wrap that same field in a prose
+  block in some DOM variants; only a prose line with a strict geographic shape
+  (comma-delimited place or an explicit remote/hybrid/on-site marker) may be
+  used as the location fallback. Other prose-family lines only feed
+  `description` and `skills`.
 - A description that LinkedIn renders collapsed keeps its truncated visible
   text; the untruncated accessibility duplicate inside `.visually-hidden` is
   not merged (hidden duplicates are removed, never preferred).
@@ -331,7 +335,9 @@ Field assignment follows these deterministic signals:
   after a whitespace-delimited range separator, contains another year or a
   localized current-role marker (`Present`, `aujourd’hui`, `en cours`);
 - `location`: first non-duration structural line immediately after the date
-  line; a prose-family line is never classified as location;
+  line; when absent, the first post-date prose line that satisfies the strict
+  geographic fallback contract (comma-delimited place or explicit
+  remote/hybrid/on-site marker);
 - `description`: remaining prose after structural/action/skill labels;
 - `skills`: values from a whole-line `Compétences` / `Skills` label, either the
   label alone or the label followed by a colon and inline values. The label
@@ -466,6 +472,10 @@ extracting → merging` sequence.
     link and its adjacent edit action resolve to the same `/edit/forms/{id}`
     bucket, and one parseable representation is sufficient. The action-only
     duplicate can neither invalidate the bucket nor create another experience.
+23. A prose-wrapped LinkedIn location is never persisted in `description`:
+    structural location wins; otherwise only the strict geographic fallback
+    can consume one prose line, and prose that does not match that contract
+    remains description content.
 
 ## Error and recovery matrix
 
