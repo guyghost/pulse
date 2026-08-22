@@ -284,6 +284,37 @@ remain available to distinguish title, company/employment type, date range,
 location, description, and skills. Hidden accessibility duplicates and action
 labels are removed before field assignment.
 
+##### Line sources
+
+A position row exposes text through two source families, merged in DOM order:
+
+1. **Accessibility leaves**: `[aria-hidden="true"]` elements that contain no
+   nested `[aria-hidden="true"]`, excluding anything inside a `button`, `svg`,
+   `[hidden]`, `.visually-hidden`, or `.sr-only`. LinkedIn renders the
+   structural fields (title, company, dates, location) this way.
+2. **Block prose leaves**: `p`/`li` elements outside any
+   `[aria-hidden="true"]` ancestor, excluding buttons, svg, hidden elements,
+   and non-leaf blocks. LinkedIn renders experience descriptions and skill
+   chips this way (`pvs-entity__sub-components` blocks whose text is _not_
+   duplicated in an aria-hidden wrapper).
+
+Invariants:
+
+- Prose containers own their nested accessibility values: an aria-hidden leaf
+  inside a collected prose block is never also a standalone source (it is the
+  same text).
+- Within prose containers, `.visually-hidden` labels are **kept** — they carry
+  the field label (for example `Compétences :`) required to classify a skills
+  line; buttons, svg, and hidden elements are removed.
+- Block boundaries (`p`, `li`, `br`) inside a source are line boundaries:
+  two paragraphs of a description never merge into one glued line, regardless
+  of the whitespace between their tags.
+- A row is only reduced to a whole-text fallback when it exposes no source of
+  either family.
+- A description that LinkedIn renders collapsed keeps its truncated visible
+  text; the untruncated accessibility duplicate inside `.visually-hidden` is
+  not merged (hidden duplicates are removed, never preferred).
+
 Field assignment follows these deterministic signals:
 
 - `title`: first primary/bold line in a leaf position row;
@@ -297,7 +328,12 @@ Field assignment follows these deterministic signals:
 - `skills`: values from a whole-line `Compétences` / `Skills` label, either the
   label alone or the label followed by a colon and inline values. The label
   match is anchored to the complete line: prose such as "Skills developed
-  while leading..." remains description text.
+  while leading..." remains description text. When the label stands alone on
+  its line (the visually-hidden label annotates the adjacent value list), the
+  immediately following line carries the values; that adjacent line is
+  consumed as skills and excluded from `description` and from the `location`
+  heuristic, unless it is itself a structural line (date range, duration, or
+  action label).
 
 `employmentType` is an optional canonical experience field. Legacy/manual
 experiences normalize it to `null`; import must not append the value to the
