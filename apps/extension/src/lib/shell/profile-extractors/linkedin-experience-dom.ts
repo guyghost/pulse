@@ -54,6 +54,12 @@ export async function extractLinkedInExperiencesFromDom(
     // them, so raw textContent would glue paragraphs together.
     const rawLinesFrom = (source: Element): string[] => {
       const clone = source.cloneNode(true) as Element;
+      // Interactive and hidden descendants (e.g. a nested "voir plus" button)
+      // are removed before reading text; .visually-hidden labels are kept —
+      // they carry field labels such as "Compétences :".
+      for (const removed of [...clone.querySelectorAll('button, svg, [hidden], .sr-only')]) {
+        removed.remove();
+      }
       for (const lineBreak of [...clone.querySelectorAll('br')]) {
         lineBreak.replaceWith('\n');
       }

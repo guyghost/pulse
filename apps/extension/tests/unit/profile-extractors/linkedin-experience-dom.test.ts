@@ -816,6 +816,40 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences[0]?.description).toBeUndefined();
   });
 
+  it('strips nested buttons, svg, and hidden descendants from prose descriptions', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:prose-nested-chrome">
+              <a data-view-name="profile-component-entity" href="/in/guyghost/details/experience/903/?profilePosition=903">
+                <span aria-hidden="true"><strong>Technical Lead</strong></span>
+                <span aria-hidden="true">Example Corp · Freelance</span>
+                <span aria-hidden="true">janv. 2023 - oct. 2025 · 2 ans 10 mois</span>
+                <span aria-hidden="true">Paris, France</span>
+                <div class="pvs-entity__sub-components">
+                  <p class="text-body-small">
+                    Refonte du SI de paiement.
+                    <span class="sr-only">confidentiel</span>
+                    <svg aria-hidden="true"><title>icône</title></svg>
+                    <button type="button">…voir plus</button>
+                  </p>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.description).toBe('Refonte du SI de paiement.');
+  });
+
   it('does not accept a generic zero-row experience page as empty', async () => {
     render(`
       <main data-testid="experience-detail-root">
