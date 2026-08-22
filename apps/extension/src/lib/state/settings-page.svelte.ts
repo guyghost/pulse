@@ -265,6 +265,17 @@ export class SettingsPageController {
   }
 
   private applyProfile(profile: UserProfile): void {
+    this.seedProfileFields(profile);
+    this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
+  }
+
+  /**
+   * Seeds the form fields from a profile without notifying the actor.
+   * CANCEL uses this (model invariant 5): the read-only view returns to the
+   * freshest persisted truth, and no mirror event can be deferred onto an
+   * in-flight save.
+   */
+  private seedProfileFields(profile: UserProfile): void {
     this.firstName = profile.firstName ?? '';
     this.jobTitle = profile.jobTitle ?? '';
     this.profileLocation = profile.location ?? '';
@@ -273,7 +284,6 @@ export class SettingsPageController {
     this.tjmMin = profile.tjmMin ?? 0;
     this.tjmMax = profile.tjmMax ?? 0;
     this.profileKeywords = profile.keywords ?? [];
-    this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
   }
 
   async loadAiAvailability(): Promise<void> {
@@ -502,6 +512,15 @@ export class SettingsPageController {
   }
 
   toggleProfileEditing(): void {
+    if (this.editingProfile) {
+      // Cancel: return the form to the freshest persisted truth. The draft
+      // is abandoned, and `current` may have been refreshed by an external
+      // PROFILE_UPDATED during editing (invariant 5 — profile-state.model.md).
+      const current = this.currentProfile;
+      if (current) {
+        this.seedProfileFields(current);
+      }
+    }
     this.editingProfile = !this.editingProfile;
   }
 

@@ -14,13 +14,13 @@ Le job à faire : faire émerger les missions à plus fort signal du bruit de si
 
 ## Product Purpose
 
-MissionPulse est une extension Chrome 100% locale qui agrège les missions freelance de six plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
+MissionPulse est une extension Chrome local-first qui agrège les missions freelance de six plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
 
 La réussite se mesure par une recherche plus rapide, une qualification plus simple, et moins d'opportunités ratées.
 
 ## Positioning
 
-Le différenciateur qu'un concurrent ne peut pas copier aisément : **100% local-first**. MissionPulse utilise les sessions navigateur existantes de l'utilisateur — pas de backend, pas de compte, pas de credentials stockés, zéro télémétrie. Là où un agrégateur classique exige un compte et déporte les données côté serveur, MissionPulse reste dans le navigateur : déduplication et scoring cross-plateformes, tendance TJM, et scoring sémantique optionnel via Gemini Nano (IA on-device) — tout calculé localement. C'est l'antidote local aux marketplaces, pas un énième job board.
+Le différenciateur qu'un concurrent ne peut pas copier aisément : **le noyau est 100% local-first**. MissionPulse utilise les sessions navigateur existantes de l'utilisateur — scraping, déduplication, scoring et stockage vivent entièrement dans le navigateur (IndexedDB + chrome.storage), sans compte requis, sans credentials de plateforme stockés, zéro télémétrie. Un mode connecté optionnel existe (appairage opt-in avec le dashboard missionpulse.app pour les entitlements premium), mais il n'est jamais requis : l'extension fonctionne intégralement sans compte ni backend. Là où un agrégateur classique déporte les données côté serveur, MissionPulse calcule tout localement : déduplication et scoring cross-plateformes, tendance TJM, et scoring sémantique optionnel via Gemini Nano (IA on-device). C'est l'antidote local aux marketplaces, pas un énième job board.
 
 ## Operating Context
 
@@ -31,7 +31,7 @@ Le différenciateur qu'un concurrent ne peut pas copier aisément : **100% local
 ## Capabilities and Constraints
 
 - 6 connecteurs plateformes (Free-Work, LeHibou, Hiway, Collective, Cherry Pick, Malt) : parsers purs testables, connecteurs I/O dans le shell ; un DOM source qui change produit une `ConnectorError` typée et les autres connecteurs continuent.
-- Local-first strict : IndexedDB + `chrome.storage` ; aucun backend, aucun compte, aucun credential stocké, zéro télémétrie.
+- Local-first : IndexedDB + `chrome.storage` ; aucun compte requis, aucun credential de plateforme stocké, zéro télémétrie. Mode connecté optionnel (appairage dashboard via deviceSecret local, entitlements premium) — opt-in, jamais requis pour le fonctionnement local.
 - Scoring déterministe local (relevance) + scoring sémantique optionnel via Gemini Nano avec cache 7 jours, non-bloquant s'il est indisponible.
 - Contraintes MV3 : service worker non persistant, pas d'API payante, pas de scraping côté serveur.
 

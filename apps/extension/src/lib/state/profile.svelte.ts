@@ -48,6 +48,9 @@ export function createProfileStore(deps: ProfileStoreDeps): ProfileStore {
   let currentProfile = $state<UserProfile | null>(null);
   let draftProfile = $state<UserProfile | null>(null);
   let profileError = $state<string | null>(null);
+  // External sync parked while `saving` (see `(ext def.)` in
+  // profile-state.model.md) — applied when the in-flight save settles.
+  let pendingExternalProfile: UserProfile | null = null;
 
   const listeners = new SvelteSet<(snapshot: ProfileSnapshot) => void>();
 
@@ -96,6 +99,26 @@ export function createProfileStore(deps: ProfileStoreDeps): ProfileStore {
     }
   }
 
+  /**
+   * Applies a PROFILE_UPDATED that arrived while `saving`. Runs after the
+   * in-flight runSave settles, with the `(ext)` semantics of the settled
+   * state (invariant 4 — profile-state.model.md). The store's own post-save
+   * broadcast lands here too and is idempotent: same payload runSave just
+   * persisted.
+   */
+  function applyPendingExternal(): void {
+    const external = pendingExternalProfile;
+    pendingExternalProfile = null;
+    if (!external) {
+      return;
+    }
+    currentProfile = external;
+    draftProfile = external;
+    profileError = null;
+    status = 'ready';
+    notify();
+  }
+
   async function runSave(profile: UserProfile): Promise<void> {
     try {
       const saved = await deps.saveProfile(profile);
@@ -109,11 +132,17 @@ export function createProfileStore(deps: ProfileStoreDeps): ProfileStore {
       status = 'error';
       notify();
     }
+    applyPendingExternal();
   }
 
   function send(event: ProfileEvent): void {
-    // `saving` ignores all events until the in-flight save settles.
+    // `saving` ignores all events until the in-flight save settles, except
+    // external sync which is deferred (no re-entrancy, merge base stays
+    // fresh — invariants 3/4, profile-state.model.md).
     if (status === 'saving') {
+      if (event.type === 'PROFILE_UPDATED') {
+        pendingExternalProfile = event.profile;
+      }
       return;
     }
 
