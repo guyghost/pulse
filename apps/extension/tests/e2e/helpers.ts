@@ -43,6 +43,22 @@ export function navButton(page: Page, name: string): Locator {
   return mainNavigation(page).getByRole('button', { name });
 }
 
+/**
+ * Les réglages sont organisés en accordéon (`SettingsSectionId`:
+ * 'sources' | 'alerts' | 'account' | 'data') et seule la section
+ * 'sources' est ouverte par défaut. Ce helper déplie la section demandée
+ * via les ids stables `settings-trigger-{id}` / `settings-panel-{id}`.
+ */
+export async function openSettingsSection(page: Page, sectionId: string): Promise<void> {
+  const trigger = page.locator(`#settings-trigger-${sectionId}`);
+  const panel = page.locator(`#settings-panel-${sectionId}`);
+  if (await panel.isVisible().catch(() => false)) {
+    return;
+  }
+  await trigger.click();
+  await expect(panel).toBeVisible();
+}
+
 export function missionCards(page: Page): Locator {
   return page.getByTestId('mission-feed').getByRole('article');
 }
