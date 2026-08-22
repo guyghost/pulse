@@ -11,7 +11,7 @@
 </script>
 
 <div
-  class="flex h-full min-w-0 flex-col gap-4 overflow-x-hidden overflow-y-auto px-4 pb-5 pt-4"
+  class="flex h-full min-w-0 flex-col gap-4 overflow-x-hidden overflow-y-auto px-4 pb-5 pt-4 [&>*]:shrink-0"
   aria-busy={ariaBusy}
 >
   {@render children()}
