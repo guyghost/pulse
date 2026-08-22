@@ -43,15 +43,19 @@ export function navButton(page: Page, name: string): Locator {
   return mainNavigation(page).getByRole('button', { name });
 }
 
+type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data';
+
 /**
- * Les réglages sont organisés en accordéon (`SettingsSectionId`:
- * 'sources' | 'alerts' | 'account' | 'data') et seule la section
- * 'sources' est ouverte par défaut. Ce helper déplie la section demandée
- * via les ids stables `settings-trigger-{id}` / `settings-panel-{id}`.
+ * Les réglages sont organisés en accordéon (`SettingsSectionId`, défini dans
+ * SettingsPage.svelte) et seule la section 'sources' est ouverte par défaut.
+ * Ce helper déplie la section demandée via les ids stables
+ * `settings-trigger-{id}` / `settings-panel-{id}`.
  */
-export async function openSettingsSection(page: Page, sectionId: string): Promise<void> {
+export async function openSettingsSection(page: Page, sectionId: SettingsSectionId): Promise<void> {
   const trigger = page.locator(`#settings-trigger-${sectionId}`);
   const panel = page.locator(`#settings-panel-${sectionId}`);
+  // Échec rapide et diagnostic si l'id ne correspond plus au DOM (typo, refonte).
+  await expect(trigger).toBeVisible({ timeout: 2000 });
   if (await panel.isVisible().catch(() => false)) {
     return;
   }
