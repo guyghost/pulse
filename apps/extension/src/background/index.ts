@@ -42,6 +42,7 @@ import {
 } from '../models/scan-lifecycle.machine';
 import { waitForScanRecovery } from './scan-recovery';
 import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
+import { withServiceWorkerKeepalive } from '../lib/shell/utils/keepalive';
 import { getConnectorIds, getConnectorsMeta } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
@@ -341,6 +342,40 @@ type BeginScanResult =
       operation: ActiveScanOperation;
       complete: () => Promise<ScanExecutionOutcome>;
     };
+
+// Post-save rescore orchestration (profile-state.model.md): serialized and
+// coalesced so concurrent SAVE_PROFILE messages never run overlapping
+// read-modify-write cycles over the mission store, and the final persisted
+// scores always match the latest saved profile.
+let postSaveRescoreInFlight = false;
+let nextPostSaveRescoreProfile: import('../lib/core/types/profile').UserProfile | null = null;
+
+function schedulePostSaveRescore(profile: import('../lib/core/types/profile').UserProfile): void {
+  nextPostSaveRescoreProfile = profile;
+  if (postSaveRescoreInFlight) {
+    return; // coalesced: the drain loop will pick the latest profile
+  }
+  postSaveRescoreInFlight = true;
+  void (async () => {
+    while (nextPostSaveRescoreProfile) {
+      const pendingProfile = nextPostSaveRescoreProfile;
+      nextPostSaveRescoreProfile = null;
+      try {
+        // The ack already closed the message channel, so the rescore holds
+        // the service worker alive itself (MV3 idle timeout).
+        const rescored = await withServiceWorkerKeepalive(async () =>
+          rescoreStoredMissions(pendingProfile, await requireSettingsReleaseSnapshot())
+        );
+        await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('[MissionPulse] Profile saved but mission rescore failed:', err);
+        }
+      }
+    }
+    postSaveRescoreInFlight = false;
+  })();
+}
 
 let activeScanOperation: ActiveScanOperation | null = null;
 const settledScanOperationIds = new Set<string>();
@@ -1349,24 +1384,19 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         try {
           await saveProfile(message.payload);
 
-          try {
-            const rescored = await rescoreStoredMissions(
-              message.payload,
-              await requireSettingsReleaseSnapshot()
-            );
-            await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
-          } catch (err) {
-            if (import.meta.env.DEV) {
-              console.warn('[MissionPulse] Profile saved but mission rescore failed:', err);
-            }
-          }
-
+          // Ack + broadcast depend only on persistence success. The rescore
+          // is a post-commit projection and must never delay the save ack
+          // (invariant 6 — profile-state.model.md, scan-flow precedent).
           sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
           chrome.runtime
             .sendMessage({ type: 'PROFILE_UPDATED', payload: message.payload })
             .catch(() => {
               // Side panel not open, ignore
             });
+
+          // Post-commit projection (serialized + coalesced, keepalive held —
+          // see profile-state.model.md "Post-save rescore orchestration").
+          schedulePostSaveRescore(message.payload);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', message);
@@ -1375,7 +1405,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       })();
       return true;
     }
-
     if (
       message.type === 'GET_SETTINGS_RELEASE' ||
       message.type === 'GET_SETTINGS' ||

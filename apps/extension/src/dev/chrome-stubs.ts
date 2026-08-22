@@ -677,9 +677,11 @@ function createChromeStubs() {
             storage.profile = message.payload;
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, message.payload);
 
-            // Mirror the production service worker (background/index.ts SAVE_PROFILE):
-            // rescore stored missions against the new profile and broadcast the
-            // updated scores so the feed reflects the change in dev mode.
+            // Mirror the production service worker (background/index.ts
+            // SAVE_PROFILE): ack + PROFILE_UPDATED depend only on persistence;
+            // the rescore is a post-commit projection and never delays them.
+            emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
+
             try {
               const profile = message.payload as UserProfile;
               const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
@@ -705,7 +707,6 @@ function createChromeStubs() {
               }
             }
 
-            emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
             return { type: 'PROFILE_RESULT', payload: message.payload };
           case 'FORM_ASSIST_STATUS': {
             const formAssist = storage.formAssist as {
