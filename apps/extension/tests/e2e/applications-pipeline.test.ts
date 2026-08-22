@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SIDE_PANEL } from './helpers';
+import { SIDE_PANEL, enableAllSurfaceFlags } from './helpers';
 
 const mission = {
   id: 'mission-pipeline-1',
@@ -125,6 +125,7 @@ test.describe('applications pipeline', () => {
     page,
   }) => {
     await mockApplicationsPipelineBridge(page);
+    await enableAllSurfaceFlags(page);
     await page.goto(SIDE_PANEL);
 
     const nav = page.getByRole('navigation', { name: 'Main navigation' });

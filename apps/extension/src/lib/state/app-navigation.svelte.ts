@@ -13,6 +13,8 @@ import {
 } from '$lib/shell/facades/app-flags.facade';
 import { subscribeMessages } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
+import { resolveFallbackTab, type ExtensionTabId } from '$lib/core/features/flags';
+import { features } from '$lib/state/features.svelte';
 
 export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 export type AppBootStatus = 'bootstrapping' | 'ready' | 'error';
@@ -80,6 +82,20 @@ export function createAppNavigation() {
   let disposed = false;
   let unsubscribeMessages: (() => void) | null = null;
 
+  /** Surface-flag guard — see models/surface-feature-flags.model.md. */
+  function isTabEnabled(tab: ExtensionTabId): boolean {
+    return features.isTabEnabled(tab);
+  }
+
+  /** A page is navigable only if it is onboarding or an enabled tab. */
+  function isPageNavigable(page: Page): boolean {
+    return page === 'onboarding' || isTabEnabled(page);
+  }
+
+  function homePage(): Page {
+    return resolveFallbackTab(features.surfaceFlags);
+  }
+
   async function bootstrap(): Promise<void> {
     if (disposed) {
       return;
@@ -115,13 +131,16 @@ export function createAppNavigation() {
       if (hasCompletedOnboarding) {
         if (currentPage === 'onboarding') {
           previousPage = currentPage;
-          currentPage = 'feed';
+          currentPage = homePage();
+        } else if (!isPageNavigable(currentPage)) {
+          previousPage = currentPage;
+          currentPage = homePage();
         }
         previousPageIndex = PAGE_INDEX[currentPage];
       } else {
         hasCompletedOnboarding = Boolean(result.profile) || result.onboardingCompleted;
         previousPage = currentPage;
-        currentPage = resolveInitialPage(result);
+        currentPage = resolveInitialPage(result) === 'onboarding' ? 'onboarding' : homePage();
         previousPageIndex = PAGE_INDEX[currentPage];
       }
 
@@ -159,11 +178,34 @@ export function createAppNavigation() {
       return;
     }
 
+    // Guard (models/surface-feature-flags.model.md): navigating to a
+    // disabled surface is a forbidden transition — strict no-op.
+    if (!isPageNavigable(page)) {
+      return;
+    }
+
     const newIndex = PAGE_INDEX[page];
     transitionDirection = newIndex > previousPageIndex ? 1 : -1;
     previousPage = currentPage;
     previousPageIndex = newIndex;
     currentPage = page;
+  }
+
+  /**
+   * Semantic internal navigation (models/surface-feature-flags.model.md):
+   * used by in-app flows (notification click, page "back to feed", settings
+   * onBack) where stranding the user would be worse than redirecting. A
+   * disabled target resolves to the fallback home instead of a no-op.
+   */
+  function navigateWithFallback(page: Page) {
+    if (disposed || bootStatus !== 'ready' || page === currentPage) {
+      return;
+    }
+    if (!isPageNavigable(page)) {
+      navigate(homePage());
+      return;
+    }
+    navigate(page);
   }
 
   async function completeOnboarding(): Promise<boolean> {
@@ -198,8 +240,8 @@ export function createAppNavigation() {
     hasCompletedOnboarding = true;
     transitionDirection = 1;
     previousPage = currentPage;
-    previousPageIndex = PAGE_INDEX.feed;
-    currentPage = 'feed';
+    currentPage = homePage();
+    previousPageIndex = PAGE_INDEX[currentPage];
     return true;
   }
 
@@ -251,6 +293,7 @@ export function createAppNavigation() {
     },
 
     navigate,
+    navigateWithFallback,
     retryBootstrap,
     completeOnboarding,
     resetToOnboarding,

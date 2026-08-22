@@ -9,6 +9,11 @@ l'égalité du catalogue connecteurs / permissions / cache) en fixant la
 frontière **gratuit vs Premium** sur la surface marketing. Il ne modifie ni
 le catalogue connecteurs, ni les prix, ni la politique de confidentialité.
 
+Il dépend également de `apps/extension/src/models/surface-feature-flags.model.md` : les
+`EXTENSION_SURFACE_FLAGS` (définis dans `packages/domain/src/feature-flags.ts`, partagés
+extension + landing) déterminent quelles capacités sont présentées comme **livrées** ou
+**à venir** (`tier: 'soon'`).
+
 ## Principes
 
 1. **L'extension est la preuve.** Une capacité livrée dans l'extension au
@@ -31,8 +36,12 @@ le catalogue connecteurs, ni les prix, ni la politique de confidentialité.
 ```text
 PREMIUM_FEATURE_ENABLED = false
   → extension gating dormant
-  → toutes les pages extension (feed, profil, cv, applications, tjm, settings) libres
-  → compte web optionnel, n'ouvre rien dans l'extension
+  → toutes les pages extension libres
+
+EXTENSION_SURFACE_FLAGS (packages/domain/src/feature-flags.ts)
+  applications: false → nav `applications` masquée, non navigable
+  connected: false    → carte « Compte et synchronisation » masquée, loadConnectedAccount() sauté
+  autres onglets: true
 ```
 
 ## Frontière des fonctionnalités
@@ -46,8 +55,20 @@ PREMIUM_FEATURE_ENABLED = false
 | Score sémantique (IA locale Chrome)     | `apps/extension/src/lib/shell/ai/semantic-scorer.ts` (Gemini Nano) |
 | Comparateur et shortlist quotidienne    | `apps/extension/src/lib/state/feed-page.svelte.ts`                 |
 | Assistant profil et CV                  | nav `profile`, `cv`                                                |
-| Suivi de candidatures (pipeline)        | nav `applications`                                                 |
 | Radar TJM par stack (local)             | nav `tjm`                                                          |
+
+### `soon` — construit, non activé au lancement (flag surface à `false`)
+
+| Capacité                         | Flag surface                   | Preuve extension                                         |
+| -------------------------------- | ------------------------------ | -------------------------------------------------------- |
+| Suivi de candidatures (pipeline) | `applications: false`          | nav `applications` masquée par `isTabEnabled`            |
+| Dashboard connecté (compte)      | `connected: false`             | carte compte masquée, `loadConnectedAccount()` désactivé |
+| Génération IA distante           | `connected: false` (transitif) | l'entrée extension de la génération passe par le compte  |
+
+Une capacité `soon` ne peut être ni étiquetée `free`, ni présentée comme
+livrée dans la moindre copie de la landing. Quand le flag passe à `true`, la
+ligne bascule automatiquement (`tier` est calculé depuis
+`EXTENSION_SURFACE_FLAGS` dans `+page.svelte`).
 
 ### `premium` — couche connectée (compte web)
 
@@ -66,7 +87,7 @@ PREMIUM_FEATURE_ENABLED = false
    déverrouillée par Premium.
 3. **Prix cohérents.** Les compteurs de crédits (`PREMIUM_MONTHLY_CREDITS = 20`)
    et les packs (`CREDIT_PACKS`) doivent refléter `apps/landing/src/lib/credits.ts`.
-   Le prix mensuel (`12€`) est aujourd'hui un littéral dans
+   Le prix (`10€ TTC/an`) est aujourd'hui un littéral dans
    `apps/landing/src/routes/+page.svelte` et doit rester aligné avec la
    configuration Lemon Squeezy (`https://missionpulse.lemonsqueezy.com/checkout`);
    il n'est pas encore porté par `credits.ts`.
@@ -86,16 +107,26 @@ PREMIUM_FEATURE_ENABLED = false
    chemin connecté rend cette affirmation inexacte (voir
    `docs/specs/dashboard-microfrontend.md`). Formulation attendue:
    exécution plateforme locale + synchronisation cloud optionnelle/à venir.
+7. **Synchronisation landing ↔ flags surface.** Aucune copie de la landing
+   (metas, `showcase-caption`, sous-titres, `plan-card`, CTA) ne peut
+   présenter comme livrée une capacité dont le flag
+   `EXTENSION_SURFACE_FLAGS` est `false`. Ces capacités sont soit omises,
+   soit qualifiées « à venir » (`tier: 'soon'`, note d'activation). La copie
+   pilotée par flag utilise `trackingLive` / `connectedLive` /
+   `upcomingFeatures` dérivés de `EXTENSION_SURFACE_FLAGS` dans
+   `apps/landing/src/routes/+page.svelte` : un flip de flag met la landing à
+   jour sans édition manuelle.
 
 ## Transitions de surface (revue)
 
 ```text
 [visiteur anonyme]
-  └─ lit landing → featureMatrix + plans déclarent extension 100% gratuite
-       └─ installe extension → toutes les pages accessibles (gating dormant)
+  └─ lit landing → featureMatrix suit EXTENSION_SURFACE_FLAGS (suivi + connecté = « à venir »)
+       └─ installe extension → onglets activés uniquement (feed, profil, cv, tjm, réglages)
+            └─ onglet désactivé → invisible + non navigable (garde isTabEnabled)
             └─ (optionnel) crée un compte → /dashboard
                  ├─ sans premium → sync dashboard désactivée, générations distantes bloquées
-                 └─ avec premium (12€/mois) → sync activée, 20 générations/mois + packs crédits
+                 └─ avec premium (10€ TTC/an) → sync activée, 20 générations/mois + packs crédits
 ```
 
 États terminaux couverts :
@@ -109,8 +140,13 @@ PREMIUM_FEATURE_ENABLED = false
 ## Preuves attendues pour valider la landing
 
 - `PREMIUM_FEATURE_ENABLED === false` dans `apps/extension/src/lib/core/features/flags.ts` ;
+- `EXTENSION_SURFACE_FLAGS` (`packages/domain/src/feature-flags.ts`) : `applications === false`
+  et `connected === false` au lancement ; importé par
+  `apps/landing/src/routes/+page.svelte` (`trackingLive`, `connectedLive`, `upcomingFeatures`) ;
 - la liste de navigation extension (`apps/extension/src/lib/state/app-navigation.svelte.ts`) ne contient
   aucune route conditionnée au premium ;
 - `apps/landing/src/routes/+page.svelte` ne contient aucun `tier: 'premium'` pour une capacité
   listée `free` dans le tableau ci-dessus ;
+- aucune capacité dont le flag surface est `false` n'apparaît avec `tier: 'free'` ni comme
+  livrée dans une copie (metas, captions, sous-titres, plans, CTA) ;
 - `apps/landing/src/lib/credits.ts` est la seule source pour le prix mensuel et les packs.

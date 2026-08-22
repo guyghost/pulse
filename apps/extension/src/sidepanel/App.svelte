@@ -21,6 +21,7 @@
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
+  import { features } from '$lib/state/features.svelte';
 
   type PageModules = {
     feed: typeof import('../ui/pages/FeedPage.svelte');
@@ -104,6 +105,12 @@
       return;
     }
 
+    // Surface-flag guard (models/surface-feature-flags.model.md): a disabled
+    // tab is never imported — no dynamic import, no side effects.
+    if (page !== 'onboarding' && !features.isTabEnabled(page)) {
+      return;
+    }
+
     const current = pageLoads[page];
     if (current?.status === 'loading' || (current?.status === 'error' && !retry)) {
       return;
@@ -161,7 +168,7 @@
     };
   });
 
-  const visibleNavItems = NAV_ITEMS;
+  const visibleNavItems = $derived(NAV_ITEMS.filter((item) => features.isTabEnabled(item.page)));
   const currentPageLoad = $derived(pageLoads[nav.currentPage]);
   const currentPageLabel = $derived(
     NAV_ITEMS.find((item) => item.page === nav.currentPage)?.label ?? 'Onboarding'
@@ -320,7 +327,7 @@
 
   $effect(() => {
     const unsubscribe = subscribeToNotificationClicked(() => {
-      nav.navigate('feed');
+      nav.navigateWithFallback('feed');
     });
     return unsubscribe;
   });
@@ -445,7 +452,7 @@
           {#if FeedPage}
             <FeedPage
               onNavigateToOnboarding={nav.resetToOnboarding}
-              onNavigateToProfile={() => nav.navigate('profile')}
+              onNavigateToProfile={() => nav.navigateWithFallback('profile')}
               active={nav.currentPage === 'feed'}
             />
           {:else}
@@ -551,8 +558,8 @@
           >
             <TJMPage
               active={nav.currentPage === 'tjm'}
-              onNavigateToProfile={() => nav.navigate('profile')}
-              onNavigateToFeed={() => nav.navigate('feed')}
+              onNavigateToProfile={() => nav.navigateWithFallback('profile')}
+              onNavigateToFeed={() => nav.navigateWithFallback('feed')}
             />
             {#snippet failed(error, reset)}
               <div class="p-4">
@@ -621,7 +628,7 @@
               if (import.meta.env.DEV) console.error('[CvPage crash]', e);
             }}
           >
-            <CvPage onNavigateToProfile={() => nav.navigate('profile')} />
+            <CvPage onNavigateToProfile={() => nav.navigateWithFallback('profile')} />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
@@ -655,7 +662,7 @@
               if (import.meta.env.DEV) console.error('[ApplicationsPage crash]', e);
             }}
           >
-            <ApplicationsPage onNavigateToFeed={() => nav.navigate('feed')} />
+            <ApplicationsPage onNavigateToFeed={() => nav.navigateWithFallback('feed')} />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
@@ -690,7 +697,7 @@
             }}
           >
             <SettingsPage
-              onBack={() => nav.navigate('feed')}
+              onBack={() => nav.navigateWithFallback('feed')}
               onNavigateToOnboarding={nav.resetToOnboarding}
               active={nav.currentPage === 'settings'}
             />

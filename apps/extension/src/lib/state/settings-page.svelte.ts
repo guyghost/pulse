@@ -1,6 +1,7 @@
 import type { Result } from '$lib/core/backup/backup';
 import { SvelteDate } from 'svelte/reactivity';
 import { createBackup, generateBackupFilename, serializeBackup } from '$lib/core/backup/backup';
+import { features } from '$lib/state/features.svelte';
 import type { AppSettings } from '$lib/core/types/app-settings';
 import {
   exportMissionsToCSV,
@@ -235,7 +236,8 @@ export class SettingsPageController {
       this.loadProfile(),
       this.loadAiAvailability(),
       this.loadSettings(),
-      this.loadConnectedAccount(),
+      // Surface flag: no account/sync I/O when the connected feature is off.
+      features.isFeatureEnabled('connected') ? this.loadConnectedAccount() : Promise.resolve(),
       this.loadScanHistory(),
       this.loadFormAssist(),
     ]);

@@ -4,6 +4,31 @@ import type { UserProfile } from '../../src/lib/core/types/profile';
 import type { Mission } from '../../src/lib/core/types/mission';
 
 export const SIDE_PANEL = '/src/sidepanel/index.html';
+
+/**
+ * Active toutes les surfaces (onglets + couche connectée) pour un test e2e.
+ *
+ * Au lancement, `applications` et `connected` sont désactivés
+ * (`EXTENSION_SURFACE_FLAGS`). Les tests qui couvrent ces surfaces seedent
+ * l'override dev via localStorage avant le chargement du side panel — voir
+ * `apps/extension/src/models/surface-feature-flags.model.md` §5bis.
+ */
+export async function enableAllSurfaceFlags(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      '__missionpulse_dev_surface_flags',
+      JSON.stringify({
+        feed: true,
+        profile: true,
+        cv: true,
+        applications: true,
+        tjm: true,
+        settings: true,
+        connected: true,
+      })
+    );
+  });
+}
 export const FEED_SEARCH_PLACEHOLDER = 'Rechercher une mission…';
 
 export function feedSearchInput(page: Page): Locator {

@@ -1,13 +1,43 @@
 /**
  * Feature flags — pure core.
  *
- * The premium feature flag is the single switch that deactivates (or later
- * re-enables) the entire premium system. When dormant (`false`), every
- * premium-gated surface is unlocked and `isPremium` is irrelevant.
+ * Two orthogonal dimensions:
+ *
+ * 1. Surface flags (per-tab + connected layer) — shared with the landing via
+ *    `@pulse/domain`. See `apps/extension/src/models/surface-feature-flags.model.md`.
+ * 2. The premium feature flag — the single switch that deactivates (or later
+ *    re-enables) the entire premium system. When dormant (`false`), every
+ *    premium-gated surface is unlocked and `isPremium` is irrelevant.
  *
  * See `apps/extension/src/models/premium-feature-flag.model.md` for the
- * authoritative state model, truth table, and invariants.
+ * authoritative premium state model, truth table, and invariants.
  */
+import {
+  EXTENSION_SURFACE_FLAGS,
+  EXTENSION_TAB_ORDER,
+  type ExtensionSurfaceFeature,
+  type ExtensionTabId,
+} from '@pulse/domain';
+
+export {
+  EXTENSION_SURFACE_FLAGS,
+  EXTENSION_TAB_ORDER,
+  resolveSurfaceFlags,
+  isTabEnabled,
+  resolveFallbackTab,
+} from '@pulse/domain';
+export type { ExtensionSurfaceFeature, ExtensionSurfaceFlags, ExtensionTabId } from '@pulse/domain';
+
+/** Tab ids as a local union for navigation typing. */
+export type FlippableTabId = ExtensionTabId;
+
+/** All flippable surface feature keys (tabs + connected layer). */
+export const SURFACE_FEATURE_KEYS: readonly ExtensionSurfaceFeature[] = Object.keys(
+  EXTENSION_SURFACE_FLAGS
+) as ExtensionSurfaceFeature[];
+
+/** Ordered tab catalogue mirroring the shared domain constant. */
+export const FLIPPABLE_TAB_ORDER: readonly ExtensionTabId[] = EXTENSION_TAB_ORDER;
 
 /**
  * Whether the premium feature is active (gating enforced).

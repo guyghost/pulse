@@ -13,7 +13,19 @@ const premiumState = vi.hoisted(() => ({
   load: vi.fn(),
   setPremium: vi.fn(),
 }));
-const featureState = vi.hoisted(() => ({ premiumFeatureActive: false }));
+const featureState = vi.hoisted(() => ({
+  premiumFeatureActive: false,
+  isTabEnabled: () => true,
+  surfaceFlags: {
+    feed: true,
+    profile: true,
+    cv: true,
+    applications: true,
+    tjm: true,
+    settings: true,
+    connected: true,
+  },
+}));
 
 vi.mock('../../../src/lib/shell/facades/settings.facade', () => ({
   getProfile,
