@@ -850,6 +850,107 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences[0]?.description).toBe('Refonte du SI de paiement.');
   });
 
+  it('keeps the truncated text of a collapsed prose description and drops the hidden duplicate', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:prose-collapsed">
+              <a data-view-name="profile-component-entity" href="/in/guyghost/details/experience/905/?profilePosition=905">
+                <span aria-hidden="true"><strong>Technical Lead</strong></span>
+                <span aria-hidden="true">Example Corp · Freelance</span>
+                <span aria-hidden="true">janv. 2023 - oct. 2025 · 2 ans 10 mois</span>
+                <span aria-hidden="true">Paris, France</span>
+                <div class="pvs-entity__sub-components">
+                  <p class="text-body-small">
+                    <span aria-hidden="true">Refonte du SI de paiement…</span>
+                    <span class="visually-hidden">Refonte du SI de paiement. Mise en place d'une équipe de 8 personnes.</span>
+                  </p>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBe('Paris, France');
+    expect(snapshot.experiences[0]?.description).toBe('Refonte du SI de paiement…');
+  });
+
+  it('keeps prose as description when the position has no location line', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:prose-no-location">
+              <a data-view-name="profile-component-entity" href="/in/guyghost/details/experience/906/?profilePosition=906">
+                <span aria-hidden="true"><strong>Technical Lead</strong></span>
+                <span aria-hidden="true">Example Corp · Freelance</span>
+                <span aria-hidden="true">janv. 2023 - oct. 2025 · 2 ans 10 mois</span>
+                <div class="pvs-entity__sub-components">
+                  <p class="text-body-small">Refonte du SI de paiement.</p>
+                  <p class="text-body-small">Mise en place d'une équipe de 8 personnes.</p>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBeUndefined();
+    expect(snapshot.experiences[0]?.description).toBe(
+      "Refonte du SI de paiement.\nMise en place d'une équipe de 8 personnes."
+    );
+  });
+
+  it('reads structural fields through the fallback when only prose blocks carry extra text', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:hybrid-plain">
+              <a data-view-name="profile-component-entity" href="/in/guyghost/details/experience/907/?profilePosition=907">
+                <div class="display-flex flex-column">
+                  <strong>Technical Lead</strong>
+                  <span>Example Corp · Freelance</span>
+                  <span>janv. 2023 - oct. 2025</span>
+                  <div class="pvs-entity__sub-components">
+                    <p class="text-body-small">Refonte du SI.</p>
+                  </div>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]).toMatchObject({
+      title: 'Technical Lead',
+      company: 'Example Corp',
+      employmentType: 'Freelance',
+      dateRange: 'janv. 2023 - oct. 2025',
+      description: 'Refonte du SI.',
+    });
+  });
+
   it('does not accept a generic zero-row experience page as empty', async () => {
     render(`
       <main data-testid="experience-detail-root">
