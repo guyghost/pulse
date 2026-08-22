@@ -25,7 +25,7 @@ export async function extractLinkedInExperiencesFromDom(
     (value ?? '').replace(/[\t\f\v \u00a0\u202f]+/g, ' ').trim();
 
   const isActionLine = (line: string): boolean =>
-    /^(voir plus|show more|afficher plus|see more|modifier|edit|supprimer|delete)(?:\s|$)/i.test(
+    /^(?:…+)?\s*(voir plus|voir moins|show more|see less|afficher plus|afficher moins|see more|modifier|edit|supprimer|delete)(?:\s|$)/i.test(
       line
     );
   const isDurationLine = (line: string): boolean =>
@@ -45,42 +45,114 @@ export async function extractLinkedInExperiencesFromDom(
     return hasYear(start) && (hasYear(end) || isCurrentRoleEnd(end));
   };
 
-  const visibleLines = (element: Element): string[] => {
+  const skillsLabelPattern = /^(?:compétences|skills)(?:\s*:\s*(.*))?$/i;
+
+  interface VisibleLine {
+    text: string;
+    prose: boolean;
+  }
+
+  const visibleLines = (element: Element): VisibleLine[] => {
+    const hiddenFromSelector = (candidate: Element): boolean =>
+      Boolean(candidate.closest('button, svg, [hidden], .visually-hidden, .sr-only'));
+
+    // Block boundaries (p, li, br) are line boundaries: LinkedIn renders
+    // multi-paragraph descriptions whose tags may carry no whitespace between
+    // them, so raw textContent would glue paragraphs together.
+    const rawLinesFrom = (source: Element): string[] => {
+      const clone = source.cloneNode(true) as Element;
+      // Interactive and hidden descendants (e.g. a nested "voir plus" button)
+      // are removed before reading text. A .visually-hidden span is kept only
+      // when it carries a field label (for example "Compétences :"); any other
+      // hidden span duplicates adjacent visible text and is dropped.
+      for (const removed of [...clone.querySelectorAll('button, svg, [hidden], .sr-only')]) {
+        removed.remove();
+      }
+      for (const duplicate of [...clone.querySelectorAll('.visually-hidden')]) {
+        if (!skillsLabelPattern.test(cleanLine(duplicate.textContent))) {
+          duplicate.remove();
+        }
+      }
+      for (const lineBreak of [...clone.querySelectorAll('br')]) {
+        lineBreak.replaceWith('\n');
+      }
+      const blocks = [...clone.querySelectorAll('p, li')];
+      const leafBlocks = blocks.filter(
+        (block) => !blocks.some((other) => other !== block && block.contains(other))
+      );
+      const raw =
+        leafBlocks.length > 0
+          ? leafBlocks.map((block) => block.textContent ?? '').join('\n')
+          : (clone.textContent ?? '');
+      return raw.split(/\r?\n/);
+    };
+
+    // Prose blocks own their nested accessibility values: their text is
+    // represented once, through the prose source (which keeps field labels
+    // such as the visually-hidden "Compétences :").
+    const proseSourcesIn = (container: Element): Element[] =>
+      [...container.querySelectorAll('p, li')].filter(
+        (candidate) =>
+          !candidate.closest('[aria-hidden="true"]') &&
+          !hiddenFromSelector(candidate) &&
+          !candidate.querySelector('p, li')
+      );
+    const proseSources = proseSourcesIn(element);
+    const coveredByProse = (candidate: Element): boolean =>
+      proseSources.some((prose) => prose.contains(candidate));
+
     const visibleTextElements = [...element.querySelectorAll('[aria-hidden="true"]')].filter(
       (candidate) =>
-        !candidate.closest('button, svg, [hidden], .visually-hidden, .sr-only') &&
-        !candidate.querySelector('[aria-hidden="true"]')
+        !hiddenFromSelector(candidate) &&
+        !candidate.querySelector('[aria-hidden="true"]') &&
+        !coveredByProse(candidate)
     );
-    const sources =
-      visibleTextElements.length > 0
-        ? visibleTextElements.map((candidate) => candidate.textContent ?? '')
-        : (() => {
-            const clone = element.cloneNode(true) as Element;
-            for (const hidden of clone.querySelectorAll(
-              'button, svg, [hidden], .visually-hidden, .sr-only, [aria-hidden="false"]'
-            )) {
-              hidden.remove();
-            }
-            const leafTextElements = [...clone.querySelectorAll('strong, span, p')].filter(
-              (candidate) => !candidate.querySelector('strong, span, p')
-            );
-            return leafTextElements.length > 0
-              ? leafTextElements.map((candidate) => candidate.textContent ?? '')
-              : [clone.textContent ?? ''];
-          })();
 
-    const lines: string[] = [];
-    const seen = new Set<string>();
-    for (const source of sources) {
-      for (const rawLine of source.split(/\r?\n/)) {
-        const line = cleanLine(rawLine);
-        const key = line.toLocaleLowerCase();
-        if (!line || isActionLine(line) || isDurationLine(line) || seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        lines.push(line);
+    // Prose never suppresses the fallback: a row without accessibility leaves
+    // still reads its structural lines from whole text, with prose-owned
+    // blocks removed from the clone so they are never read twice.
+    const fallbackLines = (): string[] => {
+      const clone = element.cloneNode(true) as Element;
+      for (const prose of proseSourcesIn(clone)) {
+        prose.remove();
       }
+      for (const hidden of [
+        ...clone.querySelectorAll(
+          'button, svg, [hidden], .visually-hidden, .sr-only, [aria-hidden="false"]'
+        ),
+      ]) {
+        hidden.remove();
+      }
+      const leafTextElements = [...clone.querySelectorAll('strong, span, p')].filter(
+        (candidate) => !candidate.querySelector('strong, span, p')
+      );
+      const raw =
+        leafTextElements.length > 0
+          ? leafTextElements.map((candidate) => candidate.textContent ?? '').join('\n')
+          : (clone.textContent ?? '');
+      return raw.split(/\r?\n/);
+    };
+
+    const structuralLines: VisibleLine[] =
+      visibleTextElements.length > 0
+        ? visibleTextElements.flatMap((source) =>
+            rawLinesFrom(source).map((text) => ({ text, prose: false }))
+          )
+        : fallbackLines().map((text) => ({ text, prose: false }));
+    const proseLines: VisibleLine[] = proseSources.flatMap((source) =>
+      rawLinesFrom(source).map((text) => ({ text, prose: true }))
+    );
+
+    const lines: VisibleLine[] = [];
+    const seen = new Set<string>();
+    for (const sourceLine of [...structuralLines, ...proseLines]) {
+      const line = cleanLine(sourceLine.text);
+      const key = line.toLocaleLowerCase();
+      if (!line || isActionLine(line) || isDurationLine(line) || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      lines.push({ text: line, prose: sourceLine.prose });
     }
     return lines;
   };
@@ -202,7 +274,7 @@ export async function extractLinkedInExperiencesFromDom(
 
   const hasPositionStructure = (row: Element): boolean => {
     const lines = visibleLines(row);
-    const dateIndex = lines.findIndex(isDateRangeLine);
+    const dateIndex = lines.findIndex((line) => isDateRangeLine(line.text));
     return dateIndex >= 1;
   };
 
@@ -276,7 +348,9 @@ export async function extractLinkedInExperiencesFromDom(
       for (const nested of candidateRows(groupClone)) {
         nested.row.remove();
       }
-      const groupCompany = visibleLines(groupClone).find((line) => !isDurationLine(line));
+      const groupCompany = visibleLines(groupClone).find(
+        (line) => !isDurationLine(line.text)
+      )?.text;
       for (const descendant of descendants) {
         const hasNestedCandidate = descendants.some(
           (other) =>
@@ -299,10 +373,10 @@ export async function extractLinkedInExperiencesFromDom(
     positionIndex: number
   ): RawExperience | null => {
     const lines = visibleLines(row);
-    const title = lines[0] ?? '';
-    const dateIndex = lines.findIndex(isDateRangeLine);
-    const rawDateRange = dateIndex >= 0 ? lines[dateIndex] : undefined;
-    const structuralLineBeforeDate = dateIndex > 1 ? (lines[1] ?? '') : '';
+    const title = lines[0]?.text ?? '';
+    const dateIndex = lines.findIndex((line) => isDateRangeLine(line.text));
+    const rawDateRange = dateIndex >= 0 ? lines[dateIndex]?.text : undefined;
+    const structuralLineBeforeDate = dateIndex > 1 ? (lines[1]?.text ?? '') : '';
     const [standaloneCompany = '', standaloneEmploymentType = ''] = structuralLineBeforeDate.split(
       /\s+[·•]\s+/,
       2
@@ -319,10 +393,21 @@ export async function extractLinkedInExperiencesFromDom(
           )
         )
       : undefined;
-    const skillsLabelPattern = /^(?:compétences|skills)(?:\s*:\s*(.*))?$/i;
-    const skillsIndex = lines.findIndex((line) => skillsLabelPattern.test(line));
-    const skillsLine = skillsIndex >= 0 ? lines[skillsIndex] : '';
-    const skillsValue = skillsLine.match(skillsLabelPattern)?.[1] ?? '';
+    const skillsIndex = lines.findIndex((line) => skillsLabelPattern.test(line.text));
+    const skillsLine = skillsIndex >= 0 ? (lines[skillsIndex]?.text ?? '') : '';
+    const inlineSkillsValue = skillsLine.match(skillsLabelPattern)?.[1] ?? '';
+    const adjacentSkillsLine =
+      skillsIndex >= 0 && !inlineSkillsValue && skillsIndex + 1 < lines.length
+        ? (lines[skillsIndex + 1]?.text ?? '')
+        : '';
+    const adjacentSkillsIndex =
+      adjacentSkillsLine &&
+      !isDateRangeLine(adjacentSkillsLine) &&
+      !isDurationLine(adjacentSkillsLine) &&
+      !isActionLine(adjacentSkillsLine)
+        ? skillsIndex + 1
+        : -1;
+    const skillsValue = inlineSkillsValue || (adjacentSkillsIndex >= 0 ? adjacentSkillsLine : '');
     const skills = skillsValue
       ? skillsValue
           .split(/\s+[·•]\s+|\s*,\s*/)
@@ -335,11 +420,13 @@ export async function extractLinkedInExperiencesFromDom(
             (line, index) =>
               index > dateIndex &&
               index !== skillsIndex &&
-              !isDurationLine(line) &&
-              !isActionLine(line)
+              index !== adjacentSkillsIndex &&
+              !line.prose &&
+              !isDurationLine(line.text) &&
+              !isActionLine(line.text)
           )
         : -1;
-    const location = locationIndex >= 0 ? lines[locationIndex] : undefined;
+    const location = locationIndex >= 0 ? lines[locationIndex]?.text : undefined;
     const description = lines
       .filter(
         (_line, index) =>
@@ -347,8 +434,10 @@ export async function extractLinkedInExperiencesFromDom(
           index !== 1 &&
           index !== dateIndex &&
           index !== locationIndex &&
-          index !== skillsIndex
+          index !== skillsIndex &&
+          index !== adjacentSkillsIndex
       )
+      .map((line) => line.text)
       .join('\n');
     const entityUrn = cleanLine(row.getAttribute('data-entity-urn'));
     const hrefCandidates = [

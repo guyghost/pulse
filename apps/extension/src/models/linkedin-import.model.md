@@ -284,6 +284,44 @@ remain available to distinguish title, company/employment type, date range,
 location, description, and skills. Hidden accessibility duplicates and action
 labels are removed before field assignment.
 
+##### Line sources
+
+A position row exposes text through two source families. Structural lines come
+first (accessibility leaves, or the whole-text fallback when the row exposes no
+accessibility leaf), then prose lines in DOM order:
+
+1. **Accessibility leaves**: `[aria-hidden="true"]` elements that contain no
+   nested `[aria-hidden="true"]`, excluding anything inside a `button`, `svg`,
+   `[hidden]`, `.visually-hidden`, or `.sr-only`. LinkedIn renders the
+   structural fields (title, company, dates, location) this way.
+2. **Block prose leaves**: `p`/`li` elements outside any
+   `[aria-hidden="true"]` ancestor, excluding buttons, svg, hidden elements,
+   and non-leaf blocks. LinkedIn renders experience descriptions and skill
+   chips this way (`pvs-entity__sub-components` blocks whose text is _not_
+   duplicated in an aria-hidden wrapper).
+
+Invariants:
+
+- Prose containers own their nested accessibility values: an aria-hidden leaf
+  inside a collected prose block is never also a standalone source (it is the
+  same text).
+- Within prose containers, `.visually-hidden` spans are kept only when they
+  carry a field label (a whole-line `Compétences` / `Skills` label); any other
+  `.visually-hidden` span duplicates adjacent visible text and is removed.
+  Buttons, svg, `[hidden]`, and `.sr-only` descendants are always removed.
+- Block boundaries (`p`, `li`, `br`) inside a source are line boundaries:
+  two paragraphs of a description never merge into one glued line, regardless
+  of the whitespace between their tags.
+- Prose sources never suppress the whole-text fallback: a row falls back to
+  whole-text extraction whenever it exposes no accessibility leaf, and the
+  fallback excludes blocks owned by prose sources (no double read).
+- Structural fields (`title`, `company`, `dateRange`, `location`) are assigned
+  only from structural (accessibility or fallback) lines; prose-family lines
+  only feed `description` and `skills`.
+- A description that LinkedIn renders collapsed keeps its truncated visible
+  text; the untruncated accessibility duplicate inside `.visually-hidden` is
+  not merged (hidden duplicates are removed, never preferred).
+
 Field assignment follows these deterministic signals:
 
 - `title`: first primary/bold line in a leaf position row;
@@ -292,12 +330,18 @@ Field assignment follows these deterministic signals:
 - `dateRange`: first line whose start contains a four-digit year and whose end,
   after a whitespace-delimited range separator, contains another year or a
   localized current-role marker (`Present`, `aujourd’hui`, `en cours`);
-- `location`: first non-duration line immediately after the date line;
+- `location`: first non-duration structural line immediately after the date
+  line; a prose-family line is never classified as location;
 - `description`: remaining prose after structural/action/skill labels;
 - `skills`: values from a whole-line `Compétences` / `Skills` label, either the
   label alone or the label followed by a colon and inline values. The label
   match is anchored to the complete line: prose such as "Skills developed
-  while leading..." remains description text.
+  while leading..." remains description text. When the label stands alone on
+  its line (the visually-hidden label annotates the adjacent value list), the
+  immediately following line carries the values; that adjacent line is
+  consumed as skills and excluded from `description` and from the `location`
+  heuristic, unless it is itself a structural line (date range, duration, or
+  action label).
 
 `employmentType` is an optional canonical experience field. Legacy/manual
 experiences normalize it to `null`; import must not append the value to the
