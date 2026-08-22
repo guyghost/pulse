@@ -21,6 +21,7 @@
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
+  import { features } from '$lib/state/features.svelte';
 
   type PageModules = {
     feed: typeof import('../ui/pages/FeedPage.svelte');
@@ -104,6 +105,12 @@
       return;
     }
 
+    // Surface-flag guard (models/surface-feature-flags.model.md): a disabled
+    // tab is never imported — no dynamic import, no side effects.
+    if (page !== 'onboarding' && !features.isTabEnabled(page)) {
+      return;
+    }
+
     const current = pageLoads[page];
     if (current?.status === 'loading' || (current?.status === 'error' && !retry)) {
       return;
@@ -161,7 +168,7 @@
     };
   });
 
-  const visibleNavItems = NAV_ITEMS;
+  const visibleNavItems = $derived(NAV_ITEMS.filter((item) => features.isTabEnabled(item.page)));
   const currentPageLoad = $derived(pageLoads[nav.currentPage]);
   const currentPageLabel = $derived(
     NAV_ITEMS.find((item) => item.page === nav.currentPage)?.label ?? 'Onboarding'

@@ -4,7 +4,92 @@ import {
   shouldPremiumGate,
   canAccessPremium,
   resolvePremiumFeatureFlag,
+  EXTENSION_SURFACE_FLAGS,
+  EXTENSION_TAB_ORDER,
+  SURFACE_FEATURE_KEYS,
+  resolveSurfaceFlags,
+  isTabEnabled,
+  resolveFallbackTab,
 } from '../../../src/lib/core/features/flags';
+
+describe('EXTENSION_SURFACE_FLAGS (launch defaults)', () => {
+  it('ships tracking and connected surfaces disabled at launch', () => {
+    expect(EXTENSION_SURFACE_FLAGS.applications).toBe(false);
+    expect(EXTENSION_SURFACE_FLAGS.connected).toBe(false);
+  });
+
+  it('keeps every other surface enabled', () => {
+    expect(EXTENSION_SURFACE_FLAGS.feed).toBe(true);
+    expect(EXTENSION_SURFACE_FLAGS.profile).toBe(true);
+    expect(EXTENSION_SURFACE_FLAGS.cv).toBe(true);
+    expect(EXTENSION_SURFACE_FLAGS.tjm).toBe(true);
+    expect(EXTENSION_SURFACE_FLAGS.settings).toBe(true);
+  });
+
+  it('exposes one flag key per tab plus the connected layer', () => {
+    expect([...SURFACE_FEATURE_KEYS].sort()).toEqual([...EXTENSION_TAB_ORDER, 'connected'].sort());
+  });
+});
+
+describe('resolveSurfaceFlags', () => {
+  it('returns launch defaults when no override exists', () => {
+    expect(resolveSurfaceFlags(undefined)).toEqual(EXTENSION_SURFACE_FLAGS);
+    expect(resolveSurfaceFlags(null)).toEqual(EXTENSION_SURFACE_FLAGS);
+    expect(resolveSurfaceFlags({})).toEqual(EXTENSION_SURFACE_FLAGS);
+  });
+
+  it('trusts strict booleans only', () => {
+    const resolved = resolveSurfaceFlags({ applications: true, feed: false });
+    expect(resolved.applications).toBe(true);
+    expect(resolved.feed).toBe(false);
+  });
+
+  it('rejects truthy non-boolean values such as the string "false"', () => {
+    const resolved = resolveSurfaceFlags({
+      applications: 'false',
+      connected: 'true',
+      feed: 1,
+      tjm: 0,
+    });
+    expect(resolved.applications).toBe(EXTENSION_SURFACE_FLAGS.applications);
+    expect(resolved.connected).toBe(EXTENSION_SURFACE_FLAGS.connected);
+    expect(resolved.feed).toBe(EXTENSION_SURFACE_FLAGS.feed);
+    expect(resolved.tjm).toBe(EXTENSION_SURFACE_FLAGS.tjm);
+  });
+
+  it('ignores unknown keys instead of crashing', () => {
+    const resolved = resolveSurfaceFlags({ onboarding: true, bogus: 'x' });
+    expect(Object.keys(resolved).sort()).toEqual([...SURFACE_FEATURE_KEYS].sort());
+  });
+});
+
+describe('isTabEnabled', () => {
+  it('reflects the flag value for the tab', () => {
+    expect(isTabEnabled(EXTENSION_SURFACE_FLAGS, 'applications')).toBe(false);
+    expect(isTabEnabled(EXTENSION_SURFACE_FLAGS, 'feed')).toBe(true);
+  });
+});
+
+describe('resolveFallbackTab', () => {
+  it('returns feed when feed is enabled (canonical home)', () => {
+    expect(resolveFallbackTab(EXTENSION_SURFACE_FLAGS)).toBe('feed');
+  });
+
+  it('returns the first enabled tab when feed is disabled', () => {
+    const allOff = Object.fromEntries(
+      EXTENSION_TAB_ORDER.map((tab) => [tab, false])
+    ) as typeof EXTENSION_SURFACE_FLAGS;
+    allOff.profile = true;
+    expect(resolveFallbackTab(allOff)).toBe('profile');
+  });
+
+  it('still returns feed when every tab is disabled (misconfiguration guard)', () => {
+    const allOff = Object.fromEntries(
+      EXTENSION_TAB_ORDER.map((tab) => [tab, false])
+    ) as typeof EXTENSION_SURFACE_FLAGS;
+    expect(resolveFallbackTab(allOff)).toBe('feed');
+  });
+});
 
 describe('PREMIUM_FEATURE_ENABLED', () => {
   it('is dormant by default so the extension ships unlocked', () => {

@@ -190,7 +190,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain("nav.currentPage !== 'profile'");
     expect(source).not.toContain('const PREMIUM_LOCKS');
     expect(source).not.toContain('Premium verrouillé');
-    expect(source).not.toContain('NAV_ITEMS.filter');
+    // Nav filtering may only reflect launch surface flags — never premium status.
+    expect(source).toContain('features.isTabEnabled(item.page)');
+    expect(source).not.toContain('isPremium');
   });
 
   it('keeps the missions list as the primary surface, with counts inline in the header', () => {

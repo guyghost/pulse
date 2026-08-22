@@ -1,3 +1,5 @@
+export * from './feature-flags';
+
 export type ApplicationStage =
   | 'detected'
   | 'selected'
