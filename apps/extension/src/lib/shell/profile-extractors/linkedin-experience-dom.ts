@@ -44,6 +44,35 @@ export async function extractLinkedInExperiencesFromDom(
       /(?:\b(?:present|current|currently|now|présent|en cours)\b|aujourd['’]hui)/i.test(value);
     return hasYear(start) && (hasYear(end) || isCurrentRoleEnd(end));
   };
+  const workModePattern =
+    /^(?:full(?:y)? remote|remote|hybrid|hybride|on-site|onsite|sur site|à distance|a distance|télétravail|teletravail)$/i;
+  const placeConnectorPattern = /^(?:and|de|des|du|et|la|le|les|of|the)$/i;
+  const isLikelyLocationLine = (line: string): boolean => {
+    const value = cleanLine(line);
+    if (workModePattern.test(value)) {
+      return true;
+    }
+
+    const workModeSuffixMatch = value.match(/^(.+?)\s+[·•]\s+([^·•]+)$/);
+    if (workModeSuffixMatch && !workModePattern.test(workModeSuffixMatch[2] ?? '')) {
+      return false;
+    }
+
+    const placeValue = workModeSuffixMatch?.[1] ?? value;
+    const placeSegments = placeValue.split(/\s*,\s*/);
+    return (
+      placeValue.length <= 120 &&
+      placeSegments.length >= 2 &&
+      placeSegments.every((segment) =>
+        segment
+          .split(/\s+/)
+          .every(
+            (token) =>
+              placeConnectorPattern.test(token) || /^[\p{Lu}\d][\p{L}\p{M}\d.'’()/-]*$/u.test(token)
+          )
+      )
+    );
+  };
 
   const skillsLabelPattern = /^(?:compétences|skills)(?:\s*:\s*(.*))?$/i;
 
@@ -414,7 +443,7 @@ export async function extractLinkedInExperiencesFromDom(
           .map(cleanLine)
           .filter(Boolean)
       : [];
-    const locationIndex =
+    const structuralLocationIndex =
       dateIndex >= 0
         ? lines.findIndex(
             (line, index) =>
@@ -426,6 +455,19 @@ export async function extractLinkedInExperiencesFromDom(
               !isActionLine(line.text)
           )
         : -1;
+    const proseLocationIndex =
+      structuralLocationIndex < 0 && dateIndex >= 0
+        ? lines.findIndex(
+            (line, index) =>
+              index > dateIndex &&
+              index !== skillsIndex &&
+              index !== adjacentSkillsIndex &&
+              line.prose &&
+              isLikelyLocationLine(line.text)
+          )
+        : -1;
+    const locationIndex =
+      structuralLocationIndex >= 0 ? structuralLocationIndex : proseLocationIndex;
     const location = locationIndex >= 0 ? lines[locationIndex]?.text : undefined;
     const description = lines
       .filter(

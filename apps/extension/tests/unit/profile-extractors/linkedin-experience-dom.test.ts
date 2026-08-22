@@ -757,6 +757,67 @@ describe('extractLinkedInExperiencesFromDom', () => {
     );
   });
 
+  it('keeps a prose-wrapped location out of the imported description', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:prose-location">
+              <a data-view-name="profile-component-entity" href="/in/guyghost/details/experience/908/?profilePosition=908">
+                <span aria-hidden="true"><strong>Technical Lead</strong></span>
+                <span aria-hidden="true">Example Corp · Freelance</span>
+                <span aria-hidden="true">janv. 2023 - oct. 2025 · 2 ans 10 mois</span>
+                <div class="pvs-entity__sub-components">
+                  <p class="text-body-small">
+                    <span aria-hidden="true">Levallois-Perret, Île-de-France, France · Hybride</span>
+                  </p>
+                  <p class="text-body-small">Pilotage de la plateforme de paiement.</p>
+                </div>
+              </a>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBe(
+      'Levallois-Perret, Île-de-France, France · Hybride'
+    );
+    expect(snapshot.experiences[0]?.description).toBe('Pilotage de la plateforme de paiement.');
+  });
+
+  it('does not turn prose ending with a work-mode marker into a location', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:remote-prose">
+              <span aria-hidden="true"><strong>Engineering Manager</strong></span>
+              <span aria-hidden="true">Example Corp · CDI</span>
+              <span aria-hidden="true">janv. 2022 – aujourd’hui</span>
+              <div class="pvs-entity__sub-components">
+                <p class="text-body-small">Led distributed teams · Remote</p>
+              </div>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBeUndefined();
+    expect(snapshot.experiences[0]?.description).toBe('Led distributed teams · Remote');
+  });
+
   it('splits aria-hidden paragraphs and drops the expanded show-less action', async () => {
     render(`
       <main data-testid="experience-detail-root">
