@@ -191,6 +191,23 @@ export function createAppNavigation() {
     currentPage = page;
   }
 
+  /**
+   * Semantic internal navigation (models/surface-feature-flags.model.md):
+   * used by in-app flows (notification click, page "back to feed", settings
+   * onBack) where stranding the user would be worse than redirecting. A
+   * disabled target resolves to the fallback home instead of a no-op.
+   */
+  function navigateWithFallback(page: Page) {
+    if (disposed || bootStatus !== 'ready' || page === currentPage) {
+      return;
+    }
+    if (!isPageNavigable(page)) {
+      navigate(homePage());
+      return;
+    }
+    navigate(page);
+  }
+
   async function completeOnboarding(): Promise<boolean> {
     if (disposed) {
       return false;
@@ -276,6 +293,7 @@ export function createAppNavigation() {
     },
 
     navigate,
+    navigateWithFallback,
     retryBootstrap,
     completeOnboarding,
     resetToOnboarding,

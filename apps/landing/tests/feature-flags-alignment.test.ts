@@ -42,4 +42,15 @@ describe('landing / extension surface flag alignment', () => {
       );
     }
   });
+
+  it('gates account CTAs on the connected flag so no sign-up path is offered while it is off', () => {
+    // Both account CTAs (Premium sign-up and dashboard/credits management)
+    // must be flag-driven: rendered as anchors when connected is live and as
+    // inert "coming soon" placeholders otherwise.
+    expect(homePage).toContain('{#if connectedLive}');
+    expect(homePage).toContain('Créer mon compte Premium');
+    expect(homePage).toContain('Gérer mon compte et mes crédits');
+    expect(homePage).toContain('aria-disabled="true"');
+    expect(homePage).toContain('bientôt disponible');
+  });
 });

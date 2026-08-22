@@ -327,7 +327,7 @@
 
   $effect(() => {
     const unsubscribe = subscribeToNotificationClicked(() => {
-      nav.navigate('feed');
+      nav.navigateWithFallback('feed');
     });
     return unsubscribe;
   });
@@ -452,7 +452,7 @@
           {#if FeedPage}
             <FeedPage
               onNavigateToOnboarding={nav.resetToOnboarding}
-              onNavigateToProfile={() => nav.navigate('profile')}
+              onNavigateToProfile={() => nav.navigateWithFallback('profile')}
               active={nav.currentPage === 'feed'}
             />
           {:else}
@@ -558,8 +558,8 @@
           >
             <TJMPage
               active={nav.currentPage === 'tjm'}
-              onNavigateToProfile={() => nav.navigate('profile')}
-              onNavigateToFeed={() => nav.navigate('feed')}
+              onNavigateToProfile={() => nav.navigateWithFallback('profile')}
+              onNavigateToFeed={() => nav.navigateWithFallback('feed')}
             />
             {#snippet failed(error, reset)}
               <div class="p-4">
@@ -628,7 +628,7 @@
               if (import.meta.env.DEV) console.error('[CvPage crash]', e);
             }}
           >
-            <CvPage onNavigateToProfile={() => nav.navigate('profile')} />
+            <CvPage onNavigateToProfile={() => nav.navigateWithFallback('profile')} />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
@@ -662,7 +662,7 @@
               if (import.meta.env.DEV) console.error('[ApplicationsPage crash]', e);
             }}
           >
-            <ApplicationsPage onNavigateToFeed={() => nav.navigate('feed')} />
+            <ApplicationsPage onNavigateToFeed={() => nav.navigateWithFallback('feed')} />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
@@ -697,7 +697,7 @@
             }}
           >
             <SettingsPage
-              onBack={() => nav.navigate('feed')}
+              onBack={() => nav.navigateWithFallback('feed')}
               onNavigateToOnboarding={nav.resetToOnboarding}
               active={nav.currentPage === 'settings'}
             />

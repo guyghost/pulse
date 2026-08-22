@@ -971,12 +971,18 @@
               gratuits.
             </li>
           </ul>
-          <a
-            href="/register?redirectTo=%2Fdashboard%3Fupgrade%3Dpremium"
-            class="btn btn--primary btn--lg"
-          >
-            Créer mon compte Premium
-          </a>
+          {#if connectedLive}
+            <a
+              href="/register?redirectTo=%2Fdashboard%3Fupgrade%3Dpremium"
+              class="btn btn--primary btn--lg"
+            >
+              Créer mon compte Premium
+            </a>
+          {:else}
+            <span class="btn btn--primary btn--lg" aria-disabled="true">
+              Compte Premium — bientôt disponible
+            </span>
+          {/if}
         </article>
       </div>
 
@@ -989,7 +995,13 @@
             Premium et n'accordent aucun droit d'abonnement.
           </p>
         </div>
-        <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
+        {#if connectedLive}
+          <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
+        {:else}
+          <span class="btn btn--secondary" aria-disabled="true">
+            Gestion des crédits — bientôt disponible
+          </span>
+        {/if}
       </div>
     </div>
   </section>

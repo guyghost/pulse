@@ -393,8 +393,8 @@ describe('operational UI constraints', () => {
     expect(dashboardSource).toContain('3 étapes pour alimenter le radar TJM');
     expect(dashboardSource).toContain('Alimenter le radar TJM');
     expect(dashboardSource).toContain('Ajuster mon TJM cible');
-    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
-    expect(appSource).toContain("onNavigateToFeed={() => nav.navigate('feed')}");
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
+    expect(appSource).toContain("onNavigateToFeed={() => nav.navigateWithFallback('feed')}");
   });
 
   it('routes missing CV source states to add-experience or retry', () => {
@@ -411,7 +411,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('onPrimaryAction={() => store.reload()}');
     expect(feedSource).toContain('onPrimaryAction={() => store.newExperience()}');
     expect(feedSource).toContain('employmentType: null');
-    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
   });
 
   it('routes Applications story actions to the operationally recommended dossier', () => {

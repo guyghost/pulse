@@ -55,22 +55,40 @@ page courante ∈ pages navigables
 
 Événements et transitions :
 
-| Événement                       | Garde           | Transition                                          |
-| ------------------------------- | --------------- | --------------------------------------------------- |
-| `NAVIGATE(page)`                | `page` enabled  | `currentPage ← page` (respecte la direction)        |
-| `NAVIGATE(page)`                | `page` disabled | **No-op interdit de franchir** (aucun changement)   |
-| `BOOTSTRAP` (profile/flags lus) | —               | `onboarding` si non complété, sinon onglet de repli |
-| `COMPLETE_ONBOARDING`           | —               | `currentPage ← resolveFallbackTab(flags)`           |
-| `PROFILE_UPDATED` (message)     | —               | `hasCompletedOnboarding ← true` (sans navigation)   |
+| Événement                                                                                                                         | Garde           | Transition                                                                                                      |
+| --------------------------------------------------------------------------------------------------------------------------------- | --------------- | --------------------------------------------------------------------------------------------------------------- |
+| `NAVIGATE(page)` (interaction directe : pilule de nav)                                                                            | `page` enabled  | `currentPage ← page` (respecte la direction)                                                                    |
+| `NAVIGATE(page)` (interaction directe : pilule de nav)                                                                            | `page` disabled | **No-op interdit de franchir** (aucun changement)                                                               |
+| `NAVIGATE_INTERNAL(page)` (flux applicatifs : retour au feed depuis Réglages/TJM/Suivi, `onNavigateToProfile`, clic notification) | `page` enabled  | `currentPage ← page`                                                                                            |
+| `NAVIGATE_INTERNAL(page)`                                                                                                         | `page` disabled | `currentPage ← resolveFallbackTab(flags)` — un flux interne ne peut jamais laisser l'utilisateur muet sur place |
+| `BOOTSTRAP` (profile/flags lus)                                                                                                   | —               | `onboarding` si non complété, sinon onglet de repli                                                             |
+| `COMPLETE_ONBOARDING`                                                                                                             | —               | `currentPage ← resolveFallbackTab(flags)`                                                                       |
+| `PROFILE_UPDATED` (message)                                                                                                       | —               | `hasCompletedOnboarding ← true` (sans navigation)                                                               |
+
+Deux commandes distinctes dans `app-navigation.svelte.ts` :
+
+- `navigate(page)` : garde stricte, no-op si `page` est disabled. C'est la
+  commande des **interactions utilisateur directes** (pilules de navigation —
+  qui de toute façon ne listent que les onglets enabled).
+- `navigateWithFallback(page)` : commande des **destinations sémantiques
+  internes** (deep-link notification, `onBack` des pages, liens croisés
+  inter-pages). Une cible disabled résout vers le repli plutôt qu'un no-op :
+  ces appels viennent de l'application elle-même, jamais d'une tentative
+  utilisateur d'atteindre un onglet masqué.
 
 Le repli est calculé par la fonction pure `resolveFallbackTab` :
 
 ```text
 resolveFallbackTab(flags) = feed si feed enabled
                           sinon premier onglet enabled (ordre EXTENSION_TAB_ORDER)
-                          sinon feed (mauvaise config ne doit jamais produire
-                          une page non rendable)
+                          sinon feed (garde pour cartes de flags brutes,
+                          hors normalisation)
 ```
+
+Normalisation amont : `resolveSurfaceFlags` réactive `feed` si les overrides
+désactivent **tous** les onglets — la carte de flags résultante ne peut jamais
+être « tout off ». Le `?? 'feed'` final de `resolveFallbackTab` ne couvre que
+les cartes brutes qui contourneraient la normalisation.
 
 ### Surfaces dérivées de l'état des flags
 
@@ -103,7 +121,11 @@ resolveFallbackTab(flags) = feed si feed enabled
    et ses copies de la même constante (voir
    `apps/landing/src/models/landing-feature-positioning.model.md`). Une
    capacité `disabled` ne peut jamais être étiquetée `free` ni présentée
-   comme livrée : elle est omise ou marquée « à venir ».
+   comme livrée : elle est omise ou marquée « à venir ». Cela couvre aussi
+   les **CTA de compte** : quand `connected` est disabled, aucun lien vers
+   `/register` ou `/dashboard` n'est rendu — les CTA « Créer mon compte
+   Premium » et « Gérer mon compte et mes crédits » deviennent des
+   placeholders inertes « bientôt disponible » (`aria-disabled`).
 8. **Le flag premium historique reste orthogonal** : `applications: true` +
    `PREMIUM_FEATURE_ENABLED: true` reste nécessaire pour un gating freemium
    du Suivi ; ce modèle ne gère que la disponibilité.
@@ -129,14 +151,22 @@ resolveFallbackTab(flags) = feed si feed enabled
 - `resolveFallbackTab` s'applique aussi au bootstrap
   (`resolveInitialPage`) : si `feed` est désactivé, la page initiale est le
   repli, jamais une page non rendable.
+- Les tests e2e **packagés** (build production, pas de stubs DEV : l'override
+  `localStorage` ne peut pas activer un onglet disabled) dérivent la liste
+  des surfaces traversées de la même constante
+  (`EXTENSION_TAB_ORDER` filtré par `EXTENSION_SURFACE_FLAGS`) — jamais
+  d'une liste statique qui divergerait des flags de lancement.
 
 ## 6. Vérifications attendues (Verify)
 
-- Tests unitaires purs : `resolveSurfaceFlags` (coercion, fallback),
-  `resolveFallbackTab` (feed off, tout off), `isTabEnabled`.
-- Tests de navigation : `NAVIGATE` vers un onglet disabled = no-op ;
-  complétion d'onboarding aboutit sur le repli.
+- Tests unitaires purs : `resolveSurfaceFlags` (coercion, fallback,
+  normalisation « jamais tout off »), `resolveFallbackTab` (feed off, tout
+  off), `isTabEnabled`.
+- Tests de navigation : `NAVIGATE` vers un onglet disabled = no-op strict ;
+  `NAVIGATE_INTERNAL` vers un onglet disabled = repli ; complétion
+  d'onboarding aboutit sur le repli.
 - Test d'alignement landing : aucune ligne `tier: 'free'` pour une clé
-  disabled ; lignes `soon` uniquement pour clés disabled.
+  disabled ; lignes `soon` uniquement pour clés disabled ; CTA de compte
+  gated par `connectedLive`.
 - Le LLM ne décide aucune transition : rien à tester au-delà de la
   staticité des constantes (garantie par le typage).

@@ -55,20 +55,26 @@ export const EXTENSION_TAB_ORDER: readonly ExtensionTabId[] = [
  * Storage is untyped: the string `'false'` is truthy and would wrongly enable
  * a surface. Only strict booleans are trusted; anything else falls back to
  * the launch constant for that key.
+ *
+ * Invariant: at least one tab is always enabled. If overrides disable every
+ * tab, `feed` is force-re-enabled so the fallback home stays renderable —
+ * an all-off map would otherwise dead-lock the shell on a skeleton page.
  */
 export function resolveSurfaceFlags(
   overrides: Record<string, unknown> | null | undefined,
   defaults: ExtensionSurfaceFlags = EXTENSION_SURFACE_FLAGS
 ): ExtensionSurfaceFlags {
   const resolved = { ...defaults };
-  if (!overrides) {
-    return resolved;
-  }
-  for (const key of Object.keys(defaults) as ExtensionSurfaceFeature[]) {
-    const value = overrides[key];
-    if (typeof value === 'boolean') {
-      resolved[key] = value;
+  if (overrides) {
+    for (const key of Object.keys(defaults) as ExtensionSurfaceFeature[]) {
+      const value = overrides[key];
+      if (typeof value === 'boolean') {
+        resolved[key] = value;
+      }
     }
+  }
+  if (!EXTENSION_TAB_ORDER.some((tab) => resolved[tab] === true)) {
+    resolved.feed = true;
   }
   return resolved;
 }
@@ -82,9 +88,9 @@ export function isTabEnabled(flags: ExtensionSurfaceFlags, tab: ExtensionTabId):
  * Fallback page invariant: navigation needs at least one enabled tab.
  *
  * Returns `feed` when enabled (the canonical home), otherwise the first
- * enabled tab in {@link EXTENSION_TAB_ORDER}. When every tab is disabled
- * (misconfiguration), still returns `feed` so the shell can never end up
- * without a renderable page.
+ * enabled tab in {@link EXTENSION_TAB_ORDER}. {@link resolveSurfaceFlags}
+ * guarantees at least one enabled tab, so the `?? 'feed'` guard only covers
+ * raw flag maps that bypassed normalization.
  */
 export function resolveFallbackTab(flags: ExtensionSurfaceFlags): ExtensionTabId {
   if (isTabEnabled(flags, 'feed')) {

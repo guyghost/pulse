@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, it, expect } from 'vitest';
 import {
   PREMIUM_FEATURE_ENABLED,
@@ -60,6 +61,16 @@ describe('resolveSurfaceFlags', () => {
   it('ignores unknown keys instead of crashing', () => {
     const resolved = resolveSurfaceFlags({ onboarding: true, bogus: 'x' });
     expect(Object.keys(resolved).sort()).toEqual([...SURFACE_FEATURE_KEYS].sort());
+  });
+
+  it('force-re-enables feed when overrides disable every tab (never all-off)', () => {
+    const allOff = Object.fromEntries(EXTENSION_TAB_ORDER.map((tab) => [tab, false])) as Record<
+      string,
+      boolean
+    >;
+    const resolved = resolveSurfaceFlags(allOff);
+    expect(resolved.feed).toBe(true);
+    expect(resolveFallbackTab(resolved)).toBe('feed');
   });
 });
 
@@ -145,5 +156,17 @@ describe('resolvePremiumFeatureFlag', () => {
     expect(resolvePremiumFeatureFlag('true')).toBe(PREMIUM_FEATURE_ENABLED);
     expect(resolvePremiumFeatureFlag(1)).toBe(PREMIUM_FEATURE_ENABLED);
     expect(resolvePremiumFeatureFlag(0)).toBe(PREMIUM_FEATURE_ENABLED);
+  });
+});
+
+describe('packaged e2e surface derivation', () => {
+  // Packaged builds expose no DEV override, so the mv3 navigation test must
+  // traverse exactly the tabs the launch flags enable — never a static list
+  // that can drift out of sync (see models/surface-feature-flags.model.md).
+  it('derives navigationSurfaces from EXTENSION_TAB_ORDER filtered by the flags', () => {
+    const source = readFileSync('tests/e2e-extension/navigation.test.ts', 'utf8');
+    expect(source).toContain('EXTENSION_TAB_ORDER.filter');
+    expect(source).toContain('EXTENSION_SURFACE_FLAGS[tab]');
+    expect(source).not.toMatch(/const navigationSurfaces: NavigationSurface\[\] = \[/);
   });
 });

@@ -229,4 +229,33 @@ describe('createAppNavigation bootstrap recovery', () => {
     expect(navigation.previousPage).toBe('feed');
     expect(navigation.transitionDirection).toBe(1);
   });
+
+  it('resolves internal navigation to the fallback home when the target is disabled', async () => {
+    surfaceFlags.feed = false;
+    surfaceFlags.applications = false;
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    // Boot lands on the first enabled tab (profile) when feed is disabled.
+    navigation.navigateWithFallback('feed');
+    expect(navigation.currentPage).toBe('profile');
+    // Same-page resolve: no transition recorded, history stays untouched.
+    expect(navigation.previousPage).toBe('feed');
+
+    navigation.navigateWithFallback('applications');
+    expect(navigation.currentPage).toBe('profile');
+  });
+
+  it('keeps navigateWithFallback a no-op for the current page and for onboarding', async () => {
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    navigation.navigateWithFallback('feed');
+    expect(navigation.currentPage).toBe('feed');
+    expect(navigation.previousPage).toBe('feed');
+  });
 });
