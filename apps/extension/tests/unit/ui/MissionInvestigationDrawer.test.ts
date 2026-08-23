@@ -101,4 +101,29 @@ describe('MissionInvestigationDrawer modal focus', () => {
     expect(document.body.textContent).not.toMatch(/\b90\b/);
     expect(document.body.textContent).not.toContain('/100');
   });
+
+  it('garantit que durée, début et description complète vivent dans le drawer', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(MissionInvestigationDrawer, {
+      target,
+      props: {
+        mission: {
+          ...mission,
+          startDate: '2026-09-01',
+          description: 'Une mission de test avec un descriptif technique complet.',
+        },
+        onClose: () => {},
+      },
+    });
+    await tick();
+
+    expect(document.body.textContent).toContain('Durée');
+    expect(document.body.textContent).toContain('6 mois');
+    expect(document.body.textContent).toContain('Début');
+    expect(document.body.textContent).toContain('Détails techniques');
+    expect(document.body.textContent).toContain(
+      'Une mission de test avec un descriptif technique complet.'
+    );
+  });
 });

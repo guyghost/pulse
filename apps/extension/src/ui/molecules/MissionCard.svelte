@@ -6,9 +6,9 @@
   import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
-  import { getMissionGrade, getMissionScore } from '$lib/core/scoring/mission-grade';
+  import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
-  import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
+  import { formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
   import Tooltip from '../atoms/Tooltip.svelte';
@@ -89,7 +89,6 @@
   );
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
-  const scoreValue = $derived(getMissionScore(mission) ?? 0);
   const missionGrade = $derived(getMissionGrade(mission));
   const semanticDisplayValue = $derived(mission.scoreBreakdown?.semantic ?? mission.semanticScore);
   const semanticReason = $derived(mission.scoreBreakdown?.semanticReason ?? mission.semanticReason);
@@ -120,41 +119,6 @@
         .slice(0, 53) || 'mission'
     }-${stableIdHash(mission.id)}`
   );
-
-  const decisionInsight = $derived.by(() => {
-    if (scoreValue >= 80) {
-      return {
-        label: 'Action recommandée',
-        text:
-          mission.tjm !== null
-            ? `À examiner en premier : note A et TJM ${formatTJM(mission.tjm, { fallback: 'non précisé' })}.`
-            : 'À examiner en premier : note A, TJM à vérifier dans l’annonce.',
-        tone: 'border-accent-green/20 bg-accent-green/10 text-text-primary',
-      };
-    }
-
-    if ((mission.scoreBreakdown?.criteria.tjm ?? 100) < 60) {
-      return {
-        label: 'Point de vigilance',
-        text: 'TJM sous votre cible : gardez cette mission seulement si le contexte compense.',
-        tone: 'border-status-orange/20 bg-status-orange/10 text-text-primary',
-      };
-    }
-
-    if (scoreValue >= 60) {
-      return {
-        label: 'À comparer',
-        text: 'Potentiel correct : comparez avec les missions notées A avant de postuler.',
-        tone: 'border-status-yellow/30 bg-status-yellow/12 text-text-primary',
-      };
-    }
-
-    return {
-      label: 'À qualifier',
-      text: 'Priorité faible : ouvrez seulement si la source ou le client est stratégique.',
-      tone: 'border-border-light bg-subtle-gray text-text-subtle',
-    };
-  });
 
   // Tier hue carried by the background tint; glyph stays neutral for WCAG AA.
   // Low tier is intentionally de-emphasized (subtle text on a calm neutral block).
@@ -486,36 +450,11 @@
       class="mt-3 border-t border-border-light pt-3"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
-      <div class="rounded-lg border px-3 py-2.5 {decisionInsight.tone}">
-        <p class="eyebrow eyebrow--strong eyebrow--inherit">{decisionInsight.label}</p>
-        <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
-      </div>
-
-      <div class="mt-3 grid grid-cols-2 gap-2 text-meta">
-        {#if mission.tjm !== null}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">TJM</p>
-            <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
-              {formatTJMValue(mission.tjm)}<span class="text-text-muted">/j</span>
-            </p>
-          </div>
-        {/if}
+      <div class="grid grid-cols-2 gap-2 text-meta">
         {#if mission.location}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
             <p class="eyebrow eyebrow--subtle">Zone</p>
             <p class="mt-1 truncate text-text-primary">{mission.location}</p>
-          </div>
-        {/if}
-        {#if mission.duration}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">Durée</p>
-            <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
-          </div>
-        {/if}
-        {#if mission.startDate}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">Début</p>
-            <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
           </div>
         {/if}
         {#if seniorityLabel}
@@ -531,7 +470,9 @@
       </div>
       {#if mission.description}
         <div class="mt-3 border-t border-border-light pt-3">
-          <p class="text-meta leading-relaxed text-text-subtle">{mission.description}</p>
+          <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
+            {mission.description}
+          </p>
         </div>
       {/if}
 

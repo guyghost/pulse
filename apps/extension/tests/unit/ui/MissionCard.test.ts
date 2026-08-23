@@ -126,6 +126,52 @@ describe('MissionCard', () => {
     expect(details!.textContent).toContain('Analyser →');
   });
 
+  it('concentre la grille dépliée sur zone, séniorité et source', async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const details = target.querySelector('[role="region"]') as HTMLElement;
+    expect(details).not.toBeNull();
+    expect(details.textContent).toContain('Zone');
+    expect(details.textContent).toContain('Séniorité');
+    expect(details.textContent).toContain('Source');
+    // TJM vit dans la ligne collapse, durée et début dans le drawer Analyser.
+    expect(details.textContent).not.toContain('TJM');
+    expect(details.textContent).not.toContain('Durée');
+    expect(details.textContent).not.toContain('Début');
+  });
+
+  it("n'affiche plus le bloc éditorial de décision dans l'expand", async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const details = target.querySelector('[role="region"]') as HTMLElement;
+    expect(details.textContent).not.toContain('Action recommandée');
+    expect(details.textContent).not.toContain('Point de vigilance');
+    expect(details.textContent).not.toContain('À qualifier');
+  });
+
+  it('tronque la description dépliée à deux lignes', async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const description = target.querySelector('[role="region"] p.line-clamp-2');
+    expect(description).not.toBeNull();
+    expect(description!.textContent).toContain('Mission de developpement');
+  });
+
   it('expose une carte article non interactive avec un nom stable', async () => {
     const target = mountCard();
     await tick();
