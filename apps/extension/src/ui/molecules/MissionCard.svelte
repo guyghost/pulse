@@ -11,7 +11,7 @@
   import { formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
-  import Tooltip from '../atoms/Tooltip.svelte';
+  import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
 
   const {
     mission,
@@ -483,29 +483,37 @@
             label={copied ? 'Lien copié' : 'Copier le lien'}
             description="Partagez ou archivez la mission sans ouvrir la plateforme."
           >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-              onclick={handleCopyLink}
-              aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
-            >
-              <Icon
-                name={copied ? 'check' : 'link'}
-                size={13}
-                class={copied ? 'text-blueprint-blue' : ''}
-              />
-            </button>
+            {#snippet children(tooltip: TooltipTriggerState)}
+              <button
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                onclick={handleCopyLink}
+                onkeydown={tooltip.onKeydown}
+                aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+                aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+              >
+                <Icon
+                  name={copied ? 'check' : 'link'}
+                  size={13}
+                  class={copied ? 'text-blueprint-blue' : ''}
+                />
+              </button>
+            {/snippet}
           </Tooltip>
           <Tooltip
             label="Ouvrir la mission"
             description="Passez à la plateforme source pour vérifier ou postuler."
           >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-              onclick={handleOpenLink}
-              aria-label="Ouvrir la mission sur la plateforme source"
-            >
-              <Icon name="external-link" size={13} />
-            </button>
+            {#snippet children(tooltip: TooltipTriggerState)}
+              <button
+                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                onclick={handleOpenLink}
+                onkeydown={tooltip.onKeydown}
+                aria-label="Ouvrir la mission sur la plateforme source"
+                aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+              >
+                <Icon name="external-link" size={13} />
+              </button>
+            {/snippet}
           </Tooltip>
         </div>
         <button
@@ -558,13 +566,17 @@
         ? 'La mission reviendra dans le feed actif.'
         : 'Retirez cette mission du flux de décision.'}
     >
-      <button
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
-        onclick={handleHide}
-        aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
-      >
-        <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
-      </button>
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <button
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+          onclick={handleHide}
+          onkeydown={tooltip.onKeydown}
+          aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
+        </button>
+      {/snippet}
     </Tooltip>
     <Tooltip
       label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
@@ -572,19 +584,26 @@
         ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
         : 'Ajoutez cette mission à la sélection pour départager les missions.'}
     >
-      <button
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
-          ? 'bg-blueprint-blue/8 text-blueprint-blue'
-          : ''}"
-        onclick={handleToggleCompare}
-        disabled={compareDisabled && !isCompared}
-        aria-label={isCompared
-          ? 'Retirer la mission de la comparaison'
-          : 'Ajouter la mission à la comparaison'}
-        aria-pressed={isCompared}
-      >
-        <Icon name="git-compare-arrows" size={13} />
-      </button>
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <!-- aria-disabled (et non disabled) : le bouton reste focalisable pour
+             que l'explication du blocage soit atteignable au clavier ; le
+             handler garde l'action inactive. -->
+        <button
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+            ? 'bg-blueprint-blue/8 text-blueprint-blue'
+            : ''}"
+          onclick={handleToggleCompare}
+          onkeydown={tooltip.onKeydown}
+          aria-disabled={compareDisabled && !isCompared ? 'true' : undefined}
+          aria-label={isCompared
+            ? 'Retirer la mission de la comparaison'
+            : 'Ajouter la mission à la comparaison'}
+          aria-pressed={isCompared}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name="git-compare-arrows" size={13} />
+        </button>
+      {/snippet}
     </Tooltip>
     <Tooltip
       label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
@@ -592,20 +611,42 @@
         ? 'La mission quitte le fil des favoris.'
         : 'Épinglez la mission pour la retrouver dans le fil des favoris.'}
     >
-      <button
-        type="button"
-        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
-          ? 'text-blueprint-blue hover:text-blueprint-blue'
-          : ''}"
-        onclick={handleToggleFavorite}
-        disabled={isFavoritePending}
-        aria-label={isFavorite
-          ? 'Retirer la mission des favoris'
-          : 'Ajouter la mission aux favoris'}
-        aria-pressed={isFavorite}
-      >
-        <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
-      </button>
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
+            ? 'text-blueprint-blue hover:text-blueprint-blue'
+            : ''}"
+          onclick={handleToggleFavorite}
+          onkeydown={tooltip.onKeydown}
+          disabled={isFavoritePending}
+          aria-label={isFavorite
+            ? 'Retirer la mission des favoris'
+            : 'Ajouter la mission aux favoris'}
+          aria-pressed={isFavorite}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
+        </button>
+      {/snippet}
     </Tooltip>
   </div>
+
+  {#if swipeParams.enabled}
+    <!-- Affordance swipe (models/mission-card-swipe.model.md) : indice
+         purement décoratif, masqué aux lecteurs d'écran et hors tabulation —
+         les boutons d'action restent la voie accessible. -->
+    <span
+      class="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-within:opacity-60"
+      aria-hidden="true"
+    >
+      <Icon name="chevron-left" size={14} />
+    </span>
+    <span
+      class="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-within:opacity-60"
+      aria-hidden="true"
+    >
+      <Icon name="chevron-right" size={14} />
+    </span>
+  {/if}
 </article>

@@ -410,6 +410,7 @@
                     bind:this={actionsMenuElement}
                     class="absolute right-0 top-full z-50 mt-2 w-52 rounded-lg border border-border-light bg-surface-white p-1.5 shadow-xl"
                     role="menu"
+                    tabindex="-1"
                     aria-label="Actions secondaires"
                     onkeydown={handleActionsMenuKeydown}
                   >
@@ -423,8 +424,8 @@
                         handleToggleCompare();
                       }}
                       disabled={compareDisabled && !isCompared}
-                      role="menuitem"
-                      aria-pressed={isCompared}
+                      role="menuitemcheckbox"
+                      aria-checked={isCompared}
                     >
                       <Icon name="git-compare-arrows" size={14} />
                       {isCompared ? 'Retirer comparaison' : 'Comparer'}
@@ -436,8 +437,8 @@
                         actionsMenuOpen = false;
                         onHide?.();
                       }}
-                      role="menuitem"
-                      aria-pressed={isHidden}
+                      role="menuitemcheckbox"
+                      aria-checked={isHidden}
                     >
                       <Icon name={isHidden ? 'eye' : 'x-circle'} size={14} />
                       {isHidden ? 'Restaurer' : 'Masquer'}

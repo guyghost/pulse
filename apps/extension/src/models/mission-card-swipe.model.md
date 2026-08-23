@@ -43,6 +43,12 @@ stateDiagram-v2
 - Post-détection de clic : un `POINTER_UP` sous le seuil est traité comme clic
   normal (ouverture du détail) — jamais comme tri accidentel. Un `POINTER_UP`
   après intention horizontale verrouillée supprime le clic qui suit.
+- Affordance hors geste : deux chevrons translucides (← masquer, → favori)
+  apparaissent aux bords de la carte au survol et au focus dans la carte
+  (`group-hover` / `group-focus-within`), uniquement quand le geste est actif.
+  Ils sont **purement décoratifs** (`aria-hidden`, `pointer-events-none`,
+  hors ordre de tabulation) : aucun événement, aucun état — l'invariant 2
+  (les boutons d'action restent la voie accessible) s'applique à l'identique.
 
 ## Invariants
 

@@ -126,4 +126,28 @@ describe('MissionInvestigationDrawer modal focus', () => {
       'Une mission de test avec un descriptif technique complet.'
     );
   });
+
+  it('expose les actions secondaires comme cases à cocher de menu (menuitemcheckbox)', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(MissionInvestigationDrawer, {
+      target,
+      props: { mission, onClose: () => {} },
+    });
+    await tick();
+
+    const kebab = document.querySelector<HTMLButtonElement>('button[aria-haspopup="menu"]');
+    kebab!.click();
+    await tick();
+
+    const items = document.querySelectorAll('[role="menu"] button');
+    expect(items.length).toBe(2);
+    const [compare, hide] = items;
+    expect(compare.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(compare.getAttribute('aria-checked')).toBe('false');
+    expect(compare.getAttribute('aria-pressed')).toBeNull();
+    expect(hide.getAttribute('role')).toBe('menuitemcheckbox');
+    expect(hide.getAttribute('aria-checked')).toBe('false');
+    expect(hide.getAttribute('aria-pressed')).toBeNull();
+  });
 });
