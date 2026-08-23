@@ -70,6 +70,62 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
+  it('affiche le TJM et la localisation dès l’état réduit, sans déplier', async () => {
+    const target = mountCard();
+    await tick();
+
+    expect(target.textContent).toMatch(/650.*€.*\/j/);
+    expect(target.textContent).toContain('Paris');
+  });
+
+  it('signale un TJM absent au lieu de ne rien afficher', async () => {
+    const target = mountCard({ mission: makeMission({ tjm: null, location: 'Bordeaux' }) });
+    await tick();
+
+    expect(target.textContent).toContain('TJM à vérifier');
+    expect(target.textContent).not.toMatch(/€\/j/);
+    expect(target.textContent).toContain('Bordeaux');
+  });
+
+  it('expose les actions de triage dès l’état réduit, sans doublon', async () => {
+    const target = mountCard();
+    await tick();
+
+    expect(target.querySelectorAll('button[aria-label="Masquer la mission"]')).toHaveLength(1);
+    expect(
+      target.querySelectorAll('button[aria-label="Ajouter la mission à la comparaison"]')
+    ).toHaveLength(1);
+    expect(
+      target.querySelectorAll('button[aria-label="Ajouter la mission aux favoris"]')
+    ).toHaveLength(1);
+  });
+
+  it('réserve la zone dépliée aux actions copier/ouvrir/analyser', async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const details = target.querySelector('[role="region"]');
+    expect(details).not.toBeNull();
+    expect(details!.querySelectorAll('button[aria-label="Masquer la mission"]')).toHaveLength(0);
+    expect(
+      details!.querySelectorAll('button[aria-label="Ajouter la mission à la comparaison"]')
+    ).toHaveLength(0);
+    expect(
+      details!.querySelectorAll('button[aria-label="Ajouter la mission aux favoris"]')
+    ).toHaveLength(0);
+    expect(
+      details!.querySelectorAll('button[aria-label="Copier le lien de la mission"]')
+    ).toHaveLength(1);
+    expect(
+      details!.querySelectorAll('button[aria-label="Ouvrir la mission sur la plateforme source"]')
+    ).toHaveLength(1);
+    expect(details!.textContent).toContain('Analyser →');
+  });
+
   it('expose une carte article non interactive avec un nom stable', async () => {
     const target = mountCard();
     await tick();

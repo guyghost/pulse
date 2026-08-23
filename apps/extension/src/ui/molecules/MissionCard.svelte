@@ -82,6 +82,8 @@
     mission.seniority ? (seniorityLabels[mission.seniority] ?? mission.seniority) : null
   );
 
+  const tjmValue = $derived(formatTJMValue(mission.tjm));
+
   const availableTransitions = $derived(
     trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []
   );
@@ -321,20 +323,6 @@
       {/if}
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {isFavorite
-          ? 'text-blueprint-blue hover:text-blueprint-blue'
-          : ''}"
-        onclick={handleToggleFavorite}
-        disabled={isFavoritePending}
-        aria-label={isFavorite
-          ? 'Retirer la mission des favoris'
-          : 'Ajouter la mission aux favoris'}
-        aria-pressed={isFavorite}
-      >
-        <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
-      </button>
-      <button
-        type="button"
         class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
         'expand'
           ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
@@ -367,6 +355,21 @@
       >
         {semanticReason}
       </span>
+    {/if}
+  </div>
+
+  <!-- Quick-scan line: TJM (scoring driver) + location, visible from collapse -->
+  <div class="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-body">
+    {#if tjmValue !== null}
+      <span class="font-mono font-bold tabular-nums text-text-primary">
+        {tjmValue}<span class="text-text-muted">/j</span>
+      </span>
+    {:else}
+      <span class="text-text-muted">TJM à vérifier</span>
+    {/if}
+    {#if mission.location}
+      <span class="text-text-muted" aria-hidden="true">•</span>
+      <span class="text-text-secondary">{mission.location}</span>
     {/if}
   </div>
 
@@ -532,43 +535,9 @@
         </div>
       {/if}
 
-      <!-- Actions — inside the disclosure, quiet until hover -->
+      <!-- Actions — utility shortcuts vs commitment action, inside the disclosure -->
       <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
         <div class="flex gap-1">
-          <Tooltip
-            label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
-            description={isHidden
-              ? 'La mission reviendra dans le feed actif.'
-              : 'Retirez cette mission du flux de décision.'}
-          >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
-              onclick={handleHide}
-              aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
-            >
-              <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
-            </button>
-          </Tooltip>
-          <Tooltip
-            label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
-            description={compareDisabled && !isCompared
-              ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
-              : 'Ajoutez cette mission à la sélection pour départager les missions.'}
-          >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
-                ? 'bg-blueprint-blue/8 text-blueprint-blue'
-                : ''}"
-              onclick={handleToggleCompare}
-              disabled={compareDisabled && !isCompared}
-              aria-label={isCompared
-                ? 'Retirer la mission de la comparaison'
-                : 'Ajouter la mission à la comparaison'}
-              aria-pressed={isCompared}
-            >
-              <Icon name="git-compare-arrows" size={13} />
-            </button>
-          </Tooltip>
           <Tooltip
             label={copied ? 'Lien copié' : 'Copier le lien'}
             description="Partagez ou archivez la mission sans ouvrir la plateforme."
@@ -600,7 +569,7 @@
         </div>
         <button
           type="button"
-          class="text-caption font-medium text-text-subtle transition-colors hover:text-blueprint-blue"
+          class="rounded-lg bg-blueprint-blue/8 px-5 py-3 text-body-lg font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/15"
           onclick={handleInvestigate}
         >
           Analyser →
@@ -638,4 +607,64 @@
       {/each}
     </div>
   {/if}
+
+  <!-- Triage bar — favorite/hide/compare affordances relocated to the card
+       footer, visible from collapse. Same callbacks, no new workflow. -->
+  <div class="mt-3 flex items-center gap-1 border-t border-border-light pt-2.5">
+    <Tooltip
+      label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
+      description={isHidden
+        ? 'La mission reviendra dans le feed actif.'
+        : 'Retirez cette mission du flux de décision.'}
+    >
+      <button
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+        onclick={handleHide}
+        aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
+      >
+        <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
+      </button>
+    </Tooltip>
+    <Tooltip
+      label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
+      description={compareDisabled && !isCompared
+        ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
+        : 'Ajoutez cette mission à la sélection pour départager les missions.'}
+    >
+      <button
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
+          ? 'bg-blueprint-blue/8 text-blueprint-blue'
+          : ''}"
+        onclick={handleToggleCompare}
+        disabled={compareDisabled && !isCompared}
+        aria-label={isCompared
+          ? 'Retirer la mission de la comparaison'
+          : 'Ajouter la mission à la comparaison'}
+        aria-pressed={isCompared}
+      >
+        <Icon name="git-compare-arrows" size={13} />
+      </button>
+    </Tooltip>
+    <Tooltip
+      label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      description={isFavorite
+        ? 'La mission quitte le fil des favoris.'
+        : 'Épinglez la mission pour la retrouver dans le fil des favoris.'}
+    >
+      <button
+        type="button"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
+          ? 'text-blueprint-blue hover:text-blueprint-blue'
+          : ''}"
+        onclick={handleToggleFavorite}
+        disabled={isFavoritePending}
+        aria-label={isFavorite
+          ? 'Retirer la mission des favoris'
+          : 'Ajouter la mission aux favoris'}
+        aria-pressed={isFavorite}
+      >
+        <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
+      </button>
+    </Tooltip>
+  </div>
 </article>
