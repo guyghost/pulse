@@ -287,7 +287,7 @@
       {/if}
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
         'expand'
           ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
           : ''}"
@@ -340,7 +340,7 @@
   {#if hasScoreDetails}
     <button
       type="button"
-      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
+      class="mt-2 -my-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
       onclick={handleScoreDetailsToggle}
       onkeydown={(e) => e.stopPropagation()}
       aria-expanded={scoreDetailsOpen}
@@ -351,7 +351,7 @@
       <Icon
         name="chevron-down"
         size={11}
-        class="transition-transform duration-150 {scoreDetailsOpen ? 'rotate-180' : ''}"
+        class="transition-transform duration-200 {scoreDetailsOpen ? 'rotate-180' : ''}"
       />
     </button>
   {/if}
@@ -469,7 +469,7 @@
         </div>
       </div>
       {#if mission.description}
-        <div class="mt-3 border-t border-border-light pt-3">
+        <div class="mt-3.5">
           <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
             {mission.description}
           </p>
@@ -485,7 +485,7 @@
           >
             {#snippet children(tooltip: TooltipTriggerState)}
               <button
-                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
                 onclick={handleCopyLink}
                 onkeydown={tooltip.onKeydown}
                 aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
@@ -505,7 +505,7 @@
           >
             {#snippet children(tooltip: TooltipTriggerState)}
               <button
-                class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
                 onclick={handleOpenLink}
                 onkeydown={tooltip.onKeydown}
                 aria-label="Ouvrir la mission sur la plateforme source"
@@ -518,7 +518,7 @@
         </div>
         <button
           type="button"
-          class="rounded-lg bg-blueprint-blue/8 px-5 py-3 text-body-lg font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/15"
+          class="cursor-pointer rounded-lg bg-blueprint-blue/8 px-5 py-3 text-body-lg font-medium text-blueprint-blue transition-colors duration-150 hover:bg-blueprint-blue/15"
           onclick={handleInvestigate}
         >
           Analyser →
@@ -545,7 +545,7 @@
         {@const label = STATUS_LABELS[nextStatus]}
         {#if onStatusTransition}
           <button
-            class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-caption text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
+            class="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-caption text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
             onclick={() => onStatusTransition?.(nextStatus)}
             aria-label={`Passer le statut à ${label}`}
             disabled={isStatusTransitionPending}
@@ -568,7 +568,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
           onclick={handleHide}
           onkeydown={tooltip.onKeydown}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
@@ -589,7 +589,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -614,7 +614,7 @@
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
           type="button"
-          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
+          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
