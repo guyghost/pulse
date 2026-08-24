@@ -89,7 +89,14 @@ describe('MissionCard', () => {
     const target = mountCard();
     await tick();
 
-    expect(target.textContent).toContain('Publiée 14 mars 2026');
+    // formatAbsoluteDate rend la date dans le fuseau local du runtime :
+    // on dérive l'attendu du même instant pour rester indépendant du TZ.
+    const expectedDate = new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date('2026-03-14T09:00:00.000Z'));
+    expect(target.textContent).toContain(`Publiée ${expectedDate}`);
   });
 
   it('masque la date de publication absente ou invalide', async () => {
