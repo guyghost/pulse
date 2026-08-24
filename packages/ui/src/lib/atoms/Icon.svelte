@@ -10,11 +10,13 @@
     name,
     size = 16,
     class: className = '',
+    filled = false,
   }: {
     name: IconName;
     size?: number;
     class?: string;
+    filled?: boolean;
   } = $props();
 </script>
 
-<IconBase {name} {size} class={className} />
+<IconBase {name} {size} class={className} {filled} />

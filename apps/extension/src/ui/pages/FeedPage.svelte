@@ -1512,7 +1512,7 @@
       aria-label="Actions du feed"
     >
       <div
-        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 bg-surface-white/55 shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] backdrop-blur-xl backdrop-saturate-150 transition-colors duration-200 focus-within:border-blueprint-blue/40"
+        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 bg-surface-white/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-200 hover:bg-surface-white/70 focus-within:border-blueprint-blue/50 focus-within:bg-surface-white/70 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)]"
       >
         <SearchInput
           variant="dock"
@@ -1532,8 +1532,8 @@
           type="button"
           class="soft-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
           page.filterActive
-            ? 'border-blueprint-blue/30 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_28px_rgba(28,25,23,0.13)]'
-            : 'border-white/70 bg-surface-white/55 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] hover:bg-surface-white/80 hover:text-text-primary'}"
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)]'
+            : 'border-white/70 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)]'}"
           onclick={() => page.setShowFilters(!page.showFilters)}
           aria-expanded={page.showFilters}
           aria-controls="filter-panel"
@@ -1556,8 +1556,8 @@
         <button
           type="button"
           class="soft-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {showAdvancedControls
-            ? 'border-blueprint-blue/30 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_10px_28px_rgba(28,25,23,0.13)]'
-            : 'border-white/70 bg-surface-white/55 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.5),0_10px_28px_rgba(28,25,23,0.13),0_2px_6px_rgba(28,25,23,0.05)] hover:bg-surface-white/80 hover:text-text-primary'}"
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)]'
+            : 'border-white/70 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)]'}"
           onclick={toggleOperationalDetails}
           aria-expanded={showAdvancedControls}
           aria-label={showAdvancedControls

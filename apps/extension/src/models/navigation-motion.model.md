@@ -12,11 +12,20 @@ The navigation keeps the six existing product destinations accessible:
 existing `feed` route identity; visible or accessible copy never changes that
 canonical page value.
 
+The canonical pill order — also the canonical transition-index order — places
+`Profil` first (leftmost), then `Missions`, `CV`, `Suivi`, `TJM` and
+`Réglages`. The leftmost position is a presentation choice only: it never
+changes the initial route. `Missions` (`feed`) remains the default landing
+page whenever the app-shell route guard accepts it, exactly as before.
+
 The visual contract is inspired by the selected MissionPulse storyboard:
 
 - every destination is a separate pill;
 - exactly one pill is expanded and shows its visible label;
 - inactive pills are compact and icon-only;
+- the active pill renders its icon in the **filled** variant while inactive
+  pills render the default stroke variant — the icon variant is a pure
+  function of `currentPage`, never an independent state;
 - the newly selected page enters from the direction of its navigation index;
 - the previously selected page leaves in the opposite direction.
 
@@ -41,9 +50,22 @@ interface NavigationMotionContext {
 ```
 
 `transitionDirection` is `1` when the target page has a greater canonical
-index than the current page and `-1` otherwise. `PagePosition` is derived by
-comparing a rendered page with `currentPage`; it is never inferred from copy,
-icons or DOM order.
+index than the current page and `-1` otherwise. The canonical index order is:
+
+```ts
+const PAGE_INDEX = {
+  profile: 0,
+  feed: 1,
+  cv: 2,
+  applications: 3,
+  tjm: 4,
+  settings: 5,
+  onboarding: -1, // terminal bootstrap route, never a pill
+};
+```
+
+`PagePosition` is derived by comparing a rendered page with `currentPage`; it
+is never inferred from copy, icons or DOM order.
 
 ## Events
 
@@ -77,6 +99,10 @@ For each destination pill:
 - outer padding is owned by the shell and is symmetric; the navigation never
   creates an additional trailing gap;
 - active label has visible width and opacity;
+- the active pill renders its icon in the filled variant; every inactive pill
+  renders the default stroke variant. The variant is recomputed from
+  `currentPage` on every navigation — it is never memorized, animated
+  independently, or driven by anything other than page equality;
 - inactive label has zero visible width and is not exposed twice to assistive
   technology; the button keeps its full accessible name through `aria-label`;
 - pill interpolation lasts 180 ms with an ease-out curve.
@@ -144,6 +170,12 @@ a rendering input, not a route transition.
 7. Reduced-motion users receive the same final state without meaningful
    animation.
 8. An LLM never chooses a page, direction, duration or completion transition.
+9. The leftmost pill (`Profil`) is a position choice only: the default landing
+   page remains `feed` (`Missions`) whenever the route guard accepts it, and
+   `PAGE_INDEX` never influences route selection — only direction.
+10. Exactly the active pill renders the filled icon variant; every inactive
+    pill renders the stroke variant. No pill owns an independent icon-variant
+    state.
 
 ## Review result
 
@@ -155,3 +187,8 @@ a rendering input, not a route transition.
 - [x] No existing destination is removed or hidden behind implicit copy.
 - [x] Narrow and wide side-panel widths cannot leave unused navigation space or
       clip an inactive destination.
+- [x] Canonical order (`profile` leftmost) is a presentation choice that never
+      changes the `feed` initial route; the direction table derives from
+      `PAGE_INDEX` only.
+- [x] The filled/stroke icon variant is a deterministic projection of
+      `currentPage` and introduces no new state or transition.
