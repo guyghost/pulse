@@ -1,2 +1,2 @@
 export { default as Icon } from './Icon.svelte';
-export { iconPaths, type IconName } from './paths';
+export { iconPaths, filledIconPaths, type IconName } from './paths';

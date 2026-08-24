@@ -377,7 +377,11 @@
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">
-                <Icon name={item.icon as IconName} size={16} />
+                <Icon
+                  name={item.icon as IconName}
+                  size={16}
+                  filled={nav.currentPage === item.page}
+                />
               </span>
               <span
                 aria-hidden="true"

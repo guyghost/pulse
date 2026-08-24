@@ -4,7 +4,7 @@
  * Format: [tag, attrs] or [tag, attrs, children[]]
  */
 
-type SVGChild = [string, Record<string, string>, ...SVGChild[]];
+export type SVGChild = [string, Record<string, string>, ...SVGChild[]];
 
 export const iconPaths = {
   search: [
@@ -464,3 +464,76 @@ export const iconPaths = {
 } as const satisfies Record<string, SVGChild[]>;
 
 export type IconName = keyof typeof iconPaths;
+
+/**
+ * Filled (solid) variants for selected icons, rendered with
+ * `fill="currentColor" stroke="none"`. Use `fill-rule="evenodd"` compound
+ * subpaths to punch holes (document text lines, envelope flap, gear center).
+ * Rendering falls back to the stroke variant when an icon has no entry here.
+ */
+export const filledIconPaths: Partial<Record<IconName, SVGChild[]>> = {
+  user: [
+    ['circle', { cx: '12', cy: '7.75', r: '4.25' }],
+    [
+      'path',
+      {
+        d: 'M4.5 20.25v-.75c0-3.38 3.36-6.13 7.5-6.13s7.5 2.75 7.5 6.13v.75a.75.75 0 0 1-.75.75H5.25a.75.75 0 0 1-.75-.75Z',
+      },
+    ],
+  ],
+  briefcase: [
+    [
+      'path',
+      {
+        d: 'M8.5 6.5V5a2.5 2.5 0 0 1 2.5-2.5h2A2.5 2.5 0 0 1 15.5 5v1.5h3A2.5 2.5 0 0 1 21 9v8.5a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 17.5V9a2.5 2.5 0 0 1 2.5-2.5h3Z',
+      },
+    ],
+  ],
+  'file-text': [
+    [
+      'path',
+      {
+        'fill-rule': 'evenodd',
+        d: 'M7 2.25h6.2l5.05 5.05V20a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4.25a2 2 0 0 1 2-2Zm1.75 8.75v1.4h6.5V11h-6.5Zm0 3.25v1.4h6.5v-1.4h-6.5Zm0 3.25v1.4h4v-1.4h-4Z',
+      },
+    ],
+  ],
+  mail: [
+    [
+      'path',
+      {
+        'fill-rule': 'evenodd',
+        d: 'M5.25 4.75h13.5A2.25 2.25 0 0 1 21 7v10a2.25 2.25 0 0 1-2.25 2.25H5.25A2.25 2.25 0 0 1 3 17V7a2.25 2.25 0 0 1 2.25-2.25ZM4 7.5v1.75l8 5.7 8-5.7V7.5l-8 5.7-8-5.7Z',
+      },
+    ],
+  ],
+  'chart-column': [
+    [
+      'path',
+      {
+        d: 'M5 20.25v-8.6h3.4v8.6H5Zm5.3 0V4.75h3.4v15.5h-3.4Zm5.3 0v-11h3.4v11h-3.4Z',
+      },
+    ],
+  ],
+  settings: [
+    [
+      'path',
+      {
+        'fill-rule': 'evenodd',
+        d: 'M12 4.25a7.75 7.75 0 1 0 0 15.5 7.75 7.75 0 0 0 0-15.5Zm0 4.25a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7Z',
+      },
+    ],
+    ['rect', { x: '10.4', y: '2.2', width: '3.2', height: '6', rx: '1.6' }],
+    ['rect', { x: '10.4', y: '15.8', width: '3.2', height: '6', rx: '1.6' }],
+    ['rect', { x: '2.2', y: '10.4', width: '6', height: '3.2', rx: '1.6' }],
+    ['rect', { x: '15.8', y: '10.4', width: '6', height: '3.2', rx: '1.6' }],
+    [
+      'g',
+      { transform: 'rotate(45 12 12)' },
+      ['rect', { x: '10.4', y: '2.2', width: '3.2', height: '6', rx: '1.6' }],
+      ['rect', { x: '10.4', y: '15.8', width: '3.2', height: '6', rx: '1.6' }],
+      ['rect', { x: '2.2', y: '10.4', width: '6', height: '3.2', rx: '1.6' }],
+      ['rect', { x: '15.8', y: '10.4', width: '6', height: '3.2', rx: '1.6' }],
+    ],
+  ],
+};

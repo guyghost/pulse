@@ -16,7 +16,7 @@ export type { ChipGroupOption } from './lib/atoms/ChipGroup.svelte';
 export { default as Icon } from './lib/atoms/Icon.svelte';
 
 // Icons (tree-shakeable)
-export { iconPaths, type IconName } from './icons/paths';
+export { iconPaths, filledIconPaths, type IconName } from './icons/paths';
 
 // Actions
 export { ripple } from './lib/actions/ripple';

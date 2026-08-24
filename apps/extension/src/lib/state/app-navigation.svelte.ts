@@ -30,8 +30,8 @@ export interface PageLoadSnapshot {
 
 const PAGE_INDEX: Record<Page, number> = {
   onboarding: -1,
-  feed: 0,
-  profile: 1,
+  profile: 0,
+  feed: 1,
   cv: 2,
   applications: 3,
   tjm: 4,
@@ -50,8 +50,8 @@ export function getPagePosition(page: Page, currentPage: Page): PagePosition {
 }
 
 export const NAV_ITEMS: { page: Page; label: string; icon: string; ariaLabel?: string }[] = [
-  { page: 'feed', label: 'Missions', icon: 'briefcase' },
   { page: 'profile', label: 'Profil', icon: 'user' },
+  { page: 'feed', label: 'Missions', icon: 'briefcase' },
   { page: 'cv', label: 'CV', icon: 'file-text' },
   { page: 'applications', label: 'Suivi', icon: 'mail' },
   { page: 'tjm', label: 'TJM', icon: 'chart-column' },
