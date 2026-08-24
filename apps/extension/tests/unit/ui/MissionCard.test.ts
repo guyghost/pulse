@@ -464,39 +464,19 @@ describe('MissionCard', () => {
   });
 });
 
-describe('MissionCard — affordance swipe et accessibilité clavier (couche 3)', () => {
+describe('MissionCard — accessibilité clavier (couche 3)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
   const swipeCallbacks = { onToggleFavorite: vi.fn(), onHide: vi.fn() };
 
-  const CHEVRON_SELECTOR = 'span.pointer-events-none.group-hover\\:opacity-60';
-
-  it('affiche deux chevrons de swipe décoratifs quand le geste est actif', async () => {
+  it('ne rend aucun chevron décoratif de swipe, même quand le geste est actif', async () => {
     const target = mountCard(swipeCallbacks);
     await tick();
 
-    const chevrons = target.querySelectorAll(CHEVRON_SELECTOR);
-    expect(chevrons.length).toBe(2);
-    for (const chevron of chevrons) {
-      expect(chevron.getAttribute('aria-hidden')).toBe('true');
-      expect(chevron.className).toContain('pointer-events-none');
-      expect(chevron.className).toContain('group-hover:opacity-60');
-      expect(chevron.className).toContain('group-focus-within:opacity-60');
-    }
-  });
-
-  it('masque les chevrons de swipe quand le geste est désactivé (mission comparée)', async () => {
-    const target = mountCard({ ...swipeCallbacks, isCompared: true });
-    await tick();
-    expect(target.querySelectorAll(CHEVRON_SELECTOR).length).toBe(0);
-  });
-
-  it('masque les chevrons de swipe sans callbacks de triage', async () => {
-    const target = mountCard();
-    await tick();
-    expect(target.querySelectorAll(CHEVRON_SELECTOR).length).toBe(0);
+    const chevrons = target.querySelectorAll('span.pointer-events-none.group-hover\\:opacity-60');
+    expect(chevrons.length).toBe(0);
   });
 
   it('ouvre le tooltip du comparateur au focus clavier et le referme au blur', async () => {

@@ -613,22 +613,4 @@
       <Icon name="arrow-right" size={13} />
     </button>
   </div>
-
-  {#if swipeParams.enabled}
-    <!-- Affordance swipe (models/mission-card-swipe.model.md) : indice
-         purement décoratif, masqué aux lecteurs d'écran et hors tabulation —
-         les boutons d'action restent la voie accessible. -->
-    <span
-      class="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-within:opacity-60"
-      aria-hidden="true"
-    >
-      <Icon name="chevron-left" size={14} />
-    </span>
-    <span
-      class="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-within:opacity-60"
-      aria-hidden="true"
-    >
-      <Icon name="chevron-right" size={14} />
-    </span>
-  {/if}
 </article>
