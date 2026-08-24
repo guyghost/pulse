@@ -107,7 +107,7 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
-  it('regarroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
+  it('regroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
     const target = mountCard();
     await tick();
 

@@ -63,7 +63,8 @@
 
   // Replié par défaut : le scan rapide du feed prime. La barre d'actions
   // unique garde les six actions visibles même replié ; déplier n'ajoute
-  // que les détails (zone, séniorité, source, description).
+  // que la description (localisation et séniorité vivent dans la ligne de
+  // scan rapide, la source en badge d'en-tête).
   let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
 
@@ -288,23 +289,25 @@
           {missionGrade}
         </span>
       {/if}
-      <button
-        type="button"
-        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
-        'expand'
-          ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
-          : ''}"
-        onclick={toggleExpand}
-        aria-label={`${expanded ? 'Masquer' : 'Afficher'} les détails de la mission ${mission.title}`}
-        aria-expanded={expanded}
-        aria-controls={missionDetailsId}
-      >
-        <Icon
-          name="chevron-down"
-          size={12}
-          class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
-        />
-      </button>
+      {#if mission.description}
+        <button
+          type="button"
+          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+          'expand'
+            ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
+            : ''}"
+          onclick={toggleExpand}
+          aria-label={`${expanded ? 'Masquer' : 'Afficher'} les détails de la mission ${mission.title}`}
+          aria-expanded={expanded}
+          aria-controls={missionDetailsId}
+        >
+          <Icon
+            name="chevron-down"
+            size={12}
+            class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
+          />
+        </button>
+      {/if}
     </div>
   </div>
 
@@ -449,7 +452,7 @@
   {/if}
 
   <!-- Inline details controlled by the scoped disclosure. -->
-  {#if expanded}
+  {#if expanded && mission.description}
     <div
       id={missionDetailsId}
       role="region"
@@ -457,11 +460,9 @@
       class="mt-3 border-t border-border-light pt-3"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
-      {#if mission.description}
-        <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
-          {mission.description}
-        </p>
-      {/if}
+      <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
+        {mission.description}
+      </p>
     </div>
   {/if}
 
@@ -495,9 +496,9 @@
     </div>
   {/if}
 
-  <!-- Action bar — single row, all actions in both card states.
-       Same callbacks, no new workflow. -->
-  <div class="mt-3 flex items-center gap-1.5 border-t border-border-light pt-3">
+  <!-- Action bar — single row, all actions in both card states. Wraps only
+       on very narrow side panels rather than overflowing. -->
+  <div class="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border-light pt-3">
     <Tooltip
       label={copied ? 'Lien copié' : 'Copier le lien'}
       description="Partagez ou archivez la mission sans ouvrir la plateforme."
