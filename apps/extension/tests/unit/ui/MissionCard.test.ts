@@ -61,21 +61,28 @@ describe('MissionCard', () => {
 
   it('affiche le TJM quand il est present', async () => {
     const target = mountCard();
-    const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
-    ) as HTMLButtonElement;
-    disclosure.click();
     await tick();
     expect(target.textContent).toContain('650');
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
-  it('affiche le TJM et la localisation dès l’état réduit, sans déplier', async () => {
+  it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {
     const target = mountCard();
     await tick();
 
     expect(target.textContent).toMatch(/650.*€.*\/j/);
     expect(target.textContent).toContain('Paris');
+    expect(target.textContent).toContain('Senior (7+ ans)');
+  });
+
+  it('masque la séniorité inconnue de la ligne de scan rapide', async () => {
+    const target = mountCard({ mission: makeMission({ seniority: null }) });
+    await tick();
+
+    expect(target.textContent).not.toContain('Séniorité');
+    expect(target.textContent).not.toMatch(
+      /Junior \(0-2 ans\)|Confirmé \(3-7 ans\)|Senior \(7\+ ans\)/
+    );
   });
 
   it('signale un TJM absent au lieu de ne rien afficher', async () => {
@@ -100,8 +107,25 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
-  it('réserve la zone dépliée aux actions copier/ouvrir/analyser', async () => {
+  it('regroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
     const target = mountCard();
+    await tick();
+
+    const actionLabels = [
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+    ];
+
+    // État replié (défaut) : toutes les actions restent visibles sur la même ligne.
+    for (const label of actionLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
+    }
+    expect(target.textContent).toContain('Analyser');
+
+    // État déplié : la région de détails n'introduit aucun bouton dupliqué.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -110,23 +134,14 @@ describe('MissionCard', () => {
 
     const details = target.querySelector('[role="region"]');
     expect(details).not.toBeNull();
-    expect(details!.querySelectorAll('button[aria-label="Masquer la mission"]')).toHaveLength(0);
-    expect(
-      details!.querySelectorAll('button[aria-label="Ajouter la mission à la comparaison"]')
-    ).toHaveLength(0);
-    expect(
-      details!.querySelectorAll('button[aria-label="Ajouter la mission aux favoris"]')
-    ).toHaveLength(0);
-    expect(
-      details!.querySelectorAll('button[aria-label="Copier le lien de la mission"]')
-    ).toHaveLength(1);
-    expect(
-      details!.querySelectorAll('button[aria-label="Ouvrir la mission sur la plateforme source"]')
-    ).toHaveLength(1);
-    expect(details!.textContent).toContain('Analyser →');
+    expect(details!.querySelectorAll('button')).toHaveLength(0);
+    for (const label of actionLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
+    }
+    expect(target.textContent).toContain('Analyser');
   });
 
-  it('concentre la grille dépliée sur zone, séniorité et source', async () => {
+  it('réserve la zone dépliée à la description, sans grille redondante', async () => {
     const target = mountCard();
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
@@ -136,13 +151,12 @@ describe('MissionCard', () => {
 
     const details = target.querySelector('[role="region"]') as HTMLElement;
     expect(details).not.toBeNull();
-    expect(details.textContent).toContain('Zone');
-    expect(details.textContent).toContain('Séniorité');
-    expect(details.textContent).toContain('Source');
-    // TJM vit dans la ligne collapse, durée et début dans le drawer Analyser.
-    expect(details.textContent).not.toContain('TJM');
-    expect(details.textContent).not.toContain('Durée');
-    expect(details.textContent).not.toContain('Début');
+    // Zone, séniorité et source vivent hors de la zone dépliée :
+    // localisation et séniorité dans la ligne de scan rapide, source en badge d'en-tête.
+    expect(details.textContent).not.toContain('Zone');
+    expect(details.textContent).not.toContain('Séniorité');
+    expect(details.textContent).not.toContain('Source');
+    expect(details.textContent).toContain('Mission de developpement');
   });
 
   it("n'affiche plus le bloc éditorial de décision dans l'expand", async () => {
@@ -188,6 +202,7 @@ describe('MissionCard', () => {
     const target = mountCard({ mission: makeMission({ id: '123/mission très longue' }) });
     await tick();
 
+    // Replié par défaut : la région n'est pas montée, l'identifiant reste borné.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -449,39 +464,19 @@ describe('MissionCard', () => {
   });
 });
 
-describe('MissionCard — affordance swipe et accessibilité clavier (couche 3)', () => {
+describe('MissionCard — accessibilité clavier (couche 3)', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
   const swipeCallbacks = { onToggleFavorite: vi.fn(), onHide: vi.fn() };
 
-  const CHEVRON_SELECTOR = 'span.pointer-events-none.group-hover\\:opacity-60';
-
-  it('affiche deux chevrons de swipe décoratifs quand le geste est actif', async () => {
+  it('ne rend aucun chevron décoratif de swipe, même quand le geste est actif', async () => {
     const target = mountCard(swipeCallbacks);
     await tick();
 
-    const chevrons = target.querySelectorAll(CHEVRON_SELECTOR);
-    expect(chevrons.length).toBe(2);
-    for (const chevron of chevrons) {
-      expect(chevron.getAttribute('aria-hidden')).toBe('true');
-      expect(chevron.className).toContain('pointer-events-none');
-      expect(chevron.className).toContain('group-hover:opacity-60');
-      expect(chevron.className).toContain('group-focus-within:opacity-60');
-    }
-  });
-
-  it('masque les chevrons de swipe quand le geste est désactivé (mission comparée)', async () => {
-    const target = mountCard({ ...swipeCallbacks, isCompared: true });
-    await tick();
-    expect(target.querySelectorAll(CHEVRON_SELECTOR).length).toBe(0);
-  });
-
-  it('masque les chevrons de swipe sans callbacks de triage', async () => {
-    const target = mountCard();
-    await tick();
-    expect(target.querySelectorAll(CHEVRON_SELECTOR).length).toBe(0);
+    const chevrons = target.querySelectorAll('span.pointer-events-none.group-hover\\:opacity-60');
+    expect(chevrons.length).toBe(0);
   });
 
   it('ouvre le tooltip du comparateur au focus clavier et le referme au blur', async () => {
@@ -581,16 +576,20 @@ describe('MissionCard — affordance swipe et accessibilité clavier (couche 3)'
         (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
       );
 
-    // État réduit : header → ligne note → triage.
-    expect(labels()).toEqual([
+    // État réduit (défaut) : disclosure → note → les six actions sur une ligne.
+    const collapsedLabels = [
       'Afficher les détails de la mission Developpeur fullstack TypeScript',
       'Pourquoi cette note ?',
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
       'Masquer la mission',
       'Ajouter la mission à la comparaison',
       'Ajouter la mission aux favoris',
-    ]);
+      'Analyser',
+    ];
+    expect(labels()).toEqual(collapsedLabels);
 
-    // État déplié : les actions utilitaires puis « Analyser » précèdent le triage.
+    // État déplié : la barre d'actions reste complète et inchangée.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -599,13 +598,7 @@ describe('MissionCard — affordance swipe et accessibilité clavier (couche 3)'
 
     expect(labels()).toEqual([
       'Masquer les détails de la mission Developpeur fullstack TypeScript',
-      'Pourquoi cette note ?',
-      'Copier le lien de la mission',
-      'Ouvrir la mission sur la plateforme source',
-      'Analyser →',
-      'Masquer la mission',
-      'Ajouter la mission à la comparaison',
-      'Ajouter la mission aux favoris',
+      ...collapsedLabels.slice(1),
     ]);
   });
 
