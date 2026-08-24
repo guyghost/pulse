@@ -61,10 +61,11 @@
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
 
-  // Replié par défaut : le scan rapide du feed prime. La barre d'actions
-  // unique garde les six actions visibles même replié ; déplier n'ajoute
-  // que la description (localisation et séniorité vivent dans la ligne de
-  // scan rapide, la source en badge d'en-tête).
+  // Replié par défaut : le scan rapide du feed prime. Densité compacte :
+  // paddings et marges verticales réduits, cible d'action 32px. La barre
+  // d'actions unique garde les six actions visibles même replié ; déplier
+  // n'ajoute que la description (localisation et séniorité vivent dans la
+  // ligne de scan rapide, la source en badge d'en-tête).
   let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
 
@@ -217,7 +218,7 @@
       }
     },
   }}
-  class="group relative rounded-xl border border-border-light bg-surface-white px-4 py-3.5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
+  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
@@ -265,13 +266,16 @@
         {/if}
       </div>
       <h3
-        class="mt-2 line-clamp-2 break-words text-subheading font-medium leading-snug text-text-primary"
+        class="mt-1 line-clamp-2 break-words text-subheading font-medium leading-snug text-text-primary"
         title={mission.title}
       >
         {mission.title}
       </h3>
       {#if mission.client}
-        <p class="mt-1 line-clamp-1 break-words text-meta text-text-subtle" title={mission.client}>
+        <p
+          class="mt-0.5 line-clamp-1 break-words text-meta text-text-subtle"
+          title={mission.client}
+        >
           {mission.client}
         </p>
       {/if}
@@ -279,7 +283,7 @@
     <div class="flex shrink-0 items-center gap-1.5">
       {#if missionGrade !== null}
         <span
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-full font-mono text-heading-lg font-bold leading-none text-text-primary {scoreColor} {tourHighlight ===
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-mono text-heading font-bold leading-none text-text-primary {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
@@ -292,7 +296,7 @@
       {#if mission.description}
         <button
           type="button"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+          class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
           'expand'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
@@ -312,7 +316,7 @@
   </div>
 
   <!-- Tags -->
-  <div class="mt-2 flex flex-wrap gap-1.5">
+  <div class="mt-1.5 flex flex-wrap gap-1.5">
     {#each mission.stack.slice(0, 3) as tech (tech)}
       <Badge label={tech} variant="tech" />
     {/each}
@@ -329,7 +333,7 @@
   </div>
 
   <!-- Quick-scan line: TJM (scoring driver) + location + seniority, visible from collapse -->
-  <div class="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-body">
+  <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
     {#if tjmValue !== null}
       <span class="font-mono font-bold tabular-nums text-text-primary">
         {tjmValue}<span class="text-text-muted">/j</span>
@@ -350,7 +354,7 @@
   {#if hasScoreDetails}
     <button
       type="button"
-      class="mt-2 -my-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
+      class="mt-1 -mb-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
       onclick={handleScoreDetailsToggle}
       onkeydown={(e) => e.stopPropagation()}
       aria-expanded={scoreDetailsOpen}
@@ -370,7 +374,7 @@
   {#if scoreDetailsOpen && hasScoreDetails}
     <div
       id={scoreDetailsId}
-      class="mt-3 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 p-3"
+      class="mt-2 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 p-2.5"
     >
       <div class="flex items-start justify-between gap-3">
         <div>
@@ -457,7 +461,7 @@
       id={missionDetailsId}
       role="region"
       aria-label={`Détails de la mission ${mission.title}`}
-      class="mt-3 border-t border-border-light pt-3"
+      class="mt-2 border-t border-border-light pt-2"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
       <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
@@ -468,7 +472,7 @@
 
   {#if trackingStatus}
     <div
-      class="mt-3 flex flex-wrap gap-1.5"
+      class="mt-2 flex flex-wrap gap-1.5"
       role="group"
       aria-label={`Statut de la mission ${mission.title}`}
       aria-busy={isStatusTransitionPending}
@@ -484,7 +488,7 @@
         {@const label = STATUS_LABELS[nextStatus]}
         {#if onStatusTransition}
           <button
-            class="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-page-canvas px-2.5 text-caption text-text-secondary transition-colors duration-150 hover:border-border-light hover:bg-subtle-gray hover:text-text-primary active:border-transparent disabled:cursor-wait disabled:opacity-50"
+            class="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-page-canvas px-2.5 text-caption text-text-secondary transition-colors duration-150 hover:border-border-light hover:bg-subtle-gray hover:text-text-primary active:border-transparent disabled:cursor-wait disabled:opacity-50"
             onclick={() => onStatusTransition?.(nextStatus)}
             aria-label={`Passer le statut à ${label}`}
             disabled={isStatusTransitionPending}
@@ -498,14 +502,14 @@
 
   <!-- Action bar — single row, all actions in both card states. Wraps only
        on very narrow side panels rather than overflowing. -->
-  <div class="mt-3 flex flex-wrap items-center gap-1.5 border-t border-border-light pt-3">
+  <div class="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border-light pt-2">
     <Tooltip
       label={copied ? 'Lien copié' : 'Copier le lien'}
       description="Partagez ou archivez la mission sans ouvrir la plateforme."
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
           onclick={handleCopyLink}
           onkeydown={tooltip.onKeydown}
           aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
@@ -525,7 +529,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
           onclick={handleOpenLink}
           onkeydown={tooltip.onKeydown}
           aria-label="Ouvrir la mission sur la plateforme source"
@@ -543,7 +547,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
           onclick={handleHide}
           onkeydown={tooltip.onKeydown}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
@@ -564,7 +568,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -589,7 +593,7 @@
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
           type="button"
-          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
@@ -607,7 +611,7 @@
     </Tooltip>
     <button
       type="button"
-      class="ml-auto inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-blueprint-blue-strong px-4 text-body font-medium text-white shadow-subtle-2 transition-colors duration-150 ease-out hover:bg-blueprint-blue-strong/90 active:translate-y-px"
+      class="ml-auto inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-blueprint-blue-strong px-3 text-body font-medium text-white shadow-subtle-2 transition-colors duration-150 ease-out hover:bg-blueprint-blue-strong/90 active:translate-y-px"
       onclick={handleInvestigate}
     >
       <span>Analyser</span>

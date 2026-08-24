@@ -223,7 +223,7 @@
     {/if}
 
     <!-- Lazy-loaded list: renders only visibleCount missions, loads more on scroll -->
-    <div class="flex flex-col gap-3">
+    <div class="flex flex-col gap-2">
       {#each visibleMissions as mission (mission.id)}
         {@const missionTracking = trackingByMissionId.get(mission.id)}
         <MissionCard
