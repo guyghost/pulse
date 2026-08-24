@@ -76,7 +76,7 @@
   }
 </script>
 
-<div class="flex flex-col gap-3 overflow-y-auto">
+<div class="flex flex-col gap-2 overflow-y-auto">
   {#if isLoading && sortedMissions.length === 0}
     {#each Array(3) as _, i (i)}
       <div class="section-card rounded-xl p-4 space-y-3">
