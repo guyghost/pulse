@@ -296,7 +296,7 @@
       {#if mission.description}
         <button
           type="button"
-          class="flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
           'expand'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
