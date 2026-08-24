@@ -1,5 +1,6 @@
 <script lang="ts">
   import { filledIconPaths, iconPaths, type IconName, type SVGChild } from './paths';
+  import { serializeSvgChildren } from './serialize';
 
   const {
     name,
@@ -21,29 +22,7 @@
       ? filledIconPaths[name]
       : iconPaths[name];
     if (!children) return '';
-    const serialize = (nodes: readonly SVGChild[]): string =>
-      nodes
-        .map(([tag, attrs, ...nested]) => {
-          const attrStr = Object.entries(attrs)
-            .map(([k, v]) => `${k}="${v}"`)
-            .join(' ');
-          const innerNodes = nested.flat() as SVGChild[];
-          const innerContent = innerNodes.length > 0 ? serialize(innerNodes) : '';
-          if (
-            tag === 'circle' ||
-            tag === 'ellipse' ||
-            tag === 'line' ||
-            tag === 'path' ||
-            tag === 'polygon' ||
-            tag === 'polyline' ||
-            tag === 'rect'
-          ) {
-            return `<${tag} ${attrStr} />`;
-          }
-          return `<${tag} ${attrStr}>${innerContent}</${tag}>`;
-        })
-        .join('');
-    return serialize(children);
+    return serializeSvgChildren(children);
   });
 </script>
 
