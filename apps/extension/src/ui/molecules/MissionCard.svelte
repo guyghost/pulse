@@ -61,9 +61,10 @@
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
 
-  // Déplié par défaut : la vue détaillée est le parcours principal,
-  // le repli reste disponible via le chevron.
-  let expanded = $state(true);
+  // Replié par défaut : le scan rapide du feed prime. La barre d'actions
+  // unique garde les six actions visibles même replié ; déplier n'ajoute
+  // que les détails (zone, séniorité, source, description).
+  let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
 
   // Swipe-to-triage (models/mission-card-swipe.model.md): presentation
