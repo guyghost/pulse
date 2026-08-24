@@ -477,15 +477,15 @@
       {/if}
 
       <!-- Actions — utility shortcuts vs commitment action, inside the disclosure -->
-      <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
-        <div class="flex gap-1">
+      <div class="mt-3 flex items-center justify-between gap-2 border-t border-border-light pt-3">
+        <div class="flex gap-1.5">
           <Tooltip
             label={copied ? 'Lien copié' : 'Copier le lien'}
             description="Partagez ou archivez la mission sans ouvrir la plateforme."
           >
             {#snippet children(tooltip: TooltipTriggerState)}
               <button
-                class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
                 onclick={handleCopyLink}
                 onkeydown={tooltip.onKeydown}
                 aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
@@ -505,7 +505,7 @@
           >
             {#snippet children(tooltip: TooltipTriggerState)}
               <button
-                class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
                 onclick={handleOpenLink}
                 onkeydown={tooltip.onKeydown}
                 aria-label="Ouvrir la mission sur la plateforme source"
@@ -518,10 +518,11 @@
         </div>
         <button
           type="button"
-          class="cursor-pointer rounded-lg bg-blueprint-blue/8 px-5 py-3 text-body-lg font-medium text-blueprint-blue transition-colors duration-150 hover:bg-blueprint-blue/15"
+          class="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-blueprint-blue-strong px-4 text-body font-medium text-white shadow-subtle-2 transition-colors duration-150 ease-out hover:bg-blueprint-blue-strong/90 active:translate-y-px"
           onclick={handleInvestigate}
         >
-          Analyser →
+          <span>Analyser</span>
+          <Icon name="arrow-right" size={13} />
         </button>
       </div>
     </div>
@@ -545,7 +546,7 @@
         {@const label = STATUS_LABELS[nextStatus]}
         {#if onStatusTransition}
           <button
-            class="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-caption text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
+            class="inline-flex min-h-9 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-page-canvas px-2.5 text-caption text-text-secondary transition-colors duration-150 hover:border-border-light hover:bg-subtle-gray hover:text-text-primary active:border-transparent disabled:cursor-wait disabled:opacity-50"
             onclick={() => onStatusTransition?.(nextStatus)}
             aria-label={`Passer le statut à ${label}`}
             disabled={isStatusTransitionPending}
@@ -559,7 +560,7 @@
 
   <!-- Triage bar — favorite/hide/compare affordances relocated to the card
        footer, visible from collapse. Same callbacks, no new workflow. -->
-  <div class="mt-3 flex items-center gap-1 border-t border-border-light pt-2.5">
+  <div class="mt-3 flex items-center gap-1.5 border-t border-border-light pt-3">
     <Tooltip
       label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
       description={isHidden
@@ -568,7 +569,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
           onclick={handleHide}
           onkeydown={tooltip.onKeydown}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
@@ -589,7 +590,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -614,7 +615,7 @@
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
           type="button"
-          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait {isFavorite
+          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
