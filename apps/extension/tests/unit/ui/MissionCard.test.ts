@@ -85,6 +85,23 @@ describe('MissionCard', () => {
     );
   });
 
+  it('affiche la date de publication dès l’état réduit', async () => {
+    const target = mountCard();
+    await tick();
+
+    expect(target.textContent).toContain('Publiée 14 mars 2026');
+  });
+
+  it('masque la date de publication absente ou invalide', async () => {
+    const missing = mountCard({ mission: makeMission({ publishedAt: null }) });
+    await tick();
+    expect(missing.textContent).not.toContain('Publiée');
+
+    const invalid = mountCard({ mission: makeMission({ publishedAt: 'pas-une-date' }) });
+    await tick();
+    expect(invalid.textContent).not.toContain('Publiée');
+  });
+
   it('signale un TJM absent au lieu de ne rien afficher', async () => {
     const target = mountCard({ mission: makeMission({ tjm: null, location: 'Bordeaux' }) });
     await tick();

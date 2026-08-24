@@ -8,7 +8,8 @@
   import { Icon } from '@pulse/ui';
   import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
-  import { formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
+  import { formatAbsoluteDate, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
+  import { parseIsoDateTimeToEpochMs } from '$lib/core/utils/iso-time';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
   import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
@@ -64,8 +65,9 @@
   // Replié par défaut : le scan rapide du feed prime. Densité compacte :
   // paddings et marges verticales réduits, cible d'action 32px. La barre
   // d'actions unique garde les six actions visibles même replié ; déplier
-  // n'ajoute que la description (localisation et séniorité vivent dans la
-  // ligne de scan rapide, la source en badge d'en-tête).
+  // n'ajoute que la description (localisation, séniorité et date de
+  // publication vivent dans la ligne de scan rapide, la source en badge
+  // d'en-tête).
   let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
 
@@ -88,6 +90,11 @@
   );
 
   const tjmValue = $derived(formatTJMValue(mission.tjm));
+
+  // Publication date — same disclosure rule as seniority: omitted (never
+  // "null"/"Invalid Date") when missing or not ISO-parsable. Pure core
+  // formatting keeps the card mock-free testable.
+  const publishedLabel = $derived(formatPublishedDate(mission.publishedAt));
 
   const availableTransitions = $derived(
     trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []
@@ -149,6 +156,17 @@
       return null;
     }
     return formatTimestamp(timestamp);
+  }
+
+  function formatPublishedDate(value: string | null | undefined): string | null {
+    if (!value) {
+      return null;
+    }
+    const epochMs = parseIsoDateTimeToEpochMs(value);
+    if (epochMs === null) {
+      return null;
+    }
+    return formatAbsoluteDate(epochMs, { style: 'medium' });
   }
 
   function toggleExpand() {
@@ -332,7 +350,7 @@
     {/if}
   </div>
 
-  <!-- Quick-scan line: TJM (scoring driver) + location + seniority, visible from collapse -->
+  <!-- Quick-scan line: TJM (scoring driver) + location + seniority + publication date, visible from collapse -->
   <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
     {#if tjmValue !== null}
       <span class="font-mono font-bold tabular-nums text-text-primary">
@@ -348,6 +366,12 @@
     {#if seniorityLabel}
       <span class="text-text-muted" aria-hidden="true">•</span>
       <span class="text-text-secondary">{seniorityLabel}</span>
+    {/if}
+    {#if publishedLabel}
+      <span class="text-text-muted" aria-hidden="true">•</span>
+      <span class="text-text-secondary">
+        Publiée {publishedLabel}
+      </span>
     {/if}
   </div>
 
