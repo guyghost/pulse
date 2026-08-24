@@ -61,10 +61,6 @@ describe('MissionCard', () => {
 
   it('affiche le TJM quand il est present', async () => {
     const target = mountCard();
-    const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
-    ) as HTMLButtonElement;
-    disclosure.click();
     await tick();
     expect(target.textContent).toContain('650');
     expect(target.textContent).toMatch(/650.*\/j/);
@@ -100,38 +96,43 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
-  it('réserve la zone dépliée aux actions copier/ouvrir/analyser', async () => {
+  it('regarroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
     const target = mountCard();
-    const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
-    ) as HTMLButtonElement;
-    disclosure.click();
     await tick();
 
     const details = target.querySelector('[role="region"]');
     expect(details).not.toBeNull();
-    expect(details!.querySelectorAll('button[aria-label="Masquer la mission"]')).toHaveLength(0);
+    expect(details!.querySelectorAll('button')).toHaveLength(0);
+
+    const actionLabels = [
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+    ];
     expect(
-      details!.querySelectorAll('button[aria-label="Ajouter la mission à la comparaison"]')
-    ).toHaveLength(0);
-    expect(
-      details!.querySelectorAll('button[aria-label="Ajouter la mission aux favoris"]')
-    ).toHaveLength(0);
-    expect(
-      details!.querySelectorAll('button[aria-label="Copier le lien de la mission"]')
-    ).toHaveLength(1);
-    expect(
-      details!.querySelectorAll('button[aria-label="Ouvrir la mission sur la plateforme source"]')
-    ).toHaveLength(1);
-    expect(details!.textContent).toContain('Analyser →');
+      Array.from(target.querySelectorAll('button'))
+        .map((button) => button.getAttribute('aria-label') ?? '')
+        .filter((label) => actionLabels.includes(label))
+    ).toEqual(actionLabels);
+    expect(target.textContent).toContain('Analyser');
+
+    // État replié : les mêmes actions restent visibles sur la même ligne.
+    const disclosure = target.querySelector(
+      'button[aria-label="Masquer les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    for (const label of actionLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
+    }
+    expect(target.textContent).toContain('Analyser');
   });
 
   it('concentre la grille dépliée sur zone, séniorité et source', async () => {
     const target = mountCard();
-    const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
-    ) as HTMLButtonElement;
-    disclosure.click();
     await tick();
 
     const details = target.querySelector('[role="region"]') as HTMLElement;
@@ -147,10 +148,6 @@ describe('MissionCard', () => {
 
   it("n'affiche plus le bloc éditorial de décision dans l'expand", async () => {
     const target = mountCard();
-    const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
-    ) as HTMLButtonElement;
-    disclosure.click();
     await tick();
 
     const details = target.querySelector('[role="region"]') as HTMLElement;
@@ -161,10 +158,6 @@ describe('MissionCard', () => {
 
   it('tronque la description dépliée à deux lignes', async () => {
     const target = mountCard();
-    const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
-    ) as HTMLButtonElement;
-    disclosure.click();
     await tick();
 
     const description = target.querySelector('[role="region"] p.line-clamp-2');
@@ -188,29 +181,29 @@ describe('MissionCard', () => {
     const target = mountCard({ mission: makeMission({ id: '123/mission très longue' }) });
     await tick();
 
+    // Déplié par défaut : la région nommée est présente dès le montage.
     const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+      'button[aria-label="Masquer les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
     const detailsId = disclosure.getAttribute('aria-controls') ?? '';
 
-    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
     expect(detailsId).toMatch(/^mission-details-[A-Za-z][A-Za-z0-9-]{0,63}$/);
     expect(detailsId.length).toBeGreaterThanOrEqual(17);
     expect(detailsId.length).toBeLessThanOrEqual(80);
-    expect(document.querySelectorAll(`#${detailsId}`)).toHaveLength(0);
-
-    disclosure.click();
-    await tick();
-
-    expect(disclosure.getAttribute('aria-label')).toBe(
-      'Masquer les détails de la mission Developpeur fullstack TypeScript'
-    );
-    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
     const region = target.querySelector(`#${detailsId}`);
     expect(region?.getAttribute('role')).toBe('region');
     expect(region?.getAttribute('aria-label')).toBe(
       'Détails de la mission Developpeur fullstack TypeScript'
     );
+
+    disclosure.click();
+    await tick();
+
+    expect(disclosure.getAttribute('aria-label')).toBe(
+      'Afficher les détails de la mission Developpeur fullstack TypeScript'
+    );
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
   });
 
   it('évite les collisions entre identifiants de mission normalisés', async () => {
@@ -554,7 +547,7 @@ describe('MissionCard — affordance swipe et accessibilité clavier (couche 3)'
     expect(onToggleCompare).not.toHaveBeenCalled();
   });
 
-  it('suit un ordre de tabulation aligné sur l’ordre visuel (réduit puis déplié)', async () => {
+  it('suit un ordre de tabulation aligné sur l’ordre visuel (déplié par défaut)', async () => {
     const target = mountCard({
       mission: makeMission({
         scoreBreakdown: {
@@ -581,31 +574,29 @@ describe('MissionCard — affordance swipe et accessibilité clavier (couche 3)'
         (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
       );
 
-    // État réduit : header → ligne note → triage.
-    expect(labels()).toEqual([
-      'Afficher les détails de la mission Developpeur fullstack TypeScript',
+    // Déplié par défaut : disclosure → note → les six actions sur une ligne.
+    const expandedLabels = [
+      'Masquer les détails de la mission Developpeur fullstack TypeScript',
       'Pourquoi cette note ?',
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
       'Masquer la mission',
       'Ajouter la mission à la comparaison',
       'Ajouter la mission aux favoris',
-    ]);
+      'Analyser',
+    ];
+    expect(labels()).toEqual(expandedLabels);
 
-    // État déplié : les actions utilitaires puis « Analyser » précèdent le triage.
+    // État replié : la barre d'actions reste complète et inchangée.
     const disclosure = target.querySelector(
-      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+      'button[aria-label="Masquer les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
     disclosure.click();
     await tick();
 
     expect(labels()).toEqual([
-      'Masquer les détails de la mission Developpeur fullstack TypeScript',
-      'Pourquoi cette note ?',
-      'Copier le lien de la mission',
-      'Ouvrir la mission sur la plateforme source',
-      'Analyser →',
-      'Masquer la mission',
-      'Ajouter la mission à la comparaison',
-      'Ajouter la mission aux favoris',
+      'Afficher les détails de la mission Developpeur fullstack TypeScript',
+      ...expandedLabels.slice(1),
     ]);
   });
 

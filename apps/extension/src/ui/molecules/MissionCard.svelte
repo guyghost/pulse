@@ -61,7 +61,9 @@
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
 
-  let expanded = $state(false);
+  // Déplié par défaut : la vue détaillée est le parcours principal,
+  // le repli reste disponible via le chevron.
+  let expanded = $state(true);
   let scoreDetailsOpen = $state(false);
 
   // Swipe-to-triage (models/mission-card-swipe.model.md): presentation
@@ -508,48 +510,45 @@
     </div>
   {/if}
 
-  <!-- Action bar — single row per card state: collapsed shows triage only,
-       expanded shows copy/open + triage + Analyser CTA, all on one line.
+  <!-- Action bar — single row, all actions in both card states.
        Same callbacks, no new workflow. -->
   <div class="mt-3 flex items-center gap-1.5 border-t border-border-light pt-3">
-    {#if expanded}
-      <Tooltip
-        label={copied ? 'Lien copié' : 'Copier le lien'}
-        description="Partagez ou archivez la mission sans ouvrir la plateforme."
-      >
-        {#snippet children(tooltip: TooltipTriggerState)}
-          <button
-            class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
-            onclick={handleCopyLink}
-            onkeydown={tooltip.onKeydown}
-            aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
-            aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
-          >
-            <Icon
-              name={copied ? 'check' : 'link'}
-              size={13}
-              class={copied ? 'text-blueprint-blue' : ''}
-            />
-          </button>
-        {/snippet}
-      </Tooltip>
-      <Tooltip
-        label="Ouvrir la mission"
-        description="Passez à la plateforme source pour vérifier ou postuler."
-      >
-        {#snippet children(tooltip: TooltipTriggerState)}
-          <button
-            class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
-            onclick={handleOpenLink}
-            onkeydown={tooltip.onKeydown}
-            aria-label="Ouvrir la mission sur la plateforme source"
-            aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
-          >
-            <Icon name="external-link" size={13} />
-          </button>
-        {/snippet}
-      </Tooltip>
-    {/if}
+    <Tooltip
+      label={copied ? 'Lien copié' : 'Copier le lien'}
+      description="Partagez ou archivez la mission sans ouvrir la plateforme."
+    >
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <button
+          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+          onclick={handleCopyLink}
+          onkeydown={tooltip.onKeydown}
+          aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon
+            name={copied ? 'check' : 'link'}
+            size={13}
+            class={copied ? 'text-blueprint-blue' : ''}
+          />
+        </button>
+      {/snippet}
+    </Tooltip>
+    <Tooltip
+      label="Ouvrir la mission"
+      description="Passez à la plateforme source pour vérifier ou postuler."
+    >
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <button
+          class="inline-flex size-9 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+          onclick={handleOpenLink}
+          onkeydown={tooltip.onKeydown}
+          aria-label="Ouvrir la mission sur la plateforme source"
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name="external-link" size={13} />
+        </button>
+      {/snippet}
+    </Tooltip>
     <Tooltip
       label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
       description={isHidden
@@ -620,16 +619,14 @@
         </button>
       {/snippet}
     </Tooltip>
-    {#if expanded}
-      <button
-        type="button"
-        class="ml-auto inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-blueprint-blue-strong px-4 text-body font-medium text-white shadow-subtle-2 transition-colors duration-150 ease-out hover:bg-blueprint-blue-strong/90 active:translate-y-px"
-        onclick={handleInvestigate}
-      >
-        <span>Analyser</span>
-        <Icon name="arrow-right" size={13} />
-      </button>
-    {/if}
+    <button
+      type="button"
+      class="ml-auto inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-lg bg-blueprint-blue-strong px-4 text-body font-medium text-white shadow-subtle-2 transition-colors duration-150 ease-out hover:bg-blueprint-blue-strong/90 active:translate-y-px"
+      onclick={handleInvestigate}
+    >
+      <span>Analyser</span>
+      <Icon name="arrow-right" size={13} />
+    </button>
   </div>
 
   {#if swipeParams.enabled}
