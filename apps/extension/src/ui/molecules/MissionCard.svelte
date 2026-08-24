@@ -458,9 +458,7 @@
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
       {#if mission.description}
-        <p
-          class="mt-3 line-clamp-2 border-t border-border-light pt-3 text-meta leading-relaxed text-text-subtle"
-        >
+        <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
           {mission.description}
         </p>
       {/if}
