@@ -495,7 +495,7 @@ test.describe('Feed', () => {
     await expect(arrivalStack).not.toBeVisible();
 
     await expandMission(partialCard);
-    const investigateButton = partialCard.getByRole('button', { name: 'Analyser →' });
+    const investigateButton = partialCard.getByRole('button', { name: 'Analyser' });
     await expect(investigateButton).toBeEnabled();
     await investigateButton.click();
 
