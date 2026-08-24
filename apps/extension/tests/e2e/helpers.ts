@@ -123,9 +123,9 @@ export function missionDetailsToggle(card: Locator): Locator {
 }
 
 /**
- * Ouvre le disclosure de la carte pour exposer les actions (masquer,
- * comparer, copier, ouvrir, investiguer). Le content-first redesign garde
- * ces actions dans la zone de détails repliée par défaut.
+ * Ouvre le disclosure de la carte pour exposer les actions détaillées
+ * (copier, ouvrir, investiguer). Les actions de triage (masquer,
+ * comparer, favori) sont visibles dès l'état réduit via le bandeau bas.
  */
 export async function expandMission(card: Locator) {
   const toggle = missionDetailsToggle(card);

@@ -1,5 +1,11 @@
 <script module lang="ts">
   let tooltipIdCounter = 0;
+
+  export type TooltipTriggerState = {
+    id: string;
+    isOpen: boolean;
+    onKeydown: (event: KeyboardEvent) => void;
+  };
 </script>
 
 <script lang="ts">
@@ -19,7 +25,7 @@
     description?: string | null;
     side?: TooltipSide;
     disabled?: boolean;
-    children: Snippet;
+    children: Snippet<[TooltipTriggerState]>;
   } = $props();
 
   const tooltipId = `tooltip-${++tooltipIdCounter}`;
@@ -47,6 +53,15 @@
   function close() {
     isOpen = false;
   }
+
+  // WCAG 1.4.13 (dismissible) : Escape ferme le tooltip sans déplacer le
+  // focus. Le handler est exposé au déclencheur via le snippet children —
+  // c'est l'élément focusable qui doit porter l'écoute clavier.
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape' && isOpen) {
+      close();
+    }
+  }
 </script>
 
 <span
@@ -58,7 +73,7 @@
   onfocusin={open}
   onfocusout={close}
 >
-  {@render children()}
+  {@render children({ id: tooltipId, isOpen, onKeydown: handleKeydown })}
 
   {#if isOpen}
     <span

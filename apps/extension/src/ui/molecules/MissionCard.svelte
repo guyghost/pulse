@@ -6,12 +6,12 @@
   import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
-  import { getMissionGrade, getMissionScore } from '$lib/core/scoring/mission-grade';
+  import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
-  import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
+  import { formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
-  import Tooltip from '../atoms/Tooltip.svelte';
+  import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
 
   const {
     mission,
@@ -82,12 +82,13 @@
     mission.seniority ? (seniorityLabels[mission.seniority] ?? mission.seniority) : null
   );
 
+  const tjmValue = $derived(formatTJMValue(mission.tjm));
+
   const availableTransitions = $derived(
     trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []
   );
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
-  const scoreValue = $derived(getMissionScore(mission) ?? 0);
   const missionGrade = $derived(getMissionGrade(mission));
   const semanticDisplayValue = $derived(mission.scoreBreakdown?.semantic ?? mission.semanticScore);
   const semanticReason = $derived(mission.scoreBreakdown?.semanticReason ?? mission.semanticReason);
@@ -118,41 +119,6 @@
         .slice(0, 53) || 'mission'
     }-${stableIdHash(mission.id)}`
   );
-
-  const decisionInsight = $derived.by(() => {
-    if (scoreValue >= 80) {
-      return {
-        label: 'Action recommandée',
-        text:
-          mission.tjm !== null
-            ? `À examiner en premier : note A et TJM ${formatTJM(mission.tjm, { fallback: 'non précisé' })}.`
-            : 'À examiner en premier : note A, TJM à vérifier dans l’annonce.',
-        tone: 'border-accent-green/20 bg-accent-green/10 text-text-primary',
-      };
-    }
-
-    if ((mission.scoreBreakdown?.criteria.tjm ?? 100) < 60) {
-      return {
-        label: 'Point de vigilance',
-        text: 'TJM sous votre cible : gardez cette mission seulement si le contexte compense.',
-        tone: 'border-status-orange/20 bg-status-orange/10 text-text-primary',
-      };
-    }
-
-    if (scoreValue >= 60) {
-      return {
-        label: 'À comparer',
-        text: 'Potentiel correct : comparez avec les missions notées A avant de postuler.',
-        tone: 'border-status-yellow/30 bg-status-yellow/12 text-text-primary',
-      };
-    }
-
-    return {
-      label: 'À qualifier',
-      text: 'Priorité faible : ouvrez seulement si la source ou le client est stratégique.',
-      tone: 'border-border-light bg-subtle-gray text-text-subtle',
-    };
-  });
 
   // Tier hue carried by the background tint; glyph stays neutral for WCAG AA.
   // Low tier is intentionally de-emphasized (subtle text on a calm neutral block).
@@ -321,21 +287,7 @@
       {/if}
       <button
         type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {isFavorite
-          ? 'text-blueprint-blue hover:text-blueprint-blue'
-          : ''}"
-        onclick={handleToggleFavorite}
-        disabled={isFavoritePending}
-        aria-label={isFavorite
-          ? 'Retirer la mission des favoris'
-          : 'Ajouter la mission aux favoris'}
-        aria-pressed={isFavorite}
-      >
-        <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
-      </button>
-      <button
-        type="button"
-        class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+        class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
         'expand'
           ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
           : ''}"
@@ -370,10 +322,25 @@
     {/if}
   </div>
 
+  <!-- Quick-scan line: TJM (scoring driver) + location, visible from collapse -->
+  <div class="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-body">
+    {#if tjmValue !== null}
+      <span class="font-mono font-bold tabular-nums text-text-primary">
+        {tjmValue}<span class="text-text-muted">/j</span>
+      </span>
+    {:else}
+      <span class="text-text-muted">TJM à vérifier</span>
+    {/if}
+    {#if mission.location}
+      <span class="text-text-muted" aria-hidden="true">•</span>
+      <span class="text-text-secondary">{mission.location}</span>
+    {/if}
+  </div>
+
   {#if hasScoreDetails}
     <button
       type="button"
-      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-1.5 py-1 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
+      class="mt-2 -my-0.5 inline-flex cursor-pointer items-center gap-1.5 rounded-lg px-2 py-1.5 text-caption text-text-subtle transition-colors hover:text-blueprint-blue"
       onclick={handleScoreDetailsToggle}
       onkeydown={(e) => e.stopPropagation()}
       aria-expanded={scoreDetailsOpen}
@@ -384,7 +351,7 @@
       <Icon
         name="chevron-down"
         size={11}
-        class="transition-transform duration-150 {scoreDetailsOpen ? 'rotate-180' : ''}"
+        class="transition-transform duration-200 {scoreDetailsOpen ? 'rotate-180' : ''}"
       />
     </button>
   {/if}
@@ -483,36 +450,11 @@
       class="mt-3 border-t border-border-light pt-3"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
-      <div class="rounded-lg border px-3 py-2.5 {decisionInsight.tone}">
-        <p class="eyebrow eyebrow--strong eyebrow--inherit">{decisionInsight.label}</p>
-        <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
-      </div>
-
-      <div class="mt-3 grid grid-cols-2 gap-2 text-meta">
-        {#if mission.tjm !== null}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">TJM</p>
-            <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
-              {formatTJMValue(mission.tjm)}<span class="text-text-muted">/j</span>
-            </p>
-          </div>
-        {/if}
+      <div class="grid grid-cols-2 gap-2 text-meta">
         {#if mission.location}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
             <p class="eyebrow eyebrow--subtle">Zone</p>
             <p class="mt-1 truncate text-text-primary">{mission.location}</p>
-          </div>
-        {/if}
-        {#if mission.duration}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">Durée</p>
-            <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
-          </div>
-        {/if}
-        {#if mission.startDate}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">Début</p>
-            <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
           </div>
         {/if}
         {#if seniorityLabel}
@@ -527,80 +469,56 @@
         </div>
       </div>
       {#if mission.description}
-        <div class="mt-3 border-t border-border-light pt-3">
-          <p class="text-meta leading-relaxed text-text-subtle">{mission.description}</p>
+        <div class="mt-3.5">
+          <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
+            {mission.description}
+          </p>
         </div>
       {/if}
 
-      <!-- Actions — inside the disclosure, quiet until hover -->
+      <!-- Actions — utility shortcuts vs commitment action, inside the disclosure -->
       <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
         <div class="flex gap-1">
-          <Tooltip
-            label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
-            description={isHidden
-              ? 'La mission reviendra dans le feed actif.'
-              : 'Retirez cette mission du flux de décision.'}
-          >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
-              onclick={handleHide}
-              aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
-            >
-              <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
-            </button>
-          </Tooltip>
-          <Tooltip
-            label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
-            description={compareDisabled && !isCompared
-              ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
-              : 'Ajoutez cette mission à la sélection pour départager les missions.'}
-          >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
-                ? 'bg-blueprint-blue/8 text-blueprint-blue'
-                : ''}"
-              onclick={handleToggleCompare}
-              disabled={compareDisabled && !isCompared}
-              aria-label={isCompared
-                ? 'Retirer la mission de la comparaison'
-                : 'Ajouter la mission à la comparaison'}
-              aria-pressed={isCompared}
-            >
-              <Icon name="git-compare-arrows" size={13} />
-            </button>
-          </Tooltip>
           <Tooltip
             label={copied ? 'Lien copié' : 'Copier le lien'}
             description="Partagez ou archivez la mission sans ouvrir la plateforme."
           >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-              onclick={handleCopyLink}
-              aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
-            >
-              <Icon
-                name={copied ? 'check' : 'link'}
-                size={13}
-                class={copied ? 'text-blueprint-blue' : ''}
-              />
-            </button>
+            {#snippet children(tooltip: TooltipTriggerState)}
+              <button
+                class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                onclick={handleCopyLink}
+                onkeydown={tooltip.onKeydown}
+                aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+                aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+              >
+                <Icon
+                  name={copied ? 'check' : 'link'}
+                  size={13}
+                  class={copied ? 'text-blueprint-blue' : ''}
+                />
+              </button>
+            {/snippet}
           </Tooltip>
           <Tooltip
             label="Ouvrir la mission"
             description="Passez à la plateforme source pour vérifier ou postuler."
           >
-            <button
-              class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-              onclick={handleOpenLink}
-              aria-label="Ouvrir la mission sur la plateforme source"
-            >
-              <Icon name="external-link" size={13} />
-            </button>
+            {#snippet children(tooltip: TooltipTriggerState)}
+              <button
+                class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                onclick={handleOpenLink}
+                onkeydown={tooltip.onKeydown}
+                aria-label="Ouvrir la mission sur la plateforme source"
+                aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+              >
+                <Icon name="external-link" size={13} />
+              </button>
+            {/snippet}
           </Tooltip>
         </div>
         <button
           type="button"
-          class="text-caption font-medium text-text-subtle transition-colors hover:text-blueprint-blue"
+          class="cursor-pointer rounded-lg bg-blueprint-blue/8 px-5 py-3 text-body-lg font-medium text-blueprint-blue transition-colors duration-150 hover:bg-blueprint-blue/15"
           onclick={handleInvestigate}
         >
           Analyser →
@@ -627,7 +545,7 @@
         {@const label = STATUS_LABELS[nextStatus]}
         {#if onStatusTransition}
           <button
-            class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-caption text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
+            class="inline-flex cursor-pointer items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-caption text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
             onclick={() => onStatusTransition?.(nextStatus)}
             aria-label={`Passer le statut à ${label}`}
             disabled={isStatusTransitionPending}
@@ -637,5 +555,98 @@
         {/if}
       {/each}
     </div>
+  {/if}
+
+  <!-- Triage bar — favorite/hide/compare affordances relocated to the card
+       footer, visible from collapse. Same callbacks, no new workflow. -->
+  <div class="mt-3 flex items-center gap-1 border-t border-border-light pt-2.5">
+    <Tooltip
+      label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
+      description={isHidden
+        ? 'La mission reviendra dans le feed actif.'
+        : 'Retirez cette mission du flux de décision.'}
+    >
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <button
+          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+          onclick={handleHide}
+          onkeydown={tooltip.onKeydown}
+          aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
+        </button>
+      {/snippet}
+    </Tooltip>
+    <Tooltip
+      label={isCompared ? 'Retirer de la comparaison' : 'Comparer cette mission'}
+      description={compareDisabled && !isCompared
+        ? 'Trois missions sont déjà sélectionnées. Retirez-en une pour comparer celle-ci.'
+        : 'Ajoutez cette mission à la sélection pour départager les missions.'}
+    >
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <!-- aria-disabled (et non disabled) : le bouton reste focalisable pour
+             que l'explication du blocage soit atteignable au clavier ; le
+             handler garde l'action inactive. -->
+        <button
+          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+            ? 'bg-blueprint-blue/8 text-blueprint-blue'
+            : ''}"
+          onclick={handleToggleCompare}
+          onkeydown={tooltip.onKeydown}
+          aria-disabled={compareDisabled && !isCompared ? 'true' : undefined}
+          aria-label={isCompared
+            ? 'Retirer la mission de la comparaison'
+            : 'Ajouter la mission à la comparaison'}
+          aria-pressed={isCompared}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name="git-compare-arrows" size={13} />
+        </button>
+      {/snippet}
+    </Tooltip>
+    <Tooltip
+      label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      description={isFavorite
+        ? 'La mission quitte le fil des favoris.'
+        : 'Épinglez la mission pour la retrouver dans le fil des favoris.'}
+    >
+      {#snippet children(tooltip: TooltipTriggerState)}
+        <button
+          type="button"
+          class="inline-flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait {isFavorite
+            ? 'text-blueprint-blue hover:text-blueprint-blue'
+            : ''}"
+          onclick={handleToggleFavorite}
+          onkeydown={tooltip.onKeydown}
+          disabled={isFavoritePending}
+          aria-label={isFavorite
+            ? 'Retirer la mission des favoris'
+            : 'Ajouter la mission aux favoris'}
+          aria-pressed={isFavorite}
+          aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+        >
+          <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
+        </button>
+      {/snippet}
+    </Tooltip>
+  </div>
+
+  {#if swipeParams.enabled}
+    <!-- Affordance swipe (models/mission-card-swipe.model.md) : indice
+         purement décoratif, masqué aux lecteurs d'écran et hors tabulation —
+         les boutons d'action restent la voie accessible. -->
+    <span
+      class="pointer-events-none absolute top-1/2 left-1.5 -translate-y-1/2 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-within:opacity-60"
+      aria-hidden="true"
+    >
+      <Icon name="chevron-left" size={14} />
+    </span>
+    <span
+      class="pointer-events-none absolute top-1/2 right-1.5 -translate-y-1/2 text-text-muted opacity-0 transition-opacity duration-150 group-hover:opacity-60 group-focus-within:opacity-60"
+      aria-hidden="true"
+    >
+      <Icon name="chevron-right" size={14} />
+    </span>
   {/if}
 </article>
