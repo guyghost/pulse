@@ -325,7 +325,7 @@
     {/if}
   </div>
 
-  <!-- Quick-scan line: TJM (scoring driver) + location, visible from collapse -->
+  <!-- Quick-scan line: TJM (scoring driver) + location + seniority, visible from collapse -->
   <div class="mt-2 flex flex-wrap items-baseline gap-x-1.5 text-body">
     {#if tjmValue !== null}
       <span class="font-mono font-bold tabular-nums text-text-primary">
@@ -337,6 +337,10 @@
     {#if mission.location}
       <span class="text-text-muted" aria-hidden="true">•</span>
       <span class="text-text-secondary">{mission.location}</span>
+    {/if}
+    {#if seniorityLabel}
+      <span class="text-text-muted" aria-hidden="true">•</span>
+      <span class="text-text-secondary">{seniorityLabel}</span>
     {/if}
   </div>
 
@@ -453,30 +457,12 @@
       class="mt-3 border-t border-border-light pt-3"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
-      <div class="grid grid-cols-2 gap-2 text-meta">
-        {#if mission.location}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">Zone</p>
-            <p class="mt-1 truncate text-text-primary">{mission.location}</p>
-          </div>
-        {/if}
-        {#if seniorityLabel}
-          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="eyebrow eyebrow--subtle">Séniorité</p>
-            <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
-          </div>
-        {/if}
-        <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-          <p class="eyebrow eyebrow--subtle">Source</p>
-          <p class="mt-1 truncate text-text-primary">{mission.source}</p>
-        </div>
-      </div>
       {#if mission.description}
-        <div class="mt-3.5">
-          <p class="line-clamp-2 text-meta leading-relaxed text-text-subtle">
-            {mission.description}
-          </p>
-        </div>
+        <p
+          class="mt-3 line-clamp-2 border-t border-border-light pt-3 text-meta leading-relaxed text-text-subtle"
+        >
+          {mission.description}
+        </p>
       {/if}
     </div>
   {/if}

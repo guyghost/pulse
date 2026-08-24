@@ -66,12 +66,23 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
-  it('affiche le TJM et la localisation dès l’état réduit, sans déplier', async () => {
+  it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {
     const target = mountCard();
     await tick();
 
     expect(target.textContent).toMatch(/650.*€.*\/j/);
     expect(target.textContent).toContain('Paris');
+    expect(target.textContent).toContain('Senior (7+ ans)');
+  });
+
+  it('masque la séniorité inconnue de la ligne de scan rapide', async () => {
+    const target = mountCard({ mission: makeMission({ seniority: null }) });
+    await tick();
+
+    expect(target.textContent).not.toContain('Séniorité');
+    expect(target.textContent).not.toMatch(
+      /Junior \(0-2 ans\)|Confirmé \(3-7 ans\)|Senior \(7\+ ans\)/
+    );
   });
 
   it('signale un TJM absent au lieu de ne rien afficher', async () => {
@@ -130,7 +141,7 @@ describe('MissionCard', () => {
     expect(target.textContent).toContain('Analyser');
   });
 
-  it('concentre la grille dépliée sur zone, séniorité et source', async () => {
+  it('réserve la zone dépliée à la description, sans grille redondante', async () => {
     const target = mountCard();
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
@@ -140,13 +151,12 @@ describe('MissionCard', () => {
 
     const details = target.querySelector('[role="region"]') as HTMLElement;
     expect(details).not.toBeNull();
-    expect(details.textContent).toContain('Zone');
-    expect(details.textContent).toContain('Séniorité');
-    expect(details.textContent).toContain('Source');
-    // TJM vit dans la ligne collapse, durée et début dans le drawer Analyser.
-    expect(details.textContent).not.toContain('TJM');
-    expect(details.textContent).not.toContain('Durée');
-    expect(details.textContent).not.toContain('Début');
+    // Zone, séniorité et source vivent hors de la zone dépliée :
+    // localisation et séniorité dans la ligne de scan rapide, source en badge d'en-tête.
+    expect(details.textContent).not.toContain('Zone');
+    expect(details.textContent).not.toContain('Séniorité');
+    expect(details.textContent).not.toContain('Source');
+    expect(details.textContent).toContain('Mission de developpement');
   });
 
   it("n'affiche plus le bloc éditorial de décision dans l'expand", async () => {
