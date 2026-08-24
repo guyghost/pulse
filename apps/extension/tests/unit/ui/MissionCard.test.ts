@@ -85,6 +85,30 @@ describe('MissionCard', () => {
     );
   });
 
+  it('affiche la date de publication dès l’état réduit', async () => {
+    const target = mountCard();
+    await tick();
+
+    // formatAbsoluteDate rend la date dans le fuseau local du runtime :
+    // on dérive l'attendu du même instant pour rester indépendant du TZ.
+    const expectedDate = new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date('2026-03-14T09:00:00.000Z'));
+    expect(target.textContent).toContain(`Publiée ${expectedDate}`);
+  });
+
+  it('masque la date de publication absente ou invalide', async () => {
+    const missing = mountCard({ mission: makeMission({ publishedAt: null }) });
+    await tick();
+    expect(missing.textContent).not.toContain('Publiée');
+
+    const invalid = mountCard({ mission: makeMission({ publishedAt: 'pas-une-date' }) });
+    await tick();
+    expect(invalid.textContent).not.toContain('Publiée');
+  });
+
   it('signale un TJM absent au lieu de ne rien afficher', async () => {
     const target = mountCard({ mission: makeMission({ tjm: null, location: 'Bordeaux' }) });
     await tick();
