@@ -67,8 +67,10 @@ export const filterSmartNotifications = (
 
       // Stack filter: mission must contain at least one required stack
       if (requiredStacksLower.length > 0) {
-        const missionStacksLower = mission.stack.filter(Boolean).map((s) => s.toLowerCase());
-        const hasMatch = requiredStacksLower.some((req) => missionStacksLower.includes(req));
+        const missionStacksLower = new Set(
+          mission.stack.filter(Boolean).map((s) => s.toLowerCase())
+        );
+        const hasMatch = requiredStacksLower.some((req) => missionStacksLower.has(req));
         if (!hasMatch) {
           return false;
         }
