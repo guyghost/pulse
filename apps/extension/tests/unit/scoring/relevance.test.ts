@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { scoreMission } from '../../../src/lib/core/scoring/relevance';
+import {
+  scoreMission,
+  scoreMissionWithPrepared,
+  prepareProfileScoring,
+} from '../../../src/lib/core/scoring/relevance';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 
@@ -234,6 +238,88 @@ describe('scoreMission', () => {
       const s = score(mission, baseProfile);
       expect(s).toBeGreaterThanOrEqual(0);
       expect(s).toBeLessThanOrEqual(100);
+    });
+  });
+
+  describe('precomputed profile path (perf hoist)', () => {
+    /**
+     * The scan loops precompute the profile inputs once per scan via
+     * prepareProfileScoring, then score N missions with scoreMissionWithPrepared.
+     * These tests lock in that the precomputed path is bit-identical to
+     * scoreMission for the same (mission, profile, now) inputs.
+     */
+    const now = new Date('2026-08-28');
+
+    const representativeMissions: Mission[] = [
+      makeMission({
+        stack: ['React', 'TypeScript', 'Node.js'],
+        tjm: 600,
+        location: 'Paris',
+        remote: 'hybrid',
+        seniority: 'senior',
+        startDate: '2026-08-31',
+      }),
+      makeMission({
+        stack: ['Java', 'Spring'],
+        tjm: 300,
+        location: 'Lyon',
+        remote: 'onsite',
+      }),
+      makeMission({ stack: ['react', 'TYPESCRIPT'] }),
+      makeMission({ stack: [] }),
+      makeMission({ stack: ['TypeScript', undefined, null, ''] as unknown as string[] }),
+    ];
+
+    const profiles: UserProfile[] = [
+      profile,
+      { ...profile, keywords: [] },
+      { ...profile, keywords: ['', undefined, null] as unknown as string[] },
+      { ...profile, scoringWeights: { stack: 2, location: 1, tjm: 1, remote: 0 } },
+      { ...profile, tjmMin: 0, tjmMax: 0, remote: 'any', location: '' },
+    ];
+
+    it('yields identical results to scoreMission for every representative mission/profile pair', () => {
+      for (const prof of profiles) {
+        const prepared = prepareProfileScoring(prof);
+        for (const mission of representativeMissions) {
+          expect(scoreMissionWithPrepared(mission, prepared, now)).toEqual(
+            scoreMission(mission, prof, now)
+          );
+        }
+      }
+    });
+
+    it('yields identical results when no date is provided', () => {
+      const prepared = prepareProfileScoring(profile);
+      for (const mission of representativeMissions) {
+        expect(scoreMissionWithPrepared(mission, prepared)).toEqual(scoreMission(mission, profile));
+      }
+    });
+
+    it('keeps the empty-keywords branch keyed on the raw list, not the Set ([""] is not empty)', () => {
+      const falsyKeywordsProfile: UserProfile = {
+        ...profile,
+        keywords: ['', undefined, null] as unknown as string[],
+      };
+      const prepared = prepareProfileScoring(falsyKeywordsProfile);
+
+      // Raw list is non-empty → stack criterion is NOT auto-100 (Set is empty → 0 matches).
+      expect(prepared.hasKeywords).toBe(true);
+      expect(prepared.keywordSet.size).toBe(0);
+      expect(
+        scoreMissionWithPrepared(makeMission({ stack: ['React'] }), prepared).breakdown.stack
+      ).toBe(scoreMission(makeMission({ stack: ['React'] }), falsyKeywordsProfile).breakdown.stack);
+      expect(
+        scoreMissionWithPrepared(makeMission({ stack: ['React'] }), prepared).breakdown.stack
+      ).toBe(0);
+
+      // Truly empty list → full stack score, identical on both paths.
+      const emptyProfile: UserProfile = { ...profile, keywords: [] };
+      const emptyPrepared = prepareProfileScoring(emptyProfile);
+      expect(emptyPrepared.hasKeywords).toBe(false);
+      expect(
+        scoreMissionWithPrepared(makeMission({ stack: ['React'] }), emptyPrepared).breakdown.stack
+      ).toBe(scoreMission(makeMission({ stack: ['React'] }), emptyProfile).breakdown.stack);
     });
   });
 

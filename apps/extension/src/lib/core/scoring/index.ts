@@ -1,4 +1,10 @@
-export { scoreMission, type DeterministicScoreResult } from './relevance';
+export {
+  scoreMission,
+  scoreMissionWithPrepared,
+  prepareProfileScoring,
+  type DeterministicScoreResult,
+  type PreparedScoringProfile,
+} from './relevance';
 export { deduplicateMissions } from './dedup';
 export { computeFinalScore, computeFinalBreakdown, buildScoreBreakdown } from './final-score';
 export { sortMissions, type MissionSortBy } from './sort-missions';
