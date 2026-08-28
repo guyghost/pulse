@@ -105,9 +105,13 @@ export async function extractLinkedInExperiencesFromDom(
       for (const lineBreak of [...clone.querySelectorAll('br')]) {
         lineBreak.replaceWith('\n');
       }
-      const blocks = [...clone.querySelectorAll('p, li')];
-      const leafBlocks = blocks.filter(
-        (block) => !blocks.some((other) => other !== block && block.contains(other))
+      // Leaf blocks are the p/li without a nested p/li: the query above
+      // already lists every p/li of the clone, so a block contains another
+      // listed block exactly when it still has a p/li descendant. One
+      // querySelector per block (O(depth)) replaces the O(blocks²)
+      // contains() scan.
+      const leafBlocks = [...clone.querySelectorAll('p, li')].filter(
+        (block) => !block.querySelector('p, li')
       );
       const raw =
         leafBlocks.length > 0
@@ -127,8 +131,24 @@ export async function extractLinkedInExperiencesFromDom(
           !candidate.querySelector('p, li')
       );
     const proseSources = proseSourcesIn(element);
-    const coveredByProse = (candidate: Element): boolean =>
-      proseSources.some((prose) => prose.contains(candidate));
+    // A candidate is covered when a prose source is one of its ancestors.
+    // Prose sources are strict descendants of element (never the element
+    // itself, and never aria-hidden like the candidates), so a membership
+    // Set plus one ancestor walk per candidate replaces the per-prose
+    // contains() scans.
+    const proseSourceSet = new Set<Element>(proseSources);
+    const coveredByProse = (candidate: Element): boolean => {
+      for (
+        let parent = candidate.parentElement;
+        parent && parent !== element;
+        parent = parent.parentElement
+      ) {
+        if (proseSourceSet.has(parent)) {
+          return true;
+        }
+      }
+      return false;
+    };
 
     const visibleTextElements = [...element.querySelectorAll('[aria-hidden="true"]')].filter(
       (candidate) =>
@@ -183,6 +203,25 @@ export async function extractLinkedInExperiencesFromDom(
       seen.add(key);
       lines.push({ text: line, prose: sourceLine.prose });
     }
+    return lines;
+  };
+
+  /**
+   * visibleLines is pure w.r.t. the live DOM. Each observation cycle runs
+   * synchronously between two awaits, so lines computed for a row during
+   * candidate discovery stay valid when the same row is parsed later in the
+   * same cycle. The memo is recreated every cycle and never outlives it, so
+   * no DOM references are retained across invocations.
+   */
+  type VisibleLinesMemo = Map<Element, VisibleLine[]>;
+
+  const visibleLinesMemoized = (element: Element, memo: VisibleLinesMemo): VisibleLine[] => {
+    const cached = memo.get(element);
+    if (cached) {
+      return cached;
+    }
+    const lines = visibleLines(element);
+    memo.set(element, lines);
     return lines;
   };
 
@@ -301,13 +340,31 @@ export async function extractLinkedInExperiencesFromDom(
     }
   };
 
-  const hasPositionStructure = (row: Element): boolean => {
-    const lines = visibleLines(row);
+  // Strict containment previously relied on row.contains() scans that walk
+  // the tree for every pair (O(rows² × depth)). For elements in the same
+  // tree, a.contains(b) with a !== b holds exactly when a is on b's strict
+  // parentElement chain, so precomputing each row's ancestor set once turns
+  // every check into an O(1) lookup.
+  const createNestingCheck = (rows: Element[]) => {
+    const ancestorSets = new Map<Element, Set<Element>>();
+    for (const row of rows) {
+      const ancestors = new Set<Element>();
+      for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+        ancestors.add(parent);
+      }
+      ancestorSets.set(row, ancestors);
+    }
+    return (row: Element, ancestor: Element): boolean =>
+      row !== ancestor && (ancestorSets.get(row)?.has(ancestor) ?? false);
+  };
+
+  const hasPositionStructure = (row: Element, linesMemo: VisibleLinesMemo): boolean => {
+    const lines = visibleLinesMemoized(row, linesMemo);
     const dateIndex = lines.findIndex((line) => isDateRangeLine(line.text));
     return dateIndex >= 1;
   };
 
-  const candidateRows = (root: Element): CandidateRow[] => {
+  const candidateRows = (root: Element, linesMemo: VisibleLinesMemo): CandidateRow[] => {
     const discovered = new Map<Element, CandidateRow>();
 
     for (const marker of root.querySelectorAll(rowDiscoverySelector)) {
@@ -326,29 +383,33 @@ export async function extractLinkedInExperiencesFromDom(
 
     const candidates = [...discovered.values()];
     const strongRows = candidates.filter((candidate) => candidate.strong);
+    const strongIsAncestorOf = createNestingCheck(strongRows.map((candidate) => candidate.row));
+    const strongIsDescendantOf = createNestingCheck(candidates.map((candidate) => candidate.row));
 
     return candidates.filter((candidate) => {
       if (candidate.strong) {
         return true;
       }
 
-      const containsStrongPosition = strongRows.some(
-        (strongCandidate) =>
-          strongCandidate.row !== candidate.row && candidate.row.contains(strongCandidate.row)
+      const containsStrongPosition = strongRows.some((strongCandidate) =>
+        strongIsAncestorOf(strongCandidate.row, candidate.row)
       );
       if (containsStrongPosition) {
         return true;
       }
 
-      const belongsToStrongPosition = strongRows.some(
-        (strongCandidate) =>
-          strongCandidate.row !== candidate.row && strongCandidate.row.contains(candidate.row)
+      const belongsToStrongPosition = strongRows.some((strongCandidate) =>
+        strongIsDescendantOf(candidate.row, strongCandidate.row)
       );
-      return !belongsToStrongPosition && hasPositionStructure(candidate.row);
+      return !belongsToStrongPosition && hasPositionStructure(candidate.row, linesMemo);
     });
   };
 
-  const leafRows = (root: Element, candidates: CandidateRow[]): ResolvedLeaf[] => {
+  const leafRows = (
+    root: Element,
+    candidates: CandidateRow[],
+    linesMemo: VisibleLinesMemo
+  ): ResolvedLeaf[] => {
     const candidateSet = new Set(candidates.map((candidate) => candidate.row));
     const topLevel = candidates.filter((candidate) => {
       for (
@@ -363,18 +424,17 @@ export async function extractLinkedInExperiencesFromDom(
       return true;
     });
     const leaves: ResolvedLeaf[] = [];
+    const candidateNesting = createNestingCheck(candidates.map((candidate) => candidate.row));
 
     for (const candidate of topLevel) {
-      const descendants = candidates.filter(
-        (other) => other.row !== candidate.row && candidate.row.contains(other.row)
-      );
+      const descendants = candidates.filter((other) => candidateNesting(other.row, candidate.row));
       if (descendants.length === 0) {
         leaves.push({ ...candidate, inheritedCompany: undefined });
         continue;
       }
 
       const groupClone = candidate.row.cloneNode(true) as Element;
-      for (const nested of candidateRows(groupClone)) {
+      for (const nested of candidateRows(groupClone, linesMemo)) {
         nested.row.remove();
       }
       const groupCompany = visibleLines(groupClone).find(
@@ -382,10 +442,7 @@ export async function extractLinkedInExperiencesFromDom(
       )?.text;
       for (const descendant of descendants) {
         const hasNestedCandidate = descendants.some(
-          (other) =>
-            other.row !== descendant.row &&
-            descendant.row.contains(other.row) &&
-            candidateSet.has(other.row)
+          (other) => candidateNesting(other.row, descendant.row) && candidateSet.has(other.row)
         );
         if (!hasNestedCandidate) {
           leaves.push({ ...descendant, inheritedCompany: groupCompany });
@@ -399,9 +456,10 @@ export async function extractLinkedInExperiencesFromDom(
   const parseLeaf = (
     row: Element,
     inheritedCompany: string | undefined,
-    positionIndex: number
+    positionIndex: number,
+    linesMemo: VisibleLinesMemo
   ): RawExperience | null => {
-    const lines = visibleLines(row);
+    const lines = visibleLinesMemoized(row, linesMemo);
     const title = lines[0]?.text ?? '';
     const dateIndex = lines.findIndex((line) => isDateRangeLine(line.text));
     const rawDateRange = dateIndex >= 0 ? lines[dateIndex]?.text : undefined;
@@ -594,7 +652,8 @@ export async function extractLinkedInExperiencesFromDom(
 
   const resolveExperiences = (
     root: Element,
-    candidates: CandidateRow[]
+    candidates: CandidateRow[],
+    linesMemo: VisibleLinesMemo
   ): { experiences: RawExperience[]; hasInvalidStrongPosition: boolean } => {
     interface LeafBucket {
       leaves: ResolvedLeaf[];
@@ -604,7 +663,7 @@ export async function extractLinkedInExperiencesFromDom(
     const buckets: LeafBucket[] = [];
     const bucketByIdentity = new Map<string, LeafBucket>();
 
-    for (const leaf of leafRows(root, candidates)) {
+    for (const leaf of leafRows(root, candidates, linesMemo)) {
       if (!leaf.identity) {
         buckets.push({ leaves: [leaf], strong: leaf.strong });
         continue;
@@ -624,7 +683,7 @@ export async function extractLinkedInExperiencesFromDom(
     let hasInvalidStrongPosition = false;
     for (const [index, bucket] of buckets.entries()) {
       const parsed = bucket.leaves
-        .map((leaf) => parseLeaf(leaf.row, leaf.inheritedCompany, index))
+        .map((leaf) => parseLeaf(leaf.row, leaf.inheritedCompany, index, linesMemo))
         .find((experience): experience is RawExperience => experience !== null);
       if (parsed) {
         experiences.push(parsed);
@@ -655,10 +714,14 @@ export async function extractLinkedInExperiencesFromDom(
   let unchangedCycles = 0;
 
   while (Date.now() <= deadline) {
+    // Fresh per cycle: the DOM may change between cycles (LinkedIn lazily
+    // renders), and the memo must never outlive the synchronous cycle that
+    // created it.
+    const linesMemo: VisibleLinesMemo = new Map();
     const root = resolveRoot();
-    const rows = root ? candidateRows(root) : [];
+    const rows = root ? candidateRows(root, linesMemo) : [];
     const resolved = root
-      ? resolveExperiences(root, rows)
+      ? resolveExperiences(root, rows, linesMemo)
       : { experiences: [], hasInvalidStrongPosition: false };
     const hasParseableExperience = resolved.experiences.length > 0;
     const bodyText = cleanLine(document.body?.innerText || document.body?.textContent || '');
