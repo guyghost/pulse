@@ -15,7 +15,11 @@ import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
-import { scoreMission, type DeterministicScoreResult } from '../../core/scoring/relevance';
+import {
+  scoreMissionWithPrepared,
+  prepareProfileScoring,
+  type DeterministicScoreResult,
+} from '../../core/scoring/relevance';
 import { buildScoreBreakdown, computeFinalBreakdown } from '../../core/scoring/final-score';
 import { createTracking } from '../../core/tracking/transitions';
 
@@ -112,9 +116,11 @@ export const scoreStage: PipelineStage = {
     }
 
     const profile = ctx.profile;
+    // Precompute keyword Set / weights once per scan, not per mission.
+    const prepared = prepareProfileScoring(profile);
 
     return missions.map((m) => {
-      const result: DeterministicScoreResult = scoreMission(m, profile, ctx.now);
+      const result: DeterministicScoreResult = scoreMissionWithPrepared(m, prepared, ctx.now);
       return {
         ...m,
         scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),

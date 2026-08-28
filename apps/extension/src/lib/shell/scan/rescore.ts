@@ -1,6 +1,6 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
-import { scoreMission } from '../../core/scoring/relevance';
+import { scoreMissionWithPrepared, prepareProfileScoring } from '../../core/scoring/relevance';
 import { buildScoreBreakdown, computeFinalBreakdown } from '../../core/scoring/final-score';
 import { getMissions, saveMissions } from '../storage/db';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
@@ -17,8 +17,10 @@ export async function rescoreStoredMissions(
   }
 
   const now = new Date();
+  // Precompute keyword Set / weights once per rescore, not per mission.
+  const prepared = prepareProfileScoring(profile);
   const rescored: Mission[] = missions.map((mission): Mission => {
-    const result = scoreMission(mission, profile, now);
+    const result = scoreMissionWithPrepared(mission, prepared, now);
     return {
       ...mission,
       scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
