@@ -262,12 +262,19 @@ The extractor uses structural and accessibility signals, in this order:
 
 Generated or experiment-specific CSS classes are never the sole gate for a
 position. A nested identity (for example, a `profilePosition` link or an owner
-edit-form link) is normalized to its owning row before parsing. When LinkedIn's
-owner view exposes no recognized structural row wrapper, the descriptive
-edit-form link may own itself: its accessible text contains the title, company,
-date range, and location required by the position contract. The adjacent
-"Modifier" link carries the same numeric identity and is treated as a duplicate
-representation, never as a second experience. Candidates are classified as `group`,
+edit-form link) is normalized to its owning row before parsing. LinkedIn's
+current owner view may expose no `li`, list-item role, semantic entity attribute,
+or stable card class: the descriptive edit-form link then contains the structural
+fields while its description and skills are sibling blocks. For an owner
+`/details/experience/edit/forms/{id}/` marker without a recognized row wrapper,
+the owner is therefore the widest ancestor strictly below the resolved Experience
+root whose self-or-descendant edit-form markers contain exactly that one distinct
+numeric id. Climbing stops before the root or the first ancestor containing a
+different position id. This boundary works for a single-card page (the root is
+never consumed), multiple sibling cards, and arbitrarily nested generated
+wrappers without relying on their classes. The adjacent "Modifier" link carries
+the same numeric identity and remains inside that owner; it is treated as a
+duplicate representation, never as a second experience. Candidates are classified as `group`,
 `position`, or unrelated `chrome`: groups preserve company context for their
 leaf positions and are never emitted themselves; weak candidates that do not
 have the minimum position structure after inherited context are ignored as page
@@ -325,7 +332,10 @@ Invariants:
   geographic contract; only when no structural candidate qualifies may a
   prose line satisfying the same contract be used. The contract accepts a
   short title-cased place, a comma-delimited place, an optional
-  remote/hybrid/on-site suffix, or a standalone work-mode marker. It rejects
+  remote/hybrid/on-site suffix, LinkedIn's exact localized metropolitan suffix
+  `et périphérie`, or a standalone work-mode marker. `et périphérie` is valid
+  only after a place prefix that independently satisfies the title-cased place
+  contract; arbitrary prose ending with those words remains invalid. It rejects
   sentence-like prose even when it ends with a work-mode suffix. LinkedIn may
   reorder description and location accessibility lines, so DOM order alone is
   never sufficient to classify either field. Every remaining non-field line,
@@ -360,17 +370,20 @@ Field assignment follows these deterministic signals:
   action label).
 
 The strict geographic contract is deterministic. After removing an optional
-middle-dot work-mode suffix, the candidate is at most 120 characters and is
+middle-dot work-mode suffix and the optional exact `et périphérie` metropolitan
+suffix, the remaining place prefix is at most 120 characters and is
 either (a) an exact work-mode marker, (b) a comma-delimited sequence of place
 segments, or (c) a standalone place of at most four tokens. Every place token
 must either belong to the connector whitelist (`and`, `de`, `des`, `du`, `et`,
 `la`, `le`, `les`, `of`, `the`) or begin with an uppercase letter/digit and
 contain only letters, marks, digits, apostrophes, parentheses, dots, slashes, or
-hyphens. A standalone place cannot end with sentence punctuation. If a
+hyphens. A standalone place cannot end with sentence punctuation. The original
+line, including `et périphérie`, is preserved as the canonical location. If a
 middle-dot suffix exists and is not an exact work-mode marker, the candidate is
 not a location. These rules accept `Paris`, `Île-de-France`, `Paris, France`,
-and `Paris · Hybride`, while rejecting `Led distributed teams · Remote` and
-ordinary sentence prose.
+`Paris · Hybride`, and `Paris et périphérie`, while rejecting
+`Led distributed teams · Remote`, `Pilotage produit et périphérie`, and ordinary
+sentence prose.
 
 `employmentType` is an optional canonical experience field. Legacy/manual
 experiences normalize it to `null`; import must not append the value to the
@@ -495,12 +508,17 @@ extracting → merging` sequence.
     link and its adjacent edit action resolve to the same `/edit/forms/{id}`
     bucket, and one parseable representation is sufficient. The action-only
     duplicate can neither invalidate the bucket nor create another experience.
+    When no semantic/list row exists, all same-id ancestors below the Experience
+    root are one owner card; the root and any ancestor containing another id are
+    excluded. Description and skills sibling blocks inside that card belong to
+    the same position.
 23. A LinkedIn location is never persisted in `description`, and a description
     is never consumed as `location`: structural location wins; otherwise only
     the strict geographic fallback can consume one prose line. Post-date lines
     that do not match that contract remain description content even when they
     precede the actual location or when the position has no location. In
-    particular, `Remote` and `Paris · Hybride` are locations while
+    particular, `Remote`, `Paris · Hybride`, and `Paris et périphérie` are
+    locations while
     `Led distributed teams · Remote` remains a description.
 24. Re-import repairs previously persisted extraction mistakes: after matching
     by the canonical experience key, a `source: 'linkedin'` entry takes the new

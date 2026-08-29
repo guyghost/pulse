@@ -149,6 +149,65 @@ describe('extractLinkedInExperiencesFromDom', () => {
     ]);
   });
 
+  it('keeps owner-view sibling descriptions inside their generated position card', async () => {
+    render(`
+      <main>
+        <section>
+          <h1>Expérience</h1>
+          <div class="generated-list-wrapper">
+            <div class="generated-position-wrapper">
+              <div class="generated-position-content">
+                <a href="/in/guyghost/details/experience/edit/forms/2397304299/">
+                  <p>Technical Lead</p>
+                  <p>BNP Paribas Personal Finance · Freelance</p>
+                  <p>janv. 2023 - oct. 2025 · 2 ans 10 mois</p>
+                  <p>Levallois-Perret, Île-de-France, France · Hybride</p>
+                </a>
+                <div><p>Pilotage de la migration des projets vers le cloud.</p></div>
+              </div>
+              <a href="/in/guyghost/details/experience/edit/forms/2397304299/">
+                Modifier Technical Lead chez BNP Paribas Personal Finance
+              </a>
+            </div>
+            <div class="generated-position-wrapper">
+              <div class="generated-position-content">
+                <a href="/in/guyghost/details/experience/edit/forms/1749359532/">
+                  <p>Software Engineer</p>
+                  <p>Hackages · CDI</p>
+                  <p>mars 2019 - sept. 2022 · 3 ans 7 mois</p>
+                  <p>Amsterdam, Pays-Bas</p>
+                </a>
+                <div><p>Construction de plateformes web distribuées.</p></div>
+              </div>
+              <a href="/in/guyghost/details/experience/edit/forms/1749359532/">
+                Modifier Software Engineer chez Hackages
+              </a>
+            </div>
+          </div>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({
+        title: 'Technical Lead',
+        location: 'Levallois-Perret, Île-de-France, France · Hybride',
+        description: 'Pilotage de la migration des projets vers le cloud.',
+      }),
+      expect.objectContaining({
+        title: 'Software Engineer',
+        location: 'Amsterdam, Pays-Bas',
+        description: 'Construction de plateformes web distribuées.',
+      }),
+    ]);
+  });
+
   it('parses a structurally valid generic list row with generated CSS classes', async () => {
     render(`
       <main>
@@ -840,6 +899,34 @@ describe('extractLinkedInExperiencesFromDom', () => {
       'Levallois-Perret, Île-de-France, France · Hybride'
     );
     expect(snapshot.experiences[0]?.description).toBe('Pilotage de la plateforme de paiement.');
+  });
+
+  it('recognizes LinkedIn localized surrounding-area text as a location', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:surrounding-area">
+              <span aria-hidden="true"><strong>Software Engineer</strong></span>
+              <span aria-hidden="true">Example Corp · CDI</span>
+              <span aria-hidden="true">juil. 2017 – mars 2019 · 1 an 9 mois</span>
+              <span aria-hidden="true">Paris et périphérie</span>
+              <p>Construction de plateformes web distribuées.</p>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBe('Paris et périphérie');
+    expect(snapshot.experiences[0]?.description).toBe(
+      'Construction de plateformes web distribuées.'
+    );
   });
 
   it('does not turn prose ending with a work-mode marker into a location', async () => {
