@@ -77,11 +77,11 @@
     },
     {
       id: 'account',
-      label: 'Compte & IA',
-      title: 'Synchronisation',
+      label: features.isFeatureEnabled('connected') ? 'Compte & IA' : 'IA',
+      title: features.isFeatureEnabled('connected') ? 'Synchronisation' : 'Analyse locale',
       description: features.isFeatureEnabled('connected')
         ? 'Dashboard connecté et analyse locale.'
-        : 'Analyse locale et assistant de candidature.',
+        : 'Scoring et assistant de candidature exécutés localement.',
       icon: 'cpu',
     },
     {
@@ -524,23 +524,25 @@
 
 <PageShell ariaBusy={dataStatus === 'refreshing'}>
   <PageHeader eyebrow="Configuration" title="Réglages" icon="settings">
-    <OperationalStoryCard
-      eyebrow="À vérifier"
-      variant="compact"
-      title={settingsStory.title}
-      description={settingsStory.description}
-      severity={settingsStory.severity}
-      statusLabel={settingsStory.statusLabel}
-      evidence={settingsStory.evidence}
-      primaryActionLabel={settingsStory.primaryActionLabel}
-      primaryActionIcon={settingsStory.primaryActionIcon as IconName}
-      onPrimaryAction={handleSettingsStoryAction}
-    />
+    {#if features.isFeatureEnabled('connected')}
+      <OperationalStoryCard
+        eyebrow="À vérifier"
+        variant="compact"
+        title={settingsStory.title}
+        description={settingsStory.description}
+        severity={settingsStory.severity}
+        statusLabel={settingsStory.statusLabel}
+        evidence={settingsStory.evidence}
+        primaryActionLabel={settingsStory.primaryActionLabel}
+        primaryActionIcon={settingsStory.primaryActionIcon as IconName}
+        onPrimaryAction={handleSettingsStoryAction}
+      />
+    {/if}
     {#snippet footer()}
       {#if isOffline}
         <OfflineNotice
-          description="Les réglages locaux restent accessibles. Le centre de compte, les dashboards connectés et certaines restaurations peuvent être indisponibles."
-          action="Prochaine action : ajuster les alertes locales, puis vérifier le compte au retour réseau."
+          description="Les réglages locaux restent accessibles. Certaines vérifications ou restaurations peuvent être indisponibles jusqu’au retour de la connexion."
+          action="Prochaine action : ajuster les alertes et continuer à utiliser les fonctions locales."
         />
       {/if}
     {/snippet}

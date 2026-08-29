@@ -13,15 +13,15 @@ Chaque surface flippable est identifiée par une clé pure, partagée par
 l'extension et la landing via `@pulse/domain`
 (`packages/domain/src/feature-flags.ts`) :
 
-| Clé            | Surface extension                                                                                                                                           | Landing associée                            |
-| -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
-| `feed`         | Onglet Missions                                                                                                                                             | « Feed unique, 4 plateformes dédupliquées » |
-| `profile`      | Onglet Profil                                                                                                                                               | « Assistant profil »                        |
-| `cv`           | Onglet CV                                                                                                                                                   | « Assistant CV »                            |
-| `applications` | Onglet Suivi (pipeline de candidatures)                                                                                                                     | « Suivi de candidatures »                   |
-| `tjm`          | Onglet TJM (radar)                                                                                                                                          | « Radar TJM par stack »                     |
-| `settings`     | Onglet Réglages                                                                                                                                             | —                                           |
-| `connected`    | Couche connectée : section « Compte et synchronisation » des Réglages, chargement du compte extension (`loadConnectedAccount`), surfaces de synchronisation | « Dashboard connecté », mentions de sync    |
+| Clé            | Surface extension                                                                                                                                                           | Landing associée                            |
+| -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| `feed`         | Onglet Missions                                                                                                                                                             | « Feed unique, 4 plateformes dédupliquées » |
+| `profile`      | Onglet Profil                                                                                                                                                               | « Assistant profil »                        |
+| `cv`           | Onglet CV                                                                                                                                                                   | « Assistant CV »                            |
+| `applications` | Onglet Suivi (pipeline de candidatures)                                                                                                                                     | « Suivi de candidatures »                   |
+| `tjm`          | Onglet TJM (radar)                                                                                                                                                          | « Radar TJM par stack »                     |
+| `settings`     | Onglet Réglages                                                                                                                                                             | —                                           |
+| `connected`    | Couche connectée : récit d'état et section « Compte et synchronisation » des Réglages, chargement du compte extension (`loadConnectedAccount`), surfaces de synchronisation | « Dashboard connecté », mentions de sync    |
 
 **Onboarding n'est pas un onglet** : jamais gated, c'est le chemin de
 bootstrap (`resolveInitialPage`).
@@ -97,7 +97,9 @@ les cartes brutes qui contourneraient la normalisation.
 | Item de navigation                     | Visible                                                                    | Absent de la barre                                              |
 | Préchargement lazy (`App.svelte`)      | Préchargé                                                                  | Jamais importé                                                  |
 | `NAVIGATE` / page courante             | Autorisé                                                                   | No-op ; une page courante devenue disabled retombe sur le repli |
+| Réglages — récit de compte             | Carte d'état et CTA de connexion/dashboard rendus                          | Carte absente, aucun CTA de connexion ou lien dashboard         |
 | Réglages « Compte et synchronisation » | Section rendue, `loadConnectedAccount()` appelé                            | Section absente, **aucun appel** `loadConnectedAccount()`       |
+| Réglages — analyse locale              | Reste rendue dans la section IA                                            | Reste rendue dans la section IA                                 |
 | Deep-link notification                 | Non affecté (cible le feed uniquement — `notification-deep-link.model.md`) | Idem                                                            |
 
 ## 4. Invariants
@@ -129,6 +131,27 @@ les cartes brutes qui contourneraient la normalisation.
 8. **Le flag premium historique reste orthogonal** : `applications: true` +
    `PREMIUM_FEATURE_ENABLED: true` reste nécessaire pour un gating freemium
    du Suivi ; ce modèle ne gère que la disponibilité.
+9. **Aucune connexion implicite** : lorsque `connected` est désactivé, aucun
+   événement utilisateur de la page Réglages ne peut appeler
+   `startExtensionAccountLink`, `pollExtensionAccountLink`,
+   `openConnectedDashboard` ou ouvrir `/dashboard`. La présence dormante des
+   adaptateurs de compte ne crée aucune transition accessible.
+10. **Discours local cohérent** : lorsque `connected` est désactivé, les
+    libellés de navigation interne des Réglages parlent d'« IA » et d'« analyse
+    locale », jamais de compte, de plan payant ou de synchronisation distante.
+
+### Revue du parcours `connected: false`
+
+- **Nominal** : ouverture des Réglages → surfaces locales uniquement → aucune
+  transition de compte disponible.
+- **Erreur / permissions** : aucun I/O de compte ni ouverture externe n'est
+  tenté ; il n'existe donc ni erreur distante ni permission de compte à
+  demander sur cette surface.
+- **Annulation / retry** : sans commande de connexion, ces événements sont
+  inapplicables et ne doivent pas être simulés par du texte ou un CTA dormant.
+- **État terminal** : la page reste dans l'état local, avec l'IA locale et les
+  autres réglages utilisables. Réactiver `connected` constitue une décision de
+  livraison explicite, pas une transition utilisateur.
 
 ## 5. Ce que ce modèle ne fait pas (deferred)
 
@@ -165,6 +188,9 @@ les cartes brutes qui contourneraient la normalisation.
 - Tests de navigation : `NAVIGATE` vers un onglet disabled = no-op strict ;
   `NAVIGATE_INTERNAL` vers un onglet disabled = repli ; complétion
   d'onboarding aboutit sur le repli.
+- Test de composant Réglages, configuration de lancement : aucune carte d'état
+  de compte, aucun bouton « Connecter mon compte », aucun lien dashboard ; la
+  section « IA locale » reste accessible.
 - Test d'alignement landing : aucune ligne `tier: 'free'` pour une clé
   disabled ; lignes `soon` uniquement pour clés disabled ; CTA de compte
   gated par `connectedLive`.
