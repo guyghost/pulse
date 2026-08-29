@@ -93,7 +93,7 @@
       ? 'LinkedIn'
       : ownedExperience.source === 'connector-import'
         ? 'Import connecteur'
-        : 'Manuel'
+        : null
   );
 
   function focusedControl(): ExperienceCardFocusedControl {
@@ -255,16 +255,13 @@
 
 {#snippet summary()}
   <div class="min-w-0 flex-1">
-    <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <h3 class="truncate text-body-lg font-semibold text-text-primary">
-        {snapshot.context.projection.displayTitle}
-      </h3>
-      <span class="text-meta text-text-muted">·</span>
-      <span class="truncate text-body-lg text-text-secondary">
-        {snapshot.context.projection.displayCompany}
-      </span>
-    </div>
-    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-subtle">
+    <h3 class="truncate text-body-lg font-semibold text-text-primary">
+      {snapshot.context.projection.displayTitle}
+    </h3>
+    <p class="mt-0.5 truncate text-meta text-text-subtle">
+      {snapshot.context.projection.displayCompany}
+    </p>
+    <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-subtle">
       <span class="inline-flex items-center gap-1">
         <Icon name="calendar-clock" size={12} />
         {dateRange}
@@ -278,35 +275,45 @@
       {#if ownedExperience.isCurrent}
         <Badge label="Actuel" variant="success" size="sm" />
       {/if}
+      {#if sourceLabel}
+        <Badge label={sourceLabel} variant="source" size="sm" />
+      {/if}
     </div>
   </div>
 {/snippet}
 
 {#snippet mutationActions()}
-  {#if typeof snapshot.context.input.onEdit === 'function'}
-    <Button
-      variant="ghost"
-      size="sm"
-      onclick={() => sendMachineEvent({ type: 'EDIT_REQUESTED' })}
-      disabled={snapshot.context.input.isBusy}
-      aria-label="Modifier"
-      data-experience-control="edit"
-    >
-      <Icon name="edit-2" size={14} />
-    </Button>
-  {/if}
-  {#if typeof snapshot.context.input.onDelete === 'function'}
-    <Button
-      variant="ghost"
-      size="sm"
-      onclick={() => sendMachineEvent({ type: 'DELETE_REQUESTED' })}
-      disabled={snapshot.context.input.isBusy}
-      aria-label="Supprimer"
-      data-experience-control="delete"
-      class="hover:text-status-red"
-    >
-      <Icon name="trash-2" size={14} />
-    </Button>
+  {#if snapshot.context.input.isBusy}
+    <span class="inline-flex items-center gap-1.5 pr-1 text-micro text-text-muted" role="status">
+      <Icon name="loader-2" size={11} class="animate-spin" />
+      En cours…
+    </span>
+  {:else}
+    {#if typeof snapshot.context.input.onEdit === 'function'}
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={() => sendMachineEvent({ type: 'EDIT_REQUESTED' })}
+        disabled={snapshot.context.input.isBusy}
+        aria-label="Modifier"
+        data-experience-control="edit"
+      >
+        <Icon name="edit-2" size={14} />
+      </Button>
+    {/if}
+    {#if typeof snapshot.context.input.onDelete === 'function'}
+      <Button
+        variant="ghost"
+        size="sm"
+        onclick={() => sendMachineEvent({ type: 'DELETE_REQUESTED' })}
+        disabled={snapshot.context.input.isBusy}
+        aria-label="Supprimer"
+        data-experience-control="delete"
+        class="hover:text-status-red"
+      >
+        <Icon name="trash-2" size={14} />
+      </Button>
+    {/if}
   {/if}
 {/snippet}
 
@@ -317,7 +324,9 @@
     role="article"
     aria-label={snapshot.context.projection.cardName}
     tabindex="-1"
-    class="section-card rounded-xl p-4"
+    class="section-card rounded-xl p-4 {isDisplay
+      ? 'transition-colors hover:border-disabled-gray'
+      : ''}"
     data-cv-experience-article
     data-experience-id={ownedExperience.id}
     data-position-index={ownedExperience.positionIndex}
@@ -345,7 +354,7 @@
           type="button"
           onclick={handleToggle}
           onkeydown={handleToggleKeydown}
-          class="flex min-w-0 flex-1 items-start gap-3 text-left"
+          class="flex min-w-0 flex-1 cursor-pointer items-start gap-3 text-left"
           aria-label={snapshot.context.projection.toggleName}
           aria-expanded={isExpanded}
           aria-controls={snapshot.context.detailsId}
@@ -355,7 +364,7 @@
           <Icon
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={16}
-            class="mt-0.5 shrink-0 text-text-muted"
+            class="mt-[3px] shrink-0 text-text-muted"
           />
         </button>
 
@@ -385,16 +394,6 @@
           {/if}
         </div>
       {/if}
-
-      <div class="mt-2 flex items-center justify-between">
-        <span class="eyebrow">{sourceLabel}</span>
-        {#if snapshot.context.input.isBusy}
-          <span class="inline-flex items-center gap-1 text-micro text-text-muted">
-            <Icon name="loader-2" size={11} class="animate-spin" />
-            Enregistrement…
-          </span>
-        {/if}
-      </div>
     {:else if isUnavailable}
       <div class="flex items-start gap-3">
         <div class="flex min-w-0 flex-1 items-start gap-3">
@@ -404,15 +403,6 @@
           <div class="flex shrink-0 items-center gap-1">
             {@render mutationActions()}
           </div>
-        {/if}
-      </div>
-      <div class="mt-2 flex items-center justify-between">
-        <span class="eyebrow">{sourceLabel}</span>
-        {#if snapshot.context.input.isBusy}
-          <span class="inline-flex items-center gap-1 text-micro text-text-muted">
-            <Icon name="loader-2" size={11} class="animate-spin" />
-            Enregistrement…
-          </span>
         {/if}
       </div>
     {/if}

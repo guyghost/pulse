@@ -158,12 +158,12 @@
     <div aria-busy="true" role="status" aria-live="polite" class="flex flex-col gap-3">
       <span class="sr-only">Chargement de vos expériences…</span>
       {#each Array(3) as _, i (i)}
-        <div class="section-card rounded-xl p-4 space-y-3">
+        <div class="section-card space-y-2 rounded-xl p-4">
           <Skeleton width="55%" height="0.95rem" />
           <Skeleton width="35%" height="0.75rem" />
-          <div class="flex gap-2">
-            <Skeleton width="3rem" height="1rem" variant="circle" />
-            <Skeleton width="4rem" height="1rem" variant="circle" />
+          <div class="flex items-center gap-3 pt-1">
+            <Skeleton width="6.5rem" height="0.65rem" />
+            <Skeleton width="4rem" height="0.65rem" />
           </div>
         </div>
       {/each}
@@ -260,9 +260,5 @@
         </ol>
       </section>
     {/each}
-
-    {#if store.experiences.length > 0}
-      <p class="py-1 text-center text-caption text-text-muted">Tri du plus récent au plus ancien</p>
-    {/if}
   {/if}
 </div>
