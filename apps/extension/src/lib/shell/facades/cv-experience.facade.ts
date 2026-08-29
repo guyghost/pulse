@@ -1,35 +1,13 @@
 /**
- * CV experience facade — wires shell I/O (profile bridge, clipboard, tabs) into
- * the {@link CvExperienceDeps} consumed by the runes store.
+ * CV experience facade — wires profile persistence into the
+ * {@link CvExperienceDeps} consumed by the runes store.
  *
  * The side panel never touches `chrome.*` or IndexedDB directly; everything
- * crosses the service-worker bridge via `sendMessage`. Clipboard is the one
- * browser API the side panel may call directly (it is the sync transport).
+ * crosses the service-worker bridge via `sendMessage`.
  */
 import type { Experience } from '$lib/core/types/profile';
-import type { PlatformSyncTarget } from '$lib/core/cv/experience-helpers';
 import type { CvExperienceDeps } from '$lib/state/cv-experience.svelte';
 import { getProfile, saveProfile } from './settings.facade';
-import { getConnectorsMeta, openExternalUrl } from './feed-data.facade';
-
-const LINKEDIN_PROFILE_URL = 'https://www.linkedin.com/in/me/';
-
-/** Build the sync target list (LinkedIn + the 6 mission connectors). */
-export function getCvSyncTargets(): PlatformSyncTarget[] {
-  const connectors = getConnectorsMeta();
-  return [
-    {
-      id: 'linkedin',
-      name: 'LinkedIn',
-      profileUrl: LINKEDIN_PROFILE_URL,
-    },
-    ...connectors.map((connector) => ({
-      id: connector.id,
-      name: connector.name,
-      profileUrl: connector.url,
-    })),
-  ];
-}
 
 /** Default shell deps for the CV experience store. Mockable in tests. */
 export function createCvExperienceDeps(): CvExperienceDeps {
@@ -47,19 +25,6 @@ export function createCvExperienceDeps(): CvExperienceDeps {
       };
       await saveProfile(profile);
     },
-
-    async copyToClipboard(text: string): Promise<void> {
-      if (!navigator?.clipboard) {
-        throw new Error('Presse-papiers indisponible dans ce contexte.');
-      }
-      await navigator.clipboard.writeText(text);
-    },
-
-    async openUrl(url: string): Promise<void> {
-      await openExternalUrl(url);
-    },
-
-    platforms: getCvSyncTargets(),
 
     now(): number {
       return Date.now();

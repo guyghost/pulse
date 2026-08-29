@@ -9,9 +9,12 @@
  */
 import type { Availability, AvailabilityStatus } from '../types/availability';
 import { AVAILABILITY_NOTE_MAX_LENGTH } from '../types/availability';
-import type { PlatformSyncTarget } from '../cv/experience-helpers';
 
-export type { PlatformSyncTarget };
+export interface PlatformSyncTarget {
+  id: string;
+  name: string;
+  profileUrl: string;
+}
 
 /** Statuses that carry a meaningful `date`. */
 const DATE_STATUSES: ReadonlySet<AvailabilityStatus> = new Set(['from-date', 'in-mission-until']);

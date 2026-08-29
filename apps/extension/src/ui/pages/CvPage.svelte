@@ -1,10 +1,7 @@
 <script lang="ts">
   import { Button, Icon } from '@pulse/ui';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
-  import {
-    createCvExperienceDeps,
-    getCvSyncTargets,
-  } from '$lib/shell/facades/cv-experience.facade';
+  import { createCvExperienceDeps } from '$lib/shell/facades/cv-experience.facade';
   import {
     ensureLinkedInHostPermission,
     importLinkedInProfile,
@@ -14,7 +11,6 @@
   import { createCvExperienceStore } from '$lib/state/cv-experience.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import ExperienceFeed from '../organisms/ExperienceFeed.svelte';
-  import CvSyncPanel from '../organisms/CvSyncPanel.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
   import PageShell from '../templates/PageShell.svelte';
@@ -25,7 +21,6 @@
   const { onNavigateToProfile }: { onNavigateToProfile?: () => void } = $props();
 
   const store = createCvExperienceStore(createCvExperienceDeps());
-  const platforms = getCvSyncTargets();
 
   let isImporting = $state(false);
 
@@ -88,15 +83,10 @@
     eyebrow="Parcours"
     title="CV &amp; expériences"
     icon="file-text"
-    description="La source canonique de votre parcours. Chaque expérience renseignée ici est synchronisable vers vos plateformes connectées pour garder le même profil partout."
+    description="La source canonique de votre parcours, à conserver à jour avant de candidater sur vos plateformes."
   >
     {#snippet actions()}
-      <Button
-        variant="secondary"
-        size="sm"
-        onclick={handleLinkedInImport}
-        disabled={isImporting || store.isSyncing}
-      >
+      <Button variant="secondary" size="sm" onclick={handleLinkedInImport} disabled={isImporting}>
         <Icon name="download" size={14} />
         {isImporting ? 'Import…' : 'Importer LinkedIn'}
       </Button>
@@ -111,13 +101,11 @@
       {#if isOffline}
         <OfflineNotice
           title="Mode hors ligne"
-          description="Vos modifications sont conservées localement. La synchronisation reprendra à la reconnexion."
+          description="Vos modifications sont conservées localement et resteront disponibles au retour en ligne."
         />
       {/if}
     {/snippet}
   </PageHeader>
-
-  <CvSyncPanel {store} {platforms} />
 
   <ExperienceFeed {store} />
 </PageShell>

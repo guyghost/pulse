@@ -146,7 +146,7 @@
       size="sm"
       aria-label="Ajouter une expérience"
       onclick={() => store.newExperience()}
-      disabled={isAdding || isEditing || store.isSyncing}
+      disabled={isAdding || isEditing}
       data-cv-add-experience
     >
       <Icon name="file-plus" size={14} />
@@ -184,7 +184,7 @@
   {:else if store.experiences.length === 0 && !isAdding}
     <OperationalEmptyState
       title="Renseignez vos expériences professionnelles"
-      description="Ajoutez chaque poste pour construire votre CV, puis synchronisez-le vers vos plateformes connectées."
+      description="Ajoutez chaque poste pour construire un CV complet et cohérent avant vos candidatures."
       severity="neutral"
       statusLabel="CV vide"
       icon="file-text"

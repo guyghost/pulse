@@ -1,154 +1,108 @@
-# CV Experience & Sync Model
+# CV Experience Model
 
-Source of truth for the CV tab behavior: an editable feed of professional
-experiences and a cross-platform sync that pushes them to LinkedIn and the
-mission connectors. Modeled as three cooperating state machines in a Svelte 5
-runes module (`src/lib/state/cv-experience.svelte.ts`), per the project standard
-(runes over XState — see `profile-state.model.md`).
+Source of truth for the CV tab behavior: a canonical, editable feed of
+professional experiences. The former manual cross-platform synchronization
+workflow (copy the CV to the clipboard, then open every platform) is retired.
 
-The LLM never decides a transition. It may propose adapted summary copy inside a
-dedicated AI worker; the model decides whether that copy is accepted and when
-sync runs. **Le LLM produit des signaux ; le modèle décide.**
+Users keep MissionPulse open while visiting a target platform themselves. A
+future in-page form assistant may propose field values from the canonical CV,
+in the style of Grammarly, but that assistant is a separate workflow and MUST
+be modeled before implementation. The CV page does not claim that this future
+assistant is already available.
 
-## Domain entities
+The LLM never decides a transition. It may propose field content inside a
+dedicated AI worker; the model decides whether the user can accept it and how
+it affects persisted state. **Le LLM produit des signaux ; le modèle décide.**
+
+## Domain entity
 
 ### Experience (canonical, persisted on `UserProfile.experiences`)
 
 ```ts
 interface Experience {
-  id: string; // `${idPrefix}-${positionIndex}` or generated UUID
-  title: string; // e.g. "Lead Frontend"
-  company: string | null; // e.g. "Acme"
-  employmentType: string | null; // e.g. "Freelance", "CDI", "Temps plein"
+  id: string;
+  title: string;
+  company: string | null;
+  employmentType: string | null;
   location: string | null;
   startDate: string | null; // ISO month "YYYY-MM" or null
-  endDate: string | null; // null when isCurrent
+  endDate: string | null;
   isCurrent: boolean;
   description: string;
   skills: string[];
   source: 'linkedin' | 'manual' | 'connector-import';
   sourceExternalId: string | null;
   positionIndex: number; // gapless, stable ordering (0 = most recent)
-  updatedAt: number; // epoch ms (injected by shell)
+  updatedAt: number; // epoch ms injected by the shell
 }
 ```
 
-`UserProfile` is extended with `experiences: Experience[]` (default `[]`). The
-existing flat fields (jobTitle, stack, tjm, location, …) are unchanged; scoring
-ignores `experiences`.
-
-`employmentType` is optional domain data, persisted independently from
-`company`. Stored legacy experiences without the property are normalized to
-`null`; no IndexedDB version bump is required because profile schema parsing and
-the existing migration/default boundary supply the field. The edit form exposes
-it as an optional text field, cards display it when present, and sync payloads
-place it next to the company without changing the de-duplication key.
-
-### PlatformSyncTarget
-
-LinkedIn + the 6 mission connectors (`getConnectorsMeta()`). Each target has an
-independent status during a sync run.
-
-```ts
-type PlatformSyncStatus =
-  | 'pending'
-  | 'copying' // clipboard write in flight
-  | 'done' // copied + URL opened
-  | 'error' // clipboard denied or open failed
-  | 'auth-required' // platform page returned a login wall (verify path)
-  | 'blocked' // platform page unreadable
-  | 'skipped'; // user cancelled before this platform started
-```
+`employmentType` is persisted independently from `company`. Legacy values are
+normalized to `null`; no IndexedDB migration is required because the profile
+normalization boundary supplies the field.
 
 ## Machines
 
-The store composes three machines. They share the experiences list but their
-statuses are independent: editing an experience does not block sync, and a
-running sync does not block editing (edits queue on the next save).
+The Svelte 5 runes store composes two machines sharing the canonical
+experiences list.
 
 ### 1. Feed machine — `feedStatus`
 
-```
+```text
 loading ──LOAD_RESULT(ok)──► ready
-loading ──LOAD_ERROR──►      error
-error   ──RETRY──►           loading
-ready   ──RELOAD──►          loading
-*       ──PROFILE_UPDATED──► ready (experiences replaced, see Merge)
+loading ──LOAD_ERROR───────► error
+error   ──RETRY────────────► loading
+ready   ──RELOAD───────────► loading
+idle/ready/error ──PROFILE_UPDATED──► ready
 ```
 
-`FeedStatus = 'loading' | 'ready' | 'error'`. `ready` with 0 experiences renders
-the empty state (first-run: "Importez LinkedIn ou ajoutez une expérience").
+`FeedStatus = 'loading' | 'ready' | 'error'`. `ready` with zero experiences
+renders the empty state. A load failure is terminal until the user retries or
+the page is remounted.
 
-### 2. Edit machine — `editStatus` (one session at a time)
+### 2. Edit machine — `editStatus`
 
-```
-idle    ──NEW────────► adding   (draft = blank Experience)
-idle    ──EDIT(id)───► editing  (draft = copy of experience)
-adding  ──CANCEL──►    idle
-editing ──CANCEL──►    idle
-adding  ──SUBMIT──►    saving
-editing ──SUBMIT──►    saving
-saving  ──SAVE_RESULT(ok)──► ready  (draft committed, positionIndex recomputed)
-saving  ──SAVE_ERROR──►     error  (draft retained for RETRY)
-error   ──RETRY──►          saving  (guard: hasDraft)
-error   ──CANCEL──►         idle
-idle    ──DELETE(id)──► deleting
-deleting──DELETE_RESULT(ok)──► ready
-deleting──DELETE_ERROR──►     error
+```text
+idle    ──NEW──────────────► adding
+idle    ──EDIT(id)─────────► editing
+adding ──CANCEL────────────► idle
+editing──CANCEL────────────► idle
+adding/editing/error ──SUBMIT(valid draft)──► saving
+saving ──SAVE_RESULT(ok)───► idle
+saving ──SAVE_ERROR────────► error  (draft retained)
+idle/error ──DELETE(id)────► deleting
+deleting ──DELETE_RESULT───► idle
+deleting ──DELETE_ERROR────► error
 ```
 
 `EditStatus = 'idle' | 'adding' | 'editing' | 'saving' | 'deleting' | 'error'`.
-
-### 3. Sync machine — `syncStatus`
-
-```
-idle      ──SYNC_START──►        preparing
-preparing ──PREPARE_DONE──►      syncing  (per-platform: pending)
-preparing ──PREPARE_ERROR──►     error    (e.g. no experiences to push)
-syncing   ──PLATFORM_START(id)──► syncing  (platform → copying)
-syncing   ──PLATFORM_DONE(id)──►  syncing  (platform → done)
-syncing   ──PLATFORM_ERROR(id)──► syncing  (platform → error|auth-required|blocked)
-syncing   ──SYNC_CANCEL──►        cancelled (remaining platforms → skipped)
-syncing   ──ALL_SETTLED──►        synced | partial | error
-                                       (synced: all done; partial: ≥1 done, ≥1 error;
-                                        error: 0 done)
-cancelled ──SYNC_START──►        preparing
-synced|partial|error ──SYNC_START──► preparing
-```
-
-`SyncStatus = 'idle' | 'preparing' | 'syncing' | 'cancelled' | 'synced' | 'partial' | 'error'`.
-
-Per-platform status lives in `Map<platformId, PlatformSyncStatus>` and is only
-meaningful while `syncStatus` is `syncing`/terminal. It resets on `SYNC_START`.
+Only one edit/delete operation may exist at a time.
 
 ## Context
 
 ```ts
 interface CvExperienceContext {
-  experiences: Experience[]; // canonical, persisted
+  experiences: Experience[];
   feedStatus: FeedStatus;
   editStatus: EditStatus;
-  draft: Experience | null; // non-null in adding/editing/saving/error
-  editingId: string | null; // which experience is open (null for adding)
-  syncStatus: SyncStatus;
-  platformStatuses: Map<string, PlatformSyncStatus>;
-  lastSyncedAt: number | null; // epoch ms
-  feedError: string | null; // feed machine error copy
-  editError: string | null; // edit machine error copy
-  syncError: string | null; // sync machine error copy
+  draft: Experience | null;
+  editingId: string | null;
+  feedError: string | null;
+  editError: string | null;
 }
 ```
+
+There is no `syncStatus`, per-platform status map, last-sync timestamp, or sync
+error slot in the CV store.
 
 ## Events
 
 ```ts
 type CvEvent =
-  // Feed
   | { type: 'LOAD' }
   | { type: 'RELOAD' }
   | { type: 'RETRY' }
   | { type: 'PROFILE_UPDATED'; experiences: Experience[] }
-  // Edit
   | { type: 'NEW' }
   | { type: 'EDIT'; id: string }
   | { type: 'CANCEL' }
@@ -157,152 +111,108 @@ type CvEvent =
   | { type: 'SAVE_RESULT'; experience: Experience }
   | { type: 'SAVE_ERROR'; message: string }
   | { type: 'DELETE_RESULT'; id: string }
-  | { type: 'DELETE_ERROR'; message: string }
-  // Sync
-  | { type: 'SYNC_START' }
-  | { type: 'PREPARE_DONE'; payloads: Map<string, string> }
-  | { type: 'PREPARE_ERROR'; message: string }
-  | { type: 'PLATFORM_START'; id: string }
-  | { type: 'PLATFORM_DONE'; id: string }
-  | { type: 'PLATFORM_ERROR'; id: string; status: 'error' | 'auth-required' | 'blocked' }
-  | { type: 'SYNC_CANCEL' }
-  | { type: 'ALL_SETTLED' };
+  | { type: 'DELETE_ERROR'; message: string };
 ```
 
-## Transition table (edit + sync; feed is trivial above)
+`SYNC_START`, `SYNC_CANCEL`, `PREPARE_DONE`, `PLATFORM_*`, and `ALL_SETTLED`
+are not valid CV events.
 
-| From \ Event   | NEW     | EDIT    | CANCEL  | SUBMIT     | SAVE_RESULT | SAVE_ERROR | DELETE   | DELETE_RESULT | DELETE_ERROR | SYNC_START | PROFILE_UPDATED |
-| -------------- | ------- | ------- | ------- | ---------- | ----------- | ---------- | -------- | ------------- | ------------ | ---------- | --------------- |
-| `idle`         | adding  | editing | -       | -          | -           | -          | deleting | -             | -            | (sync)     | ready (merge)   |
-| `adding`       | -       | -       | idle    | saving     | -           | -          | -        | -             | -            | allowed\*  | dropped         |
-| `editing`      | -       | -       | idle    | saving     | -           | -          | -        | -             | -            | allowed\*  | dropped         |
-| `saving`       | ignored | ignored | ignored | ignored    | ready       | error      | ignored  | -             | -            | ignored    | dropped         |
-| `deleting`     | ignored | ignored | ignored | ignored    | -           | -          | ignored  | ready         | error        | ignored    | dropped         |
-| `error` (edit) | adding  | editing | idle    | saving\*\* | -           | -          | deleting | -             | -            | allowed\*  | ready (merge)   |
+## Transition review
 
-\* `SYNC_START` is allowed while an edit session is open (edit draft is
-preserved; sync operates on the committed experiences list, not the draft). The
-two machines are independent.
+| From       | NEW     | EDIT    | CANCEL  | SUBMIT  | DELETE   | PROFILE_UPDATED |
+| ---------- | ------- | ------- | ------- | ------- | -------- | --------------- |
+| `idle`     | adding  | editing | -       | -       | deleting | ready           |
+| `adding`   | ignored | ignored | idle    | saving  | ignored  | dropped         |
+| `editing`  | ignored | ignored | idle    | saving  | ignored  | dropped         |
+| `saving`   | ignored | ignored | ignored | ignored | ignored  | dropped         |
+| `deleting` | ignored | ignored | ignored | ignored | ignored  | dropped         |
+| `error`    | adding  | editing | idle    | saving  | deleting | ready           |
 
-\*\* `SUBMIT` from `error` re-enters `saving` with the retained `draft`
-(equivalent to RETRY for the edit machine).
+- Nominal: load, add, edit, save, delete, LinkedIn re-import.
+- Errors: load/save/delete failures populate only their machine's error slot.
+- Cancellation: only a local add/edit session is cancellable; persistence
+  already in flight is not cancelled.
+- Retry: load uses `reload`; a retained failed draft may be submitted again;
+  delete may be requested again from `error`.
+- Permissions: LinkedIn import permissions belong to the LinkedIn import model,
+  not to the CV store. The CV store requests no host or clipboard permission.
+- Terminal states: `ready`/`idle` are successful terminals; `error` is a stable
+  recoverable terminal. No background platform-opening operation survives the
+  page.
 
-| From \ Event (sync) | SYNC_START | PREPARE_DONE | PLATFORM\_\* | SYNC_CANCEL | ALL_SETTLED | PROFILE_UPDATED |
-| ------------------- | ---------- | ------------ | ------------ | ----------- | ----------- | --------------- |
-| `idle`              | preparing  | -            | -            | -           | -           | idle (merge)    |
-| `preparing`         | ignored    | syncing      | -            | idle        | -           | dropped         |
-| `syncing`           | ignored    | -            | updates pm   | cancelled   | terminal    | dropped         |
-| `cancelled`         | preparing  | -            | -            | -           | -           | idle (merge)    |
-| `synced/partial/er` | preparing  | -            | -            | -           | -           | idle (merge)    |
+## Side effects
 
-## Side effects (shell — `deps`)
+- `loadExperiences()` reads `UserProfile.experiences` through the profile bridge.
+- `saveExperiences(experiences)` persists the complete normalized list through
+  the profile bridge.
+- The store never calls `navigator.clipboard`, never opens an external URL, and
+  never enumerates connector targets.
+- LinkedIn import remains owned by `linkedin-import.model.md`; its
+  `PROFILE_UPDATED` message is applied only when no edit/save/delete is active.
 
-- **Enter `loading`**: `deps.loadExperiences()` → reads `UserProfile.experiences`
-  via the profile bridge. Resolves → `ready`; rejects → `error`.
-- **Enter `saving`** (SUBMIT): `deps.saveExperience(draft)`.
-  - New (`editingId === null`): append, assign `positionIndex = 0`, shift others
-    +1, persist. Resolves → `SAVE_RESULT(experience)`.
-  - Existing: replace in place, keep `positionIndex`, bump `updatedAt`. Resolves
-    → `SAVE_RESULT(experience)`.
-  - Rejects → `SAVE_ERROR(message)`, `draft` retained.
-- **Enter `deleting`** (DELETE): `deps.deleteExperience(id)`. Removes, recomputes
-  gapless `positionIndex`, persists. Resolves → `DELETE_RESULT(id)`; rejects →
-  `DELETE_ERROR`.
-- **Enter `preparing`** (SYNC_START): pure `buildPlatformPayloads(experiences,
-targets)` in core. If `experiences.length === 0` → `PREPARE_ERROR`. Else →
-  `PREPARE_DONE(payloads)`.
-- **Enter `syncing`** (PREPARE_DONE): `deps.pushAll(payloads)` iterates targets.
-  Clipboard write is attempted **once globally** before any platform opens:
-  - Clipboard denied → every platform → `error`, `ALL_SETTLED` → `error`.
-  - Else, per platform: `PLATFORM_START` → `deps.copy(payload)` + `deps.open(url)`
-    → `PLATFORM_DONE` (or `PLATFORM_ERROR` if open rejects). Platforms run
-    sequentially (one clipboard write at a time) so the user can paste in each
-    opened tab before the next.
-- **`PROFILE_UPDATED`** (LinkedIn re-import or external profile save):
-  `mergeExperiences(current, incoming)` (pure, core) dedups by
-  `(company, title, startDate)` case-insensitively and keeps the local copy's
-  `id`/`positionIndex`. A matching LinkedIn-sourced entry refreshes its
-  `description` from a non-empty canonical import value and its exact canonical
-  `location` so re-import can repair stale extraction data, including clearing
-  a stale location. A manual entry keeps its locally authored description and
-  location. The merge keeps a non-empty local `employmentType` or fills it from
-  the import, and unions `skills`.
-
-## Invariants
-
-1. At most one edit session: `NEW`/`EDIT` are accepted only from `idle` or
-   `error`. `adding`/`editing`/`saving`/`deleting` ignore them.
-2. `saving`/`deleting` ignore all events until settled (no re-entrancy).
-3. `PROFILE_UPDATED` during `saving`/`deleting`/`syncing` is **dropped** (never
-   clobbers an in-flight op). It is applied only from `idle`/`ready`/terminal.
-4. During `syncing`, one platform's failure never aborts the others (except a
-   global clipboard denial, which fails all before any tab opens).
-5. `positionIndex` is gapless and unique after every save/delete (recomputed).
-6. An experience with `isCurrent: true` has `endDate === null`. The form enforces
-   this; `SAVE_RESULT` normalizes it.
-7. `syncStatus` terminal state (`synced`/`partial`/`error`) is derived from the
-   per-platform statuses at `ALL_SETTLED`, not stored independently of them.
-8. The sync operates on the **committed** experiences list, never on an unsaved
-   `draft`. An open edit draft does not participate in sync.
-9. Error slots are per-machine (`feedError`/`editError`/`syncError`): a failure in
-   one machine never overwrites another machine's terminal error copy.
-10. `employmentType` is `null` or trimmed non-empty display text. It is never
-    folded into `company`, and it does not affect the experience de-duplication
-    key.
-11. A matching LinkedIn re-import is authoritative for a non-empty imported
-    `description` and for `location`, including an incoming `null` location.
-    Manual entries remain authoritative for both fields and cannot be
-    overwritten by import.
-
-## Public API (consumed by CvPage)
+## Public API
 
 ```ts
 createCvExperienceStore(deps): {
-  // reactive snapshot
-  experiences: Experience[];
-  feedStatus: FeedStatus;
-  editStatus: EditStatus;
-  draft: Experience | null;
-  editingId: string | null;
-  syncStatus: SyncStatus;
-  platformStatuses: Map<string, PlatformSyncStatus>;
-  lastSyncedAt: number | null;
-  feedError: string | null;
-  editError: string | null;
-  syncError: string | null;
-  // feed
+  readonly experiences: Experience[];
+  readonly feedStatus: FeedStatus;
+  readonly editStatus: EditStatus;
+  readonly draft: Experience | null;
+  readonly editingId: string | null;
+  readonly feedError: string | null;
+  readonly editError: string | null;
   load(): void;
-  // edit
+  reload(): void;
+  applyProfileUpdate(experiences: Experience[]): void;
   newExperience(): void;
   editExperience(id: string): void;
   cancelEdit(): void;
   saveExperience(draft: Experience): void;
   deleteExperience(id: string): void;
-  // sync
-  startSync(): void;
-  cancelSync(): void;
 }
 ```
-
-`deps` (shell-injected, mockable in tests):
 
 ```ts
 interface CvExperienceDeps {
   loadExperiences(): Promise<Experience[]>;
-  saveExperience(draft: Experience, isNew: boolean): Promise<Experience>;
-  deleteExperience(id: string): Promise<void>;
-  copyToClipboard(text: string): Promise<void>;
-  openUrl(url: string): Promise<void>;
-  platforms: PlatformSyncTarget[];
+  saveExperiences(experiences: Experience[]): Promise<void>;
   now(): number;
-  idPrefix: string;
+  generateId(): string;
 }
 ```
 
-## Pure helpers (core, unit-tested without mocks)
+## UI projection
 
-- `buildPlatformPayloads(experiences, targets): Map<id, string>` — formats the
-  experiences into a per-platform text block.
-- `mergeExperiences(current, incoming): Experience[]` — dedup + supplement.
-- `recomputePositionIndex(experiences): Experience[]` — gapless ordering.
-- `normalizeExperience(draft): Experience` — enforces isCurrent↔endDate, trims.
+- `CvPage` renders the page header, LinkedIn import action, optional profile
+  navigation, offline notice, and `ExperienceFeed`.
+- The manual "Synchronisation du CV" card and its "Synchroniser" button are
+  absent in every feed/edit/network state.
+- Adding or editing an experience is disabled only by the edit machine, never by
+  a removed synchronization state.
+- Copy must describe the CV as the canonical local source without promising
+  automatic propagation to connected platforms.
+
+## Invariants
+
+1. At most one edit session exists.
+2. `saving` and `deleting` reject re-entrant events until they settle.
+3. `PROFILE_UPDATED` is dropped during adding/editing/saving/deleting and is
+   accepted only from idle/error.
+4. `positionIndex` is gapless and unique after every save/delete.
+5. An experience with `isCurrent: true` has `endDate === null`.
+6. `employmentType` never mutates `company` and does not affect deduplication.
+7. The CV page and store have no manual clipboard/platform synchronization
+   capability, hidden or visible.
+8. The CV facade exposes profile load/save only; it has no connector catalogue,
+   clipboard writer, or external-tab opener.
+9. Future in-page assistance cannot be implemented as an implicit replacement:
+   its states, permissions, page injection, user acceptance, errors, retries,
+   and terminal states require their own model first.
+
+## Pure helpers retained
+
+- `mergeExperiences(current, incoming)` — dedup + controlled supplement.
+- `recomputePositionIndex(experiences)` — gapless ordering.
+- `normalizeExperience(draft)` — trims and enforces `isCurrent ↔ endDate`.
+
+The retired `buildPlatformPayloads` helper is not part of the CV domain API.
