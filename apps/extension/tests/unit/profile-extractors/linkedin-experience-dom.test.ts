@@ -623,6 +623,57 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences[0]?.description).not.toMatch(/Technical Lead|Voir plus/);
   });
 
+  it('keeps a structural description when LinkedIn emits it before the location', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:description-before-location">
+              <span aria-hidden="true"><strong>Technical Lead</strong></span>
+              <span aria-hidden="true">Example Corp · Freelance</span>
+              <span aria-hidden="true">janv. 2023 – oct. 2025 · 2 ans 10 mois</span>
+              <span aria-hidden="true">Pilotage de la plateforme de paiement.</span>
+              <span aria-hidden="true">Paris · Hybride</span>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBe('Paris · Hybride');
+    expect(snapshot.experiences[0]?.description).toBe('Pilotage de la plateforme de paiement.');
+  });
+
+  it('keeps a structural description when the LinkedIn position has no location', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:description-without-location">
+              <span aria-hidden="true"><strong>Engineering Manager</strong></span>
+              <span aria-hidden="true">Example Corp · CDI</span>
+              <span aria-hidden="true">janv. 2022 – aujourd’hui</span>
+              <span aria-hidden="true">Direction d'une équipe produit distribuée.</span>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.location).toBeUndefined();
+    expect(snapshot.experiences[0]?.description).toBe("Direction d'une équipe produit distribuée.");
+  });
+
   it.each([
     ['Skills: TypeScript · Svelte', ['TypeScript', 'Svelte']],
     ['Compétences : Java · Apache Kafka', ['Java', 'Apache Kafka']],

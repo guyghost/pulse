@@ -152,13 +152,14 @@ export function mergeExperiences(
     if (existingIdx >= 0) {
       const existing = result[existingIdx];
       const keepDescription = existing.source === 'manual' || draft.description.length === 0;
+      const refreshLinkedInLocation = existing.source === 'linkedin';
       const mergedIsCurrent = existing.isCurrent || draft.isCurrent;
       result[existingIdx] = {
         ...existing,
         skills: unionSkills(existing.skills, draft.skills),
         description: keepDescription ? existing.description : draft.description,
         employmentType: existing.employmentType ?? draft.employmentType,
-        location: existing.location ?? draft.location,
+        location: refreshLinkedInLocation ? draft.location : (existing.location ?? draft.location),
         endDate: mergedIsCurrent ? null : (existing.endDate ?? draftEnd ?? null),
         isCurrent: mergedIsCurrent,
         sourceExternalId: existing.sourceExternalId ?? draft.sourceExternalId,

@@ -220,11 +220,13 @@ targets)` in core. If `experiences.length === 0` → `PREPARE_ERROR`. Else →
     opened tab before the next.
 - **`PROFILE_UPDATED`** (LinkedIn re-import or external profile save):
   `mergeExperiences(current, incoming)` (pure, core) dedups by
-  `(company, title, startDate)` case-insensitively, keeping the local copy's
-  `id`/`positionIndex`/`description` edits, keeping a non-empty local
-  `employmentType` or filling it from the import, and unioning `skills`. Manual
-  entries (`source: 'manual'`) are never overwritten by an import, only
-  supplemented.
+  `(company, title, startDate)` case-insensitively and keeps the local copy's
+  `id`/`positionIndex`. A matching LinkedIn-sourced entry refreshes its
+  `description` from a non-empty canonical import value and its exact canonical
+  `location` so re-import can repair stale extraction data, including clearing
+  a stale location. A manual entry keeps its locally authored description and
+  location. The merge keeps a non-empty local `employmentType` or fills it from
+  the import, and unions `skills`.
 
 ## Invariants
 
@@ -247,6 +249,10 @@ targets)` in core. If `experiences.length === 0` → `PREPARE_ERROR`. Else →
 10. `employmentType` is `null` or trimmed non-empty display text. It is never
     folded into `company`, and it does not affect the experience de-duplication
     key.
+11. A matching LinkedIn re-import is authoritative for a non-empty imported
+    `description` and for `location`, including an incoming `null` location.
+    Manual entries remain authoritative for both fields and cannot be
+    overwritten by import.
 
 ## Public API (consumed by CvPage)
 

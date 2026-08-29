@@ -197,6 +197,7 @@ describe('mergeExperiences', () => {
         startDate: '2023-01',
         skills: ['Svelte'],
         description: 'Local desc.',
+        location: 'Lyon',
         source: 'manual',
       }),
     ];
@@ -207,12 +208,14 @@ describe('mergeExperiences', () => {
         startDate: '2023-01',
         skills: ['Svelte', 'React'],
         description: 'Draft desc.',
+        location: 'Paris',
       }),
     ];
 
     const result = mergeExperiences(current, incoming, NOW);
     expect(result[0].skills).toEqual(['Svelte', 'React']);
     expect(result[0].description).toBe('Local desc.');
+    expect(result[0].location).toBe('Lyon');
   });
 
   it('overwrites description with draft when local source is not manual', () => {
@@ -232,6 +235,62 @@ describe('mergeExperiences', () => {
 
     const result = mergeExperiences(current, incoming, NOW);
     expect(result[0].description).toBe('New desc.');
+  });
+
+  it('repairs swapped LinkedIn description and location fields on re-import', () => {
+    const current = [
+      baseExperience({
+        id: 'linkedin-1',
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: 'Paris · Hybride',
+        location: 'Pilotage de la plateforme de paiement.',
+        source: 'linkedin',
+      }),
+    ];
+    const incoming = [
+      draft({
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: 'Pilotage de la plateforme de paiement.',
+        location: 'Paris · Hybride',
+      }),
+    ];
+
+    const result = mergeExperiences(current, incoming, NOW);
+
+    expect(result[0].description).toBe('Pilotage de la plateforme de paiement.');
+    expect(result[0].location).toBe('Paris · Hybride');
+  });
+
+  it('clears a stale LinkedIn location when the re-imported position has none', () => {
+    const current = [
+      baseExperience({
+        id: 'linkedin-1',
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: '',
+        location: 'Direction technique de la plateforme.',
+        source: 'linkedin',
+      }),
+    ];
+    const incoming = [
+      draft({
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: 'Direction technique de la plateforme.',
+        location: null,
+      }),
+    ];
+
+    const result = mergeExperiences(current, incoming, NOW);
+
+    expect(result[0].description).toBe('Direction technique de la plateforme.');
+    expect(result[0].location).toBeNull();
   });
 
   it('recomputes gapless position indices after merge', () => {

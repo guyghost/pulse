@@ -60,17 +60,21 @@ export async function extractLinkedInExperiencesFromDom(
 
     const placeValue = workModeSuffixMatch?.[1] ?? value;
     const placeSegments = placeValue.split(/\s*,\s*/);
+    const placeTokens = placeSegments.flatMap((segment) => segment.split(/\s+/));
+    const hasOnlyPlaceTokens = placeTokens.every(
+      (token) =>
+        placeConnectorPattern.test(token) || /^[\p{Lu}\d][\p{L}\p{M}\d.'’()/-]*$/u.test(token)
+    );
+    const isCommaDelimitedPlace = placeSegments.length >= 2 && hasOnlyPlaceTokens;
+    const isStandalonePlace =
+      placeSegments.length === 1 &&
+      placeTokens.length <= 4 &&
+      !/[.!?;:]$/.test(placeValue) &&
+      hasOnlyPlaceTokens;
     return (
       placeValue.length <= 120 &&
-      placeSegments.length >= 2 &&
-      placeSegments.every((segment) =>
-        segment
-          .split(/\s+/)
-          .every(
-            (token) =>
-              placeConnectorPattern.test(token) || /^[\p{Lu}\d][\p{L}\p{M}\d.'’()/-]*$/u.test(token)
-          )
-      )
+      placeTokens.length > 0 &&
+      (isCommaDelimitedPlace || isStandalonePlace)
     );
   };
 
@@ -510,7 +514,8 @@ export async function extractLinkedInExperiencesFromDom(
               index !== adjacentSkillsIndex &&
               !line.prose &&
               !isDurationLine(line.text) &&
-              !isActionLine(line.text)
+              !isActionLine(line.text) &&
+              isLikelyLocationLine(line.text)
           )
         : -1;
     const proseLocationIndex =
