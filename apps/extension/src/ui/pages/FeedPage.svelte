@@ -72,10 +72,24 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
-  const filterSourceOptions = getConnectorsMeta().map((source) => ({
-    value: source.id as MissionSource,
-    label: source.name,
-  }));
+  const connectorMetas = getConnectorsMeta();
+  const sourceShortLabels: Record<MissionSource, string> = {
+    'free-work': 'Free-Work',
+    lehibou: 'LeHibou',
+    hiway: 'Hiway',
+    collective: 'Collective',
+    'cherry-pick': 'Cherry',
+    malt: 'Malt',
+  };
+  const filterSourceOptions = $derived.by(() =>
+    connectorMetas.map((source) => ({
+      value: source.id as MissionSource,
+      label: source.name,
+      shortLabel: sourceShortLabels[source.id as MissionSource],
+      icon: source.icon,
+      count: page.sourceMissionCounts.get(source.id) ?? 0,
+    }))
+  );
   page.setup();
   onDestroy(() => page.dispose());
   onDestroy(() => {
@@ -1525,7 +1539,7 @@
 
       <Tooltip
         label={page.showFilters ? 'Masquer les filtres' : 'Filtrer les missions'}
-        description="Ouvre la grille de filtres avec mise à jour immédiate du feed."
+        description="Ouvre la feuille de filtres avec mise à jour immédiate du feed."
       >
         <button
           bind:this={filterTrigger}
@@ -1539,7 +1553,7 @@
           aria-controls="filter-panel"
           aria-label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
         >
-          <Icon name="sliders-horizontal" size={19} />
+          <Icon name="list-filter" size={20} />
           {#if page.filterActive && !page.showFilters}
             <span
               class="absolute right-1.5 top-1.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"

@@ -122,6 +122,11 @@ export const iconPaths = {
     ['line', { x1: '8', x2: '8', y1: '10', y2: '14' }],
     ['line', { x1: '16', x2: '16', y1: '18', y2: '22' }],
   ],
+  'list-filter': [
+    ['path', { d: 'M3 6h18' }],
+    ['path', { d: 'M6 12h12' }],
+    ['path', { d: 'M9 18h6' }],
+  ],
   'filter-x': [
     ['path', { d: 'M13.013 3H2l8 9.46V19l4 2v-8.54l.9-1.055' }],
     ['path', { d: 'm22 3-5 5' }],
