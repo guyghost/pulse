@@ -380,7 +380,7 @@
           {#each requiredStacks as stack (stack)}
             <button
               type="button"
-              class="inline-flex items-center gap-1 rounded-md bg-blueprint-blue/8 px-2 py-1 text-micro font-medium text-blueprint-blue"
+              class="inline-flex items-center gap-1 rounded-md bg-blueprint-blue/8 px-2 py-1 text-micro font-medium text-blueprint-blue-on-tint"
               onclick={() => removeStack(stack)}
             >
               {stack}

@@ -262,9 +262,10 @@ La landing utilise `apps/landing/src/app.css` qui importe les custom properties 
   --color-page-canvas: #f5f5f4;
   --color-surface-white: #ffffff;
   --color-blueprint-blue: #0b64e9;
+  --color-blueprint-blue-on-tint: #1d4ed8; /* text on blue tints (chips, active segments) */
   --color-text-primary: #0c0a09;
   --color-text-secondary: #1c1917;
-  --color-text-muted: #a6a09b;
+  --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;

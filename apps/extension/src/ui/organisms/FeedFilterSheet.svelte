@@ -147,7 +147,7 @@
   <div
     bind:this={panel}
     id="filter-panel"
-    class="bottom-sheet pointer-events-auto absolute inset-x-0 bottom-0 flex h-[70%] max-h-[calc(100%-5rem)] flex-col overflow-visible rounded-t-[1.75rem] border-x border-t border-border-light bg-surface-white/98 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1.5 outline-none shadow-[0_-24px_64px_rgba(28,25,23,0.20)] backdrop-blur-2xl"
+    class="bottom-sheet pointer-events-auto absolute inset-x-0 bottom-0 flex h-[70%] max-h-[calc(100%-5rem)] flex-col overflow-visible rounded-t-[1.75rem] border-x border-t border-border-light bg-surface-white/98 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1.5 outline-none shadow-[0_-24px_64px_rgba(28,25,23,0.20)] dark:shadow-[0_-24px_64px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
     role="dialog"
     aria-modal="true"
     aria-labelledby="filter-sheet-title"
@@ -156,7 +156,7 @@
   >
     <button
       type="button"
-      class="soft-ring absolute -top-[3.75rem] left-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/75 bg-surface-white/96 text-text-secondary shadow-[0_10px_28px_rgba(28,25,23,0.18)] backdrop-blur-xl transition-[background-color,color,transform] duration-200 hover:bg-subtle-gray hover:text-text-primary active:scale-95"
+      class="soft-ring absolute -top-[3.75rem] left-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/75 dark:border-white/15 bg-surface-white/96 text-text-secondary shadow-[0_10px_28px_rgba(28,25,23,0.18)] dark:shadow-[0_10px_28px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[background-color,color,transform] duration-200 hover:bg-subtle-gray hover:text-text-primary active:scale-95"
       aria-label="Fermer les filtres et revenir au feed"
       onclick={() => onDismiss('button')}
     >
@@ -182,7 +182,7 @@
           <button
             type="button"
             class="flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-1 py-2 text-center outline-none transition-[background-color,border-color,color,transform] duration-200 focus-visible:ring-2 focus-visible:ring-blueprint-blue/35 focus-visible:ring-offset-2 active:scale-[0.97] {filter.active
-              ? 'border-blueprint-blue/45 bg-blueprint-blue/[0.08] text-blueprint-blue shadow-[inset_0_0_0_1px_rgba(11,100,233,0.08)]'
+              ? 'border-blueprint-blue/45 bg-blueprint-blue/[0.08] text-blueprint-blue-on-tint shadow-[inset_0_0_0_1px_rgba(11,100,233,0.08)]'
               : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
             aria-pressed={filter.active}
             onclick={filter.onSelect}

@@ -22,6 +22,11 @@
      Light-mode default lives in packages/design/theme.css (mirrors --color-blueprint-blue, white-on-blue 5.23:1).
      Dark override below: White-on-#2563eb = 5.17:1 (AA), so light buttons are unchanged. */
   --color-blueprint-blue-strong-dark: #2563eb;
+  /* Lighter blue for TEXT/icons sitting on translucent blue tints in dark theme
+     (selected chips, active segments). #3b82f6 only reaches 3.97:1–4.38:1 on dark
+     tints; #60a5fa clears AA everywhere (5.74:1 on /15 tint over card, 6.33:1 on
+     /8, 5.97:1 on subtle-gray). */
+  --color-blueprint-blue-on-tint-dark: #60a5fa;
   --color-text-primary-dark: #f5f5f4;
   --color-text-secondary-dark: #e7e5e4;
   /* #94908b passes 4.5:1 on canvas (6.23), card (5.51) and subtle-gray (4.78); stays dimmer than --color-text-subtle-dark (#a8a29e) to preserve hierarchy. */
@@ -62,6 +67,7 @@
   --color-surface-white: var(--color-surface-white-dark);
   --color-blueprint-blue: var(--color-blueprint-blue-dark);
   --color-blueprint-blue-strong: var(--color-blueprint-blue-strong-dark);
+  --color-blueprint-blue-on-tint: var(--color-blueprint-blue-on-tint-dark);
   --color-text-primary: var(--color-text-primary-dark);
   --color-text-secondary: var(--color-text-secondary-dark);
   --color-text-muted: var(--color-text-muted-dark);

@@ -28,7 +28,7 @@
     summary.tone === 'nominal'
       ? 'bg-accent-green/10 text-accent-green'
       : summary.tone === 'partial'
-        ? 'bg-blueprint-blue/10 text-blueprint-blue'
+        ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
         : 'bg-subtle-gray text-text-muted'
   );
 

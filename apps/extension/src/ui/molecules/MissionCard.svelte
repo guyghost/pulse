@@ -264,7 +264,7 @@
         {/if}
         {#if !isSeen}
           <span
-            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 eyebrow eyebrow--blue"
+            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 eyebrow text-blueprint-blue-on-tint"
           >
             Nouveau
           </span>

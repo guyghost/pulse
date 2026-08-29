@@ -129,7 +129,7 @@
     preview.grade === 'A'
       ? 'bg-accent-green/10 text-accent-green'
       : preview.grade === 'B'
-        ? 'bg-blueprint-blue/10 text-blueprint-blue'
+        ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
         : preview.grade === 'C'
           ? 'bg-status-yellow/15 text-status-orange'
           : 'bg-subtle-gray text-text-subtle'

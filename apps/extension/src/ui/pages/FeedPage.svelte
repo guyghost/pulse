@@ -1040,7 +1040,7 @@
                   </span>
                   {#if page.favoriteCount > 0}
                     <span
-                      class="ml-1.5 inline-flex items-center gap-1 align-baseline text-[0.6em] font-normal tracking-normal text-blueprint-blue"
+                      class="ml-1.5 inline-flex items-center gap-1 align-baseline text-[0.6em] font-normal tracking-normal text-blueprint-blue-on-tint"
                     >
                       <Icon name="star" size={10} class="fill-blueprint-blue" />
                       {page.favoriteCount}
@@ -1060,7 +1060,7 @@
                       <button
                         type="button"
                         class="inline-flex h-7.5 shrink-0 items-center gap-1.5 rounded-full border px-2.5 text-micro font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
-                          ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                          ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue-on-tint'
                           : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:text-text-primary'}"
                         onclick={() => page.applyDecisionPreset(preset.id)}
                         aria-pressed={preset.active}
@@ -1076,7 +1076,7 @@
                     {#if page.decisionPreset}
                       <button
                         type="button"
-                        class="inline-flex h-7.5 shrink-0 items-center rounded-full px-2 text-micro font-medium text-blueprint-blue transition-colors hover:text-blueprint-blue/80"
+                        class="inline-flex h-7.5 shrink-0 items-center rounded-full px-2 text-micro font-medium text-blueprint-blue-on-tint transition-colors hover:text-blueprint-blue-on-tint/80"
                         onclick={page.clearAllFilters}
                       >
                         Tout
@@ -1244,7 +1244,7 @@
 
               {#if page.isOffline}
                 <div
-                  class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-meta text-blueprint-blue"
+                  class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-meta text-blueprint-blue-on-tint"
                 >
                   <Icon name="database" size={14} />
                   <span>Mode hors ligne — Données en cache</span>
@@ -1330,7 +1330,7 @@
                   {#if page.decisionPreset}
                     <button
                       type="button"
-                      class="text-micro font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                      class="text-micro font-medium text-blueprint-blue-on-tint hover:text-blueprint-blue-on-tint/80"
                       onclick={page.clearAllFilters}
                     >
                       Réinitialiser
@@ -1342,7 +1342,7 @@
                     <button
                       type="button"
                       class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-micro font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
-                        ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                        ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue-on-tint'
                         : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
                       onclick={() => page.applyDecisionPreset(preset.id)}
                       aria-pressed={preset.active}
@@ -1409,7 +1409,7 @@
         <button
           type="button"
           onclick={() => page.dismissFocus()}
-          class="shrink-0 rounded-lg px-2.5 py-1.5 text-meta font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blueprint-blue/40"
+          class="shrink-0 rounded-lg px-2.5 py-1.5 text-meta font-semibold text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blueprint-blue/40"
           data-testid="focus-lens-dismiss"
         >
           Voir tout le feed
@@ -1497,7 +1497,7 @@
     </div>
     {#if showAlertOnly}
       <button
-        class="mt-3 w-full rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 py-2.5 text-caption font-medium text-blueprint-blue transition-all duration-200 hover:bg-blueprint-blue/10"
+        class="mt-3 w-full rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 py-2.5 text-caption font-medium text-blueprint-blue-on-tint transition-all duration-200 hover:bg-blueprint-blue/10"
         onclick={() => (showAlertOnly = false)}
       >
         Afficher toutes les missions
@@ -1526,7 +1526,7 @@
       aria-label="Actions du feed"
     >
       <div
-        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 bg-surface-white/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-200 hover:bg-surface-white/70 focus-within:border-blueprint-blue/50 focus-within:bg-surface-white/70 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)]"
+        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 dark:border-white/15 bg-surface-white/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-1px_0_rgba(255,255,255,0.03),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-200 hover:bg-surface-white/70 focus-within:border-blueprint-blue/50 focus-within:bg-surface-white/70 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)] dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(255,255,255,0.03),0_16px_36px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.32)]"
       >
         <SearchInput
           variant="dock"
@@ -1546,8 +1546,8 @@
           type="button"
           class="soft-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
           page.filterActive
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)]'
-            : 'border-white/70 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)]'}"
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue-on-tint shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(255,255,255,0.02),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)]'
+            : 'border-white/70 dark:border-white/15 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-1px_0_rgba(255,255,255,0.03),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)] dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(255,255,255,0.03),0_16px_36px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.32)]'}"
           onclick={() => page.setShowFilters(!page.showFilters)}
           aria-expanded={page.showFilters}
           aria-controls="filter-panel"
@@ -1570,8 +1570,8 @@
         <button
           type="button"
           class="soft-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {showAdvancedControls
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)]'
-            : 'border-white/70 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)]'}"
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue-on-tint shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(255,255,255,0.02),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)]'
+            : 'border-white/70 dark:border-white/15 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-1px_0_rgba(255,255,255,0.03),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)] dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(255,255,255,0.03),0_16px_36px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.32)]'}"
           onclick={toggleOperationalDetails}
           aria-expanded={showAdvancedControls}
           aria-label={showAdvancedControls
@@ -1657,7 +1657,7 @@
     </span>
     {#if page.comparisonMissions.length >= 2}
       <button
-        class="rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-meta font-medium text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
+        class="rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-meta font-medium text-blueprint-blue-on-tint hover:bg-blueprint-blue/15 transition-colors"
         onclick={openComparison}
       >
         Comparer

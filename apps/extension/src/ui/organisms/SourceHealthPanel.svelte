@@ -511,7 +511,7 @@
                   <button
                     class="rounded-md px-1.5 py-0.5 text-micro font-mono font-medium transition-colors
                       {isFiltered
-                      ? 'bg-blueprint-blue/10 text-blueprint-blue'
+                      ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
                       : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
                     onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
                     aria-label={isFiltered

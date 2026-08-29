@@ -169,7 +169,7 @@ FH Total Display Regular, 183px, lineHeight 0.8, color #1c1917, typically follow
 
 **Role:** Section/field categorization label
 
-The canonical micro-label above or beside content. System font, micro size (10px), weight 500, uppercase, 0.15em letter-spacing, Text Muted (#a6a09b). Defined once in `@pulse/ui` as `.eyebrow` (components layer).
+The canonical micro-label above or beside content. System font, micro size (10px), weight 500, uppercase, 0.15em letter-spacing, Text Muted (#6b6561). Defined once in `@pulse/ui` as `.eyebrow` (components layer).
 
 Modifiers: `.eyebrow--caption` (12px caption size, for lower-density contexts), `.eyebrow--strong` (weight 600), `.eyebrow--subtle` (Text Subtle #57534d), `.eyebrow--blue` (Blueprint Blue #0b64e9, for section markers under page headers), `.eyebrow--inherit` (`color: inherit`, for labels inside tinted containers whose tone must follow the ancestor instead of the muted default).
 
