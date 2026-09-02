@@ -34,8 +34,8 @@ Une proposition doit porter :
 ## 4. Exécution unique
 
 Quand plusieurs propositions approuvées couvrent la même intention, **une seule**
-est exécutée (la plus complète) ; les autres restent approuvées-absorbées et le
-sont noté dans leur évaluation (`dao_rate` avec commentaire « absorbé par #N »).
+est exécutée (la plus complète) ; les autres restent approuvées-absorbées, et cela
+est consigné via `dao_rate` (commentaire « absorbé par #N »).
 
 ## 5. Boucle d'amélioration continue
 
