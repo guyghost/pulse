@@ -6,6 +6,7 @@ Governance and planning artifacts for proposal 081.
 
 ## Navigation
 
+- [Intake rules](./INTAKE.md)
 - [ADRs](./adr/README.md)
 - [Decisions](./decisions/README.md)
 - [Implementation plans](./implementation-plans/README.md)
