@@ -167,7 +167,7 @@ test.describe('Accessibility', () => {
     );
 
     // Le panneau doit être visible
-    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
+    const filterPanel = page.getByRole('dialog', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
   });
 

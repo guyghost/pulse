@@ -74,11 +74,19 @@ test.describe('Scan Lifecycle', () => {
     await expect(filterToggle).toBeVisible();
     await filterToggle.click();
 
-    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
+    const filterPanel = page.getByRole('dialog', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
 
-    await page.getByRole('button', { name: 'Masquer les filtres' }).click();
+    // Le sheet ouvert couvre le toggle (scrim) — la fermeture passe par son
+    // bouton dédié introduit par le redesign bottom-sheet.
+    await page.getByRole('button', { name: 'Fermer les filtres et revenir au feed' }).click();
     await expect(filterPanel).not.toBeVisible();
+
+    // Le toggle revient à son état initial une fois la feuille fermée.
+    await expect(page.getByRole('button', { name: 'Afficher les filtres' })).toHaveAttribute(
+      'aria-expanded',
+      'false'
+    );
   });
 
   test('empty state shows when dev panel sets empty', async ({ page }) => {
