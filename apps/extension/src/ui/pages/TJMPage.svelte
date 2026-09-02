@@ -278,6 +278,7 @@
         class="inline-flex items-center gap-2"
         role="radiogroup"
         aria-label="Période d'analyse"
+        tabindex={-1}
         onkeydown={handlePeriodKeydown}
       >
         {#each PERIOD_OPTIONS as option, i (option.value)}
