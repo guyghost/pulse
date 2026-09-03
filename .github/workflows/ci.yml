@@ -297,10 +297,6 @@ jobs:
         name: Expose pinned Python executable
         run: echo "PULSE_RELEASE_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
 
-      - id: install-browser
-        name: Install Chromium
-        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
-
       - id: verify-toolchain
         name: Verify the committed package manager authority
         run: |
@@ -313,6 +309,10 @@ jobs:
       - id: install
         name: Install exact committed dependencies
         run: pnpm install --frozen-lockfile
+
+      - id: install-browser
+        name: Install Chromium
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
 
       - id: build
         name: Build, exercise, authorize and capture the sealed transport
