@@ -49,10 +49,11 @@ function requireArg(name: string): string {
 async function run(
   command: string,
   args: readonly string[],
-  maxBufferBytes = 67_108_864
+  maxBufferBytes = 67_108_864,
+  cwd = WORKSPACE_ROOT
 ): Promise<string> {
   const { stdout } = await execFile(command, args, {
-    cwd: WORKSPACE_ROOT,
+    cwd,
     maxBuffer: maxBufferBytes,
     encoding: 'utf8',
   });
@@ -149,7 +150,8 @@ async function main(): Promise<void> {
   const rawReport = await run(
     join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
     ['test', '--config=playwright.mv3.config.ts', '--reporter=json'],
-    268_435_456
+    268_435_456,
+    EXTENSION_ROOT
   );
   const rawReportPath = join(workDir, 'mv3-raw-report.json');
   await writeFile(rawReportPath, rawReport, { encoding: 'utf8', mode: 0o600 });
