@@ -144,17 +144,11 @@ async function main(): Promise<void> {
   await createReleaseGateInputCli(['--capture-tree', '--dist', dist, '--output', treeBeforePath]);
 
   const mv3StartedAt = new Date().toISOString();
+  // Direct binary: `pnpm exec` prefixes stdout with its own noise, which would
+  // corrupt the captured JSON report.
   const rawReport = await run(
-    'pnpm',
-    [
-      '--filter',
-      '@pulse/extension',
-      'exec',
-      'playwright',
-      'test',
-      '--config=playwright.mv3.config.ts',
-      '--reporter=json',
-    ],
+    join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
+    ['test', '--config=playwright.mv3.config.ts', '--reporter=json'],
     268_435_456
   );
   const rawReportPath = join(workDir, 'mv3-raw-report.json');
