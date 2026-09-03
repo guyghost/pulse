@@ -287,6 +287,20 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
+      - id: setup-python
+        name: Install pinned Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - id: expose-pinned-python
+        name: Expose pinned Python executable
+        run: echo "PULSE_RELEASE_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
+
+      - id: install-browser
+        name: Install Chromium
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
+
       - id: verify-toolchain
         name: Verify the committed package manager authority
         run: |
