@@ -4,6 +4,7 @@ import {
   saveConnectorStatuses,
   getConnectorStatuses,
   getMissions,
+  getMissionsPaginated,
   getMissionById,
   saveMissions,
   purgeOldMissions,
@@ -1470,6 +1471,22 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] GET_FEED_MISSIONS error:', err);
           sendResponse({ type: 'FEED_MISSIONS_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FEED_MISSIONS_PAGE') {
+      const { page, pageSize } = message.payload;
+      getMissionsPaginated({ page, pageSize, sortBy: 'date' })
+        .then((result) => {
+          sendResponse({ type: 'FEED_MISSIONS_PAGE_RESULT', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_MISSIONS_PAGE error:', err);
+          sendResponse({
+            type: 'FEED_MISSIONS_PAGE_RESULT',
+            payload: { missions: [], total: 0, hasMore: false },
+          });
         });
       return true;
     }

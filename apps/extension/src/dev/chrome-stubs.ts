@@ -1074,6 +1074,27 @@ function createChromeStubs() {
                 })
               ),
             };
+          case 'GET_FEED_MISSIONS_PAGE': {
+            // Dev mirror of the production page read: same date-sorted slicing
+            // over the dev catalogue so the paginated bootstrap behaves
+            // identically in the browserless dev shell.
+            const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions).map(
+              (m) => ({
+                ...m,
+                scrapedAt: new Date(),
+              })
+            );
+            const p = message.payload as { page: number; pageSize: number };
+            const start = p.page * p.pageSize;
+            return {
+              type: 'FEED_MISSIONS_PAGE_RESULT',
+              payload: {
+                missions: missions.slice(start, start + p.pageSize),
+                total: missions.length,
+                hasMore: start + p.pageSize < missions.length,
+              },
+            };
+          }
           case 'GET_FEED_FAVORITES':
             return { type: 'FEED_FAVORITES_RESULT', payload: storage.favoriteMissions };
           case 'SAVE_FEED_FAVORITES':

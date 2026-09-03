@@ -759,6 +759,21 @@ export const MessageSchemas = {
     type: z.literal('FEED_MISSIONS_RESULT'),
     payload: MissionsPayloadSchema,
   }),
+  GET_FEED_MISSIONS_PAGE: z.object({
+    type: z.literal('GET_FEED_MISSIONS_PAGE'),
+    payload: z.object({
+      page: z.number().int().nonnegative(),
+      pageSize: z.number().int().positive(),
+    }),
+  }),
+  FEED_MISSIONS_PAGE_RESULT: z.object({
+    type: z.literal('FEED_MISSIONS_PAGE_RESULT'),
+    payload: z.object({
+      missions: MissionsPayloadSchema,
+      total: z.number().int().nonnegative(),
+      hasMore: z.boolean(),
+    }),
+  }),
   GET_FEED_FAVORITES: z.object({ type: z.literal('GET_FEED_FAVORITES') }),
   FEED_FAVORITES_RESULT: z.object({
     type: z.literal('FEED_FAVORITES_RESULT'),
