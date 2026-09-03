@@ -525,7 +525,13 @@ export function createFeedPageState(
   );
 
   function sortCurrentMissions(input: Mission[]): Mission[] {
-    return sortBy === 'score' ? rankMissions(input, new Date()) : sortMissions(input, sortBy);
+    // if/else plutôt que ternaire : les appels en branche de ternaire sont
+    // annotés /* @__PURE__ */ par esbuild à une position que Rollup ne peut
+    // pas interpréter, ce qui émet un warning à chaque build.
+    if (sortBy === 'score') {
+      return rankMissions(input, new Date());
+    }
+    return sortMissions(input, sortBy);
   }
 
   const newQueueCandidateMissions = $derived.by(() => {
@@ -714,9 +720,12 @@ export function createFeedPageState(
     if (focusMode === 'focused' && focusIntent) {
       const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
-        return sortBy === 'score'
-          ? rankMissions(focused, new Date())
-          : sortMissions(focused, sortBy);
+        // Même motif que sortCurrentMissions : if/else pour éviter le warning
+        // Rollup sur l'annotation __PURE__ en branche de ternaire.
+        if (sortBy === 'score') {
+          return rankMissions(focused, new Date());
+        }
+        return sortMissions(focused, sortBy);
       }
     }
 
