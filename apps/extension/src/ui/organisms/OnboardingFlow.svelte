@@ -14,6 +14,8 @@
     OnboardingProfileDraft,
   } from '../../models/onboarding-flow.machine';
   import type { RemoteType } from '$lib/core/types/mission';
+  import { previewOnboardingMatch, REFERENCE_MISSION } from '$lib/core/scoring/onboarding-preview';
+  import { scoreToGrade } from '$lib/core/types/score';
 
   const {
     snapshot,
@@ -111,6 +113,27 @@
   const progressPercent = $derived(
     Math.round((snapshot.progress.current / snapshot.progress.total) * 100)
   );
+
+  // Live preview (models/onboarding-live-preview.model.md): read-only
+  // projection of the draft onto the reference mission. No persistence.
+  const preview = $derived(
+    previewOnboardingMatch({
+      tjmMin: snapshot.profile.tjmMin,
+      tjmMax: snapshot.profile.tjmMax,
+      remote: snapshot.profile.remote,
+      keywords: snapshot.profile.keywords,
+      location: snapshot.profile.location,
+    })
+  );
+  const previewGradeClass = $derived(
+    preview.grade === 'A'
+      ? 'bg-accent-green/10 text-accent-green'
+      : preview.grade === 'B'
+        ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
+        : preview.grade === 'C'
+          ? 'bg-status-yellow/15 text-status-orange'
+          : 'bg-subtle-gray text-text-subtle'
+  );
 </script>
 
 {#if snapshot.phase === 'welcome'}
@@ -121,7 +144,7 @@
 {:else if snapshot.phase === 'connecting'}
   <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
     <div class="flex-1">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+      <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total}
       </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
@@ -199,7 +222,7 @@
     </div>
 
     <div class="flex-1 pt-5">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+      <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total} · {stepLabel}
       </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
@@ -272,7 +295,7 @@
                 min="0"
                 step="50"
                 bind:value={tjmMin}
-                onchange={() => patch({ tjmMin: Math.max(0, Number.parseInt(tjmMin, 10) || 0) })}
+                oninput={() => patch({ tjmMin: Math.max(0, Number.parseInt(tjmMin, 10) || 0) })}
                 class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
               />
             </label>
@@ -284,12 +307,39 @@
                 min="0"
                 step="50"
                 bind:value={tjmMax}
-                onchange={() => patch({ tjmMax: Math.max(0, Number.parseInt(tjmMax, 10) || 0) })}
+                oninput={() => patch({ tjmMax: Math.max(0, Number.parseInt(tjmMax, 10) || 0) })}
                 class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
               />
             </label>
           </div>
-        {:else}
+
+          <aside
+            aria-label="Aperçu de correspondance"
+            class="rounded-2xl border border-border-light bg-surface-white p-4"
+          >
+            <p class="eyebrow eyebrow--caption">Aperçu en direct</p>
+            <div class="mt-2 flex items-center gap-3">
+              <span
+                class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {previewGradeClass} text-heading font-semibold"
+                aria-hidden="true"
+              >
+                {preview.grade}
+              </span>
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-semibold text-text-primary">
+                  {preview.label}
+                </span>
+                <span class="mt-0.5 block truncate text-xs text-text-muted">
+                  {REFERENCE_MISSION.title}
+                </span>
+              </span>
+            </div>
+            <p class="mt-2 text-xs text-text-muted">
+              Note d’une mission type du marché selon vos critères. Ajustez TJM, mobilité ou
+              compétences pour la voir évoluer.
+            </p>
+          </aside>
+        {:else if snapshot.wizardStep === 'skills'}
           <div>
             <label for="onboarding-skill-input" class="text-xs font-medium text-text-secondary"
               >Compétences</label
@@ -367,7 +417,7 @@
   <!-- Bottom-sheet style notify step: benefit-first, native Toggle. -->
   <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
     <div class="flex-1">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+      <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total}
       </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
@@ -431,7 +481,7 @@
     </h2>
     <p class="mt-2 max-w-xs text-sm text-text-secondary">
       {scanningPartial
-        ? 'Profil partiel — on lance quand même un scan par défaut pour vous montrer la valeur.'
+        ? 'Profil partiel — un scan par défaut est lancé pour découvrir les premières missions.'
         : 'Pulse récupère et note vos missions. Cela prend quelques secondes.'}
     </p>
   </section>
@@ -448,7 +498,7 @@
       <Icon name={navFailed ? 'alert-triangle' : 'check'} class="h-8 w-8" />
     </div>
     <h2 class="mt-5 text-heading-lg font-semibold text-text-primary">
-      {navFailed ? 'Finalisation impossible' : snapshot.error ? 'Presque terminé' : "C'est prêt"}
+      {navFailed ? 'Finalisation impossible' : snapshot.error ? 'Presque terminé' : 'C’est prêt'}
     </h2>
     <p class="mt-2 max-w-xs text-sm text-text-secondary">
       {navFailed

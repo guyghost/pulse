@@ -353,7 +353,7 @@
 
       {#if store.dossier.approvedArtifacts.length > 0}
         <div class="mt-3 space-y-2">
-          <p class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
+          <p class="eyebrow eyebrow--caption eyebrow--subtle">
             Brouillons approuvés ({store.dossier.approvedArtifacts.length})
           </p>
           {#each store.dossier.approvedArtifacts as artifact (artifact.artifactId)}
@@ -447,9 +447,7 @@
       </summary>
       <div class="border-t border-border-light p-3">
         <fieldset>
-          <legend class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
-            Mission
-          </legend>
+          <legend class="eyebrow eyebrow--caption eyebrow--subtle">Mission</legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
             {#each store.missionFieldOptions as field (field)}
               <label class="flex items-center gap-2 text-caption text-text-secondary">
@@ -466,9 +464,7 @@
         </fieldset>
 
         <fieldset class="mt-4">
-          <legend class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
-            Profil
-          </legend>
+          <legend class="eyebrow eyebrow--caption eyebrow--subtle">Profil</legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
             {#each store.profileFieldOptions as field (field)}
               <label class="flex items-center gap-2 text-caption text-text-secondary">
@@ -486,7 +482,7 @@
 
         {#if store.availableEvidence.length > 0}
           <fieldset class="mt-4">
-            <legend class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
+            <legend class="eyebrow eyebrow--caption eyebrow--subtle">
               Expériences comme sources
             </legend>
             <div class="mt-2 space-y-2">
@@ -573,9 +569,7 @@
 
         {#if store.job.tjmFacts}
           <div class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
-            <p class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
-              Repères locaux déterministes
-            </p>
+            <p class="eyebrow eyebrow--caption eyebrow--subtle">Repères locaux déterministes</p>
             <div class="mt-2 grid grid-cols-2 gap-2 text-caption text-text-secondary">
               <span>Mission : {formatEur(store.job.tjmFacts.missionDisplayedTjm)}</span>
               <span>Cible profil : {formatEur(store.job.tjmFacts.profileBounds.target)}</span>
@@ -593,9 +587,7 @@
 
         {#if store.job.result && store.job.status === 'review'}
           <div class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
-            <p class="text-caption font-medium uppercase tracking-[0.14em] text-blueprint-blue">
-              Proposition IA non vérifiée
-            </p>
+            <p class="eyebrow eyebrow--caption eyebrow--blue">Proposition IA non vérifiée</p>
             {#if groundedDraftText}
               <div class="mt-3 border-t border-border-light pt-3">
                 <p class="text-caption font-medium text-text-primary">Sources à vérifier</p>

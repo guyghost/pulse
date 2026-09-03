@@ -98,9 +98,7 @@
               <Icon name="keyboard" size={17} class="text-blueprint-blue" />
             </div>
             <div class="min-w-0">
-              <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-                Navigation rapide
-              </p>
+              <p class="eyebrow eyebrow--strong eyebrow--blue">Navigation rapide</p>
               <h2 id="shortcuts-title" class="mt-0.5 text-heading font-semibold text-text-primary">
                 Raccourcis clavier
               </h2>
@@ -126,10 +124,7 @@
         <div class="space-y-4">
           {#each shortcutsByCategory as [category, shortcuts] (category)}
             <section aria-labelledby={`shortcut-category-${category}`}>
-              <h3
-                id={`shortcut-category-${category}`}
-                class="mb-2 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted"
-              >
+              <h3 id={`shortcut-category-${category}`} class="mb-2 eyebrow eyebrow--strong">
                 {category}
               </h3>
               <div

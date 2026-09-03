@@ -1,8 +1,10 @@
 # Product
 
-## Register
+<!-- impeccable:product-schema 1 -->
 
-product
+## Platform
+
+web — extension Chrome (Manifest V3) : side panel HTML/CSS/JS, pas d'app native.
 
 ## Users
 
@@ -12,9 +14,26 @@ Le job à faire : faire émerger les missions à plus fort signal du bruit de si
 
 ## Product Purpose
 
-MissionPulse est une extension Chrome 100% locale qui agrège les missions freelance de six plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
+MissionPulse est une extension Chrome local-first qui agrège les missions freelance de six plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
 
 La réussite se mesure par une recherche plus rapide, une qualification plus simple, et moins d'opportunités ratées.
+
+## Positioning
+
+Le différenciateur qu'un concurrent ne peut pas copier aisément : **le noyau est 100% local-first**. MissionPulse utilise les sessions navigateur existantes de l'utilisateur — scraping, déduplication, scoring et stockage vivent entièrement dans le navigateur (IndexedDB + chrome.storage), sans compte requis, sans credentials de plateforme stockés, zéro télémétrie. Un mode connecté optionnel existe (appairage opt-in avec le dashboard missionpulse.app pour les entitlements premium), mais il n'est jamais requis : l'extension fonctionne intégralement sans compte ni backend. Là où un agrégateur classique déporte les données côté serveur, MissionPulse calcule tout localement : déduplication et scoring cross-plateformes, tendance TJM, et scoring sémantique optionnel via Gemini Nano (IA on-device). C'est l'antidote local aux marketplaces, pas un énième job board.
+
+## Operating Context
+
+- Side panel Chrome, ouvert à côté des onglets de travail ; fenêtres de focus courtes — le feed doit se scanner en moins d'une minute.
+- Les sessions plateformes vivent dans les onglets et cookies du navigateur existant ; si l'utilisateur n'est pas connecté à une plateforme, ce connecteur échoue proprement sans casser les autres.
+- Scan cyclique en arrière-plan (service worker MV3, `chrome.alarms`) avec notifications pour les missions à haut score ; usage desktop, souvent en veille pendant les temps morts.
+
+## Capabilities and Constraints
+
+- 6 connecteurs plateformes (Free-Work, LeHibou, Hiway, Collective, Cherry Pick, Malt) : parsers purs testables, connecteurs I/O dans le shell ; un DOM source qui change produit une `ConnectorError` typée et les autres connecteurs continuent.
+- Local-first : IndexedDB + `chrome.storage` ; aucun compte requis, aucun credential de plateforme stocké, zéro télémétrie. Mode connecté optionnel (appairage dashboard via deviceSecret local, entitlements premium) — opt-in, jamais requis pour le fonctionnement local.
+- Scoring déterministe local (relevance) + scoring sémantique optionnel via Gemini Nano avec cache 7 jours, non-bloquant s'il est indisponible.
+- Contraintes MV3 : service worker non persistant, pas d'API payante, pas de scraping côté serveur.
 
 ## Brand Personality
 
@@ -30,7 +49,14 @@ Direction de référence : la clarté et la sobriété fonctionnelle perçue dan
 - Dashboards SaaS flashy ou sur-décorés, gradients décoratifs, effets visuels gratuits, et interfaces bruyantes qui distraient du tri.
 - Multiplication d'éléments de chrome UI qui ralentissent la décision.
 
-## Design Principles
+## Evidence on Hand
+
+Absences à ce jour — les travaux futurs ne doivent rien inventer sur ces points :
+
+- Pas d'utilisateurs externes mesurés, pas de données d'usage réelles, pas de témoignages, pas de couverture presse.
+- Preuves disponibles : le repo lui-même (code, tests unitaires et régression golden des parsers, fixtures de pages scrapées) et la landing missionpulse.app.
+
+## Product Principles
 
 1. **Signal sur bruit.** Chaque pixel classe, clarifie ou rend une décision possible. Sinon, il n'est pas à l'écran. Aller au signal utile en premier : rendre les missions prioritaires visibles sans surcharge.
 2. **Dense mais lisible.** Comme un terminal : packer l'information, mais utiliser typo, espacement et contraste pour la garder scannable. Densité sans chaos.

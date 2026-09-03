@@ -1,10 +1,7 @@
 <script lang="ts">
   import { Button, Icon } from '@pulse/ui';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
-  import {
-    createCvExperienceDeps,
-    getCvSyncTargets,
-  } from '$lib/shell/facades/cv-experience.facade';
+  import { createCvExperienceDeps } from '$lib/shell/facades/cv-experience.facade';
   import {
     ensureLinkedInHostPermission,
     importLinkedInProfile,
@@ -14,8 +11,9 @@
   import { createCvExperienceStore } from '$lib/state/cv-experience.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import ExperienceFeed from '../organisms/ExperienceFeed.svelte';
-  import CvSyncPanel from '../organisms/CvSyncPanel.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
 
   const connection = getConnectionStore();
   const isOffline = $derived(connection.status === 'offline');
@@ -23,7 +21,6 @@
   const { onNavigateToProfile }: { onNavigateToProfile?: () => void } = $props();
 
   const store = createCvExperienceStore(createCvExperienceDeps());
-  const platforms = getCvSyncTargets();
 
   let isImporting = $state(false);
 
@@ -81,44 +78,34 @@
   });
 </script>
 
-<div class="flex h-full min-w-0 flex-col gap-4 overflow-x-hidden overflow-y-auto px-4 pb-5 pt-4">
-  {#if isOffline}
-    <OfflineNotice
-      title="Mode hors ligne"
-      description="Vos modifications sont conservées localement. La synchronisation reprendra à la reconnexion."
-    />
-  {/if}
-
-  <section class="section-card-strong shrink-0 rounded-2xl px-5 py-4">
-    <div class="flex flex-wrap items-start justify-between gap-3">
-      <div class="min-w-0">
-        <h1 class="text-subheading font-semibold text-text-primary">CV &amp; expériences</h1>
-        <p class="mt-1 max-w-prose text-meta leading-relaxed text-text-secondary">
-          La source canonique de votre parcours. Chaque expérience renseignée ici est synchronisable
-          vers vos plateformes connectées pour garder le même profil partout.
-        </p>
-      </div>
-      <div class="flex flex-wrap items-center gap-2">
-        <Button
-          variant="secondary"
-          size="sm"
-          onclick={handleLinkedInImport}
-          disabled={isImporting || store.isSyncing}
-        >
-          <Icon name="download" size={14} />
-          {isImporting ? 'Import…' : 'Importer LinkedIn'}
+<PageShell>
+  <PageHeader
+    eyebrow="Parcours"
+    title="CV &amp; expériences"
+    icon="file-text"
+    description="La source canonique de votre parcours, à conserver à jour avant de candidater sur vos plateformes."
+  >
+    {#snippet actions()}
+      <Button variant="secondary" size="sm" onclick={handleLinkedInImport} disabled={isImporting}>
+        <Icon name="download" size={14} />
+        {isImporting ? 'Import…' : 'Importer LinkedIn'}
+      </Button>
+      {#if onNavigateToProfile}
+        <Button variant="secondary" size="sm" onclick={onNavigateToProfile}>
+          <Icon name="sliders-horizontal" size={14} />
+          Profil
         </Button>
-        {#if onNavigateToProfile}
-          <Button variant="secondary" size="sm" onclick={onNavigateToProfile}>
-            <Icon name="sliders-horizontal" size={14} />
-            Profil
-          </Button>
-        {/if}
-      </div>
-    </div>
-  </section>
-
-  <CvSyncPanel {store} {platforms} />
+      {/if}
+    {/snippet}
+    {#snippet footer()}
+      {#if isOffline}
+        <OfflineNotice
+          title="Mode hors ligne"
+          description="Vos modifications sont conservées localement et resteront disponibles au retour en ligne."
+        />
+      {/if}
+    {/snippet}
+  </PageHeader>
 
   <ExperienceFeed {store} />
-</div>
+</PageShell>

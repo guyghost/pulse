@@ -1,5 +1,6 @@
 import type { Mission } from '../types/mission';
-import type { UserProfile, ScoringWeights } from '../types/profile';
+import type { RemoteType } from '../types/mission';
+import type { UserProfile, ScoringWeights, SeniorityLevel } from '../types/profile';
 import { DEFAULT_SCORING_WEIGHTS } from '../types/profile';
 import type { DeterministicBreakdown } from '../types/score';
 import { matchLocation } from './location-matching';
@@ -12,6 +13,65 @@ export interface DeterministicScoreResult {
   breakdown: DeterministicBreakdown;
   total: number; // 0-100, clamped
 }
+
+/**
+ * Profile data precomputed once per profile (not per mission).
+ *
+ * Built by {@link prepareProfileScoring}. Deterministic and pure: same profile
+ * in, same structure out. Lets scan loops score N missions against one profile
+ * without rebuilding the keyword Set / normalized weights N times.
+ *
+ * Invariant: scores produced via this structure are bit-identical to
+ * {@link scoreMission} for the same (mission, profile, now) inputs.
+ */
+export interface PreparedScoringProfile {
+  /** Normalized scoring weights (sum to 100). */
+  readonly weights: ScoringWeights;
+  /** Lowercased truthy profile keywords for O(1) membership checks. */
+  readonly keywordSet: ReadonlySet<string>;
+  /**
+   * True when the RAW profile keywords array is non-empty. This preserves the
+   * "no keywords configured → full stack score" branch exactly: a list like
+   * [''] is non-empty (stack score 0) even though its keywordSet is empty,
+   * so the flag must not be derived from keywordSet.size.
+   */
+  readonly hasKeywords: boolean;
+  /** Raw profile fields consumed by the non-stack criteria, unchanged. */
+  readonly location: string;
+  readonly tjmMin: number;
+  readonly tjmMax: number;
+  readonly remote: RemoteType | 'any';
+  readonly seniority: SeniorityLevel;
+}
+
+/**
+ * Precompute the per-profile scoring inputs (keyword Set, normalized weights).
+ *
+ * Pure and deterministic — call once per profile per scan, then use
+ * {@link scoreMissionWithPrepared} per mission. Produces identical scores to
+ * calling {@link scoreMission} directly.
+ */
+export const prepareProfileScoring = (profile: UserProfile): PreparedScoringProfile => {
+  const weights = normalizeWeights(profile.scoringWeights ?? DEFAULT_SCORING_WEIGHTS);
+
+  const keywordSet = new Set<string>();
+  for (const entry of profile.keywords) {
+    if (entry) {
+      keywordSet.add(entry.toLowerCase());
+    }
+  }
+
+  return {
+    weights,
+    keywordSet,
+    hasKeywords: profile.keywords.length > 0,
+    location: profile.location,
+    tjmMin: profile.tjmMin,
+    tjmMax: profile.tjmMax,
+    remote: profile.remote,
+    seniority: profile.seniority,
+  };
+};
 
 /**
  * Score a mission's relevance to a user profile.
@@ -34,19 +94,32 @@ export const scoreMission = (
   mission: Mission,
   profile: UserProfile,
   now?: Date
+): DeterministicScoreResult =>
+  scoreMissionWithPrepared(mission, prepareProfileScoring(profile), now);
+
+/**
+ * Score a mission against a precomputed profile (see {@link prepareProfileScoring}).
+ *
+ * Behavior-identical to {@link scoreMission}: same mission, profile and date
+ * inputs produce bit-identical results. Intended for hot loops that score N
+ * missions against one profile per scan.
+ */
+export const scoreMissionWithPrepared = (
+  mission: Mission,
+  prepared: PreparedScoringProfile,
+  now?: Date
 ): DeterministicScoreResult => {
-  const weights = profile.scoringWeights ?? DEFAULT_SCORING_WEIGHTS;
-  const normalizedWeights = normalizeWeights(weights);
+  const normalizedWeights = prepared.weights;
 
   // Raw match percentages (0-100) — directly gradable.
   // NOTE: mission.stack is the platform-parsed tech stack; profile.keywords is
   // the unified keyword list (post-unification). The dimension name "stack" in
   // ScoringWeights/breakdown is unchanged — it names the scoring axis, not the
   // profile field. See models/keywords-unification.model.md.
-  const stackMatch = rawStackScore(mission.stack, profile.keywords);
-  const locationMatch = rawLocationScore(mission.location, profile.location);
-  const tjmMatch = rawTjmScore(mission.tjm, profile.tjmMin, profile.tjmMax);
-  const remoteMatch = rawRemoteScore(mission.remote, profile.remote);
+  const stackMatch = rawStackScore(mission.stack, prepared);
+  const locationMatch = rawLocationScore(mission.location, prepared.location);
+  const tjmMatch = rawTjmScore(mission.tjm, prepared.tjmMin, prepared.tjmMax);
+  const remoteMatch = rawRemoteScore(mission.remote, prepared.remote);
 
   // Weighted contribution to total
   const weightedStack = stackMatch * (normalizedWeights.stack / 100);
@@ -57,7 +130,7 @@ export const scoreMission = (
   const baseScore = weightedStack + weightedLocation + weightedTjm + weightedRemote;
 
   // Bonus points (clamped to 100)
-  const seniorityBonus = scoreSeniorityBonus(mission.seniority, profile.seniority);
+  const seniorityBonus = scoreSeniorityBonus(mission.seniority, prepared.seniority);
   const startDateBonus = now ? scoreStartDateBonus(mission.startDate, now) : 0;
 
   const total = Math.min(100, Math.round(baseScore + seniorityBonus + startDateBonus));
@@ -108,28 +181,23 @@ const normalizeWeights = (weights: ScoringWeights): ScoringWeights => {
  * that never appear in a mission's parsed stack does not change any mission's
  * score — they are simply never matched. This is what makes it safe to merge
  * the former `stack` and `searchKeywords` into a single `keywords` list.
+ *
+ * The profile keyword Set is precomputed once per profile by
+ * `prepareProfileScoring` (formerly rebuilt per mission here). Output is
+ * identical: each truthy mission-stack entry that matches a (lowercased)
+ * profile keyword counts once toward the numerator, and the denominator stays
+ * the full missionStack.length.
  */
-const rawStackScore = (missionStack: string[], profileKeywords: string[]): number => {
-  if (profileKeywords.length === 0) {
+const rawStackScore = (missionStack: string[], prepared: PreparedScoringProfile): number => {
+  if (!prepared.hasKeywords) {
     return 100;
   }
   if (missionStack.length === 0) {
     return 0;
   }
-  // Build the profile keywords once as a Set for O(1) membership checks. This
-  // runs once per mission during scoring; the previous Array.includes made it
-  // O(m) per mission-stack entry. Output is identical: each truthy mission-stack
-  // entry that matches a (lowercased) profile keyword counts once toward the
-  // numerator, and the denominator stays the full missionStack.length.
-  const profileSet = new Set<string>();
-  for (const entry of profileKeywords) {
-    if (entry) {
-      profileSet.add(entry.toLowerCase());
-    }
-  }
   let matchCount = 0;
   for (const entry of missionStack) {
-    if (entry && profileSet.has(entry.toLowerCase())) {
+    if (entry && prepared.keywordSet.has(entry.toLowerCase())) {
       matchCount++;
     }
   }

@@ -4,6 +4,31 @@ import type { UserProfile } from '../../src/lib/core/types/profile';
 import type { Mission } from '../../src/lib/core/types/mission';
 
 export const SIDE_PANEL = '/src/sidepanel/index.html';
+
+/**
+ * Active toutes les surfaces (onglets + couche connectée) pour un test e2e.
+ *
+ * Au lancement, `applications` et `connected` sont désactivés
+ * (`EXTENSION_SURFACE_FLAGS`). Les tests qui couvrent ces surfaces seedent
+ * l'override dev via localStorage avant le chargement du side panel — voir
+ * `apps/extension/src/models/surface-feature-flags.model.md` §5bis.
+ */
+export async function enableAllSurfaceFlags(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      '__missionpulse_dev_surface_flags',
+      JSON.stringify({
+        feed: true,
+        profile: true,
+        cv: true,
+        applications: true,
+        tjm: true,
+        settings: true,
+        connected: true,
+      })
+    );
+  });
+}
 export const FEED_SEARCH_PLACEHOLDER = 'Rechercher une mission…';
 
 export function feedSearchInput(page: Page): Locator {
@@ -16,6 +41,26 @@ export function mainNavigation(page: Page): Locator {
 
 export function navButton(page: Page, name: string): Locator {
   return mainNavigation(page).getByRole('button', { name });
+}
+
+type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data';
+
+/**
+ * Les réglages sont organisés en accordéon (`SettingsSectionId`, défini dans
+ * SettingsPage.svelte) et seule la section 'sources' est ouverte par défaut.
+ * Ce helper déplie la section demandée via les ids stables
+ * `settings-trigger-{id}` / `settings-panel-{id}`.
+ */
+export async function openSettingsSection(page: Page, sectionId: SettingsSectionId): Promise<void> {
+  const trigger = page.locator(`#settings-trigger-${sectionId}`);
+  const panel = page.locator(`#settings-panel-${sectionId}`);
+  // Échec rapide et diagnostic si l'id ne correspond plus au DOM (typo, refonte).
+  await expect(trigger).toBeVisible({ timeout: 2000 });
+  if (await panel.isVisible().catch(() => false)) {
+    return;
+  }
+  await trigger.click();
+  await expect(panel).toBeVisible();
 }
 
 export function missionCards(page: Page): Locator {
@@ -71,6 +116,24 @@ export function unfavoriteButton(card: Locator): Locator {
 
 export function hideButton(card: Locator): Locator {
   return card.getByRole('button', { name: 'Masquer la mission' });
+}
+
+export function missionDetailsToggle(card: Locator): Locator {
+  return card.getByRole('button', { name: /les détails de la mission/ });
+}
+
+/**
+ * Ouvre le disclosure de la carte pour exposer les actions détaillées
+ * (copier, ouvrir, investiguer). Les actions de triage (masquer,
+ * comparer, favori) sont visibles dès l'état réduit via le bandeau bas.
+ */
+export async function expandMission(card: Locator) {
+  const toggle = missionDetailsToggle(card);
+  await expect(toggle).toBeVisible();
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') {
+    await toggle.click();
+    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  }
 }
 
 export function copyLinkButton(card: Locator): Locator {
@@ -624,6 +687,7 @@ export async function unfavoriteMission(card: Locator) {
  * Masque une mission
  */
 export async function hideMission(card: Locator) {
+  await expandMission(card);
   const hideBtn = hideButton(card);
   await expect(hideBtn).toBeVisible();
   await hideBtn.click();

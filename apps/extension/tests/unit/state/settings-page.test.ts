@@ -235,6 +235,102 @@ describe('SettingsPageController.saveProfile — availability preservation', () 
   });
 });
 
+describe('SettingsPageController — external PROFILE_UPDATED during editing', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('keeps in-flight form fields and refreshes only the merge base', async () => {
+    // Regression: an external writer's PROFILE_UPDATED broadcast (LinkedIn
+    // import, availability sync, another surface saving) used to overwrite
+    // the form mid-edit; the user's next save then persisted the stale
+    // values — the reported jobTitle bug.
+    const storedProfile = {
+      firstName: 'Ada',
+      jobTitle: 'Dev',
+      location: 'Lyon',
+      tjmMin: 500,
+      tjmMax: 700,
+      keywords: ['react'],
+      remote: 'any' as const,
+      seniority: 'senior' as const,
+      scoringWeights: null,
+      experiences: [],
+      availability: null,
+    };
+
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: storedProfile });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController({ onNavigateToOnboarding: vi.fn() });
+    await vi.waitFor(() => expect(controller.profileStatus).toBe('ready'));
+
+    controller.toggleProfileEditing();
+    controller.jobTitle = 'Architecte Cloud';
+
+    const external = { ...storedProfile, jobTitle: 'Imported Title' };
+    for (const listener of [...bridgeMock.listeners]) {
+      listener({ type: 'PROFILE_UPDATED', payload: external });
+    }
+
+    expect(controller.editingProfile).toBe(true);
+    expect(controller.jobTitle).toBe('Architecte Cloud');
+    expect(controller.currentProfile?.jobTitle).toBe('Imported Title');
+
+    controller.destroy();
+  });
+
+  it('re-seeds the form fields from current when cancelling after an external update', async () => {
+    // Regression (review on PR #316, invariant 5): the controller forwarded
+    // the external update to the actor (current was fresh), but cancelling
+    // kept the pre-edit form values — a ghost view of a stale profile.
+    const storedProfile = {
+      firstName: 'Ada',
+      jobTitle: 'Dev',
+      location: 'Lyon',
+      tjmMin: 500,
+      tjmMax: 700,
+      keywords: ['react'],
+      remote: 'any' as const,
+      seniority: 'senior' as const,
+      scoringWeights: null,
+      experiences: [],
+      availability: null,
+    };
+
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: storedProfile });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController({ onNavigateToOnboarding: vi.fn() });
+    await vi.waitFor(() => expect(controller.profileStatus).toBe('ready'));
+
+    controller.toggleProfileEditing();
+    controller.jobTitle = 'Draft Title';
+
+    const external = { ...storedProfile, jobTitle: 'Imported Title' };
+    for (const listener of [...bridgeMock.listeners]) {
+      listener({ type: 'PROFILE_UPDATED', payload: external });
+    }
+    expect(controller.currentProfile?.jobTitle).toBe('Imported Title');
+
+    controller.toggleProfileEditing(); // cancel
+    expect(controller.editingProfile).toBe(false);
+    expect(controller.jobTitle).toBe('Imported Title');
+    expect(controller.currentProfile?.jobTitle).toBe('Imported Title');
+
+    controller.destroy();
+  });
+});
+
 describe('SettingsPageController — confirmed settings projection', () => {
   beforeEach(() => {
     bridgeMock.sendMessage.mockReset();

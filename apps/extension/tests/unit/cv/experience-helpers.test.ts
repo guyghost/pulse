@@ -2,10 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import type { Experience } from '../../../src/lib/core/types/profile';
 import type { CandidateExperienceDraft } from '../../../src/lib/core/profile-extractors/types';
 import {
-  buildPlatformPayloads,
   countNewlyAddedExperiences,
   formatExperienceDateRange,
-  formatExperiencePayload,
   mergeExperiences,
   normalizeDateToMonth,
   normalizeExperience,
@@ -197,6 +195,7 @@ describe('mergeExperiences', () => {
         startDate: '2023-01',
         skills: ['Svelte'],
         description: 'Local desc.',
+        location: 'Lyon',
         source: 'manual',
       }),
     ];
@@ -207,12 +206,14 @@ describe('mergeExperiences', () => {
         startDate: '2023-01',
         skills: ['Svelte', 'React'],
         description: 'Draft desc.',
+        location: 'Paris',
       }),
     ];
 
     const result = mergeExperiences(current, incoming, NOW);
     expect(result[0].skills).toEqual(['Svelte', 'React']);
     expect(result[0].description).toBe('Local desc.');
+    expect(result[0].location).toBe('Lyon');
   });
 
   it('overwrites description with draft when local source is not manual', () => {
@@ -232,6 +233,62 @@ describe('mergeExperiences', () => {
 
     const result = mergeExperiences(current, incoming, NOW);
     expect(result[0].description).toBe('New desc.');
+  });
+
+  it('repairs swapped LinkedIn description and location fields on re-import', () => {
+    const current = [
+      baseExperience({
+        id: 'linkedin-1',
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: 'Paris · Hybride',
+        location: 'Pilotage de la plateforme de paiement.',
+        source: 'linkedin',
+      }),
+    ];
+    const incoming = [
+      draft({
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: 'Pilotage de la plateforme de paiement.',
+        location: 'Paris · Hybride',
+      }),
+    ];
+
+    const result = mergeExperiences(current, incoming, NOW);
+
+    expect(result[0].description).toBe('Pilotage de la plateforme de paiement.');
+    expect(result[0].location).toBe('Paris · Hybride');
+  });
+
+  it('clears a stale LinkedIn location when the re-imported position has none', () => {
+    const current = [
+      baseExperience({
+        id: 'linkedin-1',
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: '',
+        location: 'Direction technique de la plateforme.',
+        source: 'linkedin',
+      }),
+    ];
+    const incoming = [
+      draft({
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        description: 'Direction technique de la plateforme.',
+        location: null,
+      }),
+    ];
+
+    const result = mergeExperiences(current, incoming, NOW);
+
+    expect(result[0].description).toBe('Direction technique de la plateforme.');
+    expect(result[0].location).toBeNull();
   });
 
   it('recomputes gapless position indices after merge', () => {
@@ -409,64 +466,5 @@ describe('formatExperienceDateRange', () => {
     expect(
       formatExperienceDateRange({ startDate: '2023-01', endDate: null, isCurrent: false })
     ).toBe('2023-01');
-  });
-});
-
-describe('formatExperiencePayload', () => {
-  it('returns empty string for no experiences', () => {
-    expect(formatExperiencePayload([])).toBe('');
-  });
-
-  it('formats title, company, range, location, description and stack', () => {
-    const result = formatExperiencePayload([
-      baseExperience({
-        title: 'Lead Frontend',
-        company: 'Acme',
-        startDate: '2023-01',
-        isCurrent: true,
-        location: 'Paris',
-        description: 'Plateforme Svelte.',
-        skills: ['Svelte', 'TypeScript'],
-      }),
-    ]);
-
-    expect(result).toContain('Lead Frontend — Acme · 2023-01 — présent');
-    expect(result).toContain('Paris');
-    expect(result).toContain('Plateforme Svelte.');
-    expect(result).toContain('Stack: Svelte, TypeScript');
-  });
-
-  it('separates multiple experiences with a blank line', () => {
-    const result = formatExperiencePayload([
-      baseExperience({ id: 'a', title: 'A', company: 'Ca', startDate: '2023-01' }),
-      baseExperience({ id: 'b', title: 'B', company: 'Cb', startDate: '2020-01' }),
-    ]);
-    expect(result).toContain('\n\n');
-    expect(result.split('\n\n')).toHaveLength(2);
-  });
-
-  it('includes the employment type in the role header', () => {
-    expect(formatExperiencePayload([baseExperience({ employmentType: 'Freelance' })])).toContain(
-      'Lead Frontend — Acme · Freelance'
-    );
-  });
-});
-
-describe('buildPlatformPayloads', () => {
-  it('returns the same payload for every target', () => {
-    const targets = [
-      { id: 'linkedin', name: 'LinkedIn', profileUrl: 'https://linkedin.com/in' },
-      { id: 'freework', name: 'Free-Work', profileUrl: 'https://freework.com' },
-    ];
-    const map = buildPlatformPayloads([baseExperience()], targets);
-    expect(map.size).toBe(2);
-    const first = map.get('linkedin');
-    expect(first).toBe(map.get('freework'));
-    expect(first).toContain('Lead Frontend — Acme');
-  });
-
-  it('returns empty map for no targets', () => {
-    const map = buildPlatformPayloads([baseExperience()], []);
-    expect(map.size).toBe(0);
   });
 });

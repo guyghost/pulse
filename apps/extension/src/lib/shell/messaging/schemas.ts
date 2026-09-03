@@ -271,10 +271,13 @@ const TJMAnalysisSchema = z
   })
   .strict();
 
+const TJMPeriodSchema = z.enum(['7d', '30d', 'all']);
+
 const TJMAnalysisRequestSchema = z
   .object({
     profileStacks: z.array(z.string().min(1).max(120)).max(50).optional(),
     region: TJMRegionSchema.optional(),
+    period: TJMPeriodSchema.optional(),
   })
   .strict();
 
@@ -755,6 +758,21 @@ export const MessageSchemas = {
   FEED_MISSIONS_RESULT: z.object({
     type: z.literal('FEED_MISSIONS_RESULT'),
     payload: MissionsPayloadSchema,
+  }),
+  GET_FEED_MISSIONS_PAGE: z.object({
+    type: z.literal('GET_FEED_MISSIONS_PAGE'),
+    payload: z.object({
+      page: z.number().int().nonnegative(),
+      pageSize: z.number().int().positive(),
+    }),
+  }),
+  FEED_MISSIONS_PAGE_RESULT: z.object({
+    type: z.literal('FEED_MISSIONS_PAGE_RESULT'),
+    payload: z.object({
+      missions: MissionsPayloadSchema,
+      total: z.number().int().nonnegative(),
+      hasMore: z.boolean(),
+    }),
   }),
   GET_FEED_FAVORITES: z.object({ type: z.literal('GET_FEED_FAVORITES') }),
   FEED_FAVORITES_RESULT: z.object({

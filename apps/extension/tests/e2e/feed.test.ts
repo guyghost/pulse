@@ -7,6 +7,7 @@ import {
   favoriteButton,
   favoritesToggle,
   hideButton,
+  expandMission,
   injectMissions,
   missionCards,
   openMissionButton,
@@ -378,8 +379,11 @@ test.describe('Feed', () => {
     const firstCard = missionCards(page).first();
     await expect(firstCard).toBeVisible();
 
-    // Verify all action buttons exist and are enabled (interactive)
+    // Verify all action buttons exist and are enabled (interactive).
+    // Favorite stays on the collapsed row; the other actions live inside
+    // the quiet disclosure and require expanding the card first.
     const starBtn = favoriteButton(firstCard);
+    await expandMission(firstCard);
     const hideBtn = hideButton(firstCard);
     const copyBtn = copyLinkButton(firstCard);
     const openBtn = openMissionButton(firstCard);
@@ -429,8 +433,9 @@ test.describe('Feed', () => {
 
     await expectMissionCount(page, 5);
 
-    // Hide the first mission
+    // Hide the first mission (actions live behind the card disclosure)
     const firstCard = missionCards(page).first();
+    await expandMission(firstCard);
     const hideBtn = hideButton(firstCard);
     await hideBtn.click();
 
@@ -489,7 +494,8 @@ test.describe('Feed', () => {
     await expect(missionCards(page)).toHaveCount(1);
     await expect(arrivalStack).not.toBeVisible();
 
-    const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
+    await expandMission(partialCard);
+    const investigateButton = partialCard.getByRole('button', { name: 'Analyser' });
     await expect(investigateButton).toBeEnabled();
     await investigateButton.click();
 
@@ -566,8 +572,8 @@ test.describe('Feed', () => {
       'aria-expanded',
       'true'
     );
-    // Filter panel uses role="group" with aria-label "Filtrer les missions"
-    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
+    // Filter panel uses role="dialog" (bottom sheet) titled "Filtrer les missions"
+    const filterPanel = page.getByRole('dialog', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
 
     const panelIsTopmost = await filterPanel.evaluate((panel) => {

@@ -84,7 +84,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('Skeleton');
     expect(feedSource).toContain('store.experiences.length');
     expect(applicationsSource).toContain('type LoadingProgressStep');
-    expect(applicationsSource).toContain('Chargement candidatures');
+    expect(applicationsSource).toContain('Chargement des candidatures');
     expect(applicationsSource).toContain('Progression du chargement candidatures');
     expect(applicationsSource).toContain('Missions locales');
     expect(applicationsSource).toContain('Statuts de suivi');
@@ -154,23 +154,23 @@ describe('operational UI constraints', () => {
     expect(toastCollectionSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
   });
 
-  it('guides users from the feed summary to missions below the fold', () => {
+  it('leads with missions — no scroll-cue scaffolding between header and feed', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const storySource = readFileSync('src/lib/core/feed/build-feed-story.ts', 'utf8');
 
-    expect(source).toContain('data-testid="mission-scroll-cue"');
+    // Content-first: the feed section stays focusable and story CTAs deep-link to it.
     expect(source).toContain('data-testid="mission-feed-anchor"');
     expect(source).toContain('function scrollToMissionFeed()');
     expect(source).toContain(
       "missionFeedSection.scrollIntoView({ behavior: 'smooth', block: 'start' })"
     );
-    expect(source).toContain('Missions proposées plus bas');
-    expect(source).toContain('Missions proposées');
     // buildFeedStory was extracted to the functional core (pure presentation
     // logic); the new-mission cue string now lives there, not in FeedPage.
     expect(storySource).toContain('Voir les ${newCount} nouvelles missions');
     expect(source).toContain('visibleFeedMissionLabel');
-    expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
+    // The below-the-fold cue layer is gone: missions start in the first viewport.
+    expect(source).not.toContain('mission-scroll-cue');
+    expect(source).not.toContain('missionFeedReached');
   });
 
   it('keeps the primary navigation labels localized for the French product surface', () => {
@@ -190,16 +190,26 @@ describe('operational UI constraints', () => {
     expect(source).toContain("nav.currentPage !== 'profile'");
     expect(source).not.toContain('const PREMIUM_LOCKS');
     expect(source).not.toContain('Premium verrouillé');
-    expect(source).not.toContain('NAV_ITEMS.filter');
+    // Nav filtering may only reflect launch surface flags — never premium status.
+    expect(source).toContain('features.isTabEnabled(item.page)');
+    expect(source).not.toContain('isPremium');
   });
 
-  it('keeps the selected Missions and Suivi overview content above the operational detail', () => {
+  it('keeps the missions list as the primary surface, with counts inline in the header', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
 
-    expect(feedSource).toContain('data-testid="mission-overview"');
-    expect(feedSource).toContain('À voir');
-    expect(feedSource).toContain('Pour vous');
+    // Content-first restructure: the "À voir" / "Pour vous" overview was removed;
+    // the compact header carries the mission count inline instead.
+    expect(feedSource).not.toContain('data-testid="mission-overview"');
+    expect(feedSource).not.toContain('Pour vous');
+    expect(feedSource).toContain('formatMissionCount(page.visibleCount)');
+    expect(feedSource).toContain('{page.visibleCount}');
+    // Decision presets sit in the header, before the feed — triage is one tap away.
+    const presetsIdx = feedSource.indexOf('aria-label="Presets métier du feed"');
+    const feedIdx = feedSource.indexOf('data-testid="mission-feed-anchor"');
+    expect(presetsIdx).toBeGreaterThan(-1);
+    expect(presetsIdx).toBeLessThan(feedIdx);
     expect(applicationsSource).toContain('data-testid="application-activity-overview"');
     expect(applicationsSource).toContain('Aujourd’hui');
     expect(applicationsSource).toContain('Cette semaine');
@@ -220,15 +230,14 @@ describe('operational UI constraints', () => {
     expect(assistSource).toContain('soumet jamais le formulaire');
   });
 
-  it('keeps onboarding focused with duration and minimal shell navigation', () => {
+  it('keeps onboarding focused with minimal shell navigation', () => {
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
-    const wizardSource = readFileSync('src/ui/organisms/OnboardingWizard.svelte', 'utf8');
+    const flowSource = readFileSync('src/ui/organisms/OnboardingFlow.svelte', 'utf8');
 
     expect(appSource).toContain("nav.currentPage !== 'onboarding'");
-    expect(wizardSource).toContain('2 minutes');
-    expect(wizardSource).toContain('Modifiable ensuite');
-    expect(wizardSource).toContain('aria-label="Passer l’onboarding"');
-    expect(wizardSource).toContain('onclick={onSkip}');
+    expect(flowSource).toContain("type: 'SKIP'");
+    expect(flowSource).toContain('aria-label={`Progression de la configuration');
+    expect(flowSource).toContain('aria-valuenow={snapshot.progress.current}');
   });
 
   it('keeps Settings system actions aligned with the stated operational issue', () => {
@@ -245,11 +254,10 @@ describe('operational UI constraints', () => {
 
     expect(source).toContain('const settingsSections');
     expect(source).toContain('aria-label="Sections de réglages"');
-    expect(source).toContain('id="settings-sources"');
-    expect(source).toContain('id="settings-alerts"');
-    expect(source).toContain('id="settings-account"');
-    expect(source).toContain('id="settings-data"');
-    expect(source).toContain('function scrollToSettingsSection');
+    expect(source).toContain('id="settings-{section.id}"');
+    expect(source).toContain("type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data'");
+    expect(source).toContain('function toggleSettingsSection');
+    expect(source).toContain('aria-expanded={openSettingsSection === section.id}');
   });
 
   it('exposes scan frequency, latest trigger, and recent history in Settings', () => {
@@ -337,7 +345,7 @@ describe('operational UI constraints', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
     expect(source).toContain('primaryActionLabel: settings.isSavingProfile');
-    expect(source).toContain("? 'Sauvegarde...'");
+    expect(source).toContain("? 'Sauvegarde…'");
     expect(source).toContain("? 'Enregistrer'");
     expect(source).toContain(": 'Modifier le profil'");
     expect(source).toContain('if (settings.isSavingProfile)');
@@ -385,8 +393,8 @@ describe('operational UI constraints', () => {
     expect(dashboardSource).toContain('3 étapes pour alimenter le radar TJM');
     expect(dashboardSource).toContain('Alimenter le radar TJM');
     expect(dashboardSource).toContain('Ajuster mon TJM cible');
-    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
-    expect(appSource).toContain("onNavigateToFeed={() => nav.navigate('feed')}");
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
+    expect(appSource).toContain("onNavigateToFeed={() => nav.navigateWithFallback('feed')}");
   });
 
   it('routes missing CV source states to add-experience or retry', () => {
@@ -394,8 +402,7 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    // CvPage wires the sync panel + feed; the feed owns empty/error routing.
-    expect(cvSource).toContain('CvSyncPanel');
+    // CvPage wires the feed; the feed owns empty/error routing.
     expect(cvSource).toContain('ExperienceFeed');
     expect(cvSource).toContain('onNavigateToProfile');
     expect(feedSource).toContain('primaryActionLabel="Ajouter une expérience"');
@@ -403,7 +410,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('onPrimaryAction={() => store.reload()}');
     expect(feedSource).toContain('onPrimaryAction={() => store.newExperience()}');
     expect(feedSource).toContain('employmentType: null');
-    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
   });
 
   it('routes Applications story actions to the operationally recommended dossier', () => {
@@ -476,12 +483,14 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('{@render feedActionQueueBlock(true)}');
     expect(source).not.toContain('{@render feedActionQueueBlock(false)}');
 
-    // Business presets stay available but move off the critical path,
-    // gated behind "Détails opérationnels" (progressive disclosure).
-    const presetsIdx = source.indexOf('aria-label="Presets métier du feed"');
-    const advancedIdx = source.lastIndexOf('{#if showAdvancedControls}', presetsIdx);
-    expect(advancedIdx).toBeGreaterThan(-1);
-    expect(advancedIdx).toBeLessThan(presetsIdx);
+    // Business presets stay one tap from the top as quiet header chips
+    // (content-first: triage shortcuts ride along, they don't lead).
+    expect(source).toContain('aria-label="Presets métier du feed"');
+    expect(source).toContain('page.applyDecisionPreset(preset.id)');
+    // The story strip only renders when the feed needs attention (calm states
+    // project to no strip — see feed-story.model.md).
+    expect(source).toContain('{#if feedStoryNeedsAttention}');
+    expect(source).not.toContain('feedActionQueue');
   });
 
   it('keeps the compact feed story aligned and unclipped at side-panel width', () => {
@@ -490,7 +499,10 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
     expect(storySource).toContain('data-testid="operational-story-inline"');
-    expect(storySource).toContain('grid-cols-[auto_auto_minmax(0,1fr)]');
+    // Quiet single-line row: icon | truncated title | action. No tinted box,
+    // no badge chip — severity rides on the leading icon (feed-story.model.md).
+    expect(storySource).toContain('grid-cols-[auto_minmax(0,1fr)_auto]');
+    expect(storySource).toContain('inlineIconClass');
     expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
     expect(badgeSource).toContain('whitespace-nowrap');
     expect(feedSource).toContain('data-testid="feed-hero-card"');
@@ -587,7 +599,6 @@ describe('operational UI constraints', () => {
   it('keeps feed undo and hidden-filter microcopy accented', () => {
     const feedStateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
-    const filterSource = readFileSync('src/ui/organisms/FilterBar.svelte', 'utf8');
 
     expect(feedStateSource).toContain('Favori retiré');
     expect(feedStateSource).toContain('Mission ajoutée aux favoris');
@@ -595,8 +606,7 @@ describe('operational UI constraints', () => {
     expect(feedStateSource).toContain('Mission masquée');
     expect(feedSource).toContain('Voir les ignorées');
     expect(feedSource).toContain('Raccourci clavier : h.');
-    expect(filterSource).toContain('Retire cette vue sauvegardée.');
-    expect(`${feedStateSource}\n${feedSource}\n${filterSource}`).not.toMatch(
+    expect(`${feedStateSource}\n${feedSource}`).not.toMatch(
       /retire|ajoutee|restauree|masquee|ignoree|sauvegardee/
     );
   });
@@ -649,7 +659,7 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Le radar ne doit pas être considéré fiable pour cette source.');
     expect(source).toContain('Relancez le diagnostic puis reconnectez si l’échec persiste.');
     expect(source).toContain('Les résultats peuvent être partiels ou retardés.');
-    expect(source).toContain('Filtrez cette source si vous voulez investiguer son volume.');
+    expect(source).toContain('Filtrez cette source si vous voulez examiner son volume.');
     expect(source).toContain("{isEnabled ? 'Relancer' : 'Activer'}");
     expect(source).not.toContain("'Re-check'");
   });

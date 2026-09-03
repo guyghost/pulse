@@ -9,6 +9,8 @@
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import {
     buildProfileImpactItems,
@@ -49,7 +51,7 @@
 
   const completionExplanation = $derived.by(() => {
     if (missingProfileItems.length === 0) {
-      return 'Profil complet : MissionPulse peut utiliser toutes vos préférences pour matcher les missions.';
+      return 'Profil complet : MissionPulse peut utiliser toutes vos préférences pour classer les missions.';
     }
 
     const visibleMissingItems = missingProfileItems.slice(0, 2).join(', ');
@@ -108,7 +110,7 @@
           'Les critères essentiels sont renseignés. Gardez ce profil de référence à jour avant de comparer les missions prioritaires.',
         evidence,
         primaryActionLabel: settings.isSavingProfile
-          ? 'Sauvegarde...'
+          ? 'Sauvegarde…'
           : settings.editingProfile
             ? 'Enregistrer'
             : 'Modifier le profil',
@@ -124,7 +126,7 @@
         'Les champs manquants réduisent la précision des requêtes et des suggestions de candidature.',
       evidence,
       primaryActionLabel: settings.isSavingProfile
-        ? 'Sauvegarde...'
+        ? 'Sauvegarde…'
         : settings.editingProfile
           ? 'Enregistrer'
           : 'Modifier le profil',
@@ -165,24 +167,14 @@
   }
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <section class="section-card-strong rounded-2xl px-5 py-4">
-    <div class="flex items-start justify-between gap-4">
-      <div class="min-w-0">
-        <p class="eyebrow text-blueprint-blue">Profil freelance</p>
-        <h1 class="mt-1 text-subheading font-semibold text-text-primary">
-          {settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
-        </h1>
-        <p class="mt-1 text-meta leading-5 text-text-subtle">{targetSummary}</p>
-      </div>
-      <div
-        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
-      >
-        <Icon name="user" size={18} class="text-blueprint-blue" />
-      </div>
-    </div>
-
-    <div class="mt-4 grid grid-cols-[1fr_auto] items-center gap-3">
+<PageShell>
+  <PageHeader
+    eyebrow="Profil freelance"
+    title={settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
+    icon="user"
+    description={targetSummary}
+  >
+    <div class="grid grid-cols-[1fr_auto] items-center gap-3">
       <div
         class="h-2 overflow-hidden rounded-full bg-subtle-gray"
         role="progressbar"
@@ -215,35 +207,63 @@
         {/if}
       </div>
     </div>
+    {#snippet footer()}
+      {#if isOffline}
+        <OfflineNotice
+          description="Vous pouvez ajuster le profil localement, mais les effets sur les recherches et synchronisations seront visibles au retour réseau."
+          action="Prochaine action : sauvegarder les critères critiques, puis relancer un scan quand la connexion revient."
+        />
+      {/if}
+    {/snippet}
+  </PageHeader>
 
-    <div class="mt-4">
-      <OperationalStoryCard
-        eyebrow="Impact du profil"
-        variant="compact"
-        title={profileStory.title}
-        description={profileStory.description}
-        severity={profileStory.severity}
-        statusLabel={profileStory.statusLabel}
-        evidence={profileStory.evidence}
-        primaryActionLabel={profileStory.primaryActionLabel}
-        primaryActionIcon={profileStory.primaryActionIcon as IconName}
-        onPrimaryAction={() => {
-          if (settings.isSavingProfile) {
-            return;
-          }
-          if (settings.editingProfile) {
-            handleSave();
-            return;
-          }
-          settings.toggleProfileEditing();
-        }}
-      />
-    </div>
+  <ProfileSection
+    bind:firstName={settings.firstName}
+    bind:jobTitle={settings.jobTitle}
+    bind:profileLocation={settings.profileLocation}
+    bind:profileRemote={settings.profileRemote}
+    bind:seniority={settings.seniority}
+    bind:tjmMin={settings.tjmMin}
+    bind:tjmMax={settings.tjmMax}
+    bind:profileKeywords={settings.profileKeywords}
+    bind:keywordInput={settings.keywordInput}
+    editing={settings.editingProfile}
+    isSaving={settings.isSavingProfile}
+    profileSaved={settings.profileSaved}
+    profileError={settings.profileError}
+    onToggleEdit={() => settings.toggleProfileEditing()}
+    onSave={handleSave}
+    onAddKeyword={() => settings.addKeyword()}
+    onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
+  />
 
-    <div class="mt-4 border-t border-border-light pt-4" aria-label="Priorités d’impact profil">
+  <div class="space-y-3">
+    <OperationalStoryCard
+      eyebrow="Impact du profil"
+      variant="compact"
+      title={profileStory.title}
+      description={profileStory.description}
+      severity={profileStory.severity}
+      statusLabel={profileStory.statusLabel}
+      evidence={profileStory.evidence}
+      primaryActionLabel={profileStory.primaryActionLabel}
+      primaryActionIcon={profileStory.primaryActionIcon as IconName}
+      onPrimaryAction={() => {
+        if (settings.isSavingProfile) {
+          return;
+        }
+        if (settings.editingProfile) {
+          handleSave();
+          return;
+        }
+        settings.toggleProfileEditing();
+      }}
+    />
+
+    <section class="section-card rounded-xl p-5" aria-label="Priorités d’impact profil">
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
-          <p class="eyebrow text-text-muted">Priorités d’impact</p>
+          <p class="eyebrow">Priorités d’impact</p>
           <h3 class="mt-1 text-body-lg font-semibold leading-5 text-text-primary">
             {profileImpactSimulation.title}
           </h3>
@@ -254,7 +274,7 @@
         <div
           class="shrink-0 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2.5 py-1.5 text-right"
         >
-          <p class="text-micro uppercase tracking-[0.13em] text-text-muted">Gain</p>
+          <p class="eyebrow">Gain</p>
           <p class="font-mono text-body-lg font-semibold text-blueprint-blue">
             {profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0'}
           </p>
@@ -300,36 +320,6 @@
           <span>Stack, TJM, remote, localisation et mots-clés sont prêts pour le scoring.</span>
         </div>
       {/if}
-    </div>
-    {#if isOffline}
-      <div class="mt-3">
-        <OfflineNotice
-          description="Vous pouvez ajuster le profil localement, mais les effets sur les recherches et synchronisations seront visibles au retour réseau."
-          action="Prochaine action : sauvegarder les critères critiques, puis relancer un scan quand la connexion revient."
-        />
-      </div>
-    {/if}
-  </section>
-
-  <div class="mt-4 space-y-4">
-    <ProfileSection
-      bind:firstName={settings.firstName}
-      bind:jobTitle={settings.jobTitle}
-      bind:profileLocation={settings.profileLocation}
-      bind:profileRemote={settings.profileRemote}
-      bind:seniority={settings.seniority}
-      bind:tjmMin={settings.tjmMin}
-      bind:tjmMax={settings.tjmMax}
-      bind:profileKeywords={settings.profileKeywords}
-      bind:keywordInput={settings.keywordInput}
-      editing={settings.editingProfile}
-      isSaving={settings.isSavingProfile}
-      profileSaved={settings.profileSaved}
-      profileError={settings.profileError}
-      onToggleEdit={() => settings.toggleProfileEditing()}
-      onSave={handleSave}
-      onAddKeyword={() => settings.addKeyword()}
-      onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
-    />
+    </section>
   </div>
-</div>
+</PageShell>

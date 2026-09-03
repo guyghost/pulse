@@ -1,27 +1,28 @@
 <script lang="ts">
-  import { iconPaths, type IconName } from './paths';
+  import { filledIconPaths, iconPaths, type IconName, type SVGChild } from './paths';
+  import { serializeSvgChildren } from './serialize';
 
   const {
     name,
     size = 16,
     class: className = '',
+    filled = false,
   }: {
     name: IconName;
     size?: number;
     class?: string;
+    filled?: boolean;
   } = $props();
 
-  // Build innerHTML from path data
+  const hasFilledVariant = $derived(filled && filledIconPaths[name] !== undefined);
+
+  // Build innerHTML from path data (recursively, so groups/variants render)
   const inner = $derived.by(() => {
-    const children = iconPaths[name];
+    const children: readonly SVGChild[] | undefined = hasFilledVariant
+      ? filledIconPaths[name]
+      : iconPaths[name];
     if (!children) return '';
-    return children.map(([tag, attrs]) => {
-      const attrStr = Object.entries(attrs).map(([k, v]) => `${k}="${v}"`).join(' ');
-      if (tag === 'circle' || tag === 'ellipse' || tag === 'line' || tag === 'path' || tag === 'polygon' || tag === 'polyline') {
-        return `<${tag} ${attrStr} />`;
-      }
-      return `<${tag} ${attrStr}></${tag}>`;
-    }).join('');
+    return serializeSvgChildren(children);
   });
 </script>
 
@@ -30,9 +31,9 @@
   width={size}
   height={size}
   viewBox="0 0 24 24"
-  fill="none"
-  stroke="currentColor"
-  stroke-width="2"
+  fill={hasFilledVariant ? 'currentColor' : 'none'}
+  stroke={hasFilledVariant ? 'none' : 'currentColor'}
+  stroke-width={hasFilledVariant ? undefined : 2}
   stroke-linecap="round"
   stroke-linejoin="round"
   aria-hidden="true"

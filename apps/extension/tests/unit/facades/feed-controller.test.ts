@@ -4,6 +4,7 @@ import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 
 const feedDataMock = vi.hoisted(() => ({
   getMissions: vi.fn(),
+  getFeedMissionsPage: vi.fn(),
   getSeenIds: vi.fn(),
   getConnectorStatuses: vi.fn(),
   getConnectorsMeta: vi.fn(),
@@ -117,6 +118,18 @@ describe('feed controller facade', () => {
     vi.clearAllMocks();
 
     feedDataMock.getMissions.mockResolvedValue([makeMission()]);
+    // Mirror the real facade contract over whatever getMissions serves, so
+    // tests stubbing the full catalogue keep working through the page path.
+    feedDataMock.getFeedMissionsPage.mockImplementation(
+      async ({ page, pageSize }: { page: number; pageSize: number }) => {
+        const all = (await feedDataMock.getMissions()) as Mission[];
+        return {
+          missions: all.slice(page * pageSize, (page + 1) * pageSize),
+          total: all.length,
+          hasMore: (page + 1) * pageSize < all.length,
+        };
+      }
+    );
     feedDataMock.getSeenIds.mockResolvedValue([]);
     feedDataMock.getConnectorStatuses.mockResolvedValue([
       {
@@ -172,6 +185,111 @@ describe('feed controller facade', () => {
     // Should NOT start a scan because persistedStatuses show a recent sync (5 min ago)
     expect(messageTypes).not.toContain('SCAN_START');
     expect(storageGet).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
+  it('bootstraps from one page and never reads the full catalogue on the primary path', async () => {
+    stubChrome();
+    const feedStore = {
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    feedDataMock.getFeedMissionsPage.mockImplementation(async ({ page }: { page: number }) =>
+      page === 0
+        ? {
+            missions: [
+              makeMission({
+                id: 'page-0-mission',
+                title: 'Lead Svelte',
+                url: 'https://example.com/page-0',
+              }),
+            ],
+            total: 2,
+            hasMore: true,
+          }
+        : {
+            missions: [
+              makeMission({
+                id: 'page-1-mission',
+                title: 'DevOps Python',
+                client: 'CloudCo',
+                url: 'https://example.com/page-1',
+              }),
+            ],
+            total: 2,
+            hasMore: false,
+          }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises(); // let the constructor bootstrap settle (generation 1)
+    feedStore.setMissions.mockClear();
+
+    await controller.smartLoad();
+    await flushPromises();
+
+    // First paint uses only the first page…
+    expect(feedStore.setMissions).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'page-0-mission' }),
+    ]);
+    // …then background hydration converges to the full deduplicated catalogue
+    expect(feedStore.setMissions).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'page-0-mission' }),
+      expect.objectContaining({ id: 'page-1-mission' }),
+    ]);
+    // Exit criterion: the primary bootstrap path never reads all missions
+    expect(feedDataMock.getMissions).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
+  it('aborts a pending background hydration when a newer load replaces the catalogue', async () => {
+    stubChrome();
+    const feedStore = {
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    let resolveStalePage!: (value: {
+      missions: Mission[];
+      total: number;
+      hasMore: boolean;
+    }) => void;
+    let loadCount = 0;
+    feedDataMock.getFeedMissionsPage.mockImplementation(({ page }: { page: number }) => {
+      if (page === 0) {
+        loadCount += 1;
+      }
+      if (page === 1 && loadCount === 1) {
+        return new Promise((resolve) => {
+          resolveStalePage = resolve;
+        });
+      }
+      return Promise.resolve({
+        missions: [makeMission({ id: `page-${page}-mission` })],
+        total: 3,
+        hasMore: loadCount === 1 && page === 0,
+      });
+    });
+
+    const controller = createFeedController(feedStore);
+    const firstLoad = controller.smartLoad();
+    await flushPromises();
+
+    // Second load replaces the catalogue and invalidates the first hydration
+    const secondLoad = controller.smartLoad();
+    await flushPromises();
+    resolveStalePage({ missions: [makeMission({ id: 'stale-page-1' })], total: 3, hasMore: false });
+    await Promise.all([firstLoad, secondLoad]);
+    await flushPromises();
+
+    const appendedCalls = feedStore.setMissions.mock.calls.filter((call) =>
+      (call[0] as Mission[]).some((m) => m.id === 'stale-page-1')
+    );
+    expect(appendedCalls).toHaveLength(0);
+    expect(feedStore.setMissions).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'page-0-mission' }),
+    ]);
     controller.dispose();
   });
 

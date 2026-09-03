@@ -17,7 +17,13 @@ import { deduplicateMissions } from '$lib/core/scoring/dedup';
 import type { FeedState, OwnedActiveScan } from '$lib/core/feed/mission-arrival-queue';
 import type { FeedProjectionResult } from '$lib/shell/arrival/mission-arrival-actor';
 import { sendMessage, subscribeMessages } from '../messaging/bridge';
-import { getMissions, getConnectorStatuses, getSeenIds } from './feed-data.facade';
+import {
+  getFeedMissionsPage,
+  getMissions,
+  getConnectorStatuses,
+  getSeenIds,
+  type FeedMissionsPage,
+} from './feed-data.facade';
 import { getSettings, setSettingsConfirmed } from './settings.facade';
 import { CANONICAL_INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
 
@@ -338,6 +344,14 @@ export function createFeedController(
   let isScanning = $state(false);
   let ownedScan = $state<OwnedActiveScan | null>(null);
   let scanCompleted = $state(false);
+
+  /**
+   * Incremented whenever the visible catalogue is replaced (scan complete,
+   * new smartLoad). A background hydration loop captures its generation and
+   * stops as soon as it no longer matches — a mid-hydration scan must never
+   * re-append stale pages over the fresh catalogue.
+   */
+  let feedHydrationGeneration = 0;
   let hasPendingMissions = $state(false);
   let pendingMissionCount = $state(0);
   let pendingConnectorCount = $state(0);
@@ -597,6 +611,7 @@ export function createFeedController(
     feedStore.setMissions(missions);
     clearPendingScanUpdate();
     scanCompleted = true;
+    feedHydrationGeneration++;
     resetPartialScan();
 
     // Compter par source pour l'affichage
@@ -649,6 +664,50 @@ export function createFeedController(
   // Smart loading
   // ============================================================
 
+  /**
+   * Page size for the bootstrap read and the background hydration batches.
+   * 250 keeps the first screen's parse/transfer small (the SW streams the
+   * page through the scrapedAt cursor) while limiting the number of
+   * sequential round-trips for the remaining catalogue.
+   */
+  const FEED_HYDRATION_PAGE_SIZE = 250;
+
+  /**
+   * Append remaining date-sorted pages onto the feed store until the whole
+   * persisted catalogue is visible. Runs in the background after the first
+   * page made the feed interactive; every append re-applies the same
+   * deduplication as the pre-pagination bootstrap so filters, counts and
+   * saved views converge to identical results. Aborts when a scan replaces
+   * the catalogue (generation mismatch) or on any page error — the feed then
+   * simply keeps the pages loaded so far, same resilience as before.
+   */
+  async function hydrateRemainingFeedPages(
+    generation: number,
+    enabledSources: Set<string>,
+    accumulated: Mission[],
+    firstPage: FeedMissionsPage
+  ): Promise<void> {
+    let page = 1;
+    let hasMore = firstPage.hasMore;
+    while (hasMore && generation === feedHydrationGeneration) {
+      try {
+        const result = await getFeedMissionsPage({ page, pageSize: FEED_HYDRATION_PAGE_SIZE });
+        if (generation !== feedHydrationGeneration) {
+          return;
+        }
+        if (result.missions.length === 0) {
+          return;
+        }
+        accumulated.push(...result.missions);
+        feedStore.setMissions(deduplicateEnabledSources(accumulated, enabledSources));
+        hasMore = result.hasMore;
+        page++;
+      } catch {
+        return;
+      }
+    }
+  }
+
   function applyDevFeedStateOverride(): boolean {
     if (!import.meta.env.DEV || typeof window === 'undefined') {
       return false;
@@ -684,18 +743,29 @@ export function createFeedController(
     }
 
     try {
-      const [stored, statuses, settings] = await Promise.all([
-        getMissions(),
+      const generation = ++feedHydrationGeneration;
+      const [firstPage, statuses, settings] = await Promise.all([
+        getFeedMissionsPage({ page: 0, pageSize: FEED_HYDRATION_PAGE_SIZE }),
         getConnectorStatuses(),
         getSettings(),
       ]);
       if (applyDevFeedStateOverride()) {
         return;
       }
-      if (stored.length > 0) {
-        feedStore.setMissions(
-          deduplicateEnabledSources(stored, new SvelteSet(settings.enabledConnectors))
-        );
+      if (generation !== feedHydrationGeneration) {
+        return;
+      }
+      if (firstPage.missions.length > 0) {
+        const enabledSources = new SvelteSet(settings.enabledConnectors);
+        feedStore.setMissions(deduplicateEnabledSources(firstPage.missions, enabledSources));
+        if (firstPage.hasMore) {
+          void hydrateRemainingFeedPages(
+            generation,
+            enabledSources,
+            [...firstPage.missions],
+            firstPage
+          );
+        }
         // Use connector statuses to determine freshness
         const lastSync = statuses.reduce<number | null>((max, s) => {
           if (s.lastSyncAt && (max === null || s.lastSyncAt > max)) {

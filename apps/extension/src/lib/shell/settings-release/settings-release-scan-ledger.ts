@@ -72,9 +72,19 @@ const LedgerSchema = z
   .strict();
 
 type Ledger = z.infer<typeof LedgerSchema>;
+type Install = z.infer<typeof InstallSchema>;
+type Row = z.infer<typeof RowSchema>;
 
 function emptyLedger(): Ledger {
   return { version: 1, installs: {} };
+}
+
+// Ledgers are immutable once built: every update copies the spine (installs
+// record → install entry → rows array) and shares untouched entries and rows
+// by reference, so snapshots handed to `store` never observe later updates.
+// This copy-on-write discipline replaces full-ledger structuredClone snapshots.
+function replaceInstall(ledger: Ledger, installId: string, install: Install): Ledger {
+  return { version: ledger.version, installs: { ...ledger.installs, [installId]: install } };
 }
 
 function installIdFromToken(token: string, identity: number): string | null {
@@ -101,12 +111,14 @@ export function createSettingsReleaseScanLedgerPort(
     if (!parsed.success) {
       throw new Error('scan ledger invalid');
     }
-    return structuredClone(parsed.data);
+    // safeParse rebuilds a fresh object graph (only immutable primitives are
+    // shared with `raw`), so the caller owns the returned ledger exclusively.
+    return parsed.data;
   }
 
   async function store(expected: Ledger, intended: Ledger): Promise<void> {
     try {
-      await ports.storage.set(structuredClone(intended));
+      await ports.storage.set(intended);
     } catch {
       // Full read-back below is the only authority.
     }
@@ -129,11 +141,10 @@ export function createSettingsReleaseScanLedgerPort(
     if (scanAckThrough < current.retiredThrough) {
       throw new Error('scan watermark regressed');
     }
-    const next: Ledger = structuredClone(ledger);
-    next.installs[installId] = {
+    const next = replaceInstall(ledger, installId, {
       retiredThrough: scanAckThrough,
       rows: current.rows.filter((row) => row.identity > scanAckThrough),
-    };
+    });
     if (!sameLedger(next, ledger)) {
       await store(ledger, next);
     }
@@ -155,7 +166,12 @@ export function createSettingsReleaseScanLedgerPort(
         return { status: 'retired' };
       }
 
-      let row = install.rows.find((candidate) => candidate.identity === input.identity);
+      const rowsByIdentity = new Map<number, Row>(
+        install.rows.map((candidate) => [candidate.identity, candidate] as const)
+      );
+      let row = rowsByIdentity.get(input.identity);
+      let rows = install.rows;
+      let current = ledger;
       if (row) {
         if (row.token !== input.token || row.snapshotDigest !== input.snapshotDigest) {
           throw new Error('scan identity mismatch');
@@ -167,19 +183,24 @@ export function createSettingsReleaseScanLedgerPort(
         if (install.rows.length >= 2) {
           throw new Error('scan ledger capacity exhausted');
         }
-        const previous = structuredClone(ledger);
-        install.rows.push({
+        const reserved: Row = {
           identity: input.identity,
           token: input.token,
           snapshotDigest: input.snapshotDigest,
           result: null,
+        };
+        rows = [...install.rows, reserved].sort((left, right) => left.identity - right.identity);
+        const reservedLedger = replaceInstall(ledger, installId, {
+          retiredThrough: install.retiredThrough,
+          rows,
         });
-        install.rows.sort((left, right) => left.identity - right.identity);
-        await store(previous, ledger);
-        row = install.rows.find((candidate) => candidate.identity === input.identity);
+        await store(ledger, reservedLedger);
+        rowsByIdentity.set(input.identity, reserved);
+        row = rowsByIdentity.get(input.identity);
         if (!row) {
           throw new Error('scan row reservation disappeared');
         }
+        current = reservedLedger;
       }
 
       const permission = await ports.permission.containsForSnapshot(input.snapshot);
@@ -197,13 +218,19 @@ export function createSettingsReleaseScanLedgerPort(
             : { status: 'skipped', reason: 'already_running' };
       }
 
-      const previous = structuredClone(ledger);
-      const target = install.rows.find((candidate) => candidate.identity === input.identity);
+      const target = rowsByIdentity.get(input.identity);
       if (!target) {
         throw new Error('scan row disappeared');
       }
-      target.result = structuredClone(result);
-      await store(previous, ledger);
+      const committed: Row = { ...target, result: structuredClone(result) };
+      const committedRows = rows.map((candidate) => (candidate === target ? committed : candidate));
+      await store(
+        current,
+        replaceInstall(current, installId, {
+          retiredThrough: install.retiredThrough,
+          rows: committedRows,
+        })
+      );
       return result;
     },
 

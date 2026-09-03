@@ -3,8 +3,8 @@ import {
   expectMissionCount,
   favoriteButton,
   feedSearchInput,
-  getMissionTotalCount,
   hideButton,
+  expandMission,
   clearFeedSearch,
   injectMissions,
   missionCards,
@@ -55,23 +55,23 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
   });
 
   test('scan is disabled when offline', async ({ page }) => {
-    await setFeedState(page, 'empty');
-    // L'auto-scan du mount (SCAN_COMPLETE différé ~800ms) peut rejouer les 10
-    // missions par défaut après la première vidange : laisser passer ce pic
-    // puis re-vidanger pour obtenir un feed déterministiquement vide.
-    await page.waitForTimeout(1200);
-    if ((await getMissionTotalCount(page)) > 0) {
-      await setFeedState(page, 'empty');
-    }
+    // With missions loaded the hero is compact and exposes the scan control;
+    // the offline banner itself is covered by the empty-hero test above.
+    await injectMissions(page, 5);
+    await waitForMissions(page, 5, 5000);
+
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    // Bandeau hors ligne + « Scanner » de la vue d'ensemble désactivé. Le CTA
-    // « Lancer le scan » de l'état vide reste activable : le refus hors ligne
-    // est géré dans le handler (FeedPage.handleFeedStoryPrimaryAction), pas
-    // sur le bouton.
-    await expect(page.getByText('Mode hors ligne — Données en cache')).toBeVisible();
-    const overviewScan = page.getByRole('button', { name: 'Scanner', exact: true });
+    // Contrôle de scan de l'en-tête compact : désactivé hors ligne, son
+    // libellé accessible bascule en mode indisponible. Le CTA « Lancer le
+    // scan » de l'état vide reste activable : le refus hors ligne est géré
+    // dans le handler (FeedPage.handleFeedStoryPrimaryAction), pas sur le
+    // bouton.
+    const overviewScan = page.getByRole('button', {
+      name: 'Scan indisponible hors ligne',
+      exact: true,
+    });
     await expect(overviewScan).toBeVisible({ timeout: 10000 });
     await expect(overviewScan).toBeDisabled();
   });
@@ -118,6 +118,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await page.waitForTimeout(300);
 
     const firstCard = missionCards(page).first();
+    await expandMission(firstCard);
     const hideBtn = hideButton(firstCard);
     await expect(hideBtn).toBeVisible();
     await hideBtn.click();
@@ -169,12 +170,12 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
 
     await page
       .getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('button', { name: 'Settings' })
+      .getByRole('button', { name: 'Réglages' })
       .dispatchEvent('click');
     await expect(
       page
         .getByRole('navigation', { name: 'Main navigation' })
-        .getByRole('button', { name: 'Settings' })
+        .getByRole('button', { name: 'Réglages' })
     ).toHaveAttribute('aria-current', 'page');
 
     await page

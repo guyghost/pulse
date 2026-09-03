@@ -25,7 +25,7 @@ export async function extractLinkedInExperiencesFromDom(
     (value ?? '').replace(/[\t\f\v \u00a0\u202f]+/g, ' ').trim();
 
   const isActionLine = (line: string): boolean =>
-    /^(voir plus|show more|afficher plus|see more|modifier|edit|supprimer|delete)(?:\s|$)/i.test(
+    /^(?:…+)?\s*(voir plus|voir moins|show more|see less|afficher plus|afficher moins|see more|modifier|edit|supprimer|delete)(?:\s|$)/i.test(
       line
     );
   const isDurationLine = (line: string): boolean =>
@@ -44,44 +44,190 @@ export async function extractLinkedInExperiencesFromDom(
       /(?:\b(?:present|current|currently|now|présent|en cours)\b|aujourd['’]hui)/i.test(value);
     return hasYear(start) && (hasYear(end) || isCurrentRoleEnd(end));
   };
+  const workModePattern =
+    /^(?:full(?:y)? remote|remote|hybrid|hybride|on-site|onsite|sur site|à distance|a distance|télétravail|teletravail)$/i;
+  const placeConnectorPattern = /^(?:and|de|des|du|et|la|le|les|of|the)$/i;
+  const isLikelyLocationLine = (line: string): boolean => {
+    const value = cleanLine(line);
+    if (workModePattern.test(value)) {
+      return true;
+    }
 
-  const visibleLines = (element: Element): string[] => {
+    const workModeSuffixMatch = value.match(/^(.+?)\s+[·•]\s+([^·•]+)$/);
+    if (workModeSuffixMatch && !workModePattern.test(workModeSuffixMatch[2] ?? '')) {
+      return false;
+    }
+
+    const placeValue = workModeSuffixMatch?.[1] ?? value;
+    const surroundingAreaMatch = placeValue.match(/^(.+?)\s+et\s+périphérie$/i);
+    const strictPlaceValue = surroundingAreaMatch?.[1] ?? placeValue;
+    const placeSegments = strictPlaceValue.split(/\s*,\s*/);
+    const placeTokens = placeSegments.flatMap((segment) => segment.split(/\s+/));
+    const hasOnlyPlaceTokens = placeTokens.every(
+      (token) =>
+        placeConnectorPattern.test(token) || /^[\p{Lu}\d][\p{L}\p{M}\d.'’()/-]*$/u.test(token)
+    );
+    const isCommaDelimitedPlace = placeSegments.length >= 2 && hasOnlyPlaceTokens;
+    const isStandalonePlace =
+      placeSegments.length === 1 &&
+      placeTokens.length <= 4 &&
+      !/[.!?;:]$/.test(strictPlaceValue) &&
+      hasOnlyPlaceTokens;
+    return (
+      placeValue.length <= 120 &&
+      placeTokens.length > 0 &&
+      (isCommaDelimitedPlace || isStandalonePlace)
+    );
+  };
+
+  const skillsLabelPattern = /^(?:compétences|skills)(?:\s*:\s*(.*))?$/i;
+
+  interface VisibleLine {
+    text: string;
+    prose: boolean;
+  }
+
+  const visibleLines = (element: Element): VisibleLine[] => {
+    const hiddenFromSelector = (candidate: Element): boolean =>
+      Boolean(candidate.closest('button, svg, [hidden], .visually-hidden, .sr-only'));
+
+    // Block boundaries (p, li, br) are line boundaries: LinkedIn renders
+    // multi-paragraph descriptions whose tags may carry no whitespace between
+    // them, so raw textContent would glue paragraphs together.
+    const rawLinesFrom = (source: Element): string[] => {
+      const clone = source.cloneNode(true) as Element;
+      // Interactive and hidden descendants (e.g. a nested "voir plus" button)
+      // are removed before reading text. A .visually-hidden span is kept only
+      // when it carries a field label (for example "Compétences :"); any other
+      // hidden span duplicates adjacent visible text and is dropped.
+      for (const removed of [...clone.querySelectorAll('button, svg, [hidden], .sr-only')]) {
+        removed.remove();
+      }
+      for (const duplicate of [...clone.querySelectorAll('.visually-hidden')]) {
+        if (!skillsLabelPattern.test(cleanLine(duplicate.textContent))) {
+          duplicate.remove();
+        }
+      }
+      for (const lineBreak of [...clone.querySelectorAll('br')]) {
+        lineBreak.replaceWith('\n');
+      }
+      // Leaf blocks are the p/li without a nested p/li: the query above
+      // already lists every p/li of the clone, so a block contains another
+      // listed block exactly when it still has a p/li descendant. One
+      // querySelector per block (O(depth)) replaces the O(blocks²)
+      // contains() scan.
+      const leafBlocks = [...clone.querySelectorAll('p, li')].filter(
+        (block) => !block.querySelector('p, li')
+      );
+      const raw =
+        leafBlocks.length > 0
+          ? leafBlocks.map((block) => block.textContent ?? '').join('\n')
+          : (clone.textContent ?? '');
+      return raw.split(/\r?\n/);
+    };
+
+    // Prose blocks own their nested accessibility values: their text is
+    // represented once, through the prose source (which keeps field labels
+    // such as the visually-hidden "Compétences :").
+    const proseSourcesIn = (container: Element): Element[] =>
+      [...container.querySelectorAll('p, li')].filter(
+        (candidate) =>
+          !candidate.closest('[aria-hidden="true"]') &&
+          !hiddenFromSelector(candidate) &&
+          !candidate.querySelector('p, li')
+      );
+    const proseSources = proseSourcesIn(element);
+    // A candidate is covered when a prose source is one of its ancestors.
+    // Prose sources are strict descendants of element (never the element
+    // itself, and never aria-hidden like the candidates), so a membership
+    // Set plus one ancestor walk per candidate replaces the per-prose
+    // contains() scans.
+    const proseSourceSet = new Set<Element>(proseSources);
+    const coveredByProse = (candidate: Element): boolean => {
+      for (
+        let parent = candidate.parentElement;
+        parent && parent !== element;
+        parent = parent.parentElement
+      ) {
+        if (proseSourceSet.has(parent)) {
+          return true;
+        }
+      }
+      return false;
+    };
+
     const visibleTextElements = [...element.querySelectorAll('[aria-hidden="true"]')].filter(
       (candidate) =>
-        !candidate.closest('button, svg, [hidden], .visually-hidden, .sr-only') &&
-        !candidate.querySelector('[aria-hidden="true"]')
+        !hiddenFromSelector(candidate) &&
+        !candidate.querySelector('[aria-hidden="true"]') &&
+        !coveredByProse(candidate)
     );
-    const sources =
-      visibleTextElements.length > 0
-        ? visibleTextElements.map((candidate) => candidate.textContent ?? '')
-        : (() => {
-            const clone = element.cloneNode(true) as Element;
-            for (const hidden of clone.querySelectorAll(
-              'button, svg, [hidden], .visually-hidden, .sr-only, [aria-hidden="false"]'
-            )) {
-              hidden.remove();
-            }
-            const leafTextElements = [...clone.querySelectorAll('strong, span, p')].filter(
-              (candidate) => !candidate.querySelector('strong, span, p')
-            );
-            return leafTextElements.length > 0
-              ? leafTextElements.map((candidate) => candidate.textContent ?? '')
-              : [clone.textContent ?? ''];
-          })();
 
-    const lines: string[] = [];
-    const seen = new Set<string>();
-    for (const source of sources) {
-      for (const rawLine of source.split(/\r?\n/)) {
-        const line = cleanLine(rawLine);
-        const key = line.toLocaleLowerCase();
-        if (!line || isActionLine(line) || isDurationLine(line) || seen.has(key)) {
-          continue;
-        }
-        seen.add(key);
-        lines.push(line);
+    // Prose never suppresses the fallback: a row without accessibility leaves
+    // still reads its structural lines from whole text, with prose-owned
+    // blocks removed from the clone so they are never read twice.
+    const fallbackLines = (): string[] => {
+      const clone = element.cloneNode(true) as Element;
+      for (const prose of proseSourcesIn(clone)) {
+        prose.remove();
       }
+      for (const hidden of [
+        ...clone.querySelectorAll(
+          'button, svg, [hidden], .visually-hidden, .sr-only, [aria-hidden="false"]'
+        ),
+      ]) {
+        hidden.remove();
+      }
+      const leafTextElements = [...clone.querySelectorAll('strong, span, p')].filter(
+        (candidate) => !candidate.querySelector('strong, span, p')
+      );
+      const raw =
+        leafTextElements.length > 0
+          ? leafTextElements.map((candidate) => candidate.textContent ?? '').join('\n')
+          : (clone.textContent ?? '');
+      return raw.split(/\r?\n/);
+    };
+
+    const structuralLines: VisibleLine[] =
+      visibleTextElements.length > 0
+        ? visibleTextElements.flatMap((source) =>
+            rawLinesFrom(source).map((text) => ({ text, prose: false }))
+          )
+        : fallbackLines().map((text) => ({ text, prose: false }));
+    const proseLines: VisibleLine[] = proseSources.flatMap((source) =>
+      rawLinesFrom(source).map((text) => ({ text, prose: true }))
+    );
+
+    const lines: VisibleLine[] = [];
+    const seen = new Set<string>();
+    for (const sourceLine of [...structuralLines, ...proseLines]) {
+      const line = cleanLine(sourceLine.text);
+      const key = line.toLocaleLowerCase();
+      if (!line || isActionLine(line) || isDurationLine(line) || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      lines.push({ text: line, prose: sourceLine.prose });
     }
+    return lines;
+  };
+
+  /**
+   * visibleLines is pure w.r.t. the live DOM. Each observation cycle runs
+   * synchronously between two awaits, so lines computed for a row during
+   * candidate discovery stay valid when the same row is parsed later in the
+   * same cycle. The memo is recreated every cycle and never outlives it, so
+   * no DOM references are retained across invocations.
+   */
+  type VisibleLinesMemo = Map<Element, VisibleLine[]>;
+
+  const visibleLinesMemoized = (element: Element, memo: VisibleLinesMemo): VisibleLine[] => {
+    const cached = memo.get(element);
+    if (cached) {
+      return cached;
+    }
+    const lines = visibleLines(element);
+    memo.set(element, lines);
     return lines;
   };
 
@@ -132,6 +278,7 @@ export async function extractLinkedInExperiencesFromDom(
     'a[href*="profilePosition="]',
     'a[href*="/details/experience/edit/forms/"]',
   ].join(', ');
+  const ownerPositionSelector = 'a[href*="/details/experience/edit/forms/"]';
   const rowDiscoverySelector = [
     strongPositionSelector,
     '[data-view-name="profile-component-entity"]',
@@ -151,6 +298,51 @@ export async function extractLinkedInExperiencesFromDom(
     inheritedCompany: string | undefined;
   }
 
+  const ownerPositionId = (marker: Element): string | undefined => {
+    const href = marker.getAttribute('href');
+    if (!href) {
+      return undefined;
+    }
+
+    try {
+      const id = new URL(href, window.location.href).pathname.match(
+        /\/details\/experience\/edit\/forms\/([^/]+)\/?$/i
+      )?.[1];
+      if (!id) {
+        return undefined;
+      }
+      const normalized = decodeURIComponent(id).trim().toLocaleLowerCase();
+      return normalized || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const generatedOwnerCard = (marker: Element, root: Element): Element => {
+    const positionId = ownerPositionId(marker);
+    if (!positionId) {
+      return marker;
+    }
+
+    let owner = marker;
+    for (
+      let ancestor = marker.parentElement;
+      ancestor && ancestor !== root;
+      ancestor = ancestor.parentElement
+    ) {
+      const ownerMarkers = [
+        ...(ancestor.matches(ownerPositionSelector) ? [ancestor] : []),
+        ...ancestor.querySelectorAll(ownerPositionSelector),
+      ];
+      const distinctPositionIds = new Set(ownerMarkers.map(ownerPositionId).filter(Boolean));
+      if (distinctPositionIds.size !== 1 || !distinctPositionIds.has(positionId)) {
+        break;
+      }
+      owner = ancestor;
+    }
+    return owner;
+  };
+
   const rowOwner = (candidate: Element, root: Element): Element => {
     const structuralOwner = candidate.closest('[role="listitem"], li, .pvs-list__paged-list-item');
     if (structuralOwner && root.contains(structuralOwner)) {
@@ -158,7 +350,13 @@ export async function extractLinkedInExperiencesFromDom(
     }
 
     const semanticOwner = candidate.closest('[data-view-name="profile-component-entity"]');
-    return semanticOwner && root.contains(semanticOwner) ? semanticOwner : candidate;
+    if (semanticOwner && root.contains(semanticOwner)) {
+      return semanticOwner;
+    }
+
+    return candidate.matches(ownerPositionSelector)
+      ? generatedOwnerCard(candidate, root)
+      : candidate;
   };
 
   const positionIdentity = (marker: Element): string | undefined => {
@@ -183,11 +381,9 @@ export async function extractLinkedInExperiencesFromDom(
     }
     try {
       const parsedHref = new URL(href, window.location.href);
-      const ownerPositionId = parsedHref.pathname.match(
-        /\/details\/experience\/edit\/forms\/([^/]+)\/?$/i
-      )?.[1];
-      if (ownerPositionId) {
-        const normalizedOwnerPositionId = normalize(ownerPositionId);
+      const ownerPositionIdValue = ownerPositionId(marker);
+      if (ownerPositionIdValue) {
+        const normalizedOwnerPositionId = normalize(ownerPositionIdValue);
         return normalizedOwnerPositionId
           ? `owner-position:${normalizedOwnerPositionId}`
           : undefined;
@@ -200,13 +396,31 @@ export async function extractLinkedInExperiencesFromDom(
     }
   };
 
-  const hasPositionStructure = (row: Element): boolean => {
-    const lines = visibleLines(row);
-    const dateIndex = lines.findIndex(isDateRangeLine);
+  // Strict containment previously relied on row.contains() scans that walk
+  // the tree for every pair (O(rows² × depth)). For elements in the same
+  // tree, a.contains(b) with a !== b holds exactly when a is on b's strict
+  // parentElement chain, so precomputing each row's ancestor set once turns
+  // every check into an O(1) lookup.
+  const createNestingCheck = (rows: Element[]) => {
+    const ancestorSets = new Map<Element, Set<Element>>();
+    for (const row of rows) {
+      const ancestors = new Set<Element>();
+      for (let parent = row.parentElement; parent; parent = parent.parentElement) {
+        ancestors.add(parent);
+      }
+      ancestorSets.set(row, ancestors);
+    }
+    return (row: Element, ancestor: Element): boolean =>
+      row !== ancestor && (ancestorSets.get(row)?.has(ancestor) ?? false);
+  };
+
+  const hasPositionStructure = (row: Element, linesMemo: VisibleLinesMemo): boolean => {
+    const lines = visibleLinesMemoized(row, linesMemo);
+    const dateIndex = lines.findIndex((line) => isDateRangeLine(line.text));
     return dateIndex >= 1;
   };
 
-  const candidateRows = (root: Element): CandidateRow[] => {
+  const candidateRows = (root: Element, linesMemo: VisibleLinesMemo): CandidateRow[] => {
     const discovered = new Map<Element, CandidateRow>();
 
     for (const marker of root.querySelectorAll(rowDiscoverySelector)) {
@@ -225,29 +439,33 @@ export async function extractLinkedInExperiencesFromDom(
 
     const candidates = [...discovered.values()];
     const strongRows = candidates.filter((candidate) => candidate.strong);
+    const strongIsAncestorOf = createNestingCheck(strongRows.map((candidate) => candidate.row));
+    const strongIsDescendantOf = createNestingCheck(candidates.map((candidate) => candidate.row));
 
     return candidates.filter((candidate) => {
       if (candidate.strong) {
         return true;
       }
 
-      const containsStrongPosition = strongRows.some(
-        (strongCandidate) =>
-          strongCandidate.row !== candidate.row && candidate.row.contains(strongCandidate.row)
+      const containsStrongPosition = strongRows.some((strongCandidate) =>
+        strongIsAncestorOf(strongCandidate.row, candidate.row)
       );
       if (containsStrongPosition) {
         return true;
       }
 
-      const belongsToStrongPosition = strongRows.some(
-        (strongCandidate) =>
-          strongCandidate.row !== candidate.row && strongCandidate.row.contains(candidate.row)
+      const belongsToStrongPosition = strongRows.some((strongCandidate) =>
+        strongIsDescendantOf(candidate.row, strongCandidate.row)
       );
-      return !belongsToStrongPosition && hasPositionStructure(candidate.row);
+      return !belongsToStrongPosition && hasPositionStructure(candidate.row, linesMemo);
     });
   };
 
-  const leafRows = (root: Element, candidates: CandidateRow[]): ResolvedLeaf[] => {
+  const leafRows = (
+    root: Element,
+    candidates: CandidateRow[],
+    linesMemo: VisibleLinesMemo
+  ): ResolvedLeaf[] => {
     const candidateSet = new Set(candidates.map((candidate) => candidate.row));
     const topLevel = candidates.filter((candidate) => {
       for (
@@ -262,27 +480,25 @@ export async function extractLinkedInExperiencesFromDom(
       return true;
     });
     const leaves: ResolvedLeaf[] = [];
+    const candidateNesting = createNestingCheck(candidates.map((candidate) => candidate.row));
 
     for (const candidate of topLevel) {
-      const descendants = candidates.filter(
-        (other) => other.row !== candidate.row && candidate.row.contains(other.row)
-      );
+      const descendants = candidates.filter((other) => candidateNesting(other.row, candidate.row));
       if (descendants.length === 0) {
         leaves.push({ ...candidate, inheritedCompany: undefined });
         continue;
       }
 
       const groupClone = candidate.row.cloneNode(true) as Element;
-      for (const nested of candidateRows(groupClone)) {
+      for (const nested of candidateRows(groupClone, linesMemo)) {
         nested.row.remove();
       }
-      const groupCompany = visibleLines(groupClone).find((line) => !isDurationLine(line));
+      const groupCompany = visibleLines(groupClone).find(
+        (line) => !isDurationLine(line.text)
+      )?.text;
       for (const descendant of descendants) {
         const hasNestedCandidate = descendants.some(
-          (other) =>
-            other.row !== descendant.row &&
-            descendant.row.contains(other.row) &&
-            candidateSet.has(other.row)
+          (other) => candidateNesting(other.row, descendant.row) && candidateSet.has(other.row)
         );
         if (!hasNestedCandidate) {
           leaves.push({ ...descendant, inheritedCompany: groupCompany });
@@ -296,13 +512,14 @@ export async function extractLinkedInExperiencesFromDom(
   const parseLeaf = (
     row: Element,
     inheritedCompany: string | undefined,
-    positionIndex: number
+    positionIndex: number,
+    linesMemo: VisibleLinesMemo
   ): RawExperience | null => {
-    const lines = visibleLines(row);
-    const title = lines[0] ?? '';
-    const dateIndex = lines.findIndex(isDateRangeLine);
-    const rawDateRange = dateIndex >= 0 ? lines[dateIndex] : undefined;
-    const structuralLineBeforeDate = dateIndex > 1 ? (lines[1] ?? '') : '';
+    const lines = visibleLinesMemoized(row, linesMemo);
+    const title = lines[0]?.text ?? '';
+    const dateIndex = lines.findIndex((line) => isDateRangeLine(line.text));
+    const rawDateRange = dateIndex >= 0 ? lines[dateIndex]?.text : undefined;
+    const structuralLineBeforeDate = dateIndex > 1 ? (lines[1]?.text ?? '') : '';
     const [standaloneCompany = '', standaloneEmploymentType = ''] = structuralLineBeforeDate.split(
       /\s+[·•]\s+/,
       2
@@ -319,27 +536,54 @@ export async function extractLinkedInExperiencesFromDom(
           )
         )
       : undefined;
-    const skillsLabelPattern = /^(?:compétences|skills)(?:\s*:\s*(.*))?$/i;
-    const skillsIndex = lines.findIndex((line) => skillsLabelPattern.test(line));
-    const skillsLine = skillsIndex >= 0 ? lines[skillsIndex] : '';
-    const skillsValue = skillsLine.match(skillsLabelPattern)?.[1] ?? '';
+    const skillsIndex = lines.findIndex((line) => skillsLabelPattern.test(line.text));
+    const skillsLine = skillsIndex >= 0 ? (lines[skillsIndex]?.text ?? '') : '';
+    const inlineSkillsValue = skillsLine.match(skillsLabelPattern)?.[1] ?? '';
+    const adjacentSkillsLine =
+      skillsIndex >= 0 && !inlineSkillsValue && skillsIndex + 1 < lines.length
+        ? (lines[skillsIndex + 1]?.text ?? '')
+        : '';
+    const adjacentSkillsIndex =
+      adjacentSkillsLine &&
+      !isDateRangeLine(adjacentSkillsLine) &&
+      !isDurationLine(adjacentSkillsLine) &&
+      !isActionLine(adjacentSkillsLine)
+        ? skillsIndex + 1
+        : -1;
+    const skillsValue = inlineSkillsValue || (adjacentSkillsIndex >= 0 ? adjacentSkillsLine : '');
     const skills = skillsValue
       ? skillsValue
           .split(/\s+[·•]\s+|\s*,\s*/)
           .map(cleanLine)
           .filter(Boolean)
       : [];
-    const locationIndex =
+    const structuralLocationIndex =
       dateIndex >= 0
         ? lines.findIndex(
             (line, index) =>
               index > dateIndex &&
               index !== skillsIndex &&
-              !isDurationLine(line) &&
-              !isActionLine(line)
+              index !== adjacentSkillsIndex &&
+              !line.prose &&
+              !isDurationLine(line.text) &&
+              !isActionLine(line.text) &&
+              isLikelyLocationLine(line.text)
           )
         : -1;
-    const location = locationIndex >= 0 ? lines[locationIndex] : undefined;
+    const proseLocationIndex =
+      structuralLocationIndex < 0 && dateIndex >= 0
+        ? lines.findIndex(
+            (line, index) =>
+              index > dateIndex &&
+              index !== skillsIndex &&
+              index !== adjacentSkillsIndex &&
+              line.prose &&
+              isLikelyLocationLine(line.text)
+          )
+        : -1;
+    const locationIndex =
+      structuralLocationIndex >= 0 ? structuralLocationIndex : proseLocationIndex;
+    const location = locationIndex >= 0 ? lines[locationIndex]?.text : undefined;
     const description = lines
       .filter(
         (_line, index) =>
@@ -347,8 +591,10 @@ export async function extractLinkedInExperiencesFromDom(
           index !== 1 &&
           index !== dateIndex &&
           index !== locationIndex &&
-          index !== skillsIndex
+          index !== skillsIndex &&
+          index !== adjacentSkillsIndex
       )
+      .map((line) => line.text)
       .join('\n');
     const entityUrn = cleanLine(row.getAttribute('data-entity-urn'));
     const hrefCandidates = [
@@ -463,7 +709,8 @@ export async function extractLinkedInExperiencesFromDom(
 
   const resolveExperiences = (
     root: Element,
-    candidates: CandidateRow[]
+    candidates: CandidateRow[],
+    linesMemo: VisibleLinesMemo
   ): { experiences: RawExperience[]; hasInvalidStrongPosition: boolean } => {
     interface LeafBucket {
       leaves: ResolvedLeaf[];
@@ -473,7 +720,7 @@ export async function extractLinkedInExperiencesFromDom(
     const buckets: LeafBucket[] = [];
     const bucketByIdentity = new Map<string, LeafBucket>();
 
-    for (const leaf of leafRows(root, candidates)) {
+    for (const leaf of leafRows(root, candidates, linesMemo)) {
       if (!leaf.identity) {
         buckets.push({ leaves: [leaf], strong: leaf.strong });
         continue;
@@ -493,7 +740,7 @@ export async function extractLinkedInExperiencesFromDom(
     let hasInvalidStrongPosition = false;
     for (const [index, bucket] of buckets.entries()) {
       const parsed = bucket.leaves
-        .map((leaf) => parseLeaf(leaf.row, leaf.inheritedCompany, index))
+        .map((leaf) => parseLeaf(leaf.row, leaf.inheritedCompany, index, linesMemo))
         .find((experience): experience is RawExperience => experience !== null);
       if (parsed) {
         experiences.push(parsed);
@@ -524,10 +771,14 @@ export async function extractLinkedInExperiencesFromDom(
   let unchangedCycles = 0;
 
   while (Date.now() <= deadline) {
+    // Fresh per cycle: the DOM may change between cycles (LinkedIn lazily
+    // renders), and the memo must never outlive the synchronous cycle that
+    // created it.
+    const linesMemo: VisibleLinesMemo = new Map();
     const root = resolveRoot();
-    const rows = root ? candidateRows(root) : [];
+    const rows = root ? candidateRows(root, linesMemo) : [];
     const resolved = root
-      ? resolveExperiences(root, rows)
+      ? resolveExperiences(root, rows, linesMemo)
       : { experiences: [], hasInvalidStrongPosition: false };
     const hasParseableExperience = resolved.experiences.length > 0;
     const bodyText = cleanLine(document.body?.innerText || document.body?.textContent || '');

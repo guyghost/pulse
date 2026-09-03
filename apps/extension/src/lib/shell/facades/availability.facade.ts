@@ -2,16 +2,16 @@
  * Availability facade — wires shell I/O (profile bridge, clipboard, tabs) into
  * the {@link AvailabilityDeps} consumed by the runes store.
  *
- * Mirrors `cv-experience.facade.ts`. The side panel never touches `chrome.*`
- * or IndexedDB directly; everything crosses the service-worker bridge via
- * `sendMessage`. Clipboard is the one browser API the side panel may call
- * directly (it is the sync transport).
+ * The side panel never touches `chrome.*` or IndexedDB directly; everything
+ * crosses the service-worker bridge via `sendMessage`. Clipboard is the one
+ * browser API the side panel may call directly (it is the availability push
+ * transport).
  *
  * Push targets are the 6 mission connectors only (no LinkedIn) — see
  * `models/availability-sync.model.md`.
  */
 import type { Availability } from '$lib/core/types/availability';
-import type { PlatformSyncTarget } from '$lib/core/cv/experience-helpers';
+import type { PlatformSyncTarget } from '$lib/core/availability/availability-helpers';
 import type { Experience } from '$lib/core/types/profile';
 import type { AvailabilityDeps } from '$lib/state/availability.svelte';
 import { getProfile, saveProfile } from './settings.facade';

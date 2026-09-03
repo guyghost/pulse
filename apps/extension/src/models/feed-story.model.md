@@ -19,6 +19,57 @@ Card opérationnelle affichée en haut du feed (slot hero). Réagit aux états d
 feed : erreurs, offline, sources cassées, nouvelles missions, prioritaires,
 empty states. **Jamais** un widget permanent — c'est un call-to-action contextuel.
 
+### Projection visuelle — gating par sévérité (2026 restructuration content-first)
+
+La story card ne s'affiche **que si la sévérité projetée nécessite une action** :
+
+| Sévérités projetées                            | Strip rendu ? | Justification                                                      |
+| ---------------------------------------------- | ------------- | ------------------------------------------------------------------ |
+| `critical`, `incident`, `attention`            | **Oui**       | Une action est requise : la story a sa place en tête du feed       |
+| `success`, `neutral` (états calmes, feed prêt) | **Non**       | Le contenu (missions) parle ; le compte vit dans l'en-tête compact |
+
+Le gating vit dans `FeedPage.svelte` (`feedStoryNeedsAttention`, dérivé pur de
+`feedStory.severity`). `buildFeedStory()` continue de projeter **tous** les
+états — c'est la couche présentation qui filtre les états calmes. Le hero
+compact porte le compte de missions (`visibleCount`) inline : pas de strip
+redondant pour dire « tout va bien ».
+
+### Une seule surface d'attention connecteurs
+
+Quand `broken-sources` est le **signal de sévérité le plus élevé** (pas
+d'erreur produit, pas de mode hors ligne), la story inline est la surface
+canonique : le panneau détaillé `ConnectorAlertBar` ne rend **pas** en dessous
+(`storyCoversConnectors` dans `FeedPage.svelte`). L'action primaire de la story
+re-checke **tous** les connecteurs cassés. Ré-activer un connecteur désactivé
+reste une transition délibérée (panneau de santé / réglages) — jamais implicite
+depuis la story. Le `ConnectorAlertBar` ne rend que lorsqu'un signal de
+précédence supérieure (erreur, offline) masque le signal connecteur : il porte
+alors une information distincte, pas une duplication.
+
+Invariant de couplage rendu : `storyCoversConnectors` n'est vrai **que si la
+story inline est effectivement rendue**, c'est-à-dire quand le bloc hero-content
+est actif (`heroCompact` OU contrôles avancés OU chrome busy OU résumé de scan).
+La story inline ne vit que dans ce bloc ; avec **0 mission et un feed inactif**
+(aucune des quatre conditions), elle n'apparaît pas et le `ConnectorAlertBar`
+redevient la surface canonique — une source cassée ne doit **jamais** produire
+zéro avertissement visible.
+
+### Rendu inline — ligne calme (2026, inspiration Notion iOS)
+
+La variante `inline` (hero compact du feed) est une **ligne unique discrète**,
+pas une carte :
+
+- pas de boîte teintée, pas de bordure, pas de badge chip ;
+- la sévérité est portée par l'icône de tête (forme + teinte, contraste
+  graphique ≥3:1 sur la surface blanche du hero) ;
+- le titre tient sur une ligne (`truncate`) ; le `statusLabel` n'est pas
+  affiché — il reste annoncé au lecteur d'écran via l'`aria-label` ;
+- l'action primaire est un bouton texte discret (bleu blueprint, cible
+  tactile ≥28px).
+
+Invariant : hauteur de la ligne ≤ ~32px en état replié ; les états calmes ne
+rendent aucune ligne (gating par sévérité, ci-dessus).
+
 ## États de présentation
 
 Six états distincts, avec **précédence stricte** (de haut en bas) :

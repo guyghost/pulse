@@ -75,15 +75,3 @@ export function scoreToGrade(score: number): Grade {
   }
   return 'F';
 }
-
-/**
- * Grade to color mapping for UI display.
- * Matches the existing design tokens.
- */
-export const GRADE_COLORS: Record<Grade, { text: string; bg: string }> = {
-  A: { text: 'text-accent-emerald', bg: 'bg-accent-emerald/15' },
-  B: { text: 'text-accent-blue', bg: 'bg-accent-blue/15' },
-  C: { text: 'text-accent-amber', bg: 'bg-accent-amber/15' },
-  D: { text: 'text-text-subtle', bg: 'bg-subtle-gray' },
-  F: { text: 'text-text-subtle', bg: 'bg-subtle-gray' },
-};

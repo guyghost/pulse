@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SIDE_PANEL } from './helpers';
+import { SIDE_PANEL, enableAllSurfaceFlags } from './helpers';
 
 const mission = {
   id: 'mission-pipeline-1',
@@ -125,13 +125,16 @@ test.describe('applications pipeline', () => {
     page,
   }) => {
     await mockApplicationsPipelineBridge(page);
+    await enableAllSurfaceFlags(page);
     await page.goto(SIDE_PANEL);
 
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
     await expect(nav).toBeVisible();
     await nav.getByRole('button', { name: 'Suivi' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Candidatures' })).toBeVisible();
+    // Le titre "Candidatures" apparaît deux fois : le header de page (h1) et la
+    // colonne kanban du même nom (h3). On cible le niveau 1 pour lever l'ambiguïté.
+    await expect(page.getByRole('heading', { name: 'Candidatures', level: 1 })).toBeVisible();
     // The mission title appears in both the "Dossier recommandé" section and the selected dossier
     // detail. Use .first() to disambiguate (they show the same mission here).
     await expect(

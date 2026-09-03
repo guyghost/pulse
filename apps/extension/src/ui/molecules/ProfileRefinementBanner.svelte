@@ -53,7 +53,7 @@
     <div class="flex shrink-0 items-center gap-1">
       <button
         class="rounded-lg border border-blueprint-blue/30 bg-blueprint-blue/15 px-3 py-1.5
-               text-caption font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
+               text-caption font-medium text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/25"
         onclick={handleSetupProfile}
       >
         Compléter

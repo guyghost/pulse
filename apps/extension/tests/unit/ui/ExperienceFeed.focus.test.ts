@@ -52,14 +52,8 @@ describe('ExperienceFeed focus exit port', () => {
       editStatus: 'idle',
       draft: null,
       editingId: null,
-      syncStatus: 'idle',
-      platformStatuses: new Map(),
-      lastSyncedAt: null,
       feedError: null,
       editError: null,
-      syncError: null,
-      canSync: false,
-      isSyncing: false,
       load: noop,
       reload: noop,
       applyProfileUpdate: noop,
@@ -68,8 +62,6 @@ describe('ExperienceFeed focus exit port', () => {
       cancelEdit: noop,
       saveExperience: noop,
       deleteExperience: noop,
-      startSync: noop,
-      cancelSync: noop,
     } satisfies CvExperienceStore;
     const target = document.createElement('div');
     document.body.appendChild(target);

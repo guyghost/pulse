@@ -1,6 +1,6 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
-import { analyzeTJMHistory } from '$lib/core/tjm-history';
-import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
+import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '$lib/core/tjm-history';
+import type { TJMHistory, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
 import {
@@ -677,9 +677,11 @@ function createChromeStubs() {
             storage.profile = message.payload;
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, message.payload);
 
-            // Mirror the production service worker (background/index.ts SAVE_PROFILE):
-            // rescore stored missions against the new profile and broadcast the
-            // updated scores so the feed reflects the change in dev mode.
+            // Mirror the production service worker (background/index.ts
+            // SAVE_PROFILE): ack + PROFILE_UPDATED depend only on persistence;
+            // the rescore is a post-commit projection and never delays them.
+            emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
+
             try {
               const profile = message.payload as UserProfile;
               const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
@@ -705,7 +707,6 @@ function createChromeStubs() {
               }
             }
 
-            emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
             return { type: 'PROFILE_RESULT', payload: message.payload };
           case 'FORM_ASSIST_STATUS': {
             const formAssist = storage.formAssist as {
@@ -1073,6 +1074,27 @@ function createChromeStubs() {
                 })
               ),
             };
+          case 'GET_FEED_MISSIONS_PAGE': {
+            // Dev mirror of the production page read: same date-sorted slicing
+            // over the dev catalogue so the paginated bootstrap behaves
+            // identically in the browserless dev shell.
+            const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions).map(
+              (m) => ({
+                ...m,
+                scrapedAt: new Date(),
+              })
+            );
+            const p = message.payload as { page: number; pageSize: number };
+            const start = p.page * p.pageSize;
+            return {
+              type: 'FEED_MISSIONS_PAGE_RESULT',
+              payload: {
+                missions: missions.slice(start, start + p.pageSize),
+                total: missions.length,
+                hasMore: start + p.pageSize < missions.length,
+              },
+            };
+          }
           case 'GET_FEED_FAVORITES':
             return { type: 'FEED_FAVORITES_RESULT', payload: storage.favoriteMissions };
           case 'SAVE_FEED_FAVORITES':
@@ -1126,13 +1148,13 @@ function createChromeStubs() {
           case 'GET_TJM_ANALYSIS': {
             const history = storage.tjm_history as TJMHistory | undefined;
             const payload = message.payload as
-              { profileStacks?: string[]; region?: TJMRegion } | undefined;
+              { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod } | undefined;
             const normalizedStacks =
               payload?.profileStacks && payload.profileStacks.length > 0
                 ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))
                 : null;
             const records = history?.records ?? [];
-            const filteredRecords = records.filter((record) => {
+            const filteredByStackAndRegion = records.filter((record) => {
               if (normalizedStacks && !normalizedStacks.has(record.stack.toLowerCase().trim())) {
                 return false;
               }
@@ -1145,7 +1167,16 @@ function createChromeStubs() {
             return {
               type: 'TJM_ANALYSIS_RESULT',
               payload: {
-                analysis: analyzeTJMHistory({ records: filteredRecords }, new Date()),
+                analysis: analyzeTJMHistory(
+                  {
+                    records: filterTJMHistoryByPeriod(
+                      { records: filteredByStackAndRegion },
+                      payload?.period ?? 'all',
+                      new Date()
+                    ).records,
+                  },
+                  new Date()
+                ),
               },
             };
           }

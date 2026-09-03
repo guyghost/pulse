@@ -21,6 +21,7 @@
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
+  import { features } from '$lib/state/features.svelte';
 
   type PageModules = {
     feed: typeof import('../ui/pages/FeedPage.svelte');
@@ -104,6 +105,12 @@
       return;
     }
 
+    // Surface-flag guard (models/surface-feature-flags.model.md): a disabled
+    // tab is never imported — no dynamic import, no side effects.
+    if (page !== 'onboarding' && !features.isTabEnabled(page)) {
+      return;
+    }
+
     const current = pageLoads[page];
     if (current?.status === 'loading' || (current?.status === 'error' && !retry)) {
       return;
@@ -161,7 +168,7 @@
     };
   });
 
-  const visibleNavItems = NAV_ITEMS;
+  const visibleNavItems = $derived(NAV_ITEMS.filter((item) => features.isTabEnabled(item.page)));
   const currentPageLoad = $derived(pageLoads[nav.currentPage]);
   const currentPageLabel = $derived(
     NAV_ITEMS.find((item) => item.page === nav.currentPage)?.label ?? 'Onboarding'
@@ -320,7 +327,7 @@
 
   $effect(() => {
     const unsubscribe = subscribeToNotificationClicked(() => {
-      nav.navigate('feed');
+      nav.navigateWithFallback('feed');
     });
     return unsubscribe;
   });
@@ -370,7 +377,11 @@
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">
-                <Icon name={item.icon as IconName} size={16} />
+                <Icon
+                  name={item.icon as IconName}
+                  size={16}
+                  filled={nav.currentPage === item.page}
+                />
               </span>
               <span
                 aria-hidden="true"
@@ -445,7 +456,7 @@
           {#if FeedPage}
             <FeedPage
               onNavigateToOnboarding={nav.resetToOnboarding}
-              onNavigateToProfile={() => nav.navigate('profile')}
+              onNavigateToProfile={() => nav.navigateWithFallback('profile')}
               active={nav.currentPage === 'feed'}
             />
           {:else}
@@ -550,8 +561,9 @@
             }}
           >
             <TJMPage
-              onNavigateToProfile={() => nav.navigate('profile')}
-              onNavigateToFeed={() => nav.navigate('feed')}
+              active={nav.currentPage === 'tjm'}
+              onNavigateToProfile={() => nav.navigateWithFallback('profile')}
+              onNavigateToFeed={() => nav.navigateWithFallback('feed')}
             />
             {#snippet failed(error, reset)}
               <div class="p-4">
@@ -620,7 +632,7 @@
               if (import.meta.env.DEV) console.error('[CvPage crash]', e);
             }}
           >
-            <CvPage onNavigateToProfile={() => nav.navigate('profile')} />
+            <CvPage onNavigateToProfile={() => nav.navigateWithFallback('profile')} />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
@@ -654,14 +666,14 @@
               if (import.meta.env.DEV) console.error('[ApplicationsPage crash]', e);
             }}
           >
-            <ApplicationsPage onNavigateToFeed={() => nav.navigate('feed')} />
+            <ApplicationsPage onNavigateToFeed={() => nav.navigateWithFallback('feed')} />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
-                  title="Le pipeline candidatures est indisponible"
+                  title="Le suivi des candidatures est indisponible"
                   description="Le suivi ne peut pas être rendu maintenant. Réessayez avant de modifier vos statuts de candidature."
                   severity="incident"
-                  statusLabel="Pipeline interrompu"
+                  statusLabel="Suivi interrompu"
                   icon="triangle-alert"
                   proofLabel="Ecran"
                   proofValue="Candidatures"
@@ -689,7 +701,7 @@
             }}
           >
             <SettingsPage
-              onBack={() => nav.navigate('feed')}
+              onBack={() => nav.navigateWithFallback('feed')}
               onNavigateToOnboarding={nav.resetToOnboarding}
               active={nav.currentPage === 'settings'}
             />

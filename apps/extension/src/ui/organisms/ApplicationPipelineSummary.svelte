@@ -38,7 +38,7 @@
       label: 'Relances',
       value: summary.dueFollowUps,
       icon: 'calendar-clock',
-      stateLabel: summary.dueFollowUps > 0 ? 'À traiter' : 'Normal',
+      stateLabel: summary.dueFollowUps > 0 ? 'À traiter' : 'À jour',
       hint: summary.dueFollowUps > 0 ? 'Ouvrir la relance échue.' : 'Aucune échéance dépassée.',
       severity: summary.dueFollowUps > 0 ? 'attention' : 'success',
     },
@@ -46,7 +46,7 @@
       label: 'Prêtes',
       value: summary.preparedNotApplied,
       icon: 'send',
-      stateLabel: summary.preparedNotApplied > 0 ? 'À envoyer' : 'Fluide',
+      stateLabel: summary.preparedNotApplied > 0 ? 'À envoyer' : 'À jour',
       hint:
         summary.preparedNotApplied > 0
           ? 'Finaliser l’envoi ou changer le statut.'
@@ -77,7 +77,7 @@
   ]);
 </script>
 
-<div class="mt-4 space-y-3">
+<div class="space-y-3">
   <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
     {#each insightCards as card, i (i)}
       <div
@@ -91,7 +91,7 @@
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
+            <p class="eyebrow eyebrow--caption eyebrow--subtle">
               {card.label}
             </p>
             <p class="mt-1 text-heading font-semibold tabular-nums text-text-primary">
@@ -120,9 +120,7 @@
 
   <div class="rounded-xl border border-border-light bg-surface-white p-3">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
-        Avancement
-      </p>
+      <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--subtle">Avancement</p>
       {#if summary.bottleneck}
         <p class="flex items-center gap-1 text-caption text-text-subtle">
           <Icon name="traffic-cone" size={11} />

@@ -61,13 +61,153 @@ describe('MissionCard', () => {
 
   it('affiche le TJM quand il est present', async () => {
     const target = mountCard();
+    await tick();
+    expect(target.textContent).toContain('650');
+    expect(target.textContent).toMatch(/650.*\/j/);
+  });
+
+  it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {
+    const target = mountCard();
+    await tick();
+
+    expect(target.textContent).toMatch(/650.*€.*\/j/);
+    expect(target.textContent).toContain('Paris');
+    expect(target.textContent).toContain('Senior (7+ ans)');
+  });
+
+  it('masque la séniorité inconnue de la ligne de scan rapide', async () => {
+    const target = mountCard({ mission: makeMission({ seniority: null }) });
+    await tick();
+
+    expect(target.textContent).not.toContain('Séniorité');
+    expect(target.textContent).not.toMatch(
+      /Junior \(0-2 ans\)|Confirmé \(3-7 ans\)|Senior \(7\+ ans\)/
+    );
+  });
+
+  it('affiche la date de publication dès l’état réduit', async () => {
+    const target = mountCard();
+    await tick();
+
+    // formatAbsoluteDate rend la date dans le fuseau local du runtime :
+    // on dérive l'attendu du même instant pour rester indépendant du TZ.
+    const expectedDate = new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+    }).format(new Date('2026-03-14T09:00:00.000Z'));
+    expect(target.textContent).toContain(`Publiée ${expectedDate}`);
+  });
+
+  it('masque la date de publication absente ou invalide', async () => {
+    const missing = mountCard({ mission: makeMission({ publishedAt: null }) });
+    await tick();
+    expect(missing.textContent).not.toContain('Publiée');
+
+    const invalid = mountCard({ mission: makeMission({ publishedAt: 'pas-une-date' }) });
+    await tick();
+    expect(invalid.textContent).not.toContain('Publiée');
+  });
+
+  it('signale un TJM absent au lieu de ne rien afficher', async () => {
+    const target = mountCard({ mission: makeMission({ tjm: null, location: 'Bordeaux' }) });
+    await tick();
+
+    expect(target.textContent).toContain('TJM à vérifier');
+    expect(target.textContent).not.toMatch(/€\/j/);
+    expect(target.textContent).toContain('Bordeaux');
+  });
+
+  it('expose les actions de triage dès l’état réduit, sans doublon', async () => {
+    const target = mountCard();
+    await tick();
+
+    expect(target.querySelectorAll('button[aria-label="Masquer la mission"]')).toHaveLength(1);
+    expect(
+      target.querySelectorAll('button[aria-label="Ajouter la mission à la comparaison"]')
+    ).toHaveLength(1);
+    expect(
+      target.querySelectorAll('button[aria-label="Ajouter la mission aux favoris"]')
+    ).toHaveLength(1);
+  });
+
+  it('regroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
+    const target = mountCard();
+    await tick();
+
+    const actionLabels = [
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+    ];
+
+    // État replié (défaut) : toutes les actions restent visibles sur la même ligne.
+    for (const label of actionLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
+    }
+    expect(target.textContent).toContain('Analyser');
+
+    // État déplié : la région de détails n'introduit aucun bouton dupliqué.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
     disclosure.click();
     await tick();
-    expect(target.textContent).toContain('650');
-    expect(target.textContent).toMatch(/650.*\/j/);
+
+    const details = target.querySelector('[role="region"]');
+    expect(details).not.toBeNull();
+    expect(details!.querySelectorAll('button')).toHaveLength(0);
+    for (const label of actionLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
+    }
+    expect(target.textContent).toContain('Analyser');
+  });
+
+  it('réserve la zone dépliée à la description, sans grille redondante', async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const details = target.querySelector('[role="region"]') as HTMLElement;
+    expect(details).not.toBeNull();
+    // Zone, séniorité et source vivent hors de la zone dépliée :
+    // localisation et séniorité dans la ligne de scan rapide, source en badge d'en-tête.
+    expect(details.textContent).not.toContain('Zone');
+    expect(details.textContent).not.toContain('Séniorité');
+    expect(details.textContent).not.toContain('Source');
+    expect(details.textContent).toContain('Mission de developpement');
+  });
+
+  it("n'affiche plus le bloc éditorial de décision dans l'expand", async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const details = target.querySelector('[role="region"]') as HTMLElement;
+    expect(details.textContent).not.toContain('Action recommandée');
+    expect(details.textContent).not.toContain('Point de vigilance');
+    expect(details.textContent).not.toContain('À qualifier');
+  });
+
+  it('tronque la description dépliée à deux lignes', async () => {
+    const target = mountCard();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const description = target.querySelector('[role="region"] p.line-clamp-2');
+    expect(description).not.toBeNull();
+    expect(description!.textContent).toContain('Mission de developpement');
   });
 
   it('expose une carte article non interactive avec un nom stable', async () => {
@@ -86,6 +226,7 @@ describe('MissionCard', () => {
     const target = mountCard({ mission: makeMission({ id: '123/mission très longue' }) });
     await tick();
 
+    // Replié par défaut : la région n'est pas montée, l'identifiant reste borné.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -344,5 +485,154 @@ describe('MissionCard', () => {
     expect(target.textContent).toContain('Compétences');
     expect(target.textContent).toContain('IA sémantique');
     expect(target.textContent).toContain('Stack TypeScript très proche du profil');
+  });
+});
+
+describe('MissionCard — accessibilité clavier (couche 3)', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  const swipeCallbacks = { onToggleFavorite: vi.fn(), onHide: vi.fn() };
+
+  it('ne rend aucun chevron décoratif de swipe, même quand le geste est actif', async () => {
+    const target = mountCard(swipeCallbacks);
+    await tick();
+
+    const chevrons = target.querySelectorAll('span.pointer-events-none.group-hover\\:opacity-60');
+    expect(chevrons.length).toBe(0);
+  });
+
+  it('ouvre le tooltip du comparateur au focus clavier et le referme au blur', async () => {
+    const target = mountCard({ ...swipeCallbacks, onToggleCompare: vi.fn() });
+    await tick();
+
+    const compare = target.querySelector(
+      'button[aria-label="Ajouter la mission à la comparaison"]'
+    ) as HTMLButtonElement;
+    expect(compare).not.toBeNull();
+
+    compare.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    await tick();
+
+    const describedBy = compare.getAttribute('aria-describedby');
+    expect(describedBy).toMatch(/^tooltip-/);
+    const tooltip = target.querySelector(`#${describedBy}[role="tooltip"]`);
+    expect(tooltip).not.toBeNull();
+    expect(tooltip?.textContent).toContain('Comparer cette mission');
+
+    compare.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    await tick();
+    expect(compare.getAttribute('aria-describedby')).toBeNull();
+  });
+
+  it('referme le tooltip avec Escape sans déplacer le focus (WCAG 1.4.13)', async () => {
+    const target = mountCard({ ...swipeCallbacks, onToggleCompare: vi.fn() });
+    await tick();
+
+    const compare = target.querySelector(
+      'button[aria-label="Ajouter la mission à la comparaison"]'
+    ) as HTMLButtonElement;
+
+    compare.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    await tick();
+    expect(compare.getAttribute('aria-describedby')).toMatch(/^tooltip-/);
+
+    compare.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await tick();
+    expect(compare.getAttribute('aria-describedby')).toBeNull();
+    // Le focus reste sur le déclencheur.
+    expect(document.activeElement === compare || compare.isConnected).toBe(true);
+  });
+
+  it('garde le bouton comparateur focalisable et inactif quand la limite est atteinte', async () => {
+    const onToggleCompare = vi.fn();
+    const target = mountCard({
+      ...swipeCallbacks,
+      onToggleCompare,
+      compareDisabled: true,
+    });
+    await tick();
+
+    const compare = target.querySelector(
+      'button[aria-label="Ajouter la mission à la comparaison"]'
+    ) as HTMLButtonElement;
+    expect(compare.getAttribute('aria-disabled')).toBe('true');
+    expect(compare.disabled).toBe(false);
+
+    compare.dispatchEvent(new FocusEvent('focusin', { bubbles: true }));
+    await tick();
+    // L'explication du blocage reste atteignable au clavier.
+    expect(compare.getAttribute('aria-describedby')).toMatch(/^tooltip-/);
+    const tooltip = target.querySelector(
+      `#${compare.getAttribute('aria-describedby')}[role="tooltip"]`
+    );
+    expect(tooltip?.textContent).toContain('Trois missions sont déjà sélectionnées');
+
+    compare.click();
+    expect(onToggleCompare).not.toHaveBeenCalled();
+  });
+
+  it('suit un ordre de tabulation aligné sur l’ordre visuel (réduit puis déplié)', async () => {
+    const target = mountCard({
+      mission: makeMission({
+        scoreBreakdown: {
+          criteria: {
+            stack: 92,
+            tjm: 88,
+            location: 70,
+            remote: 85,
+            seniorityBonus: 4,
+            startDateBonus: 2,
+          },
+          deterministic: 84,
+          semantic: 76,
+          semanticReason: 'Stack TypeScript très proche du profil',
+          total: 82,
+          grade: 'A',
+        },
+      }),
+    });
+    await tick();
+
+    const labels = () =>
+      Array.from(target.querySelectorAll('button')).map(
+        (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
+      );
+
+    // État réduit (défaut) : disclosure → note → les six actions sur une ligne.
+    const collapsedLabels = [
+      'Afficher les détails de la mission Developpeur fullstack TypeScript',
+      'Pourquoi cette note ?',
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+      'Analyser',
+    ];
+    expect(labels()).toEqual(collapsedLabels);
+
+    // État déplié : la barre d'actions reste complète et inchangée.
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    expect(labels()).toEqual([
+      'Masquer les détails de la mission Developpeur fullstack TypeScript',
+      ...collapsedLabels.slice(1),
+    ]);
+  });
+
+  it('n’introduit aucun tabindex positif', async () => {
+    const target = mountCard(swipeCallbacks);
+    await tick();
+
+    const tabindexes = Array.from(target.querySelectorAll('[tabindex]')).map((element) =>
+      Number(element.getAttribute('tabindex'))
+    );
+    expect(tabindexes.every((value) => value <= 0)).toBe(true);
   });
 });

@@ -104,12 +104,12 @@ describe('MissionArrivalStack', () => {
       count: 2,
       missions: [makeMission(1), makeMission(2)],
       state: 'refresh-error',
-      errorMessage: 'Impossible d’actualiser la file. Réessayer.',
+      errorMessage: 'Impossible d’actualiser la file. Réessayez.',
       onClose,
     });
     await tick();
 
-    expect(target.textContent).toContain('Impossible d’actualiser la file. Réessayer.');
+    expect(target.textContent).toContain('Impossible d’actualiser la file. Réessayez.');
     expect(target.querySelectorAll('[data-testid="arrival-preview"]')).toHaveLength(2);
 
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));

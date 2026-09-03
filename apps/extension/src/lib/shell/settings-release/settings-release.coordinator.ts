@@ -187,6 +187,38 @@ function cloneEnvelope(envelope: SettingsReleaseEnvelopeV1): SettingsReleaseEnve
   return structuredClone(envelope);
 }
 
+type ConfirmedState = SettingsReleaseEnvelopeV1['confirmed'];
+
+// Envelope graphs are never mutated in place (every transition builds a new
+// top-level object via spread and replaces branches wholesale), so untouched
+// branches can be shared structurally. These targeted clones produce fresh
+// copies only for the slices that cross a port/caller boundary or get
+// replaced; AppSettings is flat except for enabledConnectors, so each helper
+// is a complete deep clone of its value object.
+function cloneSettings(settings: AppSettings): AppSettings {
+  return { ...settings, enabledConnectors: [...settings.enabledConnectors] };
+}
+
+function cloneConfirmed(confirmed: ConfirmedState): ConfirmedState {
+  return {
+    settings: cloneSettings(confirmed.settings),
+    onboardingCompleted: confirmed.onboardingCompleted,
+  };
+}
+
+function cloneSnapshot(snapshot: SettingsReleaseSnapshot): SettingsReleaseSnapshot {
+  return {
+    settings: cloneSettings(snapshot.settings),
+    onboardingCompleted: snapshot.onboardingCompleted,
+    revision: snapshot.revision,
+    generation: snapshot.generation,
+  };
+}
+
+function cloneOutcome(outcome: SettingsReleaseOutcome): SettingsReleaseOutcome {
+  return { ...outcome, snapshot: cloneSnapshot(outcome.snapshot) };
+}
+
 function operationIdMatches(
   value: unknown,
   installId: string,
@@ -323,6 +355,8 @@ export function createSettingsReleaseCoordinator(
     intended: SettingsReleaseEnvelopeV1
   ): Promise<'committed' | 'previous' | 'ambiguous'> {
     try {
+      // Fresh copy at the port boundary: storage implementations may retain
+      // or mutate the value they receive.
       await ports.storage.set({ [SETTINGS_RELEASE_ENVELOPE_KEY]: cloneEnvelope(intended) });
     } catch {
       // Read-back below is the only authority.
@@ -423,7 +457,7 @@ export function createSettingsReleaseCoordinator(
     if (!envelope?.outbox) {
       return true;
     }
-    const previous = cloneEnvelope(envelope);
+    const previous: SettingsReleaseEnvelopeV1 = envelope;
     const outbox = previous.outbox;
     if (!outbox) {
       block('storage_ambiguous');
@@ -437,7 +471,7 @@ export function createSettingsReleaseCoordinator(
       const result = await ports.broadcast.publish({
         type: 'SETTINGS_RELEASE_UPDATED',
         payload: {
-          snapshot: structuredClone(outbox.snapshot),
+          snapshot: cloneSnapshot(outbox.snapshot),
           commandId: outbox.commandId,
           broadcastId: outbox.broadcastId,
         },
@@ -450,7 +484,7 @@ export function createSettingsReleaseCoordinator(
       return false;
     }
     const intended = {
-      ...cloneEnvelope(previous),
+      ...previous,
       generation: previous.generation + 1,
       outbox: null,
     };
@@ -480,7 +514,7 @@ export function createSettingsReleaseCoordinator(
     const settledRevision = pendingEnvelope.revision + 1;
     const settledGeneration = pendingEnvelope.generation + 1;
     const snapshot: SettingsReleaseSnapshot = {
-      settings: structuredClone(confirmed.settings),
+      settings: cloneSettings(confirmed.settings),
       onboardingCompleted: confirmed.onboardingCompleted,
       revision: settledRevision,
       generation: settledGeneration,
@@ -497,10 +531,10 @@ export function createSettingsReleaseCoordinator(
     const outcome = { ...common, status, reason } as SettingsReleaseOutcome;
     const outcomes = [...pendingEnvelope.outcomes, outcome].slice(-SETTINGS_RELEASE_OUTCOME_LIMIT);
     const intended: SettingsReleaseEnvelopeV1 = {
-      ...cloneEnvelope(pendingEnvelope),
+      ...pendingEnvelope,
       revision: settledRevision,
       generation: settledGeneration,
-      confirmed: structuredClone(confirmed),
+      confirmed: cloneConfirmed(confirmed),
       pending: null,
       outcomes,
       outbox: {
@@ -598,7 +632,7 @@ export function createSettingsReleaseCoordinator(
       return false;
     }
     const retired = {
-      ...cloneEnvelope(initial),
+      ...initial,
       generation: 1,
       legacyRetirement: 'retired' as const,
     };
@@ -658,7 +692,7 @@ export function createSettingsReleaseCoordinator(
       return false;
     }
     const retired = {
-      ...cloneEnvelope(value),
+      ...value,
       generation: value.generation + 1,
       legacyRetirement: 'retired' as const,
     };
@@ -673,7 +707,7 @@ export function createSettingsReleaseCoordinator(
     if (!envelope?.pending) {
       return true;
     }
-    let current = cloneEnvelope(envelope);
+    let current: SettingsReleaseEnvelopeV1 = envelope;
     const pending = current.pending;
     if (!pending) {
       return false;
@@ -711,7 +745,7 @@ export function createSettingsReleaseCoordinator(
       const compensationReason =
         permission === true && !alarmProved ? 'effect_compensated' : 'permission_lost';
       const compensating: SettingsReleaseEnvelopeV1 = {
-        ...cloneEnvelope(current),
+        ...current,
         generation: current.generation + 1,
         pending: {
           ...pending,
@@ -732,7 +766,7 @@ export function createSettingsReleaseCoordinator(
       recoveryPending.phase !== 'compensating'
     ) {
       const compensating: SettingsReleaseEnvelopeV1 = {
-        ...cloneEnvelope(current),
+        ...current,
         generation: current.generation + 1,
         pending: {
           ...recoveryPending,
@@ -769,7 +803,7 @@ export function createSettingsReleaseCoordinator(
     if (!envelope?.scanAdmission) {
       return false;
     }
-    const previous = cloneEnvelope(envelope);
+    const previous: SettingsReleaseEnvelopeV1 = envelope;
     const record = previous.scanAdmission;
     if (!record) {
       return false;
@@ -818,7 +852,7 @@ export function createSettingsReleaseCoordinator(
     if (!envelope?.scanAdmission) {
       return true;
     }
-    const previous = cloneEnvelope(envelope);
+    const previous: SettingsReleaseEnvelopeV1 = envelope;
     const record = previous.scanAdmission;
     if (!record) {
       return false;
@@ -833,7 +867,7 @@ export function createSettingsReleaseCoordinator(
           ? ports.scan.tryAdmit({
               token: record.token,
               identity: record.identity,
-              snapshot: record.snapshot,
+              snapshot: cloneSnapshot(record.snapshot),
               snapshotDigest: record.snapshotDigest,
               scanAckThrough: previous.scanAckThrough,
             })
@@ -950,7 +984,7 @@ export function createSettingsReleaseCoordinator(
         }
         const commandId = `settings-release:${envelope.installId}:${envelope.nextIdentity}:command`;
         const migrated: SettingsReleaseEnvelopeV1 = {
-          ...cloneEnvelope(envelope),
+          ...envelope,
           nextIdentity: envelope.nextIdentity + 1,
           revision: envelope.revision + 1,
           generation: envelope.generation + 1,
@@ -1147,7 +1181,7 @@ export function createSettingsReleaseCoordinator(
         };
       }
       actor.send({ type: 'DUPLICATE_REQUEST' });
-      return { status: 'settled', outcome: structuredClone(retained) };
+      return { status: 'settled', outcome: cloneOutcome(retained) };
     }
     const snapshot = settingsReleaseSnapshot(envelope);
     if (intent.baseRevision !== envelope.revision) {
@@ -1162,11 +1196,11 @@ export function createSettingsReleaseCoordinator(
     const candidate =
       intent.kind === 'save_settings'
         ? {
-            settings: structuredClone(intent.settings),
+            settings: cloneSettings(intent.settings),
             onboardingCompleted: envelope.confirmed.onboardingCompleted,
           }
         : {
-            settings: structuredClone(envelope.confirmed.settings),
+            settings: snapshot.settings,
             onboardingCompleted: intent.targetConsent,
           };
     if (
@@ -1208,11 +1242,11 @@ export function createSettingsReleaseCoordinator(
       };
     }
     actor.send({ type: 'MUTATION_ADMITTED' });
-    const previous = cloneEnvelope(envelope);
+    const previous: SettingsReleaseEnvelopeV1 = envelope;
     const identity = previous.nextIdentity;
     const commandId = `settings-release:${previous.installId}:${identity}:command`;
     const reserved: SettingsReleaseEnvelopeV1 = {
-      ...cloneEnvelope(previous),
+      ...previous,
       nextIdentity: identity + 1,
       generation: previous.generation + 1,
       pending: {
@@ -1221,7 +1255,7 @@ export function createSettingsReleaseCoordinator(
         intentDigest: digest,
         kind: intent.kind,
         baseRevision: intent.baseRevision,
-        previous: structuredClone(previous.confirmed),
+        previous: cloneConfirmed(previous.confirmed),
         candidate,
         previousAlarm: expectedAutoScanAlarm(previous.confirmed),
         candidateAlarm: expectedAutoScanAlarm(candidate),
@@ -1313,7 +1347,7 @@ export function createSettingsReleaseCoordinator(
     }
 
     const prepared: SettingsReleaseEnvelopeV1 = {
-      ...cloneEnvelope(reserved),
+      ...reserved,
       generation: reserved.generation + 1,
       pending: { ...reservedPending, phase: 'prepared', compensationReason: null },
     };
@@ -1394,7 +1428,7 @@ export function createSettingsReleaseCoordinator(
       const compensationReason =
         finalPermission !== true ? 'permission_lost' : 'effect_compensated';
       const compensating: SettingsReleaseEnvelopeV1 = {
-        ...cloneEnvelope(prepared),
+        ...prepared,
         generation: prepared.generation + 1,
         pending: {
           ...preparedPending,
@@ -1469,7 +1503,7 @@ export function createSettingsReleaseCoordinator(
     }
     actor.send({ type: 'EFFECT_AND_PERMISSION_PROVED' });
     const effectProved: SettingsReleaseEnvelopeV1 = {
-      ...cloneEnvelope(prepared),
+      ...prepared,
       generation: prepared.generation + 1,
       pending: { ...preparedPending, phase: 'effect_proved', compensationReason: null },
     };
@@ -1523,7 +1557,7 @@ export function createSettingsReleaseCoordinator(
         };
       }
       actor.send({ type: 'ALARM_AND_STORAGE_PROVED' });
-      return { status: 'settled', outcome: structuredClone(recoveredOutcome) };
+      return { status: 'settled', outcome: cloneOutcome(recoveredOutcome) };
     }
     if (settlement.status !== 'committed') {
       actor.send({ type: 'COMMIT_AMBIGUOUS' });
@@ -1607,7 +1641,7 @@ export function createSettingsReleaseCoordinator(
       return { status: 'blocked', reason: 'identity_error' };
     }
     actor.send({ type: 'AUTO_SCAN_FIRED' });
-    const previous = cloneEnvelope(envelope);
+    const previous: SettingsReleaseEnvelopeV1 = envelope;
     const identity = previous.nextIdentity;
     const token = `settings-release:${previous.installId}:${identity}:scan`;
     const digest = await settingsReleaseScanDigest(snapshot);
@@ -1620,7 +1654,7 @@ export function createSettingsReleaseCoordinator(
       result: null,
     };
     const reserved: SettingsReleaseEnvelopeV1 = {
-      ...cloneEnvelope(previous),
+      ...previous,
       nextIdentity: identity + 1,
       generation: previous.generation + 1,
       scanAdmission: reservedScanAdmission,
@@ -1662,7 +1696,7 @@ export function createSettingsReleaseCoordinator(
     let current = reserved;
     if (result.status === 'accepted') {
       const accepted: SettingsReleaseEnvelopeV1 = {
-        ...cloneEnvelope(reserved),
+        ...reserved,
         generation: reserved.generation + 1,
         scanAdmission: { ...reservedScanAdmission, phase: 'accepted', result },
       };
@@ -1674,7 +1708,7 @@ export function createSettingsReleaseCoordinator(
       current = accepted;
     }
     const cleared: SettingsReleaseEnvelopeV1 = {
-      ...cloneEnvelope(current),
+      ...current,
       generation: current.generation + 1,
       scanAckThrough: identity,
       scanAdmission: null,

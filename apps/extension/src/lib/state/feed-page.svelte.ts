@@ -1,3 +1,10 @@
+/* eslint-disable svelte/prefer-svelte-reactivity --
+  Perf: the plain Set/Map/Date instances in this module are either rebuilt from
+  scratch inside $derived (fine-grained collection signals are pure overhead
+  there) or used only imperatively with no reactive reader. The per-item signal
+  cost of SvelteSet/SvelteMap/SvelteDate lands on every keystroke, filter
+  toggle, and seen/favorite flow, so this module intentionally uses plain
+  collections. */
 /**
  * Feed Page State — Encapsulates all UI state for the FeedPage.
  *
@@ -8,7 +15,7 @@
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
 import { untrack } from 'svelte';
-import { SvelteMap, SvelteSet, SvelteDate } from 'svelte/reactivity';
+import { SvelteSet } from 'svelte/reactivity';
 import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
 import type {
   FeedDecisionPresetId,
@@ -209,8 +216,8 @@ export function countMissionsForFilterDraft(
   seenIds: string[],
   profileTjmMin: number | null
 ): number {
-  const seenSet = new SvelteSet(seenIds);
-  const selectedStacks = new SvelteSet(draft.selectedStacks);
+  const seenSet = new Set(seenIds);
+  const selectedStacks = new Set(draft.selectedStacks);
 
   return missions.filter((mission) => {
     if (draft.selectedSource !== null && mission.source !== draft.selectedSource) {
@@ -306,7 +313,7 @@ export function createFeedPageState(
   let favorites = $state<Record<string, number>>({});
   const favoritePendingIds = new SvelteSet<string>();
   let hidden = $state<Record<string, number>>({});
-  let pendingSeenIds = new SvelteSet<string>();
+  let pendingSeenIds = new Set<string>();
   let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
   let arrivalQueueState = $state(createMissionArrivalQueueState());
   let arrivalObservedEffects: MissionArrivalQueueEffect[] = [];
@@ -351,7 +358,7 @@ export function createFeedPageState(
     onCommit: (_id, _snapshot, { stillPending }) => {
       // Persist every hidden mission EXCEPT those whose undo window is still open —
       // committing must not finalize a sibling hide the user can still undo.
-      const pendingIds = new SvelteSet(stillPending.map((p) => p.targetId));
+      const pendingIds = new Set(stillPending.map((p) => p.targetId));
       const persist: Record<string, number> = {};
       for (const [hid, ts] of Object.entries(hidden)) {
         if (!pendingIds.has(hid)) {
@@ -414,7 +421,7 @@ export function createFeedPageState(
   // ============================================================
   // Derived — UI computations
   // ============================================================
-  const seenSet = $derived(new SvelteSet(Array.isArray(seenIds) ? Array.from(seenIds) : []));
+  const seenSet = $derived(new Set(Array.isArray(seenIds) ? Array.from(seenIds) : []));
 
   const favoriteCount = $derived(Object.keys(favorites).length);
   const hiddenCount = $derived(Object.keys(hidden).length);
@@ -480,7 +487,7 @@ export function createFeedPageState(
     let result = baseFilteredMissions;
 
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
-      const stacksSet = selectedStacks.length > 0 ? new SvelteSet(selectedStacks) : null;
+      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
@@ -513,12 +520,18 @@ export function createFeedPageState(
   const stableQueueActive = $derived(arrivalQueueState.queue.value === 'stable-queue');
   const stableQueueIds = $derived(
     arrivalQueueState.queue.value === 'stable-queue'
-      ? new SvelteSet(arrivalQueueState.queue.queueIds)
+      ? new Set(arrivalQueueState.queue.queueIds)
       : null
   );
 
   function sortCurrentMissions(input: Mission[]): Mission[] {
-    return sortBy === 'score' ? rankMissions(input, new SvelteDate()) : sortMissions(input, sortBy);
+    // if/else plutôt que ternaire : les appels en branche de ternaire sont
+    // annotés /* @__PURE__ */ par esbuild à une position que Rollup ne peut
+    // pas interpréter, ce qui émet un warning à chaque build.
+    if (sortBy === 'score') {
+      return rankMissions(input, new Date());
+    }
+    return sortMissions(input, sortBy);
   }
 
   const newQueueCandidateMissions = $derived.by(() => {
@@ -547,7 +560,7 @@ export function createFeedPageState(
       result = result.filter((m) => m.source === selectedSource);
     }
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
-      const stacksSet = selectedStacks.length > 0 ? new SvelteSet(selectedStacks) : null;
+      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
@@ -565,10 +578,10 @@ export function createFeedPageState(
   });
 
   const feedAggregates = $derived.by<FeedAggregates>(() => {
-    const counts = new SvelteMap<ScoreBucket, number>(
+    const counts = new Map<ScoreBucket, number>(
       SCORE_BUCKETS.map((bucket) => [bucket.bucket, 0] as const)
     );
-    const sourceMissionCounts = new SvelteMap<string, number>();
+    const sourceMissionCounts = new Map<string, number>();
     let highScoreCount = 0;
     let newCount = 0;
     let priorityPresetCount = 0;
@@ -707,9 +720,12 @@ export function createFeedPageState(
     if (focusMode === 'focused' && focusIntent) {
       const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
-        return sortBy === 'score'
-          ? rankMissions(focused, new SvelteDate())
-          : sortMissions(focused, sortBy);
+        // Même motif que sortCurrentMissions : if/else pour éviter le warning
+        // Rollup sur l'annotation __PURE__ en branche de ternaire.
+        if (sortBy === 'score') {
+          return rankMissions(focused, new Date());
+        }
+        return sortMissions(focused, sortBy);
       }
     }
 
@@ -733,7 +749,7 @@ export function createFeedPageState(
   );
   const arrivalStackView = $derived(getMissionArrivalStackView(arrivalQueueState));
   const arrivalPreviewMissions = $derived.by(() => {
-    const missionCatalog = new SvelteMap(
+    const missionCatalog = new Map(
       [...allMissions, ...controller.pendingMissions, ...Object.values(arrivalPreviewCatalog)].map(
         (mission) => [mission.id, mission] as const
       )
@@ -758,7 +774,7 @@ export function createFeedPageState(
     if (comparisonMissionIds.length < 2) {
       return [];
     }
-    const idSet = new SvelteSet(comparisonMissionIds);
+    const idSet = new Set(comparisonMissionIds);
     return (missions ?? []).filter((m) => idSet.has(m.id));
   });
 
@@ -859,9 +875,7 @@ export function createFeedPageState(
       ownedScan: controller.ownedScan,
       networkOnline: connection.status !== 'offline',
     });
-    arrivalActor.synchronizeScope(
-      new SvelteSet([...controller.enabledConnectorIds] as MissionSource[])
-    );
+    arrivalActor.synchronizeScope(new Set([...controller.enabledConnectorIds] as MissionSource[]));
     await arrivalActor.whenIdle();
   }
 
@@ -871,7 +885,7 @@ export function createFeedPageState(
     }
 
     const nextSeenIds = markAsSeen(Array.from(seenIds), [...pendingSeenIds]);
-    pendingSeenIds = new SvelteSet();
+    pendingSeenIds = new Set();
     seenIds = nextSeenIds;
     saveSeenIds(nextSeenIds).catch(() => {});
   }
@@ -892,7 +906,7 @@ export function createFeedPageState(
       return;
     }
 
-    pendingSeenIds = new SvelteSet(pendingSeenIds).add(missionId);
+    pendingSeenIds.add(missionId);
     scheduleSeenFlush();
   }
 
@@ -1350,7 +1364,7 @@ export function createFeedPageState(
     });
 
     $effect(() => {
-      const enabledSources = new SvelteSet([...controller.enabledConnectorIds] as MissionSource[]);
+      const enabledSources = new Set([...controller.enabledConnectorIds] as MissionSource[]);
       const orderedIds = feedStore.missions.map((mission) => mission.id);
       untrack(() => {
         void orderedIds;

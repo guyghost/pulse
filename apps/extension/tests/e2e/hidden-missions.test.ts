@@ -5,6 +5,7 @@ import {
   favoriteButton,
   favoritesToggle,
   hideButton,
+  expandMission,
   missionCards,
   toggleFavoritesFilter,
   unfavoriteButton,
@@ -31,6 +32,7 @@ test.describe('Hidden Missions Flow', () => {
     const initialCount = await missionCards(page).count();
 
     const card = missionCards(page).first();
+    await expandMission(card);
     await expect(hideButton(card)).toBeVisible({ timeout: 3000 });
     await hideButton(card).click();
 
@@ -46,6 +48,7 @@ test.describe('Hidden Missions Flow', () => {
     const initialCount = await missionCards(page).count();
 
     const card = missionCards(page).first();
+    await expandMission(card);
     await hideButton(card).click();
     await expectMissionCount(page, initialCount - 1);
 
@@ -71,6 +74,7 @@ test.describe('Hidden Missions Flow', () => {
 
     // Hide a different card
     const cards = missionCards(page);
+    await expandMission(cards.nth(1));
     await hideButton(cards.nth(1)).click();
     await expectMissionCount(page, initialCount - 1);
 

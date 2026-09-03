@@ -141,9 +141,7 @@
 <section class="section-card rounded-xl p-5" aria-labelledby="form-assist-title">
   <div class="flex items-start justify-between gap-3">
     <div>
-      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-        Premium · local-first
-      </p>
+      <p class="eyebrow eyebrow--strong eyebrow--blue">Premium · local-first</p>
       <h3 id="form-assist-title" class="mt-1 text-sm font-semibold text-text-primary">
         Assistance au formulaire actif
       </h3>

@@ -36,7 +36,7 @@
           <Icon name="star" size={16} />
         </div>
         <div>
-          <p class="text-caption uppercase tracking-[0.18em] text-blueprint-blue/80">
+          <p class="eyebrow eyebrow--caption text-blueprint-blue/80">
             Tour du feed · {stepIndex + 1}/{totalSteps}
           </p>
           <h3 class="mt-1 text-body-lg font-semibold text-text-primary">{step.title}</h3>

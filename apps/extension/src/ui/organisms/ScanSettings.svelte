@@ -84,9 +84,7 @@
   </p>
   <div class="grid gap-2 sm:grid-cols-3" aria-label="Historique et cadence des scans">
     <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
-        Dernier déclenchement
-      </p>
+      <p class="eyebrow eyebrow--strong">Dernier déclenchement</p>
       <p class="mt-1 text-caption leading-4 text-text-secondary">{lastScanLabel}</p>
     </div>
     <div
@@ -96,15 +94,11 @@
           ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
           : 'border-border-light bg-surface-white'}"
     >
-      <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
-        Historique récent
-      </p>
+      <p class="eyebrow eyebrow--strong">Historique récent</p>
       <p class="mt-1 text-caption leading-4 text-text-secondary">{scanHistoryLabel}</p>
     </div>
     <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
-        Prochain déclenchement
-      </p>
+      <p class="eyebrow eyebrow--strong">Prochain déclenchement</p>
       <p class="mt-1 text-caption leading-4 text-text-secondary">{nextScanLabel}</p>
     </div>
   </div>

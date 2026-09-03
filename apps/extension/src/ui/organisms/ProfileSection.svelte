@@ -131,9 +131,7 @@
       </datalist>
       <div class="grid grid-cols-2 gap-2">
         <label class="space-y-1">
-          <span class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
-            Remote
-          </span>
+          <span class="eyebrow">Remote</span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={profileRemote}
@@ -142,11 +140,12 @@
               <option value={option.value}>{option.label}</option>
             {/each}
           </select>
+          <span class="block text-caption leading-4 text-text-muted">
+            Les missions hybrides restent visibles, avec une légère pénalité.
+          </span>
         </label>
         <label class="space-y-1">
-          <span class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
-            Séniorité
-          </span>
+          <span class="eyebrow">Séniorité</span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={seniority}
@@ -155,27 +154,36 @@
               <option value={option.value}>{option.label}</option>
             {/each}
           </select>
+          <span class="block text-caption leading-4 text-text-muted">
+            Utilisée pour écarter les annonces hors de votre profil.
+          </span>
         </label>
       </div>
-      <div class="flex gap-2">
-        <input
-          type="number"
-          aria-label="TJM minimum"
-          placeholder="TJM min"
-          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
-          bind:value={tjmMin}
-        />
-        <input
-          type="number"
-          aria-label="TJM maximum"
-          placeholder="TJM max"
-          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
-          bind:value={tjmMax}
-        />
+      <div>
+        <div class="flex gap-2">
+          <input
+            type="number"
+            aria-label="TJM minimum"
+            placeholder="TJM min"
+            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+            bind:value={tjmMin}
+          />
+          <input
+            type="number"
+            aria-label="TJM maximum"
+            placeholder="TJM max"
+            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+            bind:value={tjmMax}
+          />
+        </div>
+        <p class="mt-1 text-caption leading-4 text-text-muted">
+          Fourchette cible par jour. Les missions en deçà sont signalées dans le feed, jamais
+          masquées.
+        </p>
       </div>
 
       <div class="space-y-2">
-        <p class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">Mots-clés</p>
+        <p class="eyebrow">Mots-clés</p>
         <div class="flex gap-2">
           <input
             type="text"
@@ -214,7 +222,7 @@
 
       <div class="pt-1">
         <Button variant="secondary" onclick={onSave} loading={isSaving}>
-          {isSaving ? 'Sauvegarde...' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
+          {isSaving ? 'Sauvegarde…' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
         </Button>
       </div>
       {#if profileError}
@@ -230,15 +238,13 @@
       <p class="text-text-subtle">{profileLocation || 'Localisation non renseignée'}</p>
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
+          <p class="eyebrow">Remote</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {remoteOptions.find((option) => option.value === profileRemote)?.label ?? 'Indifférent'}
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
-            Séniorité
-          </p>
+          <p class="eyebrow">Séniorité</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
             {seniorityOptions.find((option) => option.value === seniority)?.label ?? 'Senior'}
           </p>

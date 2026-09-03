@@ -134,25 +134,44 @@ const generatePhrases = (tokens: string[], maxN = 4): string[] => {
 };
 
 /**
- * Find the metropolitan area a location belongs to.
- * Checks city names, tokens, multi-word phrases, and department codes.
+ * Precomputed matching parts for one normalized location string.
  *
- * @param location - Lightly normalized location string
+ * Tokens, multi-word phrases, department codes, and the metro-area resolution
+ * are computed once per input string per `matchLocation` invocation and reused
+ * by every downstream check (synonym token matching, metro proximity) instead
+ * of being regenerated inside each comparison (audit point #9).
+ */
+interface LocationParts {
+  readonly tokens: readonly string[];
+  readonly phrases: readonly string[];
+  readonly deptCodes: readonly string[];
+  readonly metro: string | null;
+}
+
+/**
+ * Resolve the metropolitan area a location belongs to from precomputed parts.
+ * Checks city names, tokens, multi-word phrases, and department codes.
+ * Lookup priority is unchanged: full string → tokens → phrases → department codes.
+ *
+ * @param full - The normalized location string itself
+ * @param tokens - Tokenized form of `full`
+ * @param phrases - Multi-word n-gram phrases built from `tokens`
+ * @param deptCodes - Department codes extracted from `full`
  * @returns The canonical metro name if found, null otherwise
  */
-const findMetroArea = (location: string): string | null => {
-  if (!location) {
-    return null;
-  }
-
+const resolveMetroArea = (
+  full: string,
+  tokens: readonly string[],
+  phrases: readonly string[],
+  deptCodes: readonly string[]
+): string | null => {
   // 1. Check if the full string matches a city in any metro area
-  const directMatch = METRO_AREA_CACHE.get(location);
+  const directMatch = METRO_AREA_CACHE.get(full);
   if (directMatch) {
     return directMatch;
   }
 
   // 2. Check if any token matches a city name (for compound locations like "Nanterre La Défense")
-  const tokens = tokenizeLocation(location);
   for (const token of tokens) {
     const tokenMatch = METRO_AREA_CACHE.get(token);
     if (tokenMatch) {
@@ -161,7 +180,6 @@ const findMetroArea = (location: string): string | null => {
   }
 
   // 3. Check multi-word phrases (for cities like "boulogne billancourt")
-  const phrases = generatePhrases(tokens);
   for (const phrase of phrases) {
     const phraseMatch = METRO_AREA_CACHE.get(phrase);
     if (phraseMatch) {
@@ -170,7 +188,6 @@ const findMetroArea = (location: string): string | null => {
   }
 
   // 4. Check if any department code matches a metro department
-  const deptCodes = extractDepartmentCodes(location);
   for (const code of deptCodes) {
     const deptMatch = METRO_DEPARTMENT_CACHE.get(code);
     if (deptMatch) {
@@ -182,23 +199,49 @@ const findMetroArea = (location: string): string | null => {
 };
 
 /**
- * Check if two locations are in the same metropolitan area.
+ * Tokenize, generate phrases, extract department codes, and resolve the metro
+ * area for one normalized location string — computed once and reused within
+ * the current invocation. Pure: nothing is cached between invocations.
  *
- * @param loc1 - First location string (lightly normalized)
- * @param loc2 - Second location string (lightly normalized)
+ * @param normalized - Normalized location string (non-empty)
+ * @returns The location's precomputed matching parts
+ */
+const analyzeLocation = (normalized: string): LocationParts => {
+  const tokens = tokenizeLocation(normalized);
+  const phrases = generatePhrases(tokens);
+  const deptCodes = extractDepartmentCodes(normalized);
+  return {
+    tokens,
+    phrases,
+    deptCodes,
+    metro: resolveMetroArea(normalized, tokens, phrases, deptCodes),
+  };
+};
+
+/** Shared empty phrase list: a single token can never form an n>=2 phrase. */
+const NO_PHRASES: readonly string[] = [];
+
+/**
+ * Resolve the metro area for a single standalone token (used by the token-pair
+ * proximity check in `matchLocation`). Mirrors what resolving the token as a
+ * standalone location string would produce, with the token's own department
+ * code still taken into account (e.g. "92").
+ *
+ * @param token - Single token (non-empty)
+ * @returns The canonical metro name if found, null otherwise
+ */
+const resolveTokenMetroArea = (token: string): string | null =>
+  resolveMetroArea(token, [token], NO_PHRASES, extractDepartmentCodes(token));
+
+/**
+ * Check if two pre-analyzed locations are in the same metropolitan area.
+ *
+ * @param parts1 - Precomputed parts of the first location
+ * @param parts2 - Precomputed parts of the second location
  * @returns true if both locations resolve to the same metro area
  */
-const areInSameMetroArea = (loc1: string, loc2: string): boolean => {
-  const metro1 = findMetroArea(loc1);
-  const metro2 = findMetroArea(loc2);
-
-  // Both must resolve to the same metro area
-  if (metro1 && metro2 && metro1 === metro2) {
-    return true;
-  }
-
-  return false;
-};
+const areInSameMetroArea = (parts1: LocationParts, parts2: LocationParts): boolean =>
+  parts1.metro !== null && parts1.metro === parts2.metro;
 
 /**
  * Accent → plain char mapping (lowercase). Hoisted to module scope so the map
@@ -377,9 +420,10 @@ const NUMERIC_TOKEN = /^\d+$/;
  * @param tokens2 - Second set of tokens
  * @returns true if any exact token match exists
  */
-const hasTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
+const hasTokenMatch = (tokens1: readonly string[], tokens2: readonly string[]): boolean => {
+  const candidates = new Set(tokens2);
   for (const token1 of tokens1) {
-    if (tokens2.includes(token1)) {
+    if (candidates.has(token1)) {
       return true;
     }
   }
@@ -387,75 +431,73 @@ const hasTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
 };
 
 /**
- * Check if any token pair from two locations are regional synonyms.
- * Also checks multi-word phrases for synonyms like "ile de france".
+ * Collect the synonym-group ids (canonical forms) for every matchable string
+ * of one location: non-numeric tokens plus multi-word phrases.
+ *
+ * `areRegionalSynonyms(a, b)` is true exactly when both `a` and `b` are keys
+ * of `SYNONYM_CACHE` mapping to the same canonical form: if either string is
+ * absent from the cache it cannot appear in any `REGION_SYNONYMS` list either
+ * (every listed synonym is a cache key), so the list-scan fallbacks in
+ * `areRegionalSynonyms` always see a non-member and return false. Synonym
+ * matching is therefore an equivalence-class check, which this collector
+ * turns into O(n) set construction instead of pairwise scans (audit point #5).
  *
  * Pure-numeric single tokens (department codes such as `"17"` or `"75"`) are
- * skipped in the individual-token loop: they collide with arrondissement
- * numbers and other numeric fragments (e.g. mission `"Paris 17"` must not
- * match profile `"La Rochelle"` whose department code is `17`). Whole-string
- * numeric matching (`"75"` vs `"Paris"`) is still handled earlier by the
- * whole-string `areRegionalSynonyms` check, and numeric codes inside a
- * multi-word phrase are unaffected here because phrases are n>=2.
+ * skipped: they collide with arrondissement numbers and other numeric
+ * fragments (e.g. mission `"Paris 17"` must not match profile `"La Rochelle"`
+ * whose department code is `17`). Whole-string numeric matching (`"75"` vs
+ * `"Paris"`) is still handled earlier by the whole-string `areRegionalSynonyms`
+ * check, and numeric codes inside a multi-word phrase are unaffected here
+ * because phrases are n>=2.
  *
- * @param tokens1 - First set of tokens
- * @param tokens2 - Second set of tokens
+ * @param parts - Precomputed parts of the location
+ * @returns Set of canonical forms this location's tokens/phrases belong to
+ */
+const collectSynonymGroupIds = (parts: LocationParts): Set<string> => {
+  const ids = new Set<string>();
+  for (const token of parts.tokens) {
+    if (NUMERIC_TOKEN.test(token)) {
+      continue;
+    }
+    const canonical = SYNONYM_CACHE.get(token);
+    if (canonical) {
+      ids.add(canonical);
+    }
+  }
+  for (const phrase of parts.phrases) {
+    const canonical = SYNONYM_CACHE.get(phrase);
+    if (canonical) {
+      ids.add(canonical);
+    }
+  }
+  return ids;
+};
+
+/**
+ * Check if any token pair or phrase pair from two locations are regional
+ * synonyms (e.g. "ile de france" vs "paris").
+ *
+ * Equivalent to the previous pairwise scans (token×token, phrase×phrase,
+ * phrase×token, token×phrase) because two strings are regional synonyms iff
+ * they share the same canonical form in `SYNONYM_CACHE` (see
+ * `collectSynonymGroupIds`). Two O(n) set constructions plus one intersection
+ * replace the previous O(n·m) nested loops over tokens and phrases.
+ *
+ * @param parts1 - Precomputed parts of the first location
+ * @param parts2 - Precomputed parts of the second location
  * @returns true if any token pair or phrase pair are synonyms
  */
-const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
-  // Check individual tokens. Skip pure-numeric tokens: department codes (e.g.
-  // "17") collide with arrondissement numbers and would otherwise produce
-  // false synonym matches like "Paris 17" -> "La Rochelle".
-  for (const token1 of tokens1) {
-    if (NUMERIC_TOKEN.test(token1)) {
-      continue;
-    }
-    for (const token2 of tokens2) {
-      if (NUMERIC_TOKEN.test(token2)) {
-        continue;
-      }
-      if (areRegionalSynonyms(token1, token2)) {
-        return true;
-      }
+const hasSynonymTokenMatch = (parts1: LocationParts, parts2: LocationParts): boolean => {
+  const ids1 = collectSynonymGroupIds(parts1);
+  if (ids1.size === 0) {
+    return false;
+  }
+  const ids2 = collectSynonymGroupIds(parts2);
+  for (const id of ids1) {
+    if (ids2.has(id)) {
+      return true;
     }
   }
-
-  // Check multi-word phrases (for synonyms like "ile de france")
-  const phrases1 = generatePhrases(tokens1);
-  const phrases2 = generatePhrases(tokens2);
-
-  for (const phrase1 of phrases1) {
-    for (const phrase2 of phrases2) {
-      if (areRegionalSynonyms(phrase1, phrase2)) {
-        return true;
-      }
-    }
-  }
-
-  // Also check phrases against individual tokens (e.g., "ile de france" vs "paris")
-  // Numeric single tokens are skipped (department codes vs arrondissement numbers).
-  for (const phrase1 of phrases1) {
-    for (const token2 of tokens2) {
-      if (NUMERIC_TOKEN.test(token2)) {
-        continue;
-      }
-      if (areRegionalSynonyms(phrase1, token2)) {
-        return true;
-      }
-    }
-  }
-
-  for (const token1 of tokens1) {
-    if (NUMERIC_TOKEN.test(token1)) {
-      continue;
-    }
-    for (const phrase2 of phrases2) {
-      if (areRegionalSynonyms(token1, phrase2)) {
-        return true;
-      }
-    }
-  }
-
   return false;
 };
 
@@ -510,19 +552,21 @@ export const matchLocation = (
     return 'synonym';
   }
 
-  // 4. Check token-based synonyms (handles multi-word cases)
-  const lightMissionTokens = tokenizeLocation(lightMission);
-  const lightProfileTokens = tokenizeLocation(lightProfile);
+  // Analyze each lightly normalized input once and reuse the tokens, phrases,
+  // and metro resolution across all checks below (audit point #9).
+  const lightMissionParts = analyzeLocation(lightMission);
+  const lightProfileParts = analyzeLocation(lightProfile);
 
-  if (lightMissionTokens.length > 0 && lightProfileTokens.length > 0) {
-    if (hasSynonymTokenMatch(lightMissionTokens, lightProfileTokens)) {
+  // 4. Check token-based synonyms (handles multi-word cases)
+  if (lightMissionParts.tokens.length > 0 && lightProfileParts.tokens.length > 0) {
+    if (hasSynonymTokenMatch(lightMissionParts, lightProfileParts)) {
       return 'synonym';
     }
   }
 
   // 4b. Check metropolitan area proximity (nearby)
   // This handles: Nanterre → Paris, Villeurbanne → Lyon, etc.
-  if (areInSameMetroArea(lightMission, lightProfile)) {
+  if (areInSameMetroArea(lightMissionParts, lightProfileParts)) {
     return 'nearby';
   }
 
@@ -535,19 +579,29 @@ export const matchLocation = (
     return 'none';
   }
 
+  // Analyze fully normalized inputs once as well
+  const normMissionParts = analyzeLocation(normMission);
+  const normProfileParts = analyzeLocation(normProfile);
+
   // 5b. Fallback nearby check with fully normalized values
-  if (areInSameMetroArea(normMission, normProfile)) {
+  if (areInSameMetroArea(normMissionParts, normProfileParts)) {
     return 'nearby';
   }
 
-  // 6. Fallback nearby check with tokenized normalized values
-  const missionTokens = tokenizeLocation(normMission);
-  const profileTokens = tokenizeLocation(normProfile);
-
-  // Check if any token pair are in the same metro area
-  for (const token1 of missionTokens) {
-    for (const token2 of profileTokens) {
-      if (areInSameMetroArea(token1, token2)) {
+  // 6. Fallback nearby check with tokenized normalized values.
+  // Each token's metro area is resolved once, then the two sides are
+  // intersected — the previous form re-resolved both tokens of every pair.
+  const profileTokenMetros = new Set<string>();
+  for (const token of normProfileParts.tokens) {
+    const metro = resolveTokenMetroArea(token);
+    if (metro) {
+      profileTokenMetros.add(metro);
+    }
+  }
+  if (profileTokenMetros.size > 0) {
+    for (const token of normMissionParts.tokens) {
+      const metro = resolveTokenMetroArea(token);
+      if (metro && profileTokenMetros.has(metro)) {
         return 'nearby';
       }
     }
@@ -555,12 +609,12 @@ export const matchLocation = (
 
   // 7. Token-based matching with full normalization (for partial matches)
   // Handle case where tokenization produces empty arrays
-  if (missionTokens.length === 0 || profileTokens.length === 0) {
+  if (normMissionParts.tokens.length === 0 || normProfileParts.tokens.length === 0) {
     return 'none';
   }
 
   // Check for exact token match (partial because not full string match)
-  if (hasTokenMatch(missionTokens, profileTokens)) {
+  if (hasTokenMatch(normMissionParts.tokens, normProfileParts.tokens)) {
     return 'partial';
   }
 

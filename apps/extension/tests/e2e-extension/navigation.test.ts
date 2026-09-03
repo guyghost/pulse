@@ -1,4 +1,5 @@
 import type { Locator, Page } from '@playwright/test';
+import { EXTENSION_SURFACE_FLAGS, EXTENSION_TAB_ORDER, type ExtensionTabId } from '@pulse/domain';
 import { expect, expectNoRuntimeErrors, test } from './fixtures';
 
 interface NavigationSurface {
@@ -7,18 +8,25 @@ interface NavigationSurface {
   testId: string;
 }
 
-const navigationSurfaces: NavigationSurface[] = [
-  { ariaLabel: 'Missions', heading: /Feed de missions/, testId: 'feed-scroll-container' },
-  {
+const SURFACE_SPECS: Record<ExtensionTabId, NavigationSurface> = {
+  feed: { ariaLabel: 'Missions', heading: /Feed de missions/, testId: 'feed-scroll-container' },
+  profile: {
     ariaLabel: 'Profil',
     heading: /Votre profil MissionPulse|Bonjour /,
     testId: 'page-profile',
   },
-  { ariaLabel: 'CV', heading: /CV & expériences/, testId: 'page-cv' },
-  { ariaLabel: 'Suivi', heading: /Candidatures/, testId: 'page-applications' },
-  { ariaLabel: 'TJM', heading: /Analyse TJM/, testId: 'page-tjm' },
-  { ariaLabel: 'Réglages Settings', heading: /Paramètres/, testId: 'page-settings' },
-];
+  cv: { ariaLabel: 'CV', heading: /CV & expériences/, testId: 'page-cv' },
+  applications: { ariaLabel: 'Suivi', heading: /Candidatures/, testId: 'page-applications' },
+  tjm: { ariaLabel: 'TJM', heading: /Analyse TJM/, testId: 'page-tjm' },
+  settings: { ariaLabel: 'Réglages', heading: /Réglages/, testId: 'page-settings' },
+};
+
+// Packaged builds have no DEV stubs, so the localStorage override cannot
+// enable a disabled tab: traverse exactly the surfaces the launch flags
+// enable (see src/models/surface-feature-flags.model.md).
+const navigationSurfaces: NavigationSurface[] = EXTENSION_TAB_ORDER.filter(
+  (tab) => EXTENSION_SURFACE_FLAGS[tab]
+).map((tab) => SURFACE_SPECS[tab]);
 
 async function assertNoBlankOrLoadError(page: Page): Promise<void> {
   await expect(page.getByTestId('bootstrap-error')).toHaveCount(0);
@@ -192,9 +200,14 @@ test(
 
     const page = await extension.openSidePanel();
     // The dedicated help trigger button was removed with the filter-dock
-    // redesign; the dialog now opens from the `?` shortcut. The first-run
-    // toast is suppressed by the kbd_cheatsheet_tip_seen seed.
-    const opener = page.getByRole('button', { name: 'Scanner', exact: true });
+    // redesign; the dialog now opens from the `?` shortcut. Seed focus on a
+    // navigation tab: unlike the hero scan CTA, its accessible name does not
+    // flip with the scan lifecycle (probe alarms can auto-start a scan after
+    // seeding and rename the CTA to "Stopper le scan en cours"). The
+    // first-run toast is suppressed by the kbd_cheatsheet_tip_seen seed.
+    const opener = page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'Profil' });
     await expect(opener).toBeVisible();
     await openShortcutsHelp(page, opener);
 

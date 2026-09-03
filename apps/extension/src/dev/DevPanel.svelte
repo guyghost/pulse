@@ -6,7 +6,14 @@
   import {
     DEV_PREMIUM_FEATURE_STORAGE_KEY,
     DEV_PREMIUM_ENABLED_STORAGE_KEY,
+    DEV_SURFACE_FLAGS_STORAGE_KEY,
   } from '$lib/state/features.svelte';
+  import {
+    EXTENSION_SURFACE_FLAGS,
+    resolveSurfaceFlags,
+    type ExtensionSurfaceFeature,
+    type ExtensionSurfaceFlags,
+  } from '@pulse/domain';
 
   const {
     onInjectMissions,
@@ -152,6 +159,44 @@
     }
     window.location.reload();
   }
+
+  function readCurrentSurfaceFlags(): ExtensionSurfaceFlags {
+    try {
+      const raw = window.localStorage.getItem(DEV_SURFACE_FLAGS_STORAGE_KEY);
+      const parsed: unknown = raw ? JSON.parse(raw) : null;
+      const overrides =
+        parsed !== null && typeof parsed === 'object' && !Array.isArray(parsed)
+          ? (parsed as Record<string, unknown>)
+          : null;
+      return resolveSurfaceFlags(overrides, EXTENSION_SURFACE_FLAGS);
+    } catch {
+      return { ...EXTENSION_SURFACE_FLAGS };
+    }
+  }
+
+  function applySurfaceFlags(next: ExtensionSurfaceFlags): void {
+    try {
+      window.localStorage.setItem(DEV_SURFACE_FLAGS_STORAGE_KEY, JSON.stringify(next));
+    } catch {
+      // localStorage unavailable — ignore
+    }
+    window.location.reload();
+  }
+
+  function toggleSurfaceFlag(key: ExtensionSurfaceFeature): void {
+    const current = readCurrentSurfaceFlags();
+    applySurfaceFlags({ ...current, [key]: !(current[key] === true) });
+  }
+
+  const surfaceFlagLabels: ReadonlyArray<{ key: ExtensionSurfaceFeature; label: string }> = [
+    { key: 'feed', label: 'feed' },
+    { key: 'profile', label: 'profile' },
+    { key: 'cv', label: 'cv' },
+    { key: 'applications', label: 'applications' },
+    { key: 'tjm', label: 'tjm' },
+    { key: 'settings', label: 'settings' },
+    { key: 'connected', label: 'connected' },
+  ];
 </script>
 
 <svelte:window onkeydown={handleKeydown} />
@@ -347,6 +392,54 @@
         </div>
         <p class="mt-1 text-micro text-text-subtle">
           Bascule le flag premium et recharge. Dormant = défaut production.
+        </p>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-micro uppercase font-bold text-text-secondary tracking-wider"
+            >Surface Flags</span
+          >
+          <span class="text-micro text-text-muted">Onglets &amp; features au lancement</span>
+        </div>
+        <div class="mt-1 flex flex-wrap gap-1">
+          {#each surfaceFlagLabels as flag (flag.key)}
+            <button
+              class="rounded-lg border px-2 py-1 text-caption font-mono font-semibold transition-colors {readCurrentSurfaceFlags()[
+                flag.key
+              ] === true
+                ? 'border-blueprint-blue/40 bg-blueprint-blue/12 text-blueprint-blue'
+                : 'border-border-light bg-surface-white text-text-muted hover:bg-subtle-gray'}"
+              onclick={() => toggleSurfaceFlag(flag.key)}
+              title="Basculer {flag.label} puis recharger"
+            >
+              {flag.label}
+            </button>
+          {/each}
+        </div>
+        <div class="mt-1 flex gap-1">
+          <button
+            class="rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-2 py-1.5 text-caption font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
+            onclick={() => applySurfaceFlags({ ...EXTENSION_SURFACE_FLAGS })}
+            title="Restaurer la configuration de lancement (applications et connected off)"
+          >
+            Défaut lancement
+          </button>
+          <button
+            class="rounded-lg border border-border-light bg-surface-white px-2 py-1.5 text-caption font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
+            onclick={() =>
+              applySurfaceFlags(
+                Object.fromEntries(
+                  surfaceFlagLabels.map((flag) => [flag.key, true])
+                ) as ExtensionSurfaceFlags
+              )}
+            title="Activer toutes les surfaces puis recharger"
+          >
+            Tout activer
+          </button>
+        </div>
+        <p class="mt-1 text-micro text-text-subtle">
+          Écrit {DEV_SURFACE_FLAGS_STORAGE_KEY} (JSON) puis recharge. Défaut lancement = état production.
         </p>
       </div>
 
