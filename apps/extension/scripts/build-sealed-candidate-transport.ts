@@ -149,7 +149,7 @@ async function main(): Promise<void> {
   // corrupt the captured JSON report.
   const rawReport = await run(
     join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
-    ['test', '--config=playwright.mv3.config.ts', '--reporter=json'],
+    ['test', '--config=playwright.mv3.config.ts', '--reporter=json', '--retries=0'],
     268_435_456,
     EXTENSION_ROOT
   );
