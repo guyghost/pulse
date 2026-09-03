@@ -363,6 +363,7 @@ describe('Release validation — fail-closed artifact contracts', () => {
     ) as { scenarioIds: string[] };
     const testSources = [
       resolve(EXTENSION_ROOT, 'tests/mv3/harness-adversarial.test.ts'),
+      resolve(EXTENSION_ROOT, 'tests/e2e-extension/form-assistant.test.ts'),
       resolve(EXTENSION_ROOT, 'tests/e2e-extension/navigation.test.ts'),
       resolve(EXTENSION_ROOT, 'tests/e2e-extension/runtime.test.ts'),
     ].map((path) => readFileSync(path, 'utf8'));
