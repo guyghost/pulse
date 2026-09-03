@@ -129,7 +129,6 @@ async function main(): Promise<void> {
   await run('pnpm', [
     '--filter',
     '@pulse/extension',
-    'exec',
     'verify-manifest',
     'dist/manifest.json',
     '--post-build',
