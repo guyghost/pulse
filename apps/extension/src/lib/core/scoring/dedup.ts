@@ -293,6 +293,19 @@ const compareClients = (
   return { compatible: score >= 0.75, score };
 };
 
+/**
+ * Allocation-free remote-token lookup — compareLocations runs per mission-pair
+ * in the dedup hot loop, so intermediate arrays must be avoided.
+ */
+const hasRemoteLocationToken = (tokens: ReadonlySet<string>): boolean => {
+  for (const token of tokens) {
+    if (REMOTE_LOCATION_TOKENS.has(token)) {
+      return true;
+    }
+  }
+  return false;
+};
+
 const compareLocations = (
   a: MissionComparisonCache,
   b: MissionComparisonCache
@@ -316,7 +329,8 @@ const compareLocations = (
   const hasRemoteContext =
     a.remote === 'full' ||
     b.remote === 'full' ||
-    [...aTokens, ...bTokens].some((token) => REMOTE_LOCATION_TOKENS.has(token));
+    hasRemoteLocationToken(aTokens) ||
+    hasRemoteLocationToken(bTokens);
 
   return { compatible: hasRemoteContext, score: hasRemoteContext ? 0.4 : 0 };
 };
