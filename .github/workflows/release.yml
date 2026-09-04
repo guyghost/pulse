@@ -265,6 +265,9 @@ jobs:
     needs: [package-validated, consumer-verify]
     permissions:
       contents: write
+      # the sealed commit chain contains workflow file changes — pushing the
+      # version tag over them requires the workflows scope on GITHUB_TOKEN
+      workflows: write
 
     steps:
       - name: Checkout the sealed source commit
