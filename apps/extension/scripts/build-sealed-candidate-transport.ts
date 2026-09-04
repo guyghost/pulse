@@ -38,6 +38,10 @@ function parseArg(name: string): string | undefined {
   return process.argv[index + 1];
 }
 
+function isRecordLike(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
 function requireArg(name: string): string {
   const value = parseArg(name);
   if (value === undefined || value.length === 0) {
@@ -147,12 +151,57 @@ async function main(): Promise<void> {
   const mv3StartedAt = new Date().toISOString();
   // Direct binary: `pnpm exec` prefixes stdout with its own noise, which would
   // corrupt the captured JSON report.
-  const rawReport = await run(
-    join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
-    ['test', '--config=playwright.mv3.config.ts', '--reporter=json', '--retries=0'],
-    268_435_456,
-    EXTENSION_ROOT
-  );
+  let rawReport: string;
+  try {
+    rawReport = await run(
+      join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
+      ['test', '--config=playwright.mv3.config.ts', '--reporter=json', '--retries=0'],
+      268_435_456,
+      EXTENSION_ROOT
+    );
+  } catch (error) {
+    // Make the CI log actionable: name every scenario that failed first-try.
+    const cause = error as { stdout?: string };
+    if (typeof cause.stdout === 'string' && cause.stdout.trimStart().startsWith('{')) {
+      try {
+        const parsed = JSON.parse(cause.stdout) as {
+          suites?: unknown;
+        };
+        const failures: string[] = [];
+        const walk = (suite: unknown): void => {
+          if (!isRecordLike(suite)) {
+            return;
+          }
+          for (const child of Array.isArray(suite.suites) ? suite.suites : []) {
+            walk(child);
+          }
+          for (const test of Array.isArray(suite.tests) ? suite.tests : []) {
+            if (!isRecordLike(test)) {
+              continue;
+            }
+            const scenario = (
+              test.annotations as Array<{ type?: string; description?: string }>
+            )?.find((annotation) => annotation.type === 'scenario-id')?.description;
+            const worst = Array.isArray(test.results)
+              ? test.results[test.results.length - 1]
+              : undefined;
+            if (scenario && isRecordLike(worst) && worst.status !== 'passed') {
+              failures.push(`${scenario}=${String(worst.status)}`);
+            }
+          }
+        };
+        for (const suite of Array.isArray(parsed.suites) ? parsed.suites : []) {
+          walk(suite);
+        }
+        console.error(
+          `[build-sealed-candidate-transport] MV3 first-try failures: ${failures.join(', ') || 'none parsed'}`
+        );
+      } catch {
+        // Report capture is best-effort; rethrow the original failure below.
+      }
+    }
+    throw error;
+  }
   const rawReportPath = join(workDir, 'mv3-raw-report.json');
   await writeFile(rawReportPath, rawReport, { encoding: 'utf8', mode: 0o600 });
   const mv3CompletedAt = new Date().toISOString();
