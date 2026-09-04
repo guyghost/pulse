@@ -114,6 +114,15 @@ jobs:
           repository: ${{ github.repository }}
           run-id: ${{ inputs.evidence_run_id }}
 
+      - name: Extract the sealed transport
+        run: |
+          test -f "$GITHUB_WORKSPACE/release-input/missionpulse-sealed-candidate.tar.gz"
+          mkdir -p "$GITHUB_WORKSPACE/release-input"
+          tar -xzf "$GITHUB_WORKSPACE/release-input/missionpulse-sealed-candidate.tar.gz" \
+            -C "$GITHUB_WORKSPACE/release-input"
+          test -f "$GITHUB_WORKSPACE/release-input/tested-dist-seal.json"
+          test -f "$GITHUB_WORKSPACE/release-input/dist/manifest.json"
+
       - name: Verify sealed evidence identity
         env:
           EXPECTED_COMMIT: ${{ inputs.source_commit }}
