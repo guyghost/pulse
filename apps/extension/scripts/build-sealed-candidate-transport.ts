@@ -150,60 +150,65 @@ async function main(): Promise<void> {
 
   const mv3StartedAt = new Date().toISOString();
   // Direct binary: `pnpm exec` prefixes stdout with its own noise, which would
-  // corrupt the captured JSON report.
-  let rawReport: string;
+  // corrupt a stdout-captured JSON report. The JSON reporter writes its file
+  // via PLAYWRIGHT_JSON_OUTPUT_NAME instead, leaving stdout for the CI log.
+  const rawReportPath = join(workDir, 'mv3-raw-report.json');
   try {
-    rawReport = await run(
+    await execFile(
       join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
       ['test', '--config=playwright.mv3.config.ts', '--reporter=json', '--retries=0'],
-      268_435_456,
-      EXTENSION_ROOT
+      {
+        cwd: EXTENSION_ROOT,
+        maxBuffer: 268_435_456,
+        encoding: 'utf8',
+        env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: rawReportPath },
+      }
     );
   } catch (error) {
     // Make the CI log actionable: name every scenario that failed first-try.
-    const cause = error as { stdout?: string };
-    if (typeof cause.stdout === 'string' && cause.stdout.trimStart().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(cause.stdout) as {
-          suites?: unknown;
-        };
-        const failures: string[] = [];
-        const walk = (suite: unknown): void => {
-          if (!isRecordLike(suite)) {
-            return;
-          }
-          for (const child of Array.isArray(suite.suites) ? suite.suites : []) {
-            walk(child);
-          }
-          for (const test of Array.isArray(suite.tests) ? suite.tests : []) {
-            if (!isRecordLike(test)) {
-              continue;
-            }
-            const scenario = (
-              test.annotations as Array<{ type?: string; description?: string }>
-            )?.find((annotation) => annotation.type === 'scenario-id')?.description;
-            const worst = Array.isArray(test.results)
-              ? test.results[test.results.length - 1]
-              : undefined;
-            if (scenario && isRecordLike(worst) && worst.status !== 'passed') {
-              failures.push(`${scenario}=${String(worst.status)}`);
-            }
-          }
-        };
-        for (const suite of Array.isArray(parsed.suites) ? parsed.suites : []) {
-          walk(suite);
+    try {
+      const parsed = JSON.parse(await readFile(rawReportPath, 'utf8')) as {
+        suites?: unknown;
+        errors?: unknown;
+      };
+      const failures: string[] = [];
+      const walk = (suite: unknown): void => {
+        if (!isRecordLike(suite)) {
+          return;
         }
-        console.error(
-          `[build-sealed-candidate-transport] MV3 first-try failures: ${failures.join(', ') || 'none parsed'}`
-        );
-      } catch {
-        // Report capture is best-effort; rethrow the original failure below.
+        for (const child of Array.isArray(suite.suites) ? suite.suites : []) {
+          walk(child);
+        }
+        for (const test of Array.isArray(suite.tests) ? suite.tests : []) {
+          if (!isRecordLike(test)) {
+            continue;
+          }
+          const scenario = (
+            test.annotations as Array<{ type?: string; description?: string }>
+          )?.find((annotation) => annotation.type === 'scenario-id')?.description;
+          const worst = Array.isArray(test.results)
+            ? test.results[test.results.length - 1]
+            : undefined;
+          if (scenario && isRecordLike(worst) && worst.status !== 'passed') {
+            failures.push(`${scenario}=${String(worst.status)}`);
+          }
+        }
+      };
+      for (const suite of Array.isArray(parsed.suites) ? parsed.suites : []) {
+        walk(suite);
       }
+      const topErrors = Array.isArray(parsed.errors) ? parsed.errors.length : 0;
+      console.error(
+        `[build-sealed-candidate-transport] MV3 first-try failures: ${failures.join(', ') || 'none'} (${topErrors} top-level error(s))`
+      );
+    } catch (parseError) {
+      console.error(
+        `[build-sealed-candidate-transport] MV3 report unreadable:`,
+        parseError instanceof Error ? parseError.message : parseError
+      );
     }
     throw error;
   }
-  const rawReportPath = join(workDir, 'mv3-raw-report.json');
-  await writeFile(rawReportPath, rawReport, { encoding: 'utf8', mode: 0o600 });
   const mv3CompletedAt = new Date().toISOString();
 
   // ── 4. gate: bind evidence into the release gate input ──
