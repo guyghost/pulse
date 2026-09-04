@@ -424,9 +424,9 @@ describe('Release validation — fail-closed artifact contracts', () => {
     }
     expect(publish.needs).toEqual(['package-validated', 'consumer-verify']);
     expect(publish.permissions).toEqual({ contents: 'write' });
-    // the workflows scope (tag over workflow-changing commits) is granted at
-    // the workflow level: the job-level parser rejects that permission key
-    expect(isRecord(workflow.permissions) && workflow.permissions.workflows).toBe('write');
+    // no workflows scope anywhere: tagging is an operator action, not the job's
+    const workflowPermissions = isRecord(workflow.permissions) ? workflow.permissions : {};
+    expect(workflowPermissions.workflows).toBeUndefined();
 
     const steps = Array.isArray(publish.steps)
       ? (publish.steps as Array<Record<string, unknown>>)
