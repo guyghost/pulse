@@ -423,7 +423,10 @@ describe('Release validation — fail-closed artifact contracts', () => {
       return;
     }
     expect(publish.needs).toEqual(['package-validated', 'consumer-verify']);
-    expect(publish.permissions).toEqual({ contents: 'write', workflows: 'write' });
+    expect(publish.permissions).toEqual({ contents: 'write' });
+    // the workflows scope (tag over workflow-changing commits) is granted at
+    // the workflow level: the job-level parser rejects that permission key
+    expect(isRecord(workflow.permissions) && workflow.permissions.workflows).toBe('write');
 
     const steps = Array.isArray(publish.steps)
       ? (publish.steps as Array<Record<string, unknown>>)
