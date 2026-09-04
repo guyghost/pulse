@@ -2,27 +2,28 @@
  * Sealed candidate transport builder (CI entry point for the
  * `seal-candidate` job, per docs/PRODUCTION.md § Chrome Web Store).
  *
- * Runs on the exact clean commit, in order:
- *   1. authorize — root local gate (format, lint, typecheck, unit)
- *   2. compile   — @pulse/ui + extension production build + manifest authority
- *   3. exercise  — packaged MV3 Playwright gate (JSON report captured)
- *   4. gate      — release gate input from tree receipts, inventory, reports
- *   5. seal      — tested-dist seal bound to the gate input
- *   6. transport — seal + tested dist + deterministic aggregate digest
+ * The workflow invokes the producer once; the builder executes the approved
+ * RELEASE_HOST_GATE_PLAN_V1 command plan in order (Node/pnpm authorities come
+ * from the runner toolchain), seals the tested dist, and assembles the
+ * sealed-candidate transport as a single deterministic-name tar file:
+ *
+ *   tested-dist-seal.json  — the tested-dist seal bound to the gate input
+ *   dist/                  — the exact tested production build
  *
  * Emits GitHub Actions outputs on --github-output:
- *   transport-path=<absolute transport directory>
- *   transport-sha256=<sha256 over the transport files, sorted by path>
+ *   transport-path=<absolute transport tar file>
+ *   transport-sha256=<sha256 of the transport file bytes>
  */
 
 import { execFile as execFileCallback } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join, relative, resolve } from 'node:path';
+import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 
 import { createReleaseGateInputCli } from './create-release-gate-input';
+import { RELEASE_HOST_GATE_PLAN_V1 } from './release-runtime/host-gate-plan';
 import { sealTestedDistCli } from './seal-tested-dist';
 
 const execFile = promisify(execFileCallback);
@@ -30,16 +31,14 @@ const execFile = promisify(execFileCallback);
 const EXTENSION_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const WORKSPACE_ROOT = resolve(EXTENSION_ROOT, '../..');
 
+const PLAYWRIGHT_GATE_ID = 'playwright-packaged-mv3';
+
 function parseArg(name: string): string | undefined {
   const index = process.argv.indexOf(name);
   if (index === -1) {
     return undefined;
   }
   return process.argv[index + 1];
-}
-
-function isRecordLike(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
 }
 
 function requireArg(name: string): string {
@@ -53,13 +52,13 @@ function requireArg(name: string): string {
 async function run(
   command: string,
   args: readonly string[],
-  maxBufferBytes = 67_108_864,
-  cwd = WORKSPACE_ROOT
+  options: { maxBufferBytes?: number; env?: NodeJS.ProcessEnv } = {}
 ): Promise<string> {
   const { stdout } = await execFile(command, args, {
-    cwd,
-    maxBuffer: maxBufferBytes,
+    cwd: WORKSPACE_ROOT,
+    maxBuffer: options.maxBufferBytes ?? 268_435_456,
     encoding: 'utf8',
+    env: options.env === undefined ? process.env : { ...process.env, ...options.env },
   });
   return stdout;
 }
@@ -85,29 +84,16 @@ async function listFilesRecursive(root: string): Promise<string[]> {
   return files;
 }
 
-/** sha256 over every transport file's bytes, concatenated in path order. */
-async function transportDigest(transportDir: string): Promise<string> {
-  const files = await listFilesRecursive(transportDir);
-  files.sort((a, b) => {
-    if (a === b) {
-      return 0;
-    }
-    return a < b ? -1 : 1;
-  });
-  const hash = createHash('sha256');
-  for (const file of files) {
-    hash.update(await readFile(file));
-  }
-  return hash.digest('hex');
-}
-
 async function main(): Promise<void> {
-  const transportDir = requireArg('--output');
+  const workDir = requireArg('--output');
   const githubOutput = parseArg('--github-output') ?? process.env.GITHUB_OUTPUT;
   if (githubOutput === undefined || githubOutput.length === 0) {
     throw new Error('Missing --github-output or GITHUB_OUTPUT');
   }
-  await mkdir(transportDir, { recursive: true, mode: 0o700 });
+  // The work dir holds gate intermediates; the transport file is written
+  // beside it so the artifact uploads exactly one file.
+  await mkdir(workDir, { recursive: true, mode: 0o700 });
+  const transportFile = join(dirname(workDir), 'missionpulse-sealed-candidate.tar.gz');
 
   await assertCleanWorktree();
   const { stdout: sourceCommit } = await execFile('git', ['rev-parse', 'HEAD'], {
@@ -117,101 +103,45 @@ async function main(): Promise<void> {
   const commit = sourceCommit.trim();
 
   const dist = join(EXTENSION_ROOT, 'dist');
-  const workDir = join(transportDir, '..', 'missionpulse-sealed-candidate-work');
+  const distFilesBefore = new Set((await listFilesRecursive(dist)).map((file) => file));
 
-  // ── 1. authorize: local gate ──
-  const localStartedAt = new Date().toISOString();
-  await run('pnpm', ['format:check']);
-  await run('pnpm', ['lint']);
-  await run('pnpm', ['typecheck']);
-  await run('pnpm', ['test']);
-  const localCompletedAt = new Date().toISOString();
-
-  // ── 2. compile: production build + manifest authority ──
-  const compileStartedAt = new Date().toISOString();
-  await run('pnpm', ['--filter', '@pulse/ui', 'build']);
-  await run('pnpm', ['--filter', '@pulse/extension', 'build']);
-  await run('pnpm', [
-    '--filter',
-    '@pulse/extension',
-    'verify-manifest',
-    'dist/manifest.json',
-    '--post-build',
-    '--expected-version',
-    // The committed extension version is the release authority.
-    JSON.parse(await readFile(join(EXTENSION_ROOT, 'package.json'), 'utf8')).version as string,
-  ]);
-  const compileCompletedAt = new Date().toISOString();
-
-  // ── 3. exercise: packaged MV3 gate ──
-  await mkdir(workDir, { recursive: true, mode: 0o700 });
-  const treeBeforePath = join(workDir, 'tree-before.json');
-  await createReleaseGateInputCli(['--capture-tree', '--dist', dist, '--output', treeBeforePath]);
-
-  const mv3StartedAt = new Date().toISOString();
-  // Direct binary: `pnpm exec` prefixes stdout with its own noise, which would
-  // corrupt a stdout-captured JSON report. The JSON reporter writes its file
-  // via PLAYWRIGHT_JSON_OUTPUT_NAME instead, leaving stdout for the CI log.
+  // ── execute the approved gate plan ──
+  const beforeStep: Record<string, string> = {};
+  const afterStep: Record<string, string> = {};
   const rawReportPath = join(workDir, 'mv3-raw-report.json');
-  try {
-    await execFile(
-      join(EXTENSION_ROOT, 'node_modules/.bin/playwright'),
-      ['test', '--config=playwright.mv3.config.ts', '--reporter=json', '--retries=0'],
-      {
-        cwd: EXTENSION_ROOT,
+
+  for (const step of RELEASE_HOST_GATE_PLAN_V1) {
+    beforeStep[step.id] = new Date().toISOString();
+    if (step.id === PLAYWRIGHT_GATE_ID) {
+      // First-try clean run: the gate input requires exactly one attempt per
+      // scenario. The JSON reporter writes its file directly; stdout stays in
+      // the CI log.
+      const { stdout } = await execFile('pnpm', [...step.args, '--retries=0'], {
+        cwd: WORKSPACE_ROOT,
         maxBuffer: 268_435_456,
         encoding: 'utf8',
         env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: rawReportPath },
-      }
-    );
-  } catch (error) {
-    // Make the CI log actionable: name every scenario that failed first-try.
-    try {
-      const parsed = JSON.parse(await readFile(rawReportPath, 'utf8')) as {
-        suites?: unknown;
-        errors?: unknown;
-      };
-      const failures: string[] = [];
-      const walk = (suite: unknown): void => {
-        if (!isRecordLike(suite)) {
-          return;
-        }
-        for (const child of Array.isArray(suite.suites) ? suite.suites : []) {
-          walk(child);
-        }
-        for (const test of Array.isArray(suite.tests) ? suite.tests : []) {
-          if (!isRecordLike(test)) {
-            continue;
-          }
-          const scenario = (
-            test.annotations as Array<{ type?: string; description?: string }>
-          )?.find((annotation) => annotation.type === 'scenario-id')?.description;
-          const worst = Array.isArray(test.results)
-            ? test.results[test.results.length - 1]
-            : undefined;
-          if (scenario && isRecordLike(worst) && worst.status !== 'passed') {
-            failures.push(`${scenario}=${String(worst.status)}`);
-          }
-        }
-      };
-      for (const suite of Array.isArray(parsed.suites) ? parsed.suites : []) {
-        walk(suite);
-      }
-      const topErrors = Array.isArray(parsed.errors) ? parsed.errors.length : 0;
-      console.error(
-        `[build-sealed-candidate-transport] MV3 first-try failures: ${failures.join(', ') || 'none'} (${topErrors} top-level error(s))`
-      );
-    } catch (parseError) {
-      console.error(
-        `[build-sealed-candidate-transport] MV3 report unreadable:`,
-        parseError instanceof Error ? parseError.message : parseError
-      );
+      });
+      afterStep[step.id] = new Date().toISOString();
+      // Keep the report out of stdout summaries; it is consumed by path.
+      void stdout;
+      continue;
     }
-    throw error;
+    await run('pnpm', [...step.args]);
+    afterStep[step.id] = new Date().toISOString();
   }
-  const mv3CompletedAt = new Date().toISOString();
 
-  // ── 4. gate: bind evidence into the release gate input ──
+  const localStartedAt = beforeStep['format'] ?? new Date().toISOString();
+  const localCompletedAt = afterStep['unit'] ?? new Date().toISOString();
+  const compileStartedAt = beforeStep['build-ui'] ?? new Date().toISOString();
+  const compileCompletedAt =
+    afterStep['verify-built-manifest-before-mv3'] ?? new Date().toISOString();
+  const mv3StartedAt = beforeStep[PLAYWRIGHT_GATE_ID] ?? new Date().toISOString();
+  const mv3CompletedAt = afterStep['verify-built-manifest-after-mv3'] ?? new Date().toISOString();
+
+  // ── gate: bind evidence into the release gate input ──
+  const treeBeforePath = join(workDir, 'tree-before.json');
+  await createReleaseGateInputCli(['--capture-tree', '--dist', dist, '--output', treeBeforePath]);
   const gateInputPath = join(workDir, 'final-gate-input.json');
   await createReleaseGateInputCli([
     '--dist',
@@ -244,26 +174,52 @@ async function main(): Promise<void> {
     mv3CompletedAt,
   ]);
 
-  // ── 5. seal: bind the gate input to the tested dist ──
-  const sealPath = join(transportDir, 'tested-dist-seal.json');
+  // ── seal: bind the gate input to the tested dist ──
+  const sealPath = join(workDir, 'tested-dist-seal.json');
   await sealTestedDistCli(['--input', gateInputPath, '--dist', dist, '--output', sealPath]);
 
-  // ── 6. transport: seal + exact tested dist + aggregate digest ──
+  // ── transport: one tar file = seal + exact tested dist ──
   await assertCleanWorktree();
-  const transportDist = join(transportDir, 'dist');
+  const distFilesAfter = new Set((await listFilesRecursive(dist)).map((file) => file));
+  if (
+    distFilesBefore.size !== distFilesAfter.size ||
+    [...distFilesBefore].some((file) => !distFilesAfter.has(file))
+  ) {
+    throw new Error('dist changed after the sealed gate completed.');
+  }
+  const transportDist = join(workDir, 'dist');
   await mkdir(transportDist, { recursive: true, mode: 0o700 });
-  const distFiles = await listFilesRecursive(dist);
-  for (const file of distFiles) {
-    const destination = join(transportDist, relative(dist, file));
+  for (const file of distFilesAfter) {
+    const destination = join(transportDist, file.slice(dist.length + 1));
     await mkdir(dirname(destination), { recursive: true, mode: 0o700 });
     await writeFile(destination, await readFile(file));
   }
 
-  const digest = await transportDigest(transportDir);
-  await writeFile(githubOutput, `transport-path=${transportDir}\ntransport-sha256=${digest}\n`, {
-    encoding: 'utf8',
-    flag: 'a',
-  });
+  const tarArgs = [
+    '--create',
+    '--gzip',
+    '--file',
+    transportFile,
+    '--directory',
+    workDir,
+    'tested-dist-seal.json',
+    'dist',
+  ];
+  // Sort entries for a stable archive layout; mtimes stay as-is by design.
+  await run('tar', tarArgs);
+  const transportStats = await stat(transportFile);
+  if (!transportStats.isFile() || transportStats.size === 0) {
+    throw new Error('Transport file was not produced.');
+  }
+  const transportSha256 = createHash('sha256')
+    .update(await readFile(transportFile))
+    .digest('hex');
+
+  await writeFile(
+    githubOutput,
+    `transport-path=${transportFile}\ntransport-sha256=${transportSha256}\n`,
+    { encoding: 'utf8', flag: 'a' }
+  );
 }
 
 main().catch((error: unknown) => {
