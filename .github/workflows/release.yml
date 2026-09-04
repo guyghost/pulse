@@ -254,3 +254,89 @@ jobs:
 
       - name: Record local-only release boundary
         run: echo "package_validated; no Store submission or deployment state is claimed"
+
+      - name: Record local-only release boundary
+        run: echo "package_validated; no Store submission or deployment state is claimed"
+
+  release-publish:
+    name: Publish the validated GitHub Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [package-validated, consumer-verify]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the sealed source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 0
+
+      - name: Download package_validated evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.package-validated.outputs.artifact_name }}
+          path: ${{ github.workspace }}/release-bundle
+
+      - name: Verify the release bundle checksum
+        env:
+          EXPECTED_ZIP_SHA256: ${{ needs.package-validated.outputs.zip_sha256 }}
+        run: |
+          BUNDLE="$GITHUB_WORKSPACE/release-bundle/apps/extension/releases/v${{ inputs.expected_version }}"
+          ACTUAL=$(sha256sum "$BUNDLE/missionpulse.zip" | cut -d' ' -f1)
+          SIDECAR=$(cut -d' ' -f1 "$BUNDLE/missionpulse.zip.sha256")
+          test "$ACTUAL" = "$SIDECAR"
+          test "$ACTUAL" = "$EXPECTED_ZIP_SHA256"
+
+      - name: Create the immutable version tag
+        env:
+          VERSION: ${{ inputs.expected_version }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/v${VERSION}" | cut -f1)
+          if [ -n "$REMOTE_TAG" ]; then
+            test "$REMOTE_TAG" = "$SOURCE_COMMIT" || {
+              echo "Refusing: tag v${VERSION} already points at ${REMOTE_TAG}, not ${SOURCE_COMMIT}." >&2
+              exit 1
+            }
+            echo "Tag v${VERSION} already points at the sealed commit."
+          else
+            git tag "v${VERSION}" "$SOURCE_COMMIT"
+            git push origin "refs/tags/v${VERSION}"
+          fi
+
+      - name: Publish the GitHub Release with store assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.expected_version }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          BUNDLE="$GITHUB_WORKSPACE/release-bundle/apps/extension/releases/v${VERSION}"
+          if gh release view "v${VERSION}" --json url > /dev/null 2>&1; then
+            echo "Release v${VERSION} already exists — published assets are immutable, refusing to mutate." >&2
+            exit 1
+          fi
+          {
+            echo "## MissionPulse v${VERSION}"
+            echo
+            echo "Validated store handoff bundle, packaged from the sealed candidate."
+            echo
+            echo "- Sealed commit: \`${SOURCE_COMMIT}\`"
+            echo "- missionpulse.zip sha256: \`$(cut -d' ' -f1 "$BUNDLE/missionpulse.zip.sha256")\`"
+            echo "- Provenance: validation.json (seal, package validation, ownership marker)"
+          } > "$RUNNER_TEMP/release-notes.md"
+          gh release create "v${VERSION}" \
+            --verify-tag \
+            --title "MissionPulse v${VERSION}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release upload "v${VERSION}" \
+            "$BUNDLE/missionpulse.zip" \
+            "$BUNDLE/missionpulse.zip.sha256" \
+            "$BUNDLE/validation.json"
+
+      - name: Record the published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.expected_version }}
+        run: gh release view "v${VERSION}" --json url,tagName -q '"Published " + .tagName + " → " + .url' >> "$GITHUB_STEP_SUMMARY"
