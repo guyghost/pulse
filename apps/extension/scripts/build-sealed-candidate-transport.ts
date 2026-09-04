@@ -209,7 +209,6 @@ async function main(): Promise<void> {
     }
     throw error;
   }
-  const rawReport = await readFile(rawReportPath, { encoding: 'utf8' });
   const mv3CompletedAt = new Date().toISOString();
 
   // ── 4. gate: bind evidence into the release gate input ──
