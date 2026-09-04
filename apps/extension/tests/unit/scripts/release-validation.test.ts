@@ -423,7 +423,7 @@ describe('Release validation — fail-closed artifact contracts', () => {
       return;
     }
     expect(publish.needs).toEqual(['package-validated', 'consumer-verify']);
-    expect(publish.permissions).toEqual({ contents: 'write' });
+    expect(publish.permissions).toEqual({ contents: 'write', workflows: 'write' });
 
     const steps = Array.isArray(publish.steps)
       ? (publish.steps as Array<Record<string, unknown>>)
