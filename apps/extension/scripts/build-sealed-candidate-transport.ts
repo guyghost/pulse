@@ -103,7 +103,6 @@ async function main(): Promise<void> {
   const commit = sourceCommit.trim();
 
   const dist = join(EXTENSION_ROOT, 'dist');
-  const distFilesBefore = new Set((await listFilesRecursive(dist)).map((file) => file));
 
   // ── execute the approved gate plan ──
   const beforeStep: Record<string, string> = {};
@@ -176,6 +175,7 @@ async function main(): Promise<void> {
 
   // ── seal: bind the gate input to the tested dist ──
   const sealPath = join(workDir, 'tested-dist-seal.json');
+  const distFilesBefore = new Set((await listFilesRecursive(dist)).map((file) => file));
   await sealTestedDistCli(['--input', gateInputPath, '--dist', dist, '--output', sealPath]);
 
   // ── transport: one tar file = seal + exact tested dist ──
