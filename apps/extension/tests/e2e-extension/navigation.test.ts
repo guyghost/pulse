@@ -62,8 +62,15 @@ async function openShortcutsHelp(page: Page, opener: Locator): Promise<void> {
   await expect
     .poll(
       async () => {
-        await opener.focus();
-        await page.keyboard.press('Shift+Slash');
+        // Only synthesize the shortcut while the dialog is still closed. A
+        // blind re-press after the dialog started mounting would call
+        // opener.focus() BEHIND the open modal and steal focus from its
+        // focus trap — the observed intermittent failure of this scenario
+        // on loaded runners.
+        if (!(await dialog.isVisible())) {
+          await opener.focus();
+          await page.keyboard.press('Shift+Slash');
+        }
         return dialog.isVisible();
       },
       { timeout: 15_000 }
