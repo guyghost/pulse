@@ -208,6 +208,15 @@ The accepted bundle contains exactly the immutable ownership marker, canonical S
 
 Start `release.yml` manually with the source commit/version and the exact Actions run/artifact that archived `tested-dist-seal.json` with its tested `dist/`. The workflow invokes the same package-only runner and verifies the downloaded artifact in a separate job. Its maximum state is `package_validated`.
 
+After `consumer-verify` passes, the `release-publish` job publishes the result as a versioned GitHub Release:
+
+1. re-checks the bundle checksum against the sidecar and the packaging job's digest;
+2. creates (or verifies) the immutable `v<version>` tag bound to the sealed source commit;
+3. creates the GitHub Release from that tag and uploads `missionpulse.zip`, `missionpulse.zip.sha256` and `validation.json` as release assets;
+4. refuses to mutate an existing release — a published release is immutable.
+
+The GitHub Release is the durable store handoff point: download `missionpulse.zip` from the release page, recompute its SHA-256, and compare it against the release's `missionpulse.zip.sha256` before uploading to the Chrome Web Store dashboard.
+
 ### Chrome Web Store boundary
 
 There is no automatic provider publication. Store readiness requires a structured, authorized receipt covering listing completeness, privacy disclosure, permission justification, all four credential-presence checks, and a known-good rollback target. Credentials remain in the operator/provider secret store and must never enter local evidence:

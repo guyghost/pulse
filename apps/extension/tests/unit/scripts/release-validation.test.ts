@@ -412,6 +412,42 @@ describe('Release validation — fail-closed artifact contracts', () => {
     expect(release).not.toMatch(/(?:^|\s)<commit>(?:\s|$)/);
   });
 
+  it('publishes the validated bundle as an immutable versioned GitHub Release', () => {
+    const workflow: unknown = parseYaml(readFileSync(RELEASE_WORKFLOW_PATH, 'utf8'));
+    if (!isRecord(workflow) || !isRecord(workflow.jobs)) {
+      throw new Error('release jobs missing');
+    }
+    const publish = workflow.jobs['release-publish'];
+    expect(publish).toBeTypeOf('object');
+    if (!isRecord(publish)) {
+      return;
+    }
+    expect(publish.needs).toEqual(['package-validated', 'consumer-verify']);
+    expect(publish.permissions).toEqual({ contents: 'write' });
+
+    const steps = Array.isArray(publish.steps)
+      ? (publish.steps as Array<Record<string, unknown>>)
+      : [];
+    const runs = steps.map((step) => (typeof step.run === 'string' ? step.run : '')).join('\n');
+
+    // checksum re-verification before any publication
+    expect(runs).toContain('sha256sum');
+    // immutable version tag bound to the sealed commit
+    expect(runs).toContain('git tag "v${VERSION}" "$SOURCE_COMMIT"');
+    expect(runs).toContain('git push origin "refs/tags/v${VERSION}"');
+    // release creation is verify-tag based (never moves an existing tag)
+    expect(runs).toContain('--verify-tag');
+    // the three store-handoff assets are uploaded together
+    expect(runs).toContain('"$BUNDLE/missionpulse.zip"');
+    expect(runs).toContain('"$BUNDLE/missionpulse.zip.sha256"');
+    expect(runs).toContain('"$BUNDLE/validation.json"');
+    // immutability guard: refuse to mutate an existing release
+    expect(runs).toMatch(/already exists/);
+    // still no provider publication, canary or production claim
+    expect(runs).not.toMatch(/canary|production_promotion|published to chrome/i);
+    expect(runs).not.toContain('chrome-extension-upload');
+  });
+
   it('builds the deploy preflight manifest command from exact structured metadata', async () => {
     const { createManifestValidationCommand } = await loadDeployPreflight();
 
