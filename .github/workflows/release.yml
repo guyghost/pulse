@@ -18,9 +18,6 @@ on:
 permissions:
   actions: read
   contents: read
-  # the sealed commit chain contains workflow file changes — creating the
-  # version tag over them requires the workflows scope on GITHUB_TOKEN
-  workflows: write
 
 concurrency:
   group: release-candidate-${{ inputs.expected_version }}
@@ -292,22 +289,22 @@ jobs:
           test "$ACTUAL" = "$SIDECAR"
           test "$ACTUAL" = "$EXPECTED_ZIP_SHA256"
 
-      - name: Create the immutable version tag
+      - name: Verify the operator-pushed version tag
         env:
           VERSION: ${{ inputs.expected_version }}
           SOURCE_COMMIT: ${{ inputs.source_commit }}
         run: |
+          # Tagging a release is an operator action (the GITHUB_TOKEN cannot push
+          # tags over workflow-changing commits). The job only verifies it.
           REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/v${VERSION}" | cut -f1)
-          if [ -n "$REMOTE_TAG" ]; then
-            test "$REMOTE_TAG" = "$SOURCE_COMMIT" || {
-              echo "Refusing: tag v${VERSION} already points at ${REMOTE_TAG}, not ${SOURCE_COMMIT}." >&2
-              exit 1
-            }
-            echo "Tag v${VERSION} already points at the sealed commit."
-          else
-            git tag "v${VERSION}" "$SOURCE_COMMIT"
-            git push origin "refs/tags/v${VERSION}"
-          fi
+          test -n "$REMOTE_TAG" || {
+            echo "Missing tag v${VERSION}: the operator must push it at the sealed commit before dispatching." >&2
+            exit 1
+          }
+          test "$REMOTE_TAG" = "$SOURCE_COMMIT" || {
+            echo "Refusing: tag v${VERSION} points at ${REMOTE_TAG}, not the sealed commit ${SOURCE_COMMIT}." >&2
+            exit 1
+          }
 
       - name: Publish the GitHub Release with store assets
         env:

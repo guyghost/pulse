@@ -435,11 +435,14 @@ describe('Release validation — fail-closed artifact contracts', () => {
 
     // checksum re-verification before any publication
     expect(runs).toContain('sha256sum');
-    // immutable version tag bound to the sealed commit
-    expect(runs).toContain('git tag "v${VERSION}" "$SOURCE_COMMIT"');
-    expect(runs).toContain('git push origin "refs/tags/v${VERSION}"');
+    // the version tag is an operator action; the job verifies it fail-closed
+    expect(runs).toContain('git ls-remote --tags origin "refs/tags/v${VERSION}"');
+    expect(runs).toContain('the operator must push it at the sealed commit before dispatching');
+    expect(runs).toContain('not the sealed commit');
     // release creation is verify-tag based (never moves an existing tag)
     expect(runs).toContain('--verify-tag');
+    expect(runs).not.toContain('git tag "v${VERSION}"');
+    expect(runs).not.toContain('git push origin');
     // the three store-handoff assets are uploaded together
     expect(runs).toContain('"$BUNDLE/missionpulse.zip"');
     expect(runs).toContain('"$BUNDLE/missionpulse.zip.sha256"');
