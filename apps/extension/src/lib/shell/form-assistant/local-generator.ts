@@ -50,7 +50,7 @@ function profileFingerprint(profile: UserProfile): string {
     profile.location ?? '',
     profile.remote,
     String(profile.tjmMin),
-    String(profile.tjmMax),
+    profile.tjmMax === null ? '' : String(profile.tjmMax),
     (profile.keywords ?? []).join(','),
     profile.availability ? JSON.stringify(profile.availability) : '',
   ].join('|');

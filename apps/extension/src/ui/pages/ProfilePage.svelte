@@ -36,7 +36,7 @@
       location: settings.profileLocation,
       remote: settings.profileRemote,
       tjmMin: settings.tjmMin,
-      tjmMax: settings.tjmMax,
+      tjmMax: null,
       keywords: settings.profileKeywords,
     });
   });
@@ -68,8 +68,8 @@
     [
       settings.jobTitle || 'Poste non renseigné',
       settings.profileLocation || 'Lieu non renseigné',
-      settings.tjmMin > 0 || settings.tjmMax > 0
-        ? formatTJMRange(settings.tjmMin || null, settings.tjmMax || null)
+      settings.tjmMin > 0
+        ? formatTJMRange(settings.tjmMin || null, null, { minOnlyPrefix: 'à partir de' })
         : 'TJM non renseigné',
     ].join(' · ')
   );
@@ -224,7 +224,6 @@
     bind:profileRemote={settings.profileRemote}
     bind:seniority={settings.seniority}
     bind:tjmMin={settings.tjmMin}
-    bind:tjmMax={settings.tjmMax}
     bind:profileKeywords={settings.profileKeywords}
     bind:keywordInput={settings.keywordInput}
     editing={settings.editingProfile}

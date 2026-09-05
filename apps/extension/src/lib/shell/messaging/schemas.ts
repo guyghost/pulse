@@ -445,7 +445,7 @@ const ProfilePayloadSchema = z
     skills: z.array(z.string()).optional(),
     location: z.string().optional(),
     tjmMin: z.number().optional(),
-    tjmMax: z.number().optional(),
+    tjmMax: z.number().nullable().optional(),
   })
   .passthrough()
   .refine(maxBytes(80_000), { message: 'SAVE_PROFILE payload exceeds 80KB limit' });

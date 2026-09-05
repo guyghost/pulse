@@ -6,7 +6,7 @@ export const mockProfile: UserProfile = {
   firstName: 'Alice',
   keywords: ['TypeScript', 'React', 'Node.js', 'Svelte'],
   tjmMin: 500,
-  tjmMax: 750,
+  tjmMax: null,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',

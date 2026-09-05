@@ -68,7 +68,7 @@ function createBlankProfile() {
     firstName: '',
     keywords: [] as string[],
     tjmMin: 0,
-    tjmMax: 0,
+    tjmMax: null,
     location: '',
     remote: 'any' as const,
     seniority: 'senior' as const,
