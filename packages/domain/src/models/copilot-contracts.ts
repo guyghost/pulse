@@ -499,10 +499,12 @@ function isProfileData(value: unknown): value is CopilotProfileData {
           !hasOnlyKeys(fieldValue, new Set(['min', 'target', 'max', 'currency'])) ||
           !isTjmRate(fieldValue.min) ||
           !isTjmRate(fieldValue.target) ||
-          !isTjmRate(fieldValue.max) ||
+          // DAO #174 : max null = profil sans plafond (le target retombe sur
+          // le plancher) ; une borne explicite reste pleinement validée.
+          (fieldValue.max !== null && !isTjmRate(fieldValue.max)) ||
           fieldValue.currency !== 'EUR' ||
           fieldValue.min > fieldValue.target ||
-          fieldValue.target > fieldValue.max
+          (fieldValue.max !== null && fieldValue.target > fieldValue.max)
         ) {
           return false;
         }

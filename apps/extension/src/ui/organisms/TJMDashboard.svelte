@@ -58,8 +58,9 @@
   // An inverted target (min > max, both defined) is incoherent: do not derive a
   // median/delta from it, otherwise the dashboard would display a misleading
   // positioning and écart. Surfaced as an explicit validation state instead.
-  const isTargetInverted =
-    userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0);
+  const isTargetInverted = $derived(
+    userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0)
+  );
   const userTargetMedian = $derived(
     userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted
       ? Math.round((userTjmMin + (userTjmMax ?? 0)) / 2)
@@ -71,7 +72,7 @@
       : null
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
-  const hasTjmTarget = userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted;
+  const hasTjmTarget = $derived(userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted);
   const selectedLevelLabel = $derived.by(() => {
     const key = userSeniority ?? 'confirmed';
     return levels.find((level) => level.key === key)?.label ?? 'Confirmé';
