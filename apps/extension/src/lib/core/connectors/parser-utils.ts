@@ -80,6 +80,8 @@ export function createMission(fields: MissionFields): Mission {
     title: stripHtml(fields.title ?? ''),
     description: stripHtml(fields.description ?? ''),
     stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
+    tjmMin: fields.tjmMin ?? null,
+    tjmMax: fields.tjmMax ?? null,
     startDate: fields.startDate ?? null,
     seniority: fields.seniority ?? null,
     publishedAt: fields.publishedAt ?? null,

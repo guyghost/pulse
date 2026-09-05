@@ -118,29 +118,36 @@ const seniorities: Array<'junior' | 'confirmed' | 'senior' | null> = [
 
 export function generateMockMissions(count: number): Mission[] {
   const now = new Date();
-  return Array.from({ length: count }, (_, i) => ({
-    id: `mock-${i}`,
-    title: titles[i % titles.length],
-    client: clients[i % clients.length],
-    description: `Mission ${titles[i % titles.length]} pour un projet de transformation digitale. Stack moderne, équipe agile, CI/CD.`,
-    stack: stacks[i % stacks.length],
-    tjm: 400 + Math.floor(Math.random() * 400),
-    location: locations[i % locations.length],
-    remote: remotes[i % remotes.length],
-    duration: durations[i % durations.length],
-    startDate: null,
-    url: `https://www.free-work.com/fr/tech-it/jobs/mock-${i}`,
-    source: 'free-work' as const,
-    scrapedAt: now,
-    seniority: seniorities[i % seniorities.length],
-    scoreBreakdown: null,
-    score: Math.floor(Math.random() * 100),
-    semanticScore: null,
-    semanticReason: null,
-    publishedAt: new Date(
-      now.getTime() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
-    ).toISOString(),
-  }));
+  return Array.from({ length: count }, (_, i) => {
+    const tjm = 400 + Math.floor(Math.random() * 400);
+    return {
+      id: `mock-${i}`,
+      title: titles[i % titles.length],
+      client: clients[i % clients.length],
+      description: `Mission ${titles[i % titles.length]} pour un projet de transformation digitale. Stack moderne, équipe agile, CI/CD.`,
+      stack: stacks[i % stacks.length],
+      tjm,
+      // Une mission sur deux porte une fourchette (DAO #173) pour prévisualiser
+      // le rendu de la carte en mode dev.
+      tjmMin: i % 2 === 0 ? tjm : null,
+      tjmMax: i % 2 === 0 ? tjm + 150 : null,
+      location: locations[i % locations.length],
+      remote: remotes[i % remotes.length],
+      duration: durations[i % durations.length],
+      startDate: null,
+      url: `https://www.free-work.com/fr/tech-it/jobs/mock-${i}`,
+      source: 'free-work' as const,
+      scrapedAt: now,
+      seniority: seniorities[i % seniorities.length],
+      scoreBreakdown: null,
+      score: Math.floor(Math.random() * 100),
+      semanticScore: null,
+      semanticReason: null,
+      publishedAt: new Date(
+        now.getTime() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
+      ).toISOString(),
+    };
+  });
 }
 
 export const mockMissions: Mission[] = generateMockMissions(10);

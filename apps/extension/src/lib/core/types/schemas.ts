@@ -78,6 +78,10 @@ export const MissionSchema = z.object({
   description: z.string(),
   stack: z.array(z.string()),
   tjm: z.number().nullable(),
+  // Optionnels : les missions persistées avant l'ajout de la fourchette ne
+  // portent pas ces champs (rétrocompatibilité IndexedDB).
+  tjmMin: z.number().nullable().optional(),
+  tjmMax: z.number().nullable().optional(),
   location: z.string().nullable(),
   remote: RemoteTypeSchema.nullable(),
   duration: z.string().nullable(),
@@ -104,6 +108,9 @@ export const MissionSerializedSchema = z.object({
   description: z.string(),
   stack: z.array(z.string()),
   tjm: z.number().nullable(),
+  // Optionnels : les enregistrements IndexedDB antérieurs n'ont pas de fourchette.
+  tjmMin: z.number().nullable().optional(),
+  tjmMax: z.number().nullable().optional(),
   location: z.string().nullable(),
   remote: RemoteTypeSchema.nullable(),
   duration: z.string().nullable(),
