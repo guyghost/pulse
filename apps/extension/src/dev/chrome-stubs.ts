@@ -554,7 +554,11 @@ function devFormAssistProposal(kind: string, label: string, profile: UserProfile
       // Aucune URL LinkedIn dans le profil de ce modèle.
       return '';
     case 'cover-letter':
-      return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM se situe entre ${profile.tjmMin ?? 0}€ et ${profile.tjmMax ?? 0}€.\n\nCordialement,\n${name}`;
+      return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM ${
+        profile.tjmMax !== null
+          ? `se situe entre ${profile.tjmMin ?? 0}€ et ${profile.tjmMax}€`
+          : `est à partir de ${profile.tjmMin ?? 0}€`
+      }.\n\nCordialement,\n${name}`;
     case 'availability':
       return 'Disponible immédiatement';
     case 'tjm':

@@ -141,6 +141,23 @@ export const AvailabilitySchema = z.object({
 });
 
 /**
+ * Normalise les sentinelles historiques du plafond TJM (DAO #174). L'ancienne
+ * convention codait « sans plafond » en 0 (jamais exposée dans l'UI) et le
+ * défaut usine était 9999 — aucun des deux n'est un plafond délibéré. Les deux
+ * deviennent `null` (sans plafond) ; une vraie borne saisie est conservée.
+ */
+const normalizeLegacyTjmMax = (data: unknown): unknown => {
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
+  const record = data as Record<string, unknown>;
+  if (record.tjmMax !== 0 && record.tjmMax !== 9999) {
+    return record;
+  }
+  return { ...record, tjmMax: null };
+};
+
+/**
  * Preprocesses legacy profile input before schema validation. Records that still carry `stack` and/or `searchKeywords`
  * (pre-unification schema) are merged into a single `keywords` list with
  * case-insensitive dedup (first-seen casing wins) and trimmed to the 40-entry
@@ -184,7 +201,7 @@ const normalizeLegacyProfileInput = (data: unknown): unknown => {
 
 export const UserProfileSchema = z
   .preprocess(
-    normalizeLegacyProfileInput,
+    (data) => normalizeLegacyProfileInput(normalizeLegacyTjmMax(data)),
     z.object({
       firstName: z.string().max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
       keywords: z
@@ -194,10 +211,14 @@ export const UserProfileSchema = z
         .number()
         .min(0, 'Le TJM minimum doit être positif')
         .max(5000, 'Le TJM minimum ne doit pas dépasser 5000'),
+      // DAO #174 : null = sans plafond (seul le minimum est collecté dans l'UI).
+      // .default(null) répare les rares enregistrements sans la clé.
       tjmMax: z
         .number()
         .min(0, 'Le TJM maximum doit être positif')
-        .max(5000, 'Le TJM maximum ne doit pas dépasser 5000'),
+        .max(5000, 'Le TJM maximum ne doit pas dépasser 5000')
+        .nullable()
+        .default(null),
       location: z.string(),
       remote: z.union([RemoteTypeSchema, z.literal('any')]),
       seniority: SeniorityLevelSchema,
@@ -226,7 +247,7 @@ export const UserProfileSchema = z
       availability: AvailabilitySchema.nullable().default(null),
     })
   )
-  .refine((p) => p.tjmMax === 0 || p.tjmMax >= p.tjmMin, {
+  .refine((p) => p.tjmMax === null || p.tjmMax >= p.tjmMin, {
     message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum',
     path: ['tjmMax'],
   });

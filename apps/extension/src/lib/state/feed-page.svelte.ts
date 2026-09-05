@@ -174,7 +174,7 @@ function toProfileImpactInput(profile: UserProfile | null): ProfileImpactInput {
     location: typeof profile?.location === 'string' ? profile.location : '',
     remote: profile?.remote ?? 'any',
     tjmMin: typeof profile?.tjmMin === 'number' ? profile.tjmMin : 0,
-    tjmMax: typeof profile?.tjmMax === 'number' ? profile.tjmMax : 0,
+    tjmMax: typeof profile?.tjmMax === 'number' ? profile.tjmMax : null,
     keywords: Array.isArray(profile?.keywords) ? profile.keywords : [],
   };
 }

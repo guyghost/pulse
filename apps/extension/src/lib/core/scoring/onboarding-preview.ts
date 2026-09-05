@@ -27,7 +27,8 @@ export const REFERENCE_MISSION: Mission = {
 /** Draft criteria as edited in the wizard; all fields optional/neutral. */
 export interface OnboardingPreviewInput {
   tjmMin: number;
-  tjmMax: number;
+  /** null = sans plafond (DAO #174) — le wizard ne collecte plus de maximum. */
+  tjmMax: number | null;
   remote: RemoteType | 'any';
   keywords: string[];
   location: string;

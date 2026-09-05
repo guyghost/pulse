@@ -382,10 +382,13 @@ export function remoteCandidateProfileToUserProfile(
   existingProfile: UserProfile | null
 ): UserProfile {
   const tjmMin = clampDailyRate(snapshot.tjm_min, existingProfile?.tjmMin ?? 0);
-  const tjmMax = Math.max(
-    tjmMin,
-    clampDailyRate(snapshot.tjm_max, existingProfile?.tjmMax ?? 5000)
-  );
+  // DAO #174 : le plafond du profil est nullable. Le dashboard ne peut que
+  // poser une borne explicite ; sans borne snapshot, on préserve l'existant
+  // (null inclus — plus jamais de fallback fictif à 5000).
+  const tjmMax =
+    typeof snapshot.tjm_max === 'number'
+      ? Math.max(tjmMin, clampDailyRate(snapshot.tjm_max, tjmMin))
+      : (existingProfile?.tjmMax ?? null);
   const firstName = existingProfile?.firstName.trim() || 'Freelance';
   const jobTitle =
     snapshot.target_role?.trim() ||
