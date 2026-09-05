@@ -72,11 +72,13 @@ describe('MissionCard', () => {
     });
     await tick();
     expect(target.textContent).toMatch(/600–900.*\/j/);
-    const value = target.querySelector(
-      '[aria-label="Fourchette de TJM annoncée par la plateforme"]'
-    );
+    const value = target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]');
     expect(value).not.toBeNull();
-    expect(value?.getAttribute('title')).toBe('Fourchette de TJM annoncée par la plateforme');
+    // Pas d'aria-label : il masquerait la valeur numérique aux lecteurs
+    // d'écran. Le libellé est porté par un texte sr-only, la valeur reste
+    // dans le contenu annoncé.
+    expect(value?.querySelector('.sr-only')?.textContent).toContain('Fourchette de TJM annoncée');
+    expect(value?.textContent).toContain('600–900');
   });
 
   it('replie sur la valeur simple quand les bornes sont égales', async () => {
@@ -86,7 +88,7 @@ describe('MissionCard', () => {
     await tick();
     expect(target.textContent).toContain('700');
     expect(
-      target.querySelector('[aria-label="Fourchette de TJM annoncée par la plateforme"]')
+      target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]')
     ).toBeNull();
   });
 
@@ -95,7 +97,7 @@ describe('MissionCard', () => {
     await tick();
     expect(target.textContent).toMatch(/650.*\/j/);
     expect(
-      target.querySelector('[aria-label="Fourchette de TJM annoncée par la plateforme"]')
+      target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]')
     ).toBeNull();
   });
 

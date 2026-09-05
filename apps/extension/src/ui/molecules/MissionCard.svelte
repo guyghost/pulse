@@ -370,11 +370,14 @@
   <!-- Quick-scan line: TJM (scoring driver) + location + seniority + publication date, visible from collapse -->
   <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
     {#if tjmRange !== null}
+      <!-- Pas d'aria-label ici : il masquerait la valeur numérique aux
+           lecteurs d'écran. On préfixe le contenu via sr-only pour annoncer
+           libellé + montant, et le title porte le tooltip natif. -->
       <span
         class="font-mono font-bold tabular-nums text-text-primary"
         title="Fourchette de TJM annoncée par la plateforme"
-        aria-label="Fourchette de TJM annoncée par la plateforme"
       >
+        <span class="sr-only">Fourchette de TJM annoncée :</span>
         {tjmRange}<span class="text-text-muted">/j</span>
       </span>
     {:else if tjmValue !== null}
