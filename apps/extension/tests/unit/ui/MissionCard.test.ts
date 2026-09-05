@@ -66,6 +66,39 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
+  it('affiche la fourchette de TJM annoncée quand min ≠ max (DAO #173)', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: 900 }),
+    });
+    await tick();
+    expect(target.textContent).toMatch(/600–900.*\/j/);
+    const value = target.querySelector(
+      '[aria-label="Fourchette de TJM annoncée par la plateforme"]'
+    );
+    expect(value).not.toBeNull();
+    expect(value?.getAttribute('title')).toBe('Fourchette de TJM annoncée par la plateforme');
+  });
+
+  it('replie sur la valeur simple quand les bornes sont égales', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 700, tjmMin: 700, tjmMax: 700 }),
+    });
+    await tick();
+    expect(target.textContent).toContain('700');
+    expect(
+      target.querySelector('[aria-label="Fourchette de TJM annoncée par la plateforme"]')
+    ).toBeNull();
+  });
+
+  it('affiche la valeur simple pour les missions sans bornes (rétrocompatibilité)', async () => {
+    const target = mountCard({ mission: makeMission({ tjmMin: null, tjmMax: null }) });
+    await tick();
+    expect(target.textContent).toMatch(/650.*\/j/);
+    expect(
+      target.querySelector('[aria-label="Fourchette de TJM annoncée par la plateforme"]')
+    ).toBeNull();
+  });
+
   it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {
     const target = mountCard();
     await tick();

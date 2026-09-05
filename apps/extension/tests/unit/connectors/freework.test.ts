@@ -164,6 +164,35 @@ describe('parseFreeWorkAPI', () => {
     expect(missions[1].tjm).toBe(450);
   });
 
+  it('exposes the advertised TJM range bounds (DAO #173)', () => {
+    const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
+    expect(missions[0].tjmMin).toBe(500);
+    expect(missions[0].tjmMax).toBe(600);
+    expect(missions[1].tjmMin).toBe(450);
+    expect(missions[1].tjmMax).toBe(550);
+  });
+
+  it('keeps the representative tjm unchanged when a range exists (scoring compat)', () => {
+    const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
+    expect(missions[0].tjm).toBe(500);
+  });
+
+  it('nulls the range bounds when the source provides none', () => {
+    const missions = parseFreeWorkAPI(
+      wrap([makePosting({ minDailySalary: null, maxDailySalary: null })]),
+      NOW
+    );
+    expect(missions[0].tjmMin).toBeNull();
+    expect(missions[0].tjmMax).toBeNull();
+  });
+
+  it('keeps a partial range when only one bound exists', () => {
+    const missions = parseFreeWorkAPI(wrap([makePosting({ minDailySalary: null })]), NOW);
+    expect(missions[0].tjmMin).toBeNull();
+    expect(missions[0].tjmMax).toBe(600);
+    expect(missions[0].tjm).toBe(600);
+  });
+
   it('extracts location label', () => {
     const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
     expect(missions[0].location).toBe('Paris, Île-de-France');

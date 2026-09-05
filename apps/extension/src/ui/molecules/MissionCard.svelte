@@ -8,7 +8,12 @@
   import { Icon } from '@pulse/ui';
   import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
-  import { formatAbsoluteDate, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
+  import {
+    formatAbsoluteDate,
+    formatTJMRange,
+    formatTJMValue,
+    formatTimestamp,
+  } from '$lib/core/utils/format';
   import { parseIsoDateTimeToEpochMs } from '$lib/core/utils/iso-time';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
@@ -90,6 +95,18 @@
   );
 
   const tjmValue = $derived(formatTJMValue(mission.tjm));
+
+  // Fourchette annoncée par la plateforme (DAO #173) : affichée uniquement
+  // quand les deux bornes existent et diffèrent — sinon la valeur simple
+  // (mission.tjm) reste la vérité affichée. Suffixe vide ici : le "/j" est
+  // porté par le span muted du template, comme pour la valeur simple.
+  const tjmRange = $derived(
+    typeof mission.tjmMin === 'number' &&
+      typeof mission.tjmMax === 'number' &&
+      mission.tjmMin !== mission.tjmMax
+      ? formatTJMRange(mission.tjmMin, mission.tjmMax, { suffix: '' })
+      : null
+  );
 
   // Publication date — same disclosure rule as seniority: omitted (never
   // "null"/"Invalid Date") when missing or not ISO-parsable. Pure core
@@ -352,7 +369,15 @@
 
   <!-- Quick-scan line: TJM (scoring driver) + location + seniority + publication date, visible from collapse -->
   <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
-    {#if tjmValue !== null}
+    {#if tjmRange !== null}
+      <span
+        class="font-mono font-bold tabular-nums text-text-primary"
+        title="Fourchette de TJM annoncée par la plateforme"
+        aria-label="Fourchette de TJM annoncée par la plateforme"
+      >
+        {tjmRange}<span class="text-text-muted">/j</span>
+      </span>
+    {:else if tjmValue !== null}
       <span class="font-mono font-bold tabular-nums text-text-primary">
         {tjmValue}<span class="text-text-muted">/j</span>
       </span>

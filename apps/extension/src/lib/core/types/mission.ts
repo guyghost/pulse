@@ -19,6 +19,10 @@ export interface Mission {
   description: string;
   stack: string[];
   tjm: number | null;
+  /** Borne basse de la fourchette de TJM annoncée, si la source l'expose. */
+  tjmMin?: number | null;
+  /** Borne haute de la fourchette de TJM annoncée, si la source l'expose. */
+  tjmMax?: number | null;
   location: string | null;
   remote: RemoteType | null;
   duration: string | null;
