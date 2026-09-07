@@ -22,7 +22,10 @@ const statusLabel = {
 };
 
 function esc(s) {
-  return String(s ?? '').replace(/\|/g, '\\|');
+  // Escape backslashes first, then the pipe (CodeQL js/incomplete-sanitization).
+  return String(s ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/\|/g, '\\|');
 }
 
 let md = '';

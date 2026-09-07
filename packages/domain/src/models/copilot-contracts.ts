@@ -66,7 +66,8 @@ export interface CopilotDisplayedTjm {
 export interface CopilotTjmBounds {
   min: number;
   target: number;
-  max: number;
+  /** DAO #174 : null = profil sans plafond (seul le minimum est collecté). */
+  max: number | null;
   currency: 'EUR';
 }
 
@@ -119,7 +120,8 @@ export interface CopilotTjmCoachFacts {
   profileBounds: {
     min: number;
     target: number;
-    max: number;
+    /** DAO #174 : null = profil sans plafond. */
+    max: number | null;
     currency: 'EUR';
   };
   market: {
@@ -277,7 +279,7 @@ export function copilotTjmFactQuote(
     case 'mission-displayed-tjm':
       return value === null ? null : String(value);
     case 'profile-tjm-bounds':
-      return `${facts.profileBounds.min} / ${facts.profileBounds.target} / ${facts.profileBounds.max} ${facts.profileBounds.currency}`;
+      return `${facts.profileBounds.min} / ${facts.profileBounds.target} / ${facts.profileBounds.max ?? 'null'} ${facts.profileBounds.currency}`;
     case 'market-matched-stacks':
       return facts.market.matchedStacks.length > 0 ? facts.market.matchedStacks.join(', ') : null;
     case 'market-sample':
@@ -367,10 +369,10 @@ export function isCopilotTjmCoachFacts(value: unknown): value is CopilotTjmCoach
     !hasOnlyKeys(value.profileBounds, new Set(['min', 'target', 'max', 'currency'])) ||
     !isTjmRate(value.profileBounds.min) ||
     !isTjmRate(value.profileBounds.target) ||
-    !isTjmRate(value.profileBounds.max) ||
+    (value.profileBounds.max !== null && !isTjmRate(value.profileBounds.max)) ||
     value.profileBounds.currency !== 'EUR' ||
     value.profileBounds.min > value.profileBounds.target ||
-    value.profileBounds.target > value.profileBounds.max ||
+    (value.profileBounds.max !== null && value.profileBounds.target > value.profileBounds.max) ||
     !isRecord(value.market) ||
     !hasOnlyKeys(
       value.market,
@@ -497,10 +499,12 @@ function isProfileData(value: unknown): value is CopilotProfileData {
           !hasOnlyKeys(fieldValue, new Set(['min', 'target', 'max', 'currency'])) ||
           !isTjmRate(fieldValue.min) ||
           !isTjmRate(fieldValue.target) ||
-          !isTjmRate(fieldValue.max) ||
+          // DAO #174 : max null = profil sans plafond (le target retombe sur
+          // le plancher) ; une borne explicite reste pleinement validée.
+          (fieldValue.max !== null && !isTjmRate(fieldValue.max)) ||
           fieldValue.currency !== 'EUR' ||
           fieldValue.min > fieldValue.target ||
-          fieldValue.target > fieldValue.max
+          (fieldValue.max !== null && fieldValue.target > fieldValue.max)
         ) {
           return false;
         }

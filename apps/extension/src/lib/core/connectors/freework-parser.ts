@@ -128,6 +128,8 @@ export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[
         description: p.description ?? '',
         stack: (p.skills ?? []).map((s) => s.name),
         tjm: p.minDailySalary ?? p.maxDailySalary ?? null,
+        tjmMin: p.minDailySalary ?? null,
+        tjmMax: p.maxDailySalary ?? null,
         location: p.location?.label ?? p.location?.shortLabel ?? null,
         remote: mapRemoteMode(p.remoteMode),
         duration: formatDuration(p.durationValue, p.durationPeriod),

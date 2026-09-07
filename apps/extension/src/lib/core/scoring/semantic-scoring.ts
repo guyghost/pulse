@@ -20,7 +20,11 @@ Mission:
 Profil:
 - Poste: ${profile.jobTitle}
 - Stack: ${profile.keywords.join(', ')}
-- TJM: ${profile.tjmMin}-${profile.tjmMax} EUR/jour
+- TJM: ${
+    profile.tjmMax !== null
+      ? `${profile.tjmMin}-${profile.tjmMax} EUR/jour`
+      : `a partir de ${profile.tjmMin} EUR/jour`
+  }
 - Lieu: ${profile.location}
 - Remote: ${profile.remote}
 - Seniorite: ${profile.seniority}`;

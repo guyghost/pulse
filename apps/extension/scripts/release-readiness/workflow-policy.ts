@@ -6,7 +6,7 @@ import { jcsCanonicalize, sha256Hex } from './canonical';
 
 const MAX_WORKFLOW_BLOB_BYTES = 262_144;
 const MAX_PRIVILEGED_WORKFLOW_USES = 32;
-const OFFICIAL_ATTEST_SHA = 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6';
+const OFFICIAL_ATTEST_SHA = '1e69f48acb82d1966a394da916b4c1698aa569d6';
 const OFFICIAL_UPLOAD_SHA = '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
 const MV3_DIAGNOSTIC_JOB_ID = 'test-mv3';
 const MV3_DIAGNOSTIC_STEP_ID = 'upload-mv3-evidence';
@@ -17,10 +17,10 @@ const VERIFY_UPLOAD_DIGEST_RUN = `[[ "$CAPTURED_TRANSPORT_SHA256" =~ ^[0-9a-f]{6
 [[ "$UPLOADED_ARTIFACT_SHA256" == "$CAPTURED_TRANSPORT_SHA256" ]]
 `;
 const REVIEWED_ACTION_PINS = new Map<string, string>([
-  ['actions/checkout', 'de0fac2e4500dabe0009e67214ff5f5447ce83dd'],
+  ['actions/checkout', '3d3c42e5aac5ba805825da76410c181273ba90b1'],
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/setup-python', '5fda3b95a4ea91299a34e894583c3862153e4b97'],
-  ['pnpm/action-setup', '0e279bb959325dab635dd2c09392533439d90093'],
+  ['pnpm/action-setup', '0977fd99725f1db4007ccb2928dbb4e90d06cc86'],
   ['actions/attest', OFFICIAL_ATTEST_SHA],
   ['actions/upload-artifact', OFFICIAL_UPLOAD_SHA],
 ]);
