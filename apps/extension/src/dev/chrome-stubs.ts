@@ -554,7 +554,11 @@ function devFormAssistProposal(kind: string, label: string, profile: UserProfile
       // Aucune URL LinkedIn dans le profil de ce modèle.
       return '';
     case 'cover-letter':
-      return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM se situe entre ${profile.tjmMin ?? 0}€ et ${profile.tjmMax ?? 0}€.\n\nCordialement,\n${name}`;
+      return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM ${
+        profile.tjmMax !== null
+          ? `se situe entre ${profile.tjmMin ?? 0}€ et ${profile.tjmMax}€`
+          : `est à partir de ${profile.tjmMin ?? 0}€`
+      }.\n\nCordialement,\n${name}`;
     case 'availability':
       return 'Disponible immédiatement';
     case 'tjm':
@@ -1074,6 +1078,27 @@ function createChromeStubs() {
                 })
               ),
             };
+          case 'GET_FEED_MISSIONS_PAGE': {
+            // Dev mirror of the production page read: same date-sorted slicing
+            // over the dev catalogue so the paginated bootstrap behaves
+            // identically in the browserless dev shell.
+            const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions).map(
+              (m) => ({
+                ...m,
+                scrapedAt: new Date(),
+              })
+            );
+            const p = message.payload as { page: number; pageSize: number };
+            const start = p.page * p.pageSize;
+            return {
+              type: 'FEED_MISSIONS_PAGE_RESULT',
+              payload: {
+                missions: missions.slice(start, start + p.pageSize),
+                total: missions.length,
+                hasMore: start + p.pageSize < missions.length,
+              },
+            };
+          }
           case 'GET_FEED_FAVORITES':
             return { type: 'FEED_FAVORITES_RESULT', payload: storage.favoriteMissions };
           case 'SAVE_FEED_FAVORITES':

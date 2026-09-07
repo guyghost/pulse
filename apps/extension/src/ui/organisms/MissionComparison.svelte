@@ -179,7 +179,7 @@
                   <div class="mt-2 flex flex-wrap gap-1.5">
                     {#each decisionEvidence as evidence (evidence.label)}
                       <span
-                        class="inline-flex items-baseline gap-1 rounded-md bg-blueprint-blue/10 px-2 py-0.5 text-meta text-blueprint-blue"
+                        class="inline-flex items-baseline gap-1 rounded-md bg-blueprint-blue/10 px-2 py-0.5 text-meta text-blueprint-blue-on-tint"
                       >
                         <span class="eyebrow eyebrow--inherit opacity-70">{evidence.label}</span>
                         <span class="font-semibold tabular-nums">{evidence.value}</span>
@@ -235,7 +235,7 @@
           >
             {#each mission.stack.slice(0, 5) as tech (tech)}
               <span
-                class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-micro text-blueprint-blue"
+                class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-micro text-blueprint-blue-on-tint"
                 >{tech}</span
               >
             {/each}
@@ -322,7 +322,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-1 rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-meta text-blueprint-blue hover:bg-blueprint-blue/20 transition-colors"
+              class="inline-flex items-center gap-1 rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-meta text-blueprint-blue-on-tint hover:bg-blueprint-blue/20 transition-colors"
             >
               <Icon name="external-link" size={12} />
               Voir

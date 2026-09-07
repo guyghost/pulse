@@ -82,7 +82,11 @@ function projectProfile(
       case 'tjmBounds':
         projected.tjmBounds = {
           min: profile.tjmMin,
-          target: Math.round((profile.tjmMin + profile.tjmMax) / 2),
+          // DAO #174 : sans plafond, la seule ancre fiable est le minimum.
+          target:
+            profile.tjmMax !== null
+              ? Math.round((profile.tjmMin + profile.tjmMax) / 2)
+              : profile.tjmMin,
           max: profile.tjmMax,
           currency: 'EUR',
         };

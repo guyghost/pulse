@@ -104,6 +104,21 @@ async function mockFeedTrackingBridge(
             if (message.type === 'GET_FEED_MISSIONS') {
               return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
             }
+            if (message.type === 'GET_FEED_MISSIONS_PAGE') {
+              // Page mirror of the full-catalogue interception above: a
+              // single-mission catalogue fits in page 0, hasMore false.
+              const request = message as { payload?: { page: number; pageSize: number } };
+              const start = (request.payload?.page ?? 0) * (request.payload?.pageSize ?? 250);
+              const visible = start === 0 ? [missionRow] : [];
+              return {
+                type: 'FEED_MISSIONS_PAGE_RESULT',
+                payload: {
+                  missions: visible,
+                  total: 1,
+                  hasMore: false,
+                },
+              };
+            }
             if (message.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
               const now = Date.now();
               return {

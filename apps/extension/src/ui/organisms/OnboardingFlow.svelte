@@ -39,7 +39,6 @@
   let jobTitle = $state('');
   let location = $state('');
   let tjmMin = $state('');
-  let tjmMax = $state('');
   let keywordsInput = $state('');
 
   // Re-sync when the snapshot profile changes externally (e.g. back-nav).
@@ -48,7 +47,6 @@
     jobTitle = snapshot.profile.jobTitle;
     location = snapshot.profile.location;
     tjmMin = String(snapshot.profile.tjmMin);
-    tjmMax = String(snapshot.profile.tjmMax);
   });
 
   const REMOTE_OPTIONS: { value: RemoteType; label: string }[] = [
@@ -129,7 +127,7 @@
     preview.grade === 'A'
       ? 'bg-accent-green/10 text-accent-green'
       : preview.grade === 'B'
-        ? 'bg-blueprint-blue/10 text-blueprint-blue'
+        ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
         : preview.grade === 'C'
           ? 'bg-status-yellow/15 text-status-orange'
           : 'bg-subtle-gray text-text-subtle'
@@ -286,32 +284,21 @@
               />
             </div>
           </div>
-          <div class="grid grid-cols-2 gap-3">
-            <label class="block">
-              <span class="text-xs font-medium text-text-secondary">TJM min (€)</span>
-              <input
-                type="number"
-                inputmode="numeric"
-                min="0"
-                step="50"
-                bind:value={tjmMin}
-                oninput={() => patch({ tjmMin: Math.max(0, Number.parseInt(tjmMin, 10) || 0) })}
-                class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
-              />
-            </label>
-            <label class="block">
-              <span class="text-xs font-medium text-text-secondary">TJM max (€)</span>
-              <input
-                type="number"
-                inputmode="numeric"
-                min="0"
-                step="50"
-                bind:value={tjmMax}
-                oninput={() => patch({ tjmMax: Math.max(0, Number.parseInt(tjmMax, 10) || 0) })}
-                class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
-              />
-            </label>
-          </div>
+          <label class="block">
+            <span class="text-xs font-medium text-text-secondary">TJM minimum (€)</span>
+            <input
+              type="number"
+              inputmode="numeric"
+              min="0"
+              step="50"
+              bind:value={tjmMin}
+              oninput={() => patch({ tjmMin: Math.max(0, Number.parseInt(tjmMin, 10) || 0) })}
+              class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
+            />
+            <span class="mt-1 block text-xs text-text-muted">
+              Votre plancher. Pas de limite haute : toute mission au-dessus est acceptable.
+            </span>
+          </label>
 
           <aside
             aria-label="Aperçu de correspondance"

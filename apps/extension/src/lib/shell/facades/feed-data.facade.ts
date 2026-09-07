@@ -27,6 +27,31 @@ export async function getMissions(): Promise<Mission[]> {
   return response.type === 'FEED_MISSIONS_RESULT' ? response.payload : [];
 }
 
+export interface FeedMissionsPage {
+  missions: Mission[];
+  total: number;
+  hasMore: boolean;
+}
+
+/**
+ * Read one date-sorted slice of the persisted catalogue (newest first).
+ * Used by the feed bootstrap so the first screen renders from a small page
+ * instead of waiting for the whole store; remaining pages are hydrated
+ * progressively by the caller.
+ */
+export async function getFeedMissionsPage(options: {
+  page: number;
+  pageSize: number;
+}): Promise<FeedMissionsPage> {
+  const response = await sendMessage({
+    type: 'GET_FEED_MISSIONS_PAGE',
+    payload: { page: options.page, pageSize: options.pageSize },
+  });
+  return response.type === 'FEED_MISSIONS_PAGE_RESULT'
+    ? response.payload
+    : { missions: [], total: 0, hasMore: false };
+}
+
 export async function getConnectorStatuses(): Promise<PersistedConnectorStatus[]> {
   const response = await sendMessage({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' });
   return response.type === 'PERSISTED_CONNECTOR_STATUSES_RESULT' ? response.payload : [];

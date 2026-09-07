@@ -32,7 +32,11 @@ Profil:
 - Poste: ${profile.jobTitle}
 - Stack: ${profile.keywords.join(', ')}
 - Seniorité: ${profile.seniority}
-- TJM: ${profile.tjmMin}-${profile.tjmMax}€/jour
+- TJM: ${
+    profile.tjmMax !== null
+      ? `${profile.tjmMin}-${profile.tjmMax}€/jour`
+      : `à partir de ${profile.tjmMin}€/jour`
+  }
 
 Réponds uniquement avec le message, sans objet d'email ni signature.`;
 };

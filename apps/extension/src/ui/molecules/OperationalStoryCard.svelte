@@ -73,7 +73,7 @@
           ? 'bg-status-orange/10 text-status-orange'
           : severity === 'critical'
             ? 'bg-status-red/10 text-status-red'
-            : 'bg-blueprint-blue/8 text-blueprint-blue'
+            : 'bg-blueprint-blue/8 text-blueprint-blue-on-tint'
   );
 
   const iconName = $derived(
@@ -118,7 +118,7 @@
     <p class="min-w-0 truncate text-caption font-medium text-text-secondary">{title}</p>
     {#if primaryActionLabel}
       <button
-        class="inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-meta font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
+        class="inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-meta font-medium text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/8"
         onclick={onPrimaryAction}
         type="button"
       >

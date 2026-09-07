@@ -1441,7 +1441,7 @@ interface ProducerHostToolMaterialsPolicyV1 {
   runner: 'ubuntu-24.04';
   architecture: 'x64';
   setupNodeAction: 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020';
-  setupPnpmAction: 'pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093';
+  setupPnpmAction: 'pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86';
   node: {
     version: '22.23.1';
     sourceRoot: '/opt/hostedtoolcache/node/22.23.1/x64';
@@ -2682,7 +2682,7 @@ interface ValidatedAttestationActionV1 {
   handoffSha256: Sha256;
   transportSha256: Sha256;
   transportBytes: number;
-  actionUsesLiteral: 'actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6';
+  actionUsesLiteral: 'actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6';
   actionOutcome: 'success';
   actionOutput: {
     attestationId: string;
@@ -3314,7 +3314,7 @@ Node, and has exact inputs version `${{ env.PNPM_VERSION }}` and dest
 committed run steps below, then exactly these two remote-effect actions:
 
 ```text
-actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
 actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
 ```
 

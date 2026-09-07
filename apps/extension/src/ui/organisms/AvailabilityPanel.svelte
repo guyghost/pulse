@@ -8,9 +8,11 @@
     AVAILABILITY_STATUS_ORDER,
     type AvailabilityStatus,
   } from '$lib/core/types/availability';
-  import { formatAvailabilityDate } from '$lib/core/availability/availability-helpers';
+  import {
+    formatAvailabilityDate,
+    type PlatformSyncTarget,
+  } from '$lib/core/availability/availability-helpers';
   import type { AvailabilityStore, PlatformPushStatus } from '$lib/state/availability.svelte';
-  import type { PlatformSyncTarget } from '$lib/core/cv/experience-helpers';
 
   const {
     store,

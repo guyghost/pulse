@@ -33,6 +33,11 @@ jobs:
     name: Package an already sealed candidate
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # CodeQL actions/cache-poisoning: the job checks out an untrusted
+    # workflow_dispatch ref — cut its access to the Actions cache service so
+    # nothing it runs can poison caches restored on the default branch.
+    env:
+      ACTIONS_CACHE_SERVICE_TOKEN: ''
     outputs:
       artifact_name: ${{ steps.package-metadata.outputs.artifact_name }}
       zip_sha256: ${{ steps.package-metadata.outputs.zip_sha256 }}
@@ -56,7 +61,6 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
 
       - name: Setup pinned Python descriptor helper
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -106,13 +110,24 @@ jobs:
             }
 
       - name: Download sealed candidate evidence
-        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: missionpulse-sealed-candidate
+          # archive:false artifacts take the uploaded file's name as the
+          # artifact name (the upload step's name input is informational).
+          name: missionpulse-sealed-candidate.tar.gz
           path: ${{ github.workspace }}/release-input
           github-token: ${{ secrets.GITHUB_TOKEN }}
           repository: ${{ github.repository }}
           run-id: ${{ inputs.evidence_run_id }}
+
+      - name: Extract the sealed transport
+        run: |
+          test -f "$GITHUB_WORKSPACE/release-input/missionpulse-sealed-candidate.tar.gz"
+          mkdir -p "$GITHUB_WORKSPACE/release-input"
+          tar -xzf "$GITHUB_WORKSPACE/release-input/missionpulse-sealed-candidate.tar.gz" \
+            -C "$GITHUB_WORKSPACE/release-input"
+          test -f "$GITHUB_WORKSPACE/release-input/tested-dist-seal.json"
+          test -f "$GITHUB_WORKSPACE/release-input/dist/manifest.json"
 
       - name: Verify sealed evidence identity
         env:
@@ -190,6 +205,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: package-validated
+    # CodeQL actions/cache-poisoning: same untrusted-checkout isolation as
+    # package-validated (cache service access removed at the job level).
+    env:
+      ACTIONS_CACHE_SERVICE_TOKEN: ''
 
     steps:
       - name: Checkout verifier at the sealed source commit
@@ -209,7 +228,6 @@ jobs:
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
 
       - name: Setup pinned Python descriptor helper
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97
@@ -243,3 +261,89 @@ jobs:
 
       - name: Record local-only release boundary
         run: echo "package_validated; no Store submission or deployment state is claimed"
+
+      - name: Record local-only release boundary
+        run: echo "package_validated; no Store submission or deployment state is claimed"
+
+  release-publish:
+    name: Publish the validated GitHub Release
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    needs: [package-validated, consumer-verify]
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout the sealed source commit
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          ref: ${{ inputs.source_commit }}
+          fetch-depth: 0
+
+      - name: Download package_validated evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
+        with:
+          name: ${{ needs.package-validated.outputs.artifact_name }}
+          path: ${{ github.workspace }}/release-bundle
+
+      - name: Verify the release bundle checksum
+        env:
+          EXPECTED_ZIP_SHA256: ${{ needs.package-validated.outputs.zip_sha256 }}
+        run: |
+          BUNDLE="$GITHUB_WORKSPACE/release-bundle/apps/extension/releases/v${{ inputs.expected_version }}"
+          ACTUAL=$(sha256sum "$BUNDLE/missionpulse.zip" | cut -d' ' -f1)
+          SIDECAR=$(cut -d' ' -f1 "$BUNDLE/missionpulse.zip.sha256")
+          test "$ACTUAL" = "$SIDECAR"
+          test "$ACTUAL" = "$EXPECTED_ZIP_SHA256"
+
+      - name: Verify the operator-pushed version tag
+        env:
+          VERSION: ${{ inputs.expected_version }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          # Tagging a release is an operator action (the GITHUB_TOKEN cannot push
+          # tags over workflow-changing commits). The job only verifies it.
+          REMOTE_TAG=$(git ls-remote --tags origin "refs/tags/v${VERSION}" | cut -f1)
+          test -n "$REMOTE_TAG" || {
+            echo "Missing tag v${VERSION}: the operator must push it at the sealed commit before dispatching." >&2
+            exit 1
+          }
+          test "$REMOTE_TAG" = "$SOURCE_COMMIT" || {
+            echo "Refusing: tag v${VERSION} points at ${REMOTE_TAG}, not the sealed commit ${SOURCE_COMMIT}." >&2
+            exit 1
+          }
+
+      - name: Publish the GitHub Release with store assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.expected_version }}
+          SOURCE_COMMIT: ${{ inputs.source_commit }}
+        run: |
+          BUNDLE="$GITHUB_WORKSPACE/release-bundle/apps/extension/releases/v${VERSION}"
+          if gh release view "v${VERSION}" --json url > /dev/null 2>&1; then
+            echo "Release v${VERSION} already exists — published assets are immutable, refusing to mutate." >&2
+            exit 1
+          fi
+          {
+            echo "## MissionPulse v${VERSION}"
+            echo
+            echo "Validated store handoff bundle, packaged from the sealed candidate."
+            echo
+            echo "- Sealed commit: \`${SOURCE_COMMIT}\`"
+            echo "- missionpulse.zip sha256: \`$(cut -d' ' -f1 "$BUNDLE/missionpulse.zip.sha256")\`"
+            echo "- Provenance: validation.json (seal, package validation, ownership marker)"
+          } > "$RUNNER_TEMP/release-notes.md"
+          gh release create "v${VERSION}" \
+            --verify-tag \
+            --title "MissionPulse v${VERSION}" \
+            --notes-file "$RUNNER_TEMP/release-notes.md"
+          gh release upload "v${VERSION}" \
+            "$BUNDLE/missionpulse.zip" \
+            "$BUNDLE/missionpulse.zip.sha256" \
+            "$BUNDLE/validation.json"
+
+      - name: Record the published release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION: ${{ inputs.expected_version }}
+        run: gh release view "v${VERSION}" --json url,tagName -q '"Published " + .tagName + " → " + .url' >> "$GITHUB_STEP_SUMMARY"

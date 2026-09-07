@@ -61,7 +61,7 @@ export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile 
   firstName: profile.firstName ?? '',
   keywords: [...(profile.keywords ?? [])],
   tjmMin: profile.tjmMin ?? 0,
-  tjmMax: profile.tjmMax ?? 0,
+  tjmMax: profile.tjmMax ?? null,
   location: profile.location ?? '',
   remote: profile.remote ?? 'any',
   seniority: profile.seniority ?? 'senior',
@@ -73,9 +73,12 @@ export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile 
 
 export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfileResult {
   const tjmMin = normalizeDailyRate(input.tjmMin);
-  const tjmMax = normalizeDailyRate(input.tjmMax);
+  // DAO #174 : le plafond n'est plus collecté — null (sans plafond) sauf si un
+  // appelant legacy passe encore une borne explicite.
+  const tjmMax =
+    input.tjmMax === null || input.tjmMax === undefined ? null : normalizeDailyRate(input.tjmMax);
 
-  if (tjmMax > 0 && tjmMin > tjmMax) {
+  if (tjmMax !== null && tjmMin > tjmMax) {
     return { ok: false, error: PROFILE_TJM_RANGE_ERROR };
   }
 
