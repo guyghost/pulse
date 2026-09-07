@@ -445,7 +445,7 @@ const ProfilePayloadSchema = z
     skills: z.array(z.string()).optional(),
     location: z.string().optional(),
     tjmMin: z.number().optional(),
-    tjmMax: z.number().optional(),
+    tjmMax: z.number().nullable().optional(),
   })
   .passthrough()
   .refine(maxBytes(80_000), { message: 'SAVE_PROFILE payload exceeds 80KB limit' });
@@ -758,6 +758,21 @@ export const MessageSchemas = {
   FEED_MISSIONS_RESULT: z.object({
     type: z.literal('FEED_MISSIONS_RESULT'),
     payload: MissionsPayloadSchema,
+  }),
+  GET_FEED_MISSIONS_PAGE: z.object({
+    type: z.literal('GET_FEED_MISSIONS_PAGE'),
+    payload: z.object({
+      page: z.number().int().nonnegative(),
+      pageSize: z.number().int().positive(),
+    }),
+  }),
+  FEED_MISSIONS_PAGE_RESULT: z.object({
+    type: z.literal('FEED_MISSIONS_PAGE_RESULT'),
+    payload: z.object({
+      missions: MissionsPayloadSchema,
+      total: z.number().int().nonnegative(),
+      hasMore: z.boolean(),
+    }),
   }),
   GET_FEED_FAVORITES: z.object({ type: z.literal('GET_FEED_FAVORITES') }),
   FEED_FAVORITES_RESULT: z.object({

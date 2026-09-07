@@ -13,7 +13,7 @@ function makeProfile(overrides: Partial<ProfileImpactInput> = {}): ProfileImpact
     location: '',
     remote: 'any',
     tjmMin: 0,
-    tjmMax: 0,
+    tjmMax: null,
     keywords: [],
     ...overrides,
   };
@@ -43,7 +43,7 @@ describe('profile impact model', () => {
       })
     );
 
-    expect(computeProfileImpactCompletion(items)).toBe(72);
+    expect(computeProfileImpactCompletion(items)).toBe(76);
   });
 
   it('simulates the gain from the three highest-impact missing fields', () => {
@@ -51,8 +51,8 @@ describe('profile impact model', () => {
     const simulation = buildProfileImpactSimulation(items);
 
     expect(simulation.currentCompletion).toBe(2);
-    expect(simulation.nextCompletion).toBe(72);
-    expect(simulation.delta).toBe(70);
+    expect(simulation.nextCompletion).toBe(76);
+    expect(simulation.delta).toBe(74);
     expect(simulation.prioritizedItems.map((item) => item.id)).toEqual([
       'keywords',
       'tjm-min',

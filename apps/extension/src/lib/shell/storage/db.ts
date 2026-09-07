@@ -837,6 +837,15 @@ export async function getMissionsPaginated(
       totalRequest.onerror = () => reject(totalRequest.error);
     });
 
+    // Date-sorted, unfiltered pages stream through the scrapedAt index cursor:
+    // O(pageSize) parses instead of materializing the whole store. Missions
+    // absent from the index (no/invalid scrapedAt) are outside the cursor —
+    // parsed missions always carry an injected scrapedAt, so this is a
+    // documented non-issue for connector-produced data.
+    if (sortBy === 'date' && !filterSource) {
+      return readMissionsPageByDateCursor(store, { page, pageSize, totalCount });
+    }
+
     // Fetch all missions (we need to sort in memory for score/tjm)
     // For date sorting with source filter, we can use index
     let rawMissions: unknown[];
@@ -884,6 +893,53 @@ export async function getMissionsPaginated(
 }
 
 // sortMissions is imported from core/scoring/sort-missions.ts (FC&IS compliant)
+
+/**
+ * Read one date-sorted page (newest first) by walking the scrapedAt index
+ * cursor backwards instead of materializing every record. Skips
+ * `page * pageSize` valid missions, collects `pageSize`, and detects `hasMore`
+ * from the first valid record past the window — same semantics as the
+ * in-memory path (`total` is the raw store count, `hasMore` is valid-count
+ * based).
+ */
+async function readMissionsPageByDateCursor(
+  store: IDBObjectStore,
+  options: { page: number; pageSize: number; totalCount: number }
+): Promise<PaginatedMissions> {
+  const { page, pageSize, totalCount } = options;
+  const index = store.index('scrapedAt');
+  const skip = page * pageSize;
+  const missions: Mission[] = [];
+  let seenValid = 0;
+  let hasMore = false;
+
+  await new Promise<void>((resolve, reject) => {
+    const request = index.openCursor(null, 'prev');
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) {
+        resolve();
+        return;
+      }
+      const mission = parseMission(cursor.value, deserializeStoredDate);
+      if (mission) {
+        if (seenValid < skip) {
+          seenValid++;
+        } else if (missions.length < pageSize) {
+          missions.push(mission);
+        } else {
+          hasMore = true;
+          resolve();
+          return;
+        }
+      }
+      cursor.continue();
+    };
+    request.onerror = () => reject(request.error);
+  });
+
+  return { missions, total: totalCount, hasMore };
+}
 
 /**
  * Batch upsert missions with deduplication.

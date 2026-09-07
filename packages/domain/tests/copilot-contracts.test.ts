@@ -153,6 +153,26 @@ describe('copilot contracts', () => {
     ).toBe(true);
   });
 
+  it('accepts a floor-only profile (tjmBounds.max null, target = min) — DAO #174', () => {
+    expect(
+      isCopilotTransmissionAllowed(
+        {
+          mission: {
+            title: 'Développeur Svelte',
+            description: 'Construire un tableau de bord.',
+            stack: ['Svelte', 'TypeScript'],
+          },
+          profile: {
+            jobTitle: 'Développeur frontend',
+            tjmBounds: { min: 550, target: 550, max: null, currency: 'EUR' },
+          },
+          experienceEvidence: [],
+        },
+        consent
+      )
+    ).toBe(true);
+  });
+
   it('rejects raw, unknown, unconsented and oversized transmitted data', () => {
     const base = {
       mission: { title: 'Développeur Svelte' },

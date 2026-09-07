@@ -18,7 +18,6 @@
     profileRemote = $bindable('any'),
     seniority = $bindable('senior'),
     tjmMin = $bindable(0),
-    tjmMax = $bindable(0),
     profileKeywords = $bindable([]),
     keywordInput = $bindable(''),
     editing,
@@ -160,25 +159,16 @@
         </label>
       </div>
       <div>
-        <div class="flex gap-2">
-          <input
-            type="number"
-            aria-label="TJM minimum"
-            placeholder="TJM min"
-            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
-            bind:value={tjmMin}
-          />
-          <input
-            type="number"
-            aria-label="TJM maximum"
-            placeholder="TJM max"
-            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
-            bind:value={tjmMax}
-          />
-        </div>
+        <input
+          type="number"
+          aria-label="TJM minimum"
+          placeholder="TJM minimum"
+          class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+          bind:value={tjmMin}
+        />
         <p class="mt-1 text-caption leading-4 text-text-muted">
-          Fourchette cible par jour. Les missions en deçà sont signalées dans le feed, jamais
-          masquées.
+          Votre plancher par jour. Les missions en deçà sont signalées dans le feed, jamais
+          masquées. Pas de limite haute.
         </p>
       </div>
 
@@ -250,9 +240,10 @@
           </p>
         </div>
       </div>
-      {#if tjmMin > 0 || tjmMax > 0}
+      {#if tjmMin > 0}
         <p class="text-text-subtle">
-          TJM : {formatTJMRange(tjmMin || null, tjmMax || null, { suffix: '/jour' })}
+          TJM :
+          {formatTJMRange(tjmMin || null, null, { suffix: '/jour', minOnlyPrefix: 'à partir de' })}
         </p>
       {/if}
       {#if profileKeywords.length > 0}

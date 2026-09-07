@@ -312,6 +312,26 @@ describe('deduplicateMissions', () => {
     expect(result).toHaveLength(2);
   });
 
+  it('merges same title and stack when a location token signals remote', () => {
+    const missions = [
+      makeMission({
+        id: '1',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Paris',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Lyon, Teletravail',
+      }),
+    ];
+
+    const result = deduplicateMissions(missions);
+    expect(result).toHaveLength(1);
+  });
+
   it('handles complex duplicate scenarios', () => {
     const missions = [
       makeMission({

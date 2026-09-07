@@ -71,7 +71,11 @@ export interface UserProfile {
    */
   keywords: string[];
   tjmMin: number;
-  tjmMax: number;
+  /**
+   * Plafond de TJM souhaité. `null` = sans plafond : seul le minimum est
+   * comparé par le scoring. L'UI ne collecte plus de maximum (DAO #174).
+   */
+  tjmMax: number | null;
   location: string;
   remote: RemoteType | 'any';
   seniority: SeniorityLevel;

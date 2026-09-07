@@ -335,7 +335,7 @@ export async function mockNoProfile(page: Page) {
  * Onboarding wizard — machine-driven 5-step flow (OnboardingFlow.svelte):
  * welcome → connecting (sources) → identity → preferences → skills →
  * notifying → persisting/scanning → completed. Guards live in the flow
- * machine: ≥1 source, firstName+jobTitle, tjmMin>0 ∧ tjmMax≥tjmMin, ≥1 keyword.
+ * machine: ≥1 source, firstName+jobTitle, tjmMin>0 (tjmMax supprimé, DAO #174), ≥1 keyword.
  */
 
 /** Welcome heading of the outcome-led onboarding screen. */
@@ -405,9 +405,8 @@ export async function fillIdentityStep(
 }
 
 /** Remplit l'étape critères (TJM) puis continue vers les compétences. */
-export async function fillPreferencesStep(page: Page, tjmMin = 500, tjmMax = 700) {
-  await page.getByLabel('TJM min (€)').fill(String(tjmMin));
-  await page.getByLabel('TJM max (€)').fill(String(tjmMax));
+export async function fillPreferencesStep(page: Page, tjmMin = 500) {
+  await page.getByLabel('TJM minimum (€)').fill(String(tjmMin));
   await clickContinue(page);
   await expect(page.getByRole('heading', { name: 'Vos compétences clés' })).toBeVisible();
 }
@@ -445,14 +444,13 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
     jobTitle = 'Développeur Fullstack',
     location = 'Paris',
     tjmMin = 500,
-    tjmMax = 700,
   } = profile;
   const keyword = profile.keywords?.[0] ?? 'React';
 
   await startOnboardingWizard(page);
   await connectFirstSource(page);
   await fillIdentityStep(page, { firstName, jobTitle, location });
-  await fillPreferencesStep(page, tjmMin, tjmMax);
+  await fillPreferencesStep(page, tjmMin);
   await fillSkillsStep(page, keyword);
   await submitOnboardingScan(page);
 }
