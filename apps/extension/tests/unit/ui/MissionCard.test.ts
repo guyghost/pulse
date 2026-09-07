@@ -100,6 +100,15 @@ describe('MissionCard', () => {
     ).toBeNull();
   });
 
+  it('ne rend pas de séparateur avant le premier item de la ligne quick-scan (review #374)', async () => {
+    const target = mountCard();
+    await tick();
+    const line = target.textContent ?? '';
+    // La location est le premier item : pas de puce en tête de ligne.
+    expect(line.trim().startsWith('•')).toBe(false);
+    expect(line).toContain('Paris • Senior');
+  });
+
   it('affiche « à partir de » dans le bloc tarif pour une borne unique (DAO #175)', async () => {
     const target = mountCard({
       mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: null }),

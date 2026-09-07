@@ -381,9 +381,7 @@
           <p class="font-mono text-caption font-bold leading-none tabular-nums text-text-primary">
             {tjmBlockAmount}<span class="font-normal text-text-muted">/j</span>
           </p>
-          <p class="mt-0.5 text-[10px] uppercase leading-none tracking-wide text-text-muted">
-            annoncé
-          </p>
+          <p class="eyebrow eyebrow--subtle">annoncé</p>
         </div>
       {:else}
         <p class="text-right text-caption text-text-muted">TJM à vérifier</p>
@@ -409,18 +407,22 @@
   </div>
 
   <!-- Quick-scan line: location + seniority + publication date (le TJM vit
-       dans le bloc tarif de la colonne droite — DAO #175). -->
+       dans le bloc tarif de la colonne droite — DAO #175). Les séparateurs
+       ne sont rendus qu'entre items — jamais avant le premier. -->
   <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
     {#if mission.location}
-      <span class="text-text-muted" aria-hidden="true">•</span>
       <span class="text-text-secondary">{mission.location}</span>
     {/if}
     {#if seniorityLabel}
-      <span class="text-text-muted" aria-hidden="true">•</span>
+      {#if mission.location}
+        <span class="text-text-muted" aria-hidden="true">•</span>
+      {/if}
       <span class="text-text-secondary">{seniorityLabel}</span>
     {/if}
     {#if publishedLabel}
-      <span class="text-text-muted" aria-hidden="true">•</span>
+      {#if mission.location || seniorityLabel}
+        <span class="text-text-muted" aria-hidden="true">•</span>
+      {/if}
       <span class="text-text-secondary">
         Publiée {publishedLabel}
       </span>
@@ -428,12 +430,12 @@
   </div>
 
   <!-- Jauge de plancher (DAO #175) : lecture visuelle du rapport
-       fourchette annoncée / plancher du profil. Décorative pour les
-       lecteurs d'écran — le chip « sous plancher » porte l'information en
-       texte. -->
+       fourchette annoncée / plancher du profil. Seule la piste est
+       décorative (aria-hidden) — le chip « sous plancher » reste dans
+       l'arbre d'accessibilité (la couleur ne porte jamais seule le sens). -->
   {#if ratePos.visible}
-    <div class="mt-1 flex items-center gap-2" aria-hidden="true">
-      <div class="relative h-1 w-12 rounded-full bg-subtle-gray">
+    <div class="mt-1 flex items-center gap-2">
+      <div class="relative h-1 w-12 rounded-full bg-subtle-gray" aria-hidden="true">
         <div
           class="absolute inset-y-0 rounded-full bg-blueprint-blue"
           style="left:{ratePos.ratioMin * 100}%; width:{(ratePos.ratioMax - ratePos.ratioMin) *
