@@ -6,16 +6,12 @@ import { mount, tick } from 'svelte';
 import { installChromeStubs } from '../../../src/dev/chrome-stubs';
 import CvPage from '../../../src/ui/pages/CvPage.svelte';
 
-/**
- * Regression for the CV clipboard bug: navigator.clipboard.writeText can reject
- * (no permission, non-secure context, etc.). The sync flow must surface the
- * failure in the panel and mark every platform as errored — no platform should
- * be marked as synced.
- */
-describe('CvPage clipboard resilience', () => {
+describe('CvPage without manual cross-platform synchronization', () => {
   let originalClipboardDescriptor: PropertyDescriptor | undefined;
+  const writeText = vi.fn();
 
   beforeEach(() => {
+    writeText.mockReset();
     const globalRecord = globalThis as unknown as Record<string, unknown>;
     delete globalRecord.chrome;
     installChromeStubs();
@@ -23,7 +19,7 @@ describe('CvPage clipboard resilience', () => {
     originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     Object.defineProperty(navigator, 'clipboard', {
       value: {
-        writeText: vi.fn().mockRejectedValue(new Error('Clipboard not allowed')),
+        writeText,
       },
       configurable: true,
     });
@@ -48,38 +44,14 @@ describe('CvPage clipboard resilience', () => {
     return target;
   }
 
-  async function flush() {
-    await tick();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await tick();
-  }
-
-  it('surfaces a sync error in the panel when clipboard write fails', async () => {
+  it('does not render or start the retired clipboard synchronization flow', async () => {
     const target = await mountAndLoad();
 
-    const syncBtn = [...target.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('Synchroniser')
+    const syncButton = [...target.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Synchroniser')
     );
-    expect(syncBtn).toBeTruthy();
-    syncBtn!.click();
-    await flush();
-
-    // The global clipboard probe fails → every platform errored → error headline.
-    expect(target.textContent).toContain('refusé');
-  });
-
-  it('does not mark any platform as synced when clipboard fails', async () => {
-    const target = await mountAndLoad();
-
-    const syncBtn = [...target.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('Synchroniser')
-    );
-    expect(syncBtn).toBeTruthy();
-    syncBtn!.click();
-    await flush();
-
-    expect(target.textContent).not.toContain('Synchronisé');
-    // Each platform should surface the failure instead.
-    expect(target.textContent).toContain('Échec');
+    expect(target.textContent).not.toContain('Synchronisation du CV');
+    expect(syncButton).toBeUndefined();
+    expect(writeText).not.toHaveBeenCalled();
   });
 });

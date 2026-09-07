@@ -363,6 +363,7 @@ describe('Release validation — fail-closed artifact contracts', () => {
     ) as { scenarioIds: string[] };
     const testSources = [
       resolve(EXTENSION_ROOT, 'tests/mv3/harness-adversarial.test.ts'),
+      resolve(EXTENSION_ROOT, 'tests/e2e-extension/form-assistant.test.ts'),
       resolve(EXTENSION_ROOT, 'tests/e2e-extension/navigation.test.ts'),
       resolve(EXTENSION_ROOT, 'tests/e2e-extension/runtime.test.ts'),
     ].map((path) => readFileSync(path, 'utf8'));
@@ -409,6 +410,48 @@ describe('Release validation — fail-closed artifact contracts', () => {
     expect(release).toContain('.github/workflows/ci.yml');
     expect(release).toContain("conclusion !== 'success'");
     expect(release).not.toMatch(/(?:^|\s)<commit>(?:\s|$)/);
+  });
+
+  it('publishes the validated bundle as an immutable versioned GitHub Release', () => {
+    const workflow: unknown = parseYaml(readFileSync(RELEASE_WORKFLOW_PATH, 'utf8'));
+    if (!isRecord(workflow) || !isRecord(workflow.jobs)) {
+      throw new Error('release jobs missing');
+    }
+    const publish = workflow.jobs['release-publish'];
+    expect(publish).toBeTypeOf('object');
+    if (!isRecord(publish)) {
+      return;
+    }
+    expect(publish.needs).toEqual(['package-validated', 'consumer-verify']);
+    expect(publish.permissions).toEqual({ contents: 'write' });
+    // no workflows scope anywhere: tagging is an operator action, not the job's
+    const workflowPermissions = isRecord(workflow.permissions) ? workflow.permissions : {};
+    expect(workflowPermissions.workflows).toBeUndefined();
+
+    const steps = Array.isArray(publish.steps)
+      ? (publish.steps as Array<Record<string, unknown>>)
+      : [];
+    const runs = steps.map((step) => (typeof step.run === 'string' ? step.run : '')).join('\n');
+
+    // checksum re-verification before any publication
+    expect(runs).toContain('sha256sum');
+    // the version tag is an operator action; the job verifies it fail-closed
+    expect(runs).toContain('git ls-remote --tags origin "refs/tags/v${VERSION}"');
+    expect(runs).toContain('the operator must push it at the sealed commit before dispatching');
+    expect(runs).toContain('not the sealed commit');
+    // release creation is verify-tag based (never moves an existing tag)
+    expect(runs).toContain('--verify-tag');
+    expect(runs).not.toContain('git tag "v${VERSION}"');
+    expect(runs).not.toContain('git push origin');
+    // the three store-handoff assets are uploaded together
+    expect(runs).toContain('"$BUNDLE/missionpulse.zip"');
+    expect(runs).toContain('"$BUNDLE/missionpulse.zip.sha256"');
+    expect(runs).toContain('"$BUNDLE/validation.json"');
+    // immutability guard: refuse to mutate an existing release
+    expect(runs).toMatch(/already exists/);
+    // still no provider publication, canary or production claim
+    expect(runs).not.toMatch(/canary|production_promotion|published to chrome/i);
+    expect(runs).not.toContain('chrome-extension-upload');
   });
 
   it('builds the deploy preflight manifest command from exact structured metadata', async () => {

@@ -61,7 +61,8 @@ export const buildSearchContext = (
     location: profile.location || null,
     remote: profile.remote || null,
     tjmMin: profile.tjmMin > 0 ? profile.tjmMin : null,
-    tjmMax: profile.tjmMax > 0 ? profile.tjmMax : null,
+    // null = sans plafond : aucun filtre haut côté API (DAO #174)
+    tjmMax: profile.tjmMax ?? null,
     lastSync,
   };
 };

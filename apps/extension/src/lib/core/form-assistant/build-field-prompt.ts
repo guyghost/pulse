@@ -41,7 +41,10 @@ function profileLine(profile: UserProfile): string {
   }
   parts.push(`Remote : ${profile.remote}`);
   parts.push(`TJM min : ${profile.tjmMin}€`);
-  parts.push(`TJM max : ${profile.tjmMax}€`);
+  // DAO #174 : sans plafond, on ne suggère pas de maximum aux plateformes.
+  if (profile.tjmMax !== null) {
+    parts.push(`TJM max : ${profile.tjmMax}€`);
+  }
   const keywords = joinList(profile.keywords ?? [], MAX_KEYWORDS);
   if (keywords) {
     parts.push(`Compétences : ${keywords}`);

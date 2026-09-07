@@ -47,7 +47,11 @@ Profil:
 - Poste: ${profile.jobTitle}
 - Stack: ${profile.keywords.join(', ')}
 - Seniorité: ${profile.seniority}
-- TJM attendu: ${profile.tjmMin}-${profile.tjmMax}€/jour
+- TJM attendu: ${
+    profile.tjmMax !== null
+      ? `${profile.tjmMin}-${profile.tjmMax}€/jour`
+      : `à partir de ${profile.tjmMin}€/jour`
+  }
 ${matchContext}
 
 Réponds uniquement avec le pitch, sans introduction ni guillemets.`;

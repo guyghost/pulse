@@ -180,7 +180,19 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
       label: clean(anchor.textContent) || (anchor as HTMLAnchorElement).hostname,
       url: (anchor as HTMLAnchorElement).href,
     }))
-    .filter((link) => link.url.includes('linkedin.com') || !link.url.includes('/feed/'));
+    .filter((link) => {
+      // Hostname-anchored check (CodeQL js/incomplete-url-substring-sanitization):
+      // 'linkedin.com' as a plain substring would match attacker hosts like
+      // https://linkedin.com.evil.tld/.
+      try {
+        const { hostname, pathname } = new URL(link.url);
+        const isLinkedIn = hostname === 'linkedin.com' || hostname.endsWith('.linkedin.com');
+        const isFeed = pathname.includes('/feed/');
+        return isLinkedIn || !isFeed;
+      } catch {
+        return false;
+      }
+    });
 
   // Defensive guard: text-based block signals are authoritative only when the
   // page has no parseable profile sections. A real profile that mentions

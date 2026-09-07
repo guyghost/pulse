@@ -98,6 +98,11 @@ export type BridgeMessage =
     }
   | { type: 'GET_FEED_MISSIONS' }
   | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
+  | { type: 'GET_FEED_MISSIONS_PAGE'; payload: { page: number; pageSize: number } }
+  | {
+      type: 'FEED_MISSIONS_PAGE_RESULT';
+      payload: { missions: Mission[]; total: number; hasMore: boolean };
+    }
   | { type: 'GET_FEED_FAVORITES' }
   | { type: 'FEED_FAVORITES_RESULT'; payload: Record<string, number> }
   | { type: 'SAVE_FEED_FAVORITES'; payload: Record<string, number> }

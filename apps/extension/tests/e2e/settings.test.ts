@@ -44,7 +44,8 @@ test.describe('Settings Flow', () => {
     await expect(page.locator('input[placeholder*="Poste"]')).toBeVisible();
     await expect(page.locator('input[placeholder="Localisation"]')).toBeVisible();
     await expect(page.getByRole('spinbutton', { name: 'TJM minimum' })).toBeVisible();
-    await expect(page.getByRole('spinbutton', { name: 'TJM maximum' })).toBeVisible();
+    // DAO #174 : le champ « TJM maximum » n'existe plus — un seul champ TJM.
+    await expect(page.getByRole('spinbutton', { name: 'TJM maximum' })).toHaveCount(0);
   });
 
   test('canceling profile edit returns to read-only mode', async ({ page }) => {

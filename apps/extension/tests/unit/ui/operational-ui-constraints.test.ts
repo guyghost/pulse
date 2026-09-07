@@ -402,8 +402,7 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    // CvPage wires the sync panel + feed; the feed owns empty/error routing.
-    expect(cvSource).toContain('CvSyncPanel');
+    // CvPage wires the feed; the feed owns empty/error routing.
     expect(cvSource).toContain('ExperienceFeed');
     expect(cvSource).toContain('onNavigateToProfile');
     expect(feedSource).toContain('primaryActionLabel="Ajouter une expérience"');

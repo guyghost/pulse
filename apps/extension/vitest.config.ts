@@ -12,6 +12,7 @@ export default defineConfig({
   },
   test: {
     include: ['tests/unit/**/*.test.ts'],
+    reporters: ['default', './tests/reporters/skip-taxonomy.reporter.ts'],
     globals: true,
     environment: 'jsdom',
     setupFiles: ['tests/unit/setup.ts'],
