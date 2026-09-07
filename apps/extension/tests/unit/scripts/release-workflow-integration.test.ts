@@ -10,11 +10,15 @@ const WORKSPACE_ROOT = resolve(import.meta.dirname, '../../../../..');
 const CI_WORKFLOW_PATH = resolve(WORKSPACE_ROOT, '.github/workflows/ci.yml');
 
 const REVIEWED_ACTION_PINS = new Map([
-  ['actions/checkout', 'de0fac2e4500dabe0009e67214ff5f5447ce83dd'],
+  // v7.0.1 — DAO dependency sweep: bump reviewed from dependabot PR #306
+  // (SHA matches the pin already used by release.yml).
+  ['actions/checkout', '3d3c42e5aac5ba805825da76410c181273ba90b1'],
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/setup-python', '5fda3b95a4ea91299a34e894583c3862153e4b97'],
-  ['pnpm/action-setup', '0e279bb959325dab635dd2c09392533439d90093'],
-  ['actions/attest', 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6'],
+  // v6.0.10 — bump reviewed from dependabot PR #288.
+  ['pnpm/action-setup', '0977fd99725f1db4007ccb2928dbb4e90d06cc86'],
+  // v4.2.2 — bump reviewed from dependabot PR #307.
+  ['actions/attest', '1e69f48acb82d1966a394da916b4c1698aa569d6'],
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],
 ]);
 const VERIFY_UPLOAD_DIGEST_RUN = `[[ "$CAPTURED_TRANSPORT_SHA256" =~ ^[0-9a-f]{64}$ ]]
