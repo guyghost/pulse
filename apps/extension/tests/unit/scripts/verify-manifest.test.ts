@@ -13,6 +13,20 @@ import {
 import { resolveIncludedConnectors } from '../../../scripts/resolve-connectors.ts';
 import { getAllConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
 
+/**
+ * Host domain of a Chrome match pattern, with wildcards stripped
+ * (`https://*.malt.fr/*` → `malt.fr`). Anchors the domain check to the host
+ * component instead of a bare substring (CodeQL
+ * js/incomplete-url-substring-sanitization).
+ */
+function matchPatternHostDomain(pattern: string): string | null {
+  const host = /^https?:\/\/([^/]+)/.exec(pattern)?.[1];
+  if (!host) {
+    return null;
+  }
+  return host.replace(/^\*\./, '').replace(/^www\./, '');
+}
+
 // ── Minimal valid manifest fixture ──────────────────────────────────
 
 const MINIMAL_VALID_MANIFEST = {
@@ -538,12 +552,12 @@ describe('host_permissions coverage', () => {
     (realManifest as { host_permissions?: string[] }).host_permissions ?? [];
 
   it('should include host_permissions for Malt (.fr)', () => {
-    const hasMaltFr = hostPermissions.some((h) => h.includes('malt.fr'));
+    const hasMaltFr = hostPermissions.some((h) => matchPatternHostDomain(h) === 'malt.fr');
     expect(hasMaltFr).toBe(true);
   });
 
   it('should include host_permissions for Malt (.io)', () => {
-    const hasMaltIo = hostPermissions.some((h) => h.includes('malt.io'));
+    const hasMaltIo = hostPermissions.some((h) => matchPatternHostDomain(h) === 'malt.io');
     expect(hasMaltIo).toBe(true);
   });
 
@@ -575,7 +589,7 @@ describe('host_permissions coverage', () => {
     ]);
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.errors.some((e) => e.includes('malt.io'))).toBe(true);
+      expect(result.errors.some((e) => e.includes('"https://*.malt.io/*"'))).toBe(true);
     }
   });
 
@@ -638,7 +652,9 @@ describe('validateNoExcludedConnectorPatterns', () => {
     );
     expect(result.valid).toBe(false);
     if (!result.valid) {
-      expect(result.errors.some((e) => e.includes('malt.fr'))).toBe(true);
+      // Full quoted pattern — host-anchored, not a bare domain substring (CodeQL
+      // js/incomplete-url-substring-sanitization).
+      expect(result.errors.some((e) => e.includes('"https://*.malt.fr/*"'))).toBe(true);
     }
   });
 

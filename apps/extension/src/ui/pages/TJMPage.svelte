@@ -29,7 +29,7 @@
   let isLoading = $state(true);
   let error = $state<string | null>(null);
   let userTjmMin = $state(0);
-  let userTjmMax = $state(0);
+  let userTjmMax = $state<number | null>(null);
   let profileStacks = $state<string[]>([]);
   let userSeniority = $state<SeniorityLevel | null>(null);
   let selectedRegion = $state<TJMRegion | null>(null);
@@ -129,7 +129,7 @@
   }
 
   const isOffline = $derived(connection.status === 'offline');
-  const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax > 0);
+  const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax !== null);
   const dataFreshness = $derived(
     analysis ? getTJMDataFreshness(analysis.lastUpdated, new Date(analysisReferenceTime)) : null
   );

@@ -36,7 +36,7 @@ describe('normalize profile helpers', () => {
       firstName: 'Guy',
       keywords: [],
       tjmMin: 0,
-      tjmMax: 0,
+      tjmMax: null,
       location: '',
       remote: 'any',
       seniority: 'senior',

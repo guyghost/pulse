@@ -115,15 +115,66 @@ async function main(): Promise<void> {
       // First-try clean run: the gate input requires exactly one attempt per
       // scenario. The JSON reporter writes its file directly; stdout stays in
       // the CI log.
-      const { stdout } = await execFile('pnpm', [...step.args, '--retries=0'], {
-        cwd: WORKSPACE_ROOT,
-        maxBuffer: 268_435_456,
-        encoding: 'utf8',
-        env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: rawReportPath },
-      });
+      try {
+        await execFile('pnpm', [...step.args, '--retries=0'], {
+          cwd: WORKSPACE_ROOT,
+          maxBuffer: 268_435_456,
+          encoding: 'utf8',
+          env: { ...process.env, PLAYWRIGHT_JSON_OUTPUT_NAME: rawReportPath },
+        });
+      } catch (error) {
+        // Name every scenario that failed first-try so the CI log is
+        // actionable — the JSON report itself stays in the runner workdir.
+        try {
+          const parsed = JSON.parse(await readFile(rawReportPath, 'utf8')) as {
+            suites?: unknown;
+            errors?: unknown;
+          };
+          const failures: string[] = [];
+          const walk = (suite: unknown): void => {
+            if (typeof suite !== 'object' || suite === null) {
+              return;
+            }
+            const record = suite as Record<string, unknown>;
+            for (const child of Array.isArray(record.suites) ? record.suites : []) {
+              walk(child);
+            }
+            for (const test of Array.isArray(record.tests) ? record.tests : []) {
+              if (typeof test !== 'object' || test === null) {
+                continue;
+              }
+              const scenario = (
+                (test as Record<string, unknown>).annotations as
+                  Array<{ type?: string; description?: string }> | undefined
+              )?.find((annotation) => annotation.type === 'scenario-id')?.description;
+              const results = (test as Record<string, unknown>).results;
+              const worst = Array.isArray(results) ? results[results.length - 1] : undefined;
+              if (
+                scenario &&
+                typeof worst === 'object' &&
+                worst !== null &&
+                (worst as Record<string, unknown>).status !== 'passed'
+              ) {
+                failures.push(`${scenario}=${String((worst as Record<string, unknown>).status)}`);
+              }
+            }
+          };
+          for (const suite of Array.isArray(parsed.suites) ? parsed.suites : []) {
+            walk(suite);
+          }
+          const topErrors = Array.isArray(parsed.errors) ? parsed.errors.length : 0;
+          console.error(
+            `[build-sealed-candidate-transport] MV3 first-try failures: ${failures.join(', ') || 'none'} (${topErrors} top-level error(s))`
+          );
+        } catch (parseError) {
+          console.error(
+            '[build-sealed-candidate-transport] MV3 report unreadable:',
+            parseError instanceof Error ? parseError.message : parseError
+          );
+        }
+        throw error;
+      }
       afterStep[step.id] = new Date().toISOString();
-      // Keep the report out of stdout summaries; it is consumed by path.
-      void stdout;
       continue;
     }
     await run('pnpm', [...step.args]);

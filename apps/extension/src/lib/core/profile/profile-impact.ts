@@ -1,7 +1,7 @@
 import type { UserProfile } from '../types/profile';
 
 export type ProfileImpactFieldId =
-  'keywords' | 'tjm-min' | 'remote' | 'location' | 'job-title' | 'tjm-max' | 'first-name';
+  'keywords' | 'tjm-min' | 'remote' | 'location' | 'job-title' | 'first-name';
 
 export type ProfileImpactInput = Pick<
   UserProfile,
@@ -75,14 +75,6 @@ const PROFILE_IMPACT_DEFINITIONS: ProfileImpactDefinition[] = [
     impact: 'Requêtes et textes générés plus cohérents',
     action: 'Nommer le rôle que les plateformes doivent refléter.',
     isComplete: (profile) => profile.jobTitle.trim().length > 0,
-  },
-  {
-    id: 'tjm-max',
-    label: 'TJM maximum',
-    weight: 5,
-    impact: 'Fourchette réaliste pour comparer les opportunités',
-    action: 'Définir le haut de fourchette attendu pour les missions idéales.',
-    isComplete: (profile) => profile.tjmMax > 0,
   },
   {
     id: 'first-name',

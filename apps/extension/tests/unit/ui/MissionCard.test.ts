@@ -66,6 +66,41 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
+  it('affiche la fourchette de TJM annoncée quand min ≠ max (DAO #173)', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: 900 }),
+    });
+    await tick();
+    expect(target.textContent).toMatch(/600–900.*\/j/);
+    const value = target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]');
+    expect(value).not.toBeNull();
+    // Pas d'aria-label : il masquerait la valeur numérique aux lecteurs
+    // d'écran. Le libellé est porté par un texte sr-only, la valeur reste
+    // dans le contenu annoncé.
+    expect(value?.querySelector('.sr-only')?.textContent).toContain('Fourchette de TJM annoncée');
+    expect(value?.textContent).toContain('600–900');
+  });
+
+  it('replie sur la valeur simple quand les bornes sont égales', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 700, tjmMin: 700, tjmMax: 700 }),
+    });
+    await tick();
+    expect(target.textContent).toContain('700');
+    expect(
+      target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]')
+    ).toBeNull();
+  });
+
+  it('affiche la valeur simple pour les missions sans bornes (rétrocompatibilité)', async () => {
+    const target = mountCard({ mission: makeMission({ tjmMin: null, tjmMax: null }) });
+    await tick();
+    expect(target.textContent).toMatch(/650.*\/j/);
+    expect(
+      target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]')
+    ).toBeNull();
+  });
+
   it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {
     const target = mountCard();
     await tick();

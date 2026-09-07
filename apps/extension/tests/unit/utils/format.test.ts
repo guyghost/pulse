@@ -47,7 +47,10 @@ describe('formatTJMRange', () => {
   it('falls back only when both bounds are missing', () => {
     expect(formatTJMRange(null, null)).toBe('Non précisé');
     expect(formatTJMRange(null, 800)).toBe('—–800 €/j');
-    expect(formatTJMRange(500, null)).toBe('500–— €/j');
+    expect(formatTJMRange(500, null)).toBe('500 €/j');
+    expect(formatTJMRange(500, null, { minOnlyPrefix: 'à partir de', suffix: '/jour' })).toBe(
+      'à partir de 500 €/jour'
+    );
   });
 
   it('treats negative bounds as absent (consistency with formatTJM)', () => {

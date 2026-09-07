@@ -35,8 +35,11 @@ type StorageAreaWithGetKeys = chrome.storage.StorageArea & {
 /**
  * Normalize free text to a stable cache key fragment.
  */
-const normalizeKeyPart = (value: string | number): string =>
-  String(value).trim().toLowerCase().replace(/\s+/g, ' ');
+const normalizeKeyPart = (value: string | number | null): string =>
+  String(value ?? '')
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, ' ');
 
 /**
  * Build a stable fingerprint for the profile fields used by the semantic prompt.
