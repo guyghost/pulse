@@ -31,7 +31,7 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "svelte": "^5.56.9"
+    "svelte": "^5.57.0"
   },
   "devDependencies": {
     "@pulse/tsconfig": "workspace:*",
