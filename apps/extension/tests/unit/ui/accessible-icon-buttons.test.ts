@@ -3,21 +3,20 @@ import { describe, expect, it } from 'vitest';
 
 import { listFiles } from '../helpers/files';
 
+// Every '<' is swapped for an internal marker before any processing, so no
+// tag — script, style, closed or malformed — can survive in the processed
+// text (CodeQL js/bad-tag-filter, js/incomplete-multi-character-sanitization).
+// All downstream regexes match on the marker instead of '<'.
+const MARKER = '\u0001';
+
 function stripScriptAndStyle(source: string): string {
-  // Case-insensitive block strips (CodeQL js/bad-tag-filter), then a final
-  // sweep of every remaining '<' so no tag fragment — closed or not — can
-  // survive. The output only feeds aria-label regex checks, so dropping '<'
-  // is lossless for the test's purpose.
-  return source
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/</g, '');
+  return source.replace(/</g, MARKER);
 }
 
 function getVisibleButtonText(buttonMarkup: string): string {
   return buttonMarkup
-    .replace(/<Icon\b[\s\S]*?\/>/g, '')
-    .replace(/<[^>]+>/g, ' ')
+    .replace(new RegExp(`${MARKER}Icon\\b[\\s\\S]*?/>`, 'g'), '')
+    .replace(new RegExp(`${MARKER}[^>]+>`, 'g'), ' ')
     .replace(/\{[#/:@][^}]*\}/g, ' ')
     .replace(/\{[^}]+\}/g, ' expression ')
     .replace(/&nbsp;/g, ' ')
@@ -37,7 +36,7 @@ describe('icon button accessibility', () => {
 
     for (const file of files) {
       const source = stripScriptAndStyle(readFileSync(file, 'utf8'));
-      const buttonPattern = /<button\b[\s\S]*?<\/button>/g;
+      const buttonPattern = new RegExp(`${MARKER}button\\b[\\s\\S]*?${MARKER}/button>`, 'g');
       let match: RegExpExecArray | null;
 
       while ((match = buttonPattern.exec(source))) {

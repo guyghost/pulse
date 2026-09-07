@@ -74,10 +74,10 @@ export function stripHtml(html: string): string {
       .replace(/<\/p>/gi, '\n')
       .replace(HTML_ENTITY_RE, decodeHtmlEntity)
       .replace(/<[^>]*>/g, '')
-      // Remove '<' that could still open a tag (unclosed fragments like
-      // '<script src=x'). Comparisons like 'a < b' — '<' followed by a space —
-      // are preserved. CodeQL js/incomplete-multi-character-sanitization.
-      .replace(/<(?=[a-zA-Z!/?])/g, ' ')
+      // Sweep every remaining '<' (CodeQL js/incomplete-multi-character-sanitization):
+      // unclosed fragments like '<script src=x' must not survive. Raw '<' is
+      // rare in scraped text — sources normally entity-encode it (&lt;).
+      .replace(/</g, ' ')
       .replace(/\n{3,}/g, '\n\n')
       .replace(/[ \t]+/g, ' ')
       .trim()
