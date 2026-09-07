@@ -35,20 +35,44 @@ export function detectRemote(text: string): RemoteType | null {
 
 /**
  * Strip HTML tags and normalize whitespace from raw text.
+ *
+ * Safety (CodeQL js/double-escaping, js/incomplete-multi-character-sanitization):
+ * entities are decoded in a SINGLE pass (the replacement output is never
+ * re-scanned, so `&amp;lt;` stays `&lt;` instead of collapsing to `<`), and
+ * tag-stripping runs AFTER decoding so entities cannot resurrect markup
+ * (`&lt;script&gt;` decodes to `<script>` and is then removed).
  */
+const HTML_ENTITY_RE = /&(nbsp|amp|lt|gt|quot|#39|#x[0-9a-f]+|#[0-9]+);/gi;
+
+function decodeHtmlEntity(entity: string, code: string): string {
+  const lower = entity.toLowerCase();
+  const numeric = code.toLowerCase();
+  switch (lower) {
+    case '&nbsp;':
+      return ' ';
+    case '&amp;':
+      return '&';
+    case '&lt;':
+      return '<';
+    case '&gt;':
+      return '>';
+    case '&quot;':
+      return '"';
+    case '&#39;':
+      return "'";
+    default:
+      return String.fromCodePoint(
+        numeric.startsWith('#x') ? parseInt(numeric.slice(2), 16) : parseInt(numeric.slice(1), 10)
+      );
+  }
+}
+
 export function stripHtml(html: string): string {
   return html
     .replace(/<br\s*\/?>/gi, '\n')
     .replace(/<\/p>/gi, '\n')
+    .replace(HTML_ENTITY_RE, decodeHtmlEntity)
     .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
-    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
     .replace(/\n{3,}/g, '\n\n')
     .replace(/[ \t]+/g, ' ')
     .trim();

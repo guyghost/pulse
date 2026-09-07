@@ -4,7 +4,9 @@ import { describe, expect, it } from 'vitest';
 import { listFiles } from '../helpers/files';
 
 function stripScriptAndStyle(source: string): string {
-  return source.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
+  // Case-insensitive (CodeQL js/bad-tag-filter): <SCRIPT>/<Style> must be
+  // stripped too.
+  return source.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
 }
 
 function getVisibleButtonText(buttonMarkup: string): string {
