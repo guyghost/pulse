@@ -66,19 +66,18 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
-  it('affiche la fourchette de TJM annoncée quand min ≠ max (DAO #173)', async () => {
+  it('affiche la fourchette dans le bloc tarif quand min ≠ max (DAO #175)', async () => {
     const target = mountCard({
       mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: 900 }),
     });
     await tick();
-    expect(target.textContent).toMatch(/600–900.*\/j/);
-    const value = target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]');
+    const value = target.querySelector('[title="TJM annoncé par la plateforme"]');
     expect(value).not.toBeNull();
-    // Pas d'aria-label : il masquerait la valeur numérique aux lecteurs
-    // d'écran. Le libellé est porté par un texte sr-only, la valeur reste
-    // dans le contenu annoncé.
-    expect(value?.querySelector('.sr-only')?.textContent).toContain('Fourchette de TJM annoncée');
+    // L'aria-label porte la valeur numérique (jamais masquée par un
+    // libellé générique — leçon review #371).
+    expect(value?.getAttribute('aria-label')).toContain('600');
     expect(value?.textContent).toContain('600–900');
+    expect(value?.textContent).toContain('annoncé');
   });
 
   it('replie sur la valeur simple quand les bornes sont égales', async () => {
@@ -99,6 +98,50 @@ describe('MissionCard', () => {
     expect(
       target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]')
     ).toBeNull();
+  });
+
+  it('affiche « à partir de » dans le bloc tarif pour une borne unique (DAO #175)', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: null }),
+    });
+    await tick();
+    const value = target.querySelector('[title="TJM annoncé par la plateforme"]');
+    expect(value?.textContent).toContain('à partir de 600');
+    expect(value?.textContent).toContain('annoncé');
+  });
+
+  it('affiche « TJM à vérifier » dans la colonne droite quand le tarif est absent (DAO #175)', async () => {
+    const target = mountCard({ mission: makeMission({ tjm: null, tjmMin: null, tjmMax: null }) });
+    await tick();
+    expect(target.textContent).toContain('TJM à vérifier');
+    expect(target.textContent).not.toMatch(/650.*\/j/);
+  });
+
+  it('affiche la jauge de plancher quand le profil a un plancher (DAO #175)', async () => {
+    const target = mountCard({ profileTjmMin: 500 });
+    await tick();
+    // Jauge au-dessus du plancher : pas de chip, piste présente.
+    expect(target.querySelector('.h-1.w-12')).not.toBeNull();
+    expect(target.textContent).not.toContain('sous plancher');
+    const min = makeMission();
+    expect(min.tjm).toBeGreaterThan(0);
+  });
+
+  it('signale « sous plancher » quand le min de la mission est sous le plancher (DAO #175)', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 400, tjmMin: 400, tjmMax: 600 }),
+      profileTjmMin: 500,
+    });
+    await tick();
+    expect(target.textContent).toContain('sous plancher');
+    expect(target.querySelector('[aria-hidden="true"] [class*="bg-status-red"]')).not.toBeNull();
+  });
+
+  it('masque la jauge sans plancher profil (DAO #174, tjmMax null)', async () => {
+    const target = mountCard();
+    await tick();
+    expect(target.querySelector('.h-1.w-12')).toBeNull();
+    expect(target.textContent).not.toContain('sous plancher');
   });
 
   it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {

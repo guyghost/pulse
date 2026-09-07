@@ -26,6 +26,7 @@
     filterActive = false,
     searchQuery = '',
     stableQueueActive = false,
+    profileTjmMin = null as number | null,
     tourStep = null,
     onMissionSeen,
     onMissionReadSignal,
@@ -55,6 +56,8 @@
     filterActive?: boolean;
     searchQuery?: string;
     stableQueueActive?: boolean;
+    /** Plancher du profil pour la jauge tarif (DAO #175). */
+    profileTjmMin?: number | null;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
     onMissionReadSignal?: (id: string, signal: MissionDwellSignal) => void;
@@ -239,6 +242,7 @@
           isStatusTransitionPending={statusPendingMissionIds.has(mission.id)}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
           showSeenStatus={stableQueueActive}
+          {profileTjmMin}
           onReadSignal={(signal) => {
             if (onMissionReadSignal) {
               onMissionReadSignal(mission.id, signal);

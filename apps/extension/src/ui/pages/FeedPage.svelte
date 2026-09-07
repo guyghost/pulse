@@ -1466,6 +1466,7 @@
           filterActive={page.filterActive || showAlertOnly}
           searchQuery={page.searchQuery}
           stableQueueActive={page.stableQueueActive}
+          profileTjmMin={page.profileTjmMin}
           onMissionReadSignal={page.handleMissionReadSignal}
           onToggleFavorite={page.handleToggleFavorite}
           onHide={page.handleHide}

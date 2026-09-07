@@ -7,6 +7,7 @@
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import { getMissionGrade } from '$lib/core/scoring/mission-grade';
+  import { missionRatePosition } from '$lib/core/scoring/mission-rate-position';
   import { scoreToGrade } from '$lib/core/types/score';
   import {
     formatAbsoluteDate,
@@ -42,6 +43,7 @@
     trackingUpdatedAt = null as number | null,
     isStatusTransitionPending = false,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
+    profileTjmMin = null as number | null,
   }: {
     mission: Mission;
     isSeen?: boolean;
@@ -65,6 +67,8 @@
     trackingUpdatedAt?: number | null;
     isStatusTransitionPending?: boolean;
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
+    /** Plancher du profil (DAO #175) — null = profil sans plancher, jauge masquée. */
+    profileTjmMin?: number | null;
   } = $props();
 
   // Replié par défaut : le scan rapide du feed prime. Densité compacte :
@@ -96,16 +100,31 @@
 
   const tjmValue = $derived(formatTJMValue(mission.tjm));
 
-  // Fourchette annoncée par la plateforme (DAO #173) : affichée uniquement
-  // quand les deux bornes existent et diffèrent — sinon la valeur simple
-  // (mission.tjm) reste la vérité affichée. Suffixe vide ici : le "/j" est
-  // porté par le span muted du template, comme pour la valeur simple.
+  // Bloc tarif (DAO #175) : montant pour la colonne droite + jauge de
+  // plancher. Suffixe vide : l'unité "/j" reste portée par le span muted du
+  // template. Borne unique => « à partir de X » (ouverture à droite).
   const tjmRange = $derived(
     typeof mission.tjmMin === 'number' &&
       typeof mission.tjmMax === 'number' &&
       mission.tjmMin !== mission.tjmMax
       ? formatTJMRange(mission.tjmMin, mission.tjmMax, { suffix: '' })
       : null
+  );
+  const tjmBlockAmount = $derived(
+    tjmRange ??
+      (typeof mission.tjmMin === 'number' && typeof mission.tjmMax === 'number'
+        ? formatTJMRange(mission.tjmMin, mission.tjmMax, { suffix: '' })
+        : typeof mission.tjmMin === 'number'
+          ? formatTJMRange(mission.tjmMin, null, { suffix: '', minOnlyPrefix: 'à partir de' })
+          : tjmValue)
+  );
+  const ratePos = $derived(
+    missionRatePosition({
+      tjmMin: mission.tjmMin,
+      tjmMax: mission.tjmMax,
+      tjm: mission.tjm,
+      profileTjmMin,
+    })
   );
 
   // Publication date — same disclosure rule as seniority: omitted (never
@@ -315,37 +334,59 @@
         </p>
       {/if}
     </div>
-    <div class="flex shrink-0 items-center gap-1.5">
-      {#if missionGrade !== null}
-        <span
-          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-mono text-heading font-bold leading-none text-text-primary {scoreColor} {tourHighlight ===
-          'score'
-            ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
-            : ''}"
-          aria-label={`Note ${missionGrade}`}
-          title={`Note ${missionGrade}`}
+    <div class="flex shrink-0 flex-col items-end gap-1">
+      <div class="flex items-center gap-1.5">
+        {#if missionGrade !== null}
+          <span
+            class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full font-mono text-heading font-bold leading-none text-text-primary {scoreColor} {tourHighlight ===
+            'score'
+              ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
+              : ''}"
+            aria-label={`Note ${missionGrade}`}
+            title={`Note ${missionGrade}`}
+          >
+            {missionGrade}
+          </span>
+        {/if}
+        {#if mission.description}
+          <button
+            type="button"
+            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+            'expand'
+              ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
+              : ''}"
+            onclick={toggleExpand}
+            aria-label={`${expanded ? 'Masquer' : 'Afficher'} les détails de la mission ${mission.title}`}
+            aria-expanded={expanded}
+            aria-controls={missionDetailsId}
+          >
+            <Icon
+              name="chevron-down"
+              size={12}
+              class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
+            />
+          </button>
+        {/if}
+      </div>
+
+      <!-- Bloc tarif (DAO #175) : ancre économique de la carte, sous le grade.
+           aria-label portant la valeur numérique (jamais masquée — leçon
+           review #371) ; le title porte le tooltip natif. -->
+      {#if tjmBlockAmount}
+        <div
+          class="text-right"
+          title="TJM annoncé par la plateforme"
+          aria-label={`TJM annoncé par la plateforme : ${tjmBlockAmount} par jour`}
         >
-          {missionGrade}
-        </span>
-      {/if}
-      {#if mission.description}
-        <button
-          type="button"
-          class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
-          'expand'
-            ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
-            : ''}"
-          onclick={toggleExpand}
-          aria-label={`${expanded ? 'Masquer' : 'Afficher'} les détails de la mission ${mission.title}`}
-          aria-expanded={expanded}
-          aria-controls={missionDetailsId}
-        >
-          <Icon
-            name="chevron-down"
-            size={12}
-            class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
-          />
-        </button>
+          <p class="font-mono text-caption font-bold leading-none tabular-nums text-text-primary">
+            {tjmBlockAmount}<span class="font-normal text-text-muted">/j</span>
+          </p>
+          <p class="mt-0.5 text-[10px] uppercase leading-none tracking-wide text-text-muted">
+            annoncé
+          </p>
+        </div>
+      {:else}
+        <p class="text-right text-caption text-text-muted">TJM à vérifier</p>
       {/if}
     </div>
   </div>
@@ -367,26 +408,9 @@
     {/if}
   </div>
 
-  <!-- Quick-scan line: TJM (scoring driver) + location + seniority + publication date, visible from collapse -->
+  <!-- Quick-scan line: location + seniority + publication date (le TJM vit
+       dans le bloc tarif de la colonne droite — DAO #175). -->
   <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
-    {#if tjmRange !== null}
-      <!-- Pas d'aria-label ici : il masquerait la valeur numérique aux
-           lecteurs d'écran. On préfixe le contenu via sr-only pour annoncer
-           libellé + montant, et le title porte le tooltip natif. -->
-      <span
-        class="font-mono font-bold tabular-nums text-text-primary"
-        title="Fourchette de TJM annoncée par la plateforme"
-      >
-        <span class="sr-only">Fourchette de TJM annoncée :</span>
-        {tjmRange}<span class="text-text-muted">/j</span>
-      </span>
-    {:else if tjmValue !== null}
-      <span class="font-mono font-bold tabular-nums text-text-primary">
-        {tjmValue}<span class="text-text-muted">/j</span>
-      </span>
-    {:else}
-      <span class="text-text-muted">TJM à vérifier</span>
-    {/if}
     {#if mission.location}
       <span class="text-text-muted" aria-hidden="true">•</span>
       <span class="text-text-secondary">{mission.location}</span>
@@ -402,6 +426,36 @@
       </span>
     {/if}
   </div>
+
+  <!-- Jauge de plancher (DAO #175) : lecture visuelle du rapport
+       fourchette annoncée / plancher du profil. Décorative pour les
+       lecteurs d'écran — le chip « sous plancher » porte l'information en
+       texte. -->
+  {#if ratePos.visible}
+    <div class="mt-1 flex items-center gap-2" aria-hidden="true">
+      <div class="relative h-1 w-12 rounded-full bg-subtle-gray">
+        <div
+          class="absolute inset-y-0 rounded-full bg-blueprint-blue"
+          style="left:{ratePos.ratioMin * 100}%; width:{(ratePos.ratioMax - ratePos.ratioMin) *
+            100}%"
+        ></div>
+        {#if ratePos.underFloor}
+          <div
+            class="absolute inset-y-0 rounded-full bg-status-red/70"
+            style="left:{ratePos.ratioMin * 100}%; width:{(ratePos.ratioFloor - ratePos.ratioMin) *
+              100}%"
+          ></div>
+        {/if}
+        <div
+          class="absolute top-[-2px] h-[8px] w-px bg-text-muted"
+          style="left:{ratePos.ratioFloor * 100}%"
+        ></div>
+      </div>
+      {#if ratePos.underFloor}
+        <span class="text-micro font-medium text-status-red">sous plancher</span>
+      {/if}
+    </div>
+  {/if}
 
   {#if hasScoreDetails}
     <button
