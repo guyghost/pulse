@@ -4,9 +4,14 @@ import { describe, expect, it } from 'vitest';
 import { listFiles } from '../helpers/files';
 
 function stripScriptAndStyle(source: string): string {
-  // Case-insensitive (CodeQL js/bad-tag-filter): <SCRIPT>/<Style> must be
-  // stripped too.
-  return source.replace(/<script[\s\S]*?<\/script>/gi, '').replace(/<style[\s\S]*?<\/style>/gi, '');
+  // Case-insensitive block strips (CodeQL js/bad-tag-filter), then a final
+  // sweep of every remaining '<' so no tag fragment — closed or not — can
+  // survive. The output only feeds aria-label regex checks, so dropping '<'
+  // is lossless for the test's purpose.
+  return source
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/</g, '');
 }
 
 function getVisibleButtonText(buttonMarkup: string): string {

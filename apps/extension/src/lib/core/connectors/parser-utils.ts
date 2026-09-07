@@ -68,14 +68,20 @@ function decodeHtmlEntity(entity: string, code: string): string {
 }
 
 export function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(HTML_ENTITY_RE, decodeHtmlEntity)
-    .replace(/<[^>]*>/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/[ \t]+/g, ' ')
-    .trim();
+  return (
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(HTML_ENTITY_RE, decodeHtmlEntity)
+      .replace(/<[^>]*>/g, '')
+      // Remove '<' that could still open a tag (unclosed fragments like
+      // '<script src=x'). Comparisons like 'a < b' — '<' followed by a space —
+      // are preserved. CodeQL js/incomplete-multi-character-sanitization.
+      .replace(/<(?=[a-zA-Z!/?])/g, ' ')
+      .replace(/\n{3,}/g, '\n\n')
+      .replace(/[ \t]+/g, ' ')
+      .trim()
+  );
 }
 
 /**
