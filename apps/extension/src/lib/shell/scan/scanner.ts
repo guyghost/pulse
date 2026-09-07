@@ -11,7 +11,7 @@ import {
 } from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { filterStaleMissions } from '../../core/scoring/mission-freshness';
-import { scoreMission } from '../../core/scoring/relevance';
+import { scoreMissionWithPrepared, prepareProfileScoring } from '../../core/scoring/relevance';
 import { buildScoreBreakdown } from '../../core/scoring/final-score';
 import { createDefaultProfile, isDefaultProfile } from '../../core/profile/defaults';
 import { setScanState } from '../storage/session-storage';
@@ -314,13 +314,16 @@ async function _runScanInternal(
   profile ??= createDefaultProfile();
   const scanProfile = profile;
   const usingDefaultProfile = isDefaultProfile(scanProfile);
+  // Precompute keyword Set / normalized weights once per scan; the per-mission
+  // scoring loops below reuse it instead of rebuilding it N times.
+  const preparedScanProfile = prepareProfileScoring(scanProfile);
 
   function buildDeterministicMissions(rawMissions: Mission[], now: Date): Mission[] {
     const freelanceOnly = filterSalariedMissions(rawMissions);
     const freshOnly = filterStaleMissions(freelanceOnly, now);
 
     return freshOnly.map((mission) => {
-      const score = scoreMission(mission, scanProfile, now);
+      const score = scoreMissionWithPrepared(mission, preparedScanProfile, now);
       return {
         ...mission,
         scoreBreakdown: buildScoreBreakdown(score.total, score.breakdown),
@@ -651,7 +654,7 @@ async function _runScanInternal(
   // Now returns structured breakdown
   const scored = freshOnly.map((m) => {
     const now = new Date();
-    const result = scoreMission(m, scanProfile, now);
+    const result = scoreMissionWithPrepared(m, preparedScanProfile, now);
     return {
       ...m,
       scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),

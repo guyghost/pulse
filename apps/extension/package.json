@@ -1,6 +1,6 @@
 {
   "name": "@pulse/extension",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "license": "MIT",
   "type": "module",
@@ -35,7 +35,6 @@
     "@pulse/domain": "workspace:*",
     "@pulse/ui": "workspace:*",
     "@supabase/supabase-js": "^2.112.3",
-    "lucide-svelte": "^1.0.1",
     "svelte": "^5.56.9",
     "xstate": "^5.32.5",
     "zod": "^4.4.3"

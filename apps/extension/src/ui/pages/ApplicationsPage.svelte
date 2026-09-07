@@ -25,6 +25,7 @@
     isDueFollowUp,
     isTerminalStatus,
   } from '$lib/core/tracking/pipeline-summary';
+  import { buildKanbanBoard, getTrackingLastActivity } from '$lib/core/tracking/kanban-projection';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import AvailabilityPanel from '../organisms/AvailabilityPanel.svelte';
   import CopilotPanel from '../organisms/CopilotPanel.svelte';
@@ -33,6 +34,8 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import PageHeader from '../molecules/PageHeader.svelte';
+  import PageShell from '../templates/PageShell.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import FormAssistPanel from '../organisms/FormAssistPanel.svelte';
 
@@ -95,7 +98,7 @@
     },
     {
       label: 'Statuts de suivi',
-      detail: 'Reprise des relances, étapes et notes enregistrées dans le pipeline.',
+      detail: 'Reprise des relances, étapes et notes enregistrées dans le suivi.',
       icon: 'activity',
     },
     {
@@ -151,8 +154,12 @@
   });
 
   const weekActivities = $derived.by(() => {
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
-    return overviewActivities.filter(({ timestamp }) => timestamp < oneDayAgo).slice(0, 4);
+    const now = Date.now();
+    const oneDayAgo = now - 24 * 60 * 60 * 1000;
+    const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+    return overviewActivities
+      .filter(({ timestamp }) => timestamp < oneDayAgo && timestamp >= sevenDaysAgo)
+      .slice(0, 4);
   });
 
   const selectedMission = $derived(
@@ -176,6 +183,11 @@
 
   const pipelineSummary = $derived.by(() =>
     summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
+  );
+
+  const kanbanColumns = $derived(buildKanbanBoard(missions, [...tracking.trackings.values()]));
+  const kanbanActiveCount = $derived(
+    kanbanColumns.reduce((sum, column) => sum + column.cards.length, 0)
   );
 
   const recommendedTrackedMission = $derived.by(() => {
@@ -227,7 +239,7 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Indisponible',
-        title: 'Le pipeline candidatures ne peut pas être chargé',
+        title: 'Le suivi des candidatures ne peut pas être chargé',
         description: loadError,
         evidence,
         primaryActionLabel: 'Réessayer',
@@ -267,7 +279,7 @@
         statusLabel: 'Aucun suivi',
         title: 'Aucune candidature active pour le moment',
         description:
-          'Qualifiez une mission depuis le Feed pour transformer la veille en pipeline actionnable.',
+          'Qualifiez une mission depuis le Feed pour transformer la veille en candidatures suivies.',
         evidence,
         primaryActionLabel: 'Préparer une mission',
         primaryActionIcon: 'briefcase',
@@ -276,12 +288,12 @@
 
     return {
       severity: 'success' as const,
-      statusLabel: 'Pipeline sain',
+      statusLabel: 'Suivi à jour',
       title: `${pipelineSummary.activeCount} dossier${pipelineSummary.activeCount > 1 ? 's' : ''} actif${pipelineSummary.activeCount > 1 ? 's' : ''}, aucune relance en retard`,
       description:
         pipelineSummary.bottleneck !== null
-          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
-          : 'Le pipeline est sous contrôle. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
+          ? `L’étape la plus chargée est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
+          : 'Le suivi est à jour. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
       evidence,
       primaryActionLabel: 'Ouvrir le dossier',
       primaryActionIcon: 'arrow-right',
@@ -289,10 +301,7 @@
   });
 
   function getLastActivity(record: MissionTracking | null): number {
-    if (!record || record.history.length === 0) {
-      return 0;
-    }
-    return record.history[record.history.length - 1].timestamp;
+    return getTrackingLastActivity(record);
   }
 
   function getMissionActivityTimestamp(mission: Mission): number {
@@ -454,11 +463,11 @@
 
   function getRecommendedDossierReason(item: TrackedMission): string {
     if (isDueFollowUp(item.record, Date.now())) {
-      return 'Relance échue: reprenez ce dossier avant de parcourir le reste du pipeline.';
+      return 'Relance échue : reprenez ce dossier avant de parcourir les autres dossiers.';
     }
 
     if (item.record.currentStatus === 'application_prepared') {
-      return 'Kit prêt: finalisez l’envoi ou changez le statut pour garder le pipeline propre.';
+      return 'Kit prêt : finalisez l’envoi ou changez le statut pour garder le suivi à jour.';
     }
 
     return 'Dossier actif: continuez par la dernière mission suivie avant de créer un nouveau dossier.';
@@ -502,7 +511,7 @@
 
   function formatDecisionTransition(transition: StatusTransition): string {
     if (transition.from === null) {
-      return `Entrée dans le pipeline: ${STATUS_LABELS[transition.to]}`;
+      return `Entrée dans le suivi : ${STATUS_LABELS[transition.to]}`;
     }
 
     return `${STATUS_LABELS[transition.from]} vers ${STATUS_LABELS[transition.to]}`;
@@ -607,214 +616,213 @@
   void loadApplications();
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <section
-    class="mb-5"
-    data-testid="application-activity-overview"
-    aria-labelledby="application-activity-title"
+<PageShell>
+  <PageHeader
+    eyebrow="Suivi"
+    title="Candidatures"
+    icon="mail"
+    badge="Local uniquement"
+    description="Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier. Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté."
   >
-    <h1 id="application-activity-title" class="text-heading font-medium text-text-primary">
-      Aujourd’hui
-    </h1>
-    <div class="mt-2 overflow-hidden border-y border-border-light bg-surface-white">
-      {#if todayActivities.length > 0}
-        {#each todayActivities as item (item.missionId)}
-          <button
-            type="button"
-            class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
-            onclick={() => openActivity(item)}
-            disabled={!item.mission}
-          >
-            <span
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
-            >
-              <Icon name={getActivityIcon(item.status)} size={14} />
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-body-lg font-medium text-text-primary">
-                {STATUS_LABELS[item.status]}
-              </span>
-              <span class="mt-0.5 block truncate text-meta text-text-muted">
-                {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
-              </span>
-            </span>
-            <span
-              class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
-              aria-hidden="true"
-            ></span>
-          </button>
-        {/each}
-      {:else}
-        <div class="flex items-center gap-3 px-1 py-4 text-text-muted">
-          <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray">
-            <Icon name="activity" size={14} />
-          </span>
-          <p class="text-meta">Aucune nouvelle activité aujourd’hui.</p>
-        </div>
-      {/if}
-    </div>
-
-    <div class="mt-5 flex items-center justify-between gap-3">
-      <h2 class="text-heading font-medium text-text-primary">Cette semaine</h2>
-      <span class="text-meta text-text-muted">
-        {tracking.trackings.size > 0
-          ? `${tracking.trackings.size} suivies`
-          : `${missions.length} à qualifier`}
-      </span>
-    </div>
-    <div class="mt-2 overflow-hidden border-y border-border-light bg-surface-white">
-      {#if weekActivities.length > 0}
-        {#each weekActivities as item (item.missionId)}
-          <button
-            type="button"
-            class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
-            onclick={() => openActivity(item)}
-            disabled={!item.mission}
-          >
-            <span
-              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
-            >
-              <Icon name={getActivityIcon(item.status)} size={14} />
-            </span>
-            <span class="min-w-0 flex-1">
-              <span class="block truncate text-body-lg font-medium text-text-primary">
-                {STATUS_LABELS[item.status]}
-              </span>
-              <span class="mt-0.5 block truncate text-meta text-text-muted">
-                {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
-              </span>
-            </span>
-            <span
-              class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
-              aria-hidden="true"
-            ></span>
-          </button>
-        {/each}
-      {:else}
-        <div class="flex items-center justify-between gap-3 px-1 py-4">
-          <p class="text-meta text-text-muted">Le reste de votre suivi apparaîtra ici.</p>
-          <button
-            type="button"
-            class="shrink-0 rounded-lg bg-subtle-gray px-3 py-2 text-meta font-medium text-text-primary"
-            onclick={() => onNavigateToFeed?.()}
-          >
-            Voir les missions
-          </button>
-        </div>
-      {/if}
-    </div>
-  </section>
-
-  <div class={overviewActivities.length > 0 ? 'mt-96' : 'mt-8'}>
-    <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
-  </div>
-
-  <section class="section-card-strong mt-5 rounded-2xl px-5 py-5">
-    <div class="flex items-start justify-between gap-4">
-      <div>
-        <p class="eyebrow text-blueprint-blue">Pipeline</p>
-        <div class="mt-1 flex flex-wrap items-center gap-2">
-          <h1 class="text-subheading font-semibold text-text-primary">Candidatures</h1>
-          <span
-            class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-caption font-medium text-text-subtle"
-          >
-            Local uniquement
-          </span>
-        </div>
-        <p class="mt-1 text-meta leading-5 text-text-subtle">
-          Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier.
-        </p>
-        <p class="mt-2 text-caption leading-5 text-text-subtle">
-          Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté.
-        </p>
-      </div>
-      <div
-        class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
-      >
-        <Icon name="mail" size={18} class="text-blueprint-blue" />
-      </div>
-    </div>
-    <div class="mt-5">
-      <OperationalStoryCard
-        eyebrow="Priorité"
-        variant="compact"
-        title={applicationStory.title}
-        description={applicationStory.description}
-        severity={applicationStory.severity}
-        statusLabel={applicationStory.statusLabel}
-        evidence={applicationStory.evidence}
-        primaryActionLabel={applicationStory.primaryActionLabel}
-        primaryActionIcon={applicationStory.primaryActionIcon as IconName}
-        onPrimaryAction={handleApplicationStoryAction}
-      />
-    </div>
-    {#if isOffline}
-      <div class="mt-4">
+    <OperationalStoryCard
+      eyebrow="Priorité"
+      variant="compact"
+      title={applicationStory.title}
+      description={applicationStory.description}
+      severity={applicationStory.severity}
+      statusLabel={applicationStory.statusLabel}
+      evidence={applicationStory.evidence}
+      primaryActionLabel={applicationStory.primaryActionLabel}
+      primaryActionIcon={applicationStory.primaryActionIcon as IconName}
+      onPrimaryAction={handleApplicationStoryAction}
+    />
+    {#snippet footer()}
+      {#if isOffline}
         <OfflineNotice
-          description="Le pipeline local reste modifiable. Les ouvertures de mission et générations de messages peuvent attendre le retour réseau."
+          description="Le suivi local reste modifiable. Les ouvertures de mission et générations de messages peuvent attendre le retour réseau."
           action="Prochaine action : mettre à jour les relances dues et préparer les prochaines actions."
         />
-      </div>
-    {/if}
+      {/if}
+    {/snippet}
+  </PageHeader>
 
-    {#if !isLoading}
-      <section class="mt-5 rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
-        <div class="flex items-start justify-between gap-3">
-          <div class="min-w-0">
-            <p class="text-caption font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-              Dossier recommandé
+  {#if !isLoading}
+    <section class="rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--blue">Dossier recommandé</p>
+          {#if recommendedTrackedMission}
+            <h2 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
+              {recommendedTrackedMission.mission.title}
+            </h2>
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
+              {getRecommendedDossierReason(recommendedTrackedMission)}
             </p>
-            {#if recommendedTrackedMission}
-              <h3 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
-                {recommendedTrackedMission.mission.title}
-              </h3>
-              <p class="mt-1 text-meta leading-5 text-text-subtle">
-                {getRecommendedDossierReason(recommendedTrackedMission)}
-              </p>
-              <div class="mt-2 flex flex-wrap items-center gap-2">
-                <span
-                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
-                >
-                  {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
+            <div class="mt-2 flex flex-wrap items-center gap-2">
+              <span
+                class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
+              >
+                {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
+              </span>
+              {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                <span class="text-caption text-text-subtle">
+                  Prochaine action : {formatNextAction(
+                    recommendedTrackedMission.record.nextActionAt
+                  )}
                 </span>
-                {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                  <span class="text-caption text-text-subtle">
-                    Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                  </span>
-                {/if}
-              </div>
-            {:else}
-              <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
-                Aucun dossier suivi pour l’instant
-              </h3>
-              <p class="mt-1 text-meta leading-5 text-text-subtle">
-                Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
-              </p>
-            {/if}
-          </div>
-          <button
-            type="button"
-            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
-            onclick={openRecommendedDossier}
-          >
-            <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
-            {recommendedTrackedMission ? 'Ouvrir le dossier' : 'Aller au feed'}
-          </button>
+              {/if}
+            </div>
+          {:else}
+            <h2 class="mt-1 text-body-lg font-semibold text-text-primary">
+              Aucun dossier suivi pour l’instant
+            </h2>
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
+              Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
+            </p>
+          {/if}
         </div>
-      </section>
-    {/if}
-    <ApplicationPipelineSummary summary={pipelineSummary} />
+        <button
+          type="button"
+          class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
+          onclick={openRecommendedDossier}
+        >
+          <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
+          {recommendedTrackedMission ? 'Ouvrir le dossier' : 'Aller au feed'}
+        </button>
+      </div>
+    </section>
+  {/if}
+
+  <ApplicationPipelineSummary summary={pipelineSummary} />
+
+  <section data-testid="application-activity-overview" aria-labelledby="application-activity-title">
+    <div class="flex items-start gap-3 px-1">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+        <Icon name="activity" size={14} class="text-blueprint-blue" />
+      </div>
+      <div class="min-w-0">
+        <p class="eyebrow">Journal</p>
+        <h2
+          id="application-activity-title"
+          class="mt-1 text-body-lg font-semibold text-text-primary"
+        >
+          Activité de suivi
+        </h2>
+        <p class="mt-1 text-meta leading-5 text-text-subtle">
+          Les décisions récentes sur vos dossiers, de la qualification à la relance.
+        </p>
+      </div>
+    </div>
+
+    <div class="mt-3 space-y-4">
+      <div>
+        <h3 class="px-1 text-body-lg font-medium text-text-primary">Aujourd’hui</h3>
+        <div class="mt-2 overflow-hidden rounded-xl border border-border-light bg-surface-white">
+          {#if todayActivities.length > 0}
+            {#each todayActivities as item (item.missionId)}
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
+                onclick={() => openActivity(item)}
+                disabled={!item.mission}
+              >
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+                >
+                  <Icon name={getActivityIcon(item.status)} size={14} />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-body-lg font-medium text-text-primary">
+                    {STATUS_LABELS[item.status]}
+                  </span>
+                  <span class="mt-0.5 block truncate text-meta text-text-muted">
+                    {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
+                  </span>
+                </span>
+                <span
+                  class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            {/each}
+          {:else}
+            <div class="flex items-center gap-3 px-1 py-4 text-text-muted">
+              <span
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray"
+              >
+                <Icon name="activity" size={14} />
+              </span>
+              <p class="text-meta">Aucune nouvelle activité aujourd’hui.</p>
+            </div>
+          {/if}
+        </div>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between gap-3 px-1">
+          <h3 class="text-body-lg font-medium text-text-primary">Cette semaine</h3>
+          <span class="text-meta text-text-muted">
+            {tracking.trackings.size > 0
+              ? `${tracking.trackings.size} suivies`
+              : `${missions.length} à qualifier`}
+          </span>
+        </div>
+        <div class="mt-2 overflow-hidden rounded-xl border border-border-light bg-surface-white">
+          {#if weekActivities.length > 0}
+            {#each weekActivities as item (item.missionId)}
+              <button
+                type="button"
+                class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
+                onclick={() => openActivity(item)}
+                disabled={!item.mission}
+              >
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+                >
+                  <Icon name={getActivityIcon(item.status)} size={14} />
+                </span>
+                <span class="min-w-0 flex-1">
+                  <span class="block truncate text-body-lg font-medium text-text-primary">
+                    {STATUS_LABELS[item.status]}
+                  </span>
+                  <span class="mt-0.5 block truncate text-meta text-text-muted">
+                    {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
+                  </span>
+                </span>
+                <span
+                  class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            {/each}
+          {:else}
+            <div class="flex items-center justify-between gap-3 px-1 py-4">
+              <p class="text-meta text-text-muted">Le reste de votre suivi apparaîtra ici.</p>
+              <button
+                type="button"
+                class="shrink-0 rounded-lg bg-subtle-gray px-3 py-2 text-meta font-medium text-text-primary"
+                onclick={() => onNavigateToFeed?.()}
+              >
+                Voir les missions
+              </button>
+            </div>
+          {/if}
+        </div>
+      </div>
+    </div>
   </section>
 
+  <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
+
   {#if isLoading}
-    <div class="mt-5 section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
+    <div class="section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
-            Chargement candidatures
+          <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--subtle">
+            Chargement des candidatures
           </p>
           <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
-            Reconstruction du pipeline local
+            Reconstruction du suivi local
           </h3>
           <p class="mt-1 text-meta leading-5 text-text-subtle">
             Pulse relie les missions, statuts et contenus générés avant de recommander le prochain
@@ -848,14 +856,14 @@
       </div>
     </div>
   {:else if loadError}
-    <div class="mt-5">
+    <div>
       <OperationalEmptyState
-        title="Le pipeline candidatures ne peut pas être chargé"
+        title="Le suivi des candidatures ne peut pas être chargé"
         description="Les statuts locaux sont indisponibles pour le moment. Réessayez avant de modifier un dossier ou de générer un kit."
         severity="critical"
         statusLabel="Incident"
         icon="triangle-alert"
-        proofLabel="Pipeline"
+        proofLabel="Suivi"
         proofValue="Indisponible"
         primaryActionLabel="Réessayer"
         primaryActionIcon="refresh-cw"
@@ -865,12 +873,12 @@
       />
     </div>
   {:else if missions.length === 0}
-    <div class="mt-5">
+    <div>
       <OperationalEmptyState
         title="Aucune mission ne peut encore devenir candidature"
-        description="Le pipeline démarre quand une mission existe dans le feed. Lancez ou consultez le radar, puis revenez préparer un dossier."
+        description="Le suivi démarre quand une mission existe dans le feed. Lancez ou consultez le radar, puis revenez préparer un dossier."
         severity="attention"
-        statusLabel="Pipeline vide"
+        statusLabel="Suivi vide"
         icon="briefcase"
         proofLabel="Missions disponibles"
         proofValue="0"
@@ -880,7 +888,90 @@
       />
     </div>
   {:else}
-    <div class="mt-5 grid items-start gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+    {#if kanbanActiveCount > 0}
+      <section
+        data-testid="application-kanban"
+        class="section-card rounded-xl p-4"
+        aria-label="Candidatures par étape"
+      >
+        <div class="flex items-center justify-between gap-3 pb-3">
+          <div>
+            <h3 class="text-body-lg font-medium text-text-primary">Candidatures</h3>
+            <p class="mt-0.5 text-meta text-text-subtle">
+              {kanbanActiveCount} dossiers actifs, de la sélection à l’offre.
+            </p>
+          </div>
+        </div>
+        <div class="flex gap-3 overflow-x-auto pb-1">
+          {#each kanbanColumns as column (column.status)}
+            <div class="flex w-44 shrink-0 flex-col gap-2">
+              <div class="flex items-center justify-between gap-2 px-1">
+                <span class="truncate text-caption font-medium text-text-subtle">
+                  {column.label}
+                </span>
+                <span
+                  class="shrink-0 rounded-md bg-subtle-gray px-1.5 py-0.5 text-micro font-semibold text-text-subtle"
+                >
+                  {column.cards.length}
+                </span>
+              </div>
+              <div class="flex flex-col gap-2">
+                {#each column.cards.slice(0, 4) as card (card.missionId)}
+                  <button
+                    type="button"
+                    class="w-full rounded-lg border border-border-light bg-surface-white px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/30 hover:bg-blueprint-blue/4 {selectedMissionId ===
+                    card.missionId
+                      ? 'border-blueprint-blue/40 bg-blueprint-blue/6'
+                      : ''} {card.missionMissing
+                      ? 'cursor-default opacity-60 hover:border-border-light hover:bg-surface-white'
+                      : ''}"
+                    onclick={() => {
+                      if (!card.missionMissing) {
+                        selectMission(card.missionId);
+                      }
+                    }}
+                    disabled={card.missionMissing}
+                    title={card.missionMissing
+                      ? 'Mission source introuvable dans le feed local'
+                      : undefined}
+                  >
+                    <span
+                      class="block truncate text-body font-medium {card.missionMissing
+                        ? 'text-text-subtle italic'
+                        : 'text-text-primary'}"
+                    >
+                      {card.title}
+                    </span>
+                    {#if card.client}
+                      <span class="mt-0.5 block truncate text-caption text-text-muted">
+                        {card.client}
+                      </span>
+                    {/if}
+                    <span class="mt-1.5 block text-caption text-text-subtle">
+                      {card.lastActivityAt > 0 ? formatDate(card.lastActivityAt) : '—'}
+                    </span>
+                  </button>
+                {/each}
+                {#if column.cards.length > 4}
+                  <p class="px-1 text-caption text-text-muted">
+                    +{column.cards.length - 4} autres dossiers
+                  </p>
+                {/if}
+                {#if column.cards.length === 0}
+                  <p
+                    class="rounded-lg border border-dashed border-border-light px-3 py-2.5 text-caption text-text-muted"
+                  >
+                    Aucun dossier
+                  </p>
+                {/if}
+              </div>
+            </div>
+          {/each}
+        </div>
+      </section>
+    {/if}
+
+    <div class="grid items-start gap-4 lg:grid-cols-[0.85fr_1.15fr]">
       <section class="section-card rounded-xl p-3">
         <div class="flex items-center justify-between px-2 pb-2">
           <h3 class="text-body-lg font-medium text-text-primary">Missions</h3>
@@ -932,7 +1023,7 @@
           <div class="section-card rounded-xl p-5">
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
-                <p class="text-caption font-medium uppercase tracking-[0.15em] text-blueprint-blue">
+                <p class="eyebrow eyebrow--caption eyebrow--blue">
                   {STATUS_LABELS[selectedStatus]}
                 </p>
                 <h3 class="mt-1 text-subheading font-semibold text-text-primary">
@@ -946,7 +1037,7 @@
                     class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2 py-1 text-caption font-medium text-blueprint-blue"
                   >
                     <Icon name="calendar-clock" size={12} />
-                    Prochaine action {formatNextAction(selectedTracking?.nextActionAt)}
+                    Prochaine action : {formatNextAction(selectedTracking?.nextActionAt)}
                   </p>
                 {/if}
               </div>
@@ -976,12 +1067,12 @@
             <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
               {#if selectedFollowUpTerminal}
                 <p class="text-meta leading-5 text-text-subtle">
-                  Le suivi de relance est terminé pour ce statut.
+                  Aucune relance à planifier : ce dossier a atteint un statut final.
                 </p>
               {:else}
                 <label
                   for="application-next-action"
-                  class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle"
+                  class="eyebrow eyebrow--caption eyebrow--subtle"
                 >
                   Prochaine action
                 </label>
@@ -1019,9 +1110,7 @@
                 aria-label="Historique des décisions"
               >
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
-                    Historique des décisions
-                  </p>
+                  <p class="eyebrow eyebrow--caption eyebrow--subtle">Historique des décisions</p>
                   <span class="text-caption text-text-subtle">
                     {selectedTracking?.history.length ?? 0} événement{(selectedTracking?.history
                       .length ?? 0) > 1
@@ -1133,4 +1222,4 @@
       </section>
     </div>
   {/if}
-</div>
+</PageShell>

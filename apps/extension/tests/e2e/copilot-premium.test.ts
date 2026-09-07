@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { SIDE_PANEL } from './helpers';
+import { SIDE_PANEL, enableAllSurfaceFlags } from './helpers';
 
 test.skip(
   process.env.VITE_COPILOT_ROLLOUT_ENABLED !== 'true',
@@ -27,6 +27,7 @@ test('consent → generated dossier → review/copy → reopen', async ({ page }
     });
   });
 
+  await enableAllSurfaceFlags(page);
   await page.goto(SIDE_PANEL);
   const navigation = page.getByRole('navigation', { name: 'Main navigation' });
   await expect(navigation).toBeVisible();

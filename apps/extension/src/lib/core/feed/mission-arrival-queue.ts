@@ -1096,7 +1096,7 @@ export function getMissionArrivalStackView(
       count: pending.orderedIds.length,
       pendingIds: pending.orderedIds,
       previewIds: state.stack.previewIds,
-      errorMessage: 'Impossible d’actualiser la file. Réessayer.',
+      errorMessage: 'Impossible d’actualiser la file. Réessayez.',
       drawerOpen: state.stack.drawerOpen,
     };
   }

@@ -11,8 +11,8 @@ test.describe('Navigation', () => {
     await nav.getByRole('button', { name: 'TJM' }).click();
     await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
 
-    await nav.getByRole('button', { name: 'Settings' }).click();
-    await expect(nav.getByRole('button', { name: 'Settings' })).toHaveAttribute(
+    await nav.getByRole('button', { name: 'Réglages' }).click();
+    await expect(nav.getByRole('button', { name: 'Réglages' })).toHaveAttribute(
       'aria-current',
       'page'
     );

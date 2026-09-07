@@ -737,86 +737,6 @@ async function s_tjmGaugeDeadCode() {
 }
 
 // ===========================================================================
-// S12 — [MED] Onboarding alert-save failure still advances the wizard
-// ===========================================================================
-async function s_onboardingAlertFailureAdvances() {
-  const { browser, page, consoleErrors } = await seeded();
-  try {
-    await navigate(page, 'settings');
-    await page.waitForTimeout(400);
-    await page.getByRole('button', { name: /Rejouer/i }).click();
-    await page.waitForTimeout(900);
-    // Walk to the alert step.
-    await page
-      .getByRole('button', { name: /Configurer le radar/ })
-      .click()
-      .catch(() => {});
-    await page.waitForTimeout(300);
-    await page
-      .getByRole('button', { name: /Continuer avec/ })
-      .click()
-      .catch(() => {});
-    await page.waitForTimeout(300);
-    await page
-      .getByRole('button', { name: /Créer une première alerte/ })
-      .click()
-      .catch(() => {});
-    await page.waitForTimeout(400);
-    // Inject alert-save failure.
-    await injectSendMessageFailure(
-      page,
-      ['SAVE_CONNECTED_ALERT_PREFERENCES'],
-      'qa-alert-save-failed'
-    );
-    // Click the alert-step advance.
-    await page
-      .getByRole('button', { name: /Voir le premier insight/ })
-      .click()
-      .catch(() => {});
-    await page.waitForTimeout(1400);
-    const body = await page
-      .locator('body')
-      .innerText({ timeout: 1500 })
-      .catch(() => '');
-    const advancedToInsight = /Action recommandée après le scan/i.test(body);
-    const errorToast = /Impossible d['’]enregistrer l['’]alerte/i.test(body);
-    const evidence = await screenshot(page, 'onboarding-alert-failure-advances');
-    record({
-      id: 'ONB-01',
-      area: 'Onboarding',
-      severity: 'MED',
-      title: 'Onboarding advances past the alert step even when the alert save fails',
-      phaseA: 'confirms',
-      status: advancedToInsight ? 'confirmed' : 'partial',
-      repro: [
-        'Replay onboarding, walk to the "Créer une alerte" step.',
-        'Force SAVE_CONNECTED_ALERT_PREFERENCES to fail.',
-        'Click "Voir le premier insight".',
-        'handleSaveAlertPreferences catches the error (toast) but never rethrows → saveAlertAndContinue() still calls goNext().',
-      ],
-      expected: 'On save failure the wizard should stay on the alert step and let the user retry.',
-      actual: `advanced to insight step=${advancedToInsight}; error toast shown=${errorToast}.`,
-      evidence: [evidence],
-      codeRefs: [
-        'src/ui/organisms/OnboardingWizard.svelte:151-162',
-        'src/ui/pages/OnboardingPage.svelte:55-65',
-        'src/lib/shell/facades/alert-preferences.facade.ts:32-34',
-      ],
-    });
-  } catch (e) {
-    record({
-      id: 'ONB-01',
-      severity: 'MED',
-      status: 'error',
-      title: 'onboarding alert failure',
-      error: String(e),
-    });
-  } finally {
-    await browser.close();
-  }
-}
-
-// ===========================================================================
 // S13 — [MED] Onboarding skip → null profile (MASKED in dev)
 // ===========================================================================
 async function s_onboardingSkipNullProfile() {
@@ -952,7 +872,6 @@ async function main() {
     s_feedTourContrast,
     s_tjmRegionAndInverted,
     s_tjmGaugeDeadCode,
-    s_onboardingAlertFailureAdvances,
     s_onboardingSkipNullProfile,
     s_uiSweep,
   ];

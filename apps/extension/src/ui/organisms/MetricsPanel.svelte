@@ -423,7 +423,7 @@
       <section class="rounded-2xl border p-4 {toneClasses(operationalSummary.tone)}">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div class="min-w-0">
-            <p class="text-micro font-semibold uppercase tracking-[0.16em]">
+            <p class="eyebrow eyebrow--strong eyebrow--inherit">
               {operationalSummary.statusLabel}
             </p>
             <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
@@ -440,7 +440,7 @@
             {#each prioritySignals as signal, i (i)}
               <div class="rounded-xl border border-surface-white/70 bg-surface-white/70 px-3 py-2">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+                  <span class="eyebrow">
                     {signal.label}
                   </span>
                   <Icon name={signal.icon} size={12} class="shrink-0" />
@@ -476,9 +476,7 @@
       {#if activeTab === 'overview'}
         <div class="grid gap-3 md:grid-cols-2">
           <section class="rounded-xl border border-border-light bg-surface-white p-4">
-            <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-              Signaux prioritaires
-            </p>
+            <p class="eyebrow eyebrow--strong">Signaux prioritaires</p>
             <div class="mt-3 space-y-2">
               {#each prioritySignals as signal, i (i)}
                 <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
@@ -498,9 +496,7 @@
           </section>
 
           <section class="rounded-xl border border-border-light bg-surface-white p-4">
-            <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-              Couverture par source
-            </p>
+            <p class="eyebrow eyebrow--strong">Couverture par source</p>
             {#if missionsByConnector.size === 0}
               <div class="mt-3 rounded-xl border border-status-orange/20 bg-status-orange/8 p-3">
                 <p class="text-body-lg font-medium text-text-primary">
@@ -539,9 +535,7 @@
         </div>
       {:else if activeTab === 'scan'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Timeline des scans
-          </p>
+          <p class="eyebrow eyebrow--strong">Timeline des scans</p>
           <div class="mt-3 rounded-xl border border-border-light bg-page-canvas p-3">
             <p class="text-body-lg font-semibold text-text-primary">
               {scanStats.scanCount > 0
@@ -588,9 +582,7 @@
         </section>
 
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Incidents récents
-          </p>
+          <p class="eyebrow eyebrow--strong">Incidents récents</p>
           <div class="mt-3 space-y-2">
             {#each recentErrors as error, i (i)}
               <article class="rounded-xl border border-status-red/20 bg-status-red/8 px-3 py-2.5">
@@ -622,9 +614,7 @@
         </section>
       {:else if activeTab === 'cache'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Diagnostic cache
-          </p>
+          <p class="eyebrow eyebrow--strong">Diagnostic cache</p>
           <div
             class="mt-3 rounded-xl border p-3 {cacheStats.lastHitRate >= 70
               ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
@@ -677,9 +667,7 @@
         </section>
       {:else if activeTab === 'timings'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Latences à prioriser
-          </p>
+          <p class="eyebrow eyebrow--strong">Latences à prioriser</p>
           <div class="mt-3 space-y-2">
             {#each slowestTimings as [operation, stats] (operation)}
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
@@ -718,9 +706,7 @@
         </section>
       {:else if activeTab === 'webvitals'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Expérience perçue
-          </p>
+          <p class="eyebrow eyebrow--strong">Expérience perçue</p>
           <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
             {#each [{ label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' }, { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' }, { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' }, { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' }] as vital (vital.label)}
               {@const measured = vital.value > 0}
@@ -732,7 +718,7 @@
                     ? 'attention'
                     : 'success'}
               <article class="rounded-xl border p-3 {toneClasses(tone)}">
-                <p class="text-micro font-semibold uppercase tracking-[0.14em]">{vital.label}</p>
+                <p class="eyebrow eyebrow--strong">{vital.label}</p>
                 <p class="mt-1 font-mono text-heading font-semibold tabular-nums text-text-primary">
                   {measured
                     ? vital.label === 'CLS'

@@ -14,7 +14,7 @@ const DEFAULT_PROFILE = {
   firstName: '',
   keywords: [],
   tjmMin: 0,
-  tjmMax: 9999,
+  tjmMax: null,
   location: '',
   remote: 'any',
   seniority: 'senior',

@@ -44,7 +44,7 @@
 
     <p class="mt-4 text-body-lg leading-relaxed text-text-secondary">
       Connectez vos plateformes existantes. Pulse récupère, déduplique et classe les missions pour
-      ne rater que celles qui comptent.
+      ne rien rater de ce qui compte.
     </p>
 
     <ul class="mt-8 space-y-3">

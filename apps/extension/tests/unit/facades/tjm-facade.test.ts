@@ -31,6 +31,7 @@ const analysis: TJMAnalysis = {
     },
   ],
   regionInsights: [],
+  series: [],
 };
 
 describe('tjm facade', () => {

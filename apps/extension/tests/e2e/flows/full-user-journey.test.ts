@@ -104,8 +104,8 @@ baseTest.describe('Full User Journey', () => {
       await navButton(page, 'TJM').click();
       await expect(navButton(page, 'TJM')).toHaveAttribute('aria-current', 'page');
 
-      await navButton(page, 'Settings').click();
-      await expect(navButton(page, 'Settings')).toHaveAttribute('aria-current', 'page');
+      await navButton(page, 'Réglages').click();
+      await expect(navButton(page, 'Réglages')).toHaveAttribute('aria-current', 'page');
 
       await navButton(page, 'Missions').click();
       await expectFeedReady(page);

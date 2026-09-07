@@ -14,6 +14,7 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
 }));
 
 import TJMPage from '../../../src/ui/pages/TJMPage.svelte';
+import TJMPageActivationStub from './TJMPageActivationStub.svelte';
 
 const analysis: TJMAnalysis = {
   trend: 'up',
@@ -46,6 +47,10 @@ const analysis: TJMAnalysis = {
       trend: 'stable',
     },
   ],
+  series: [
+    { date: '2026-05-20', average: 640 },
+    { date: '2026-05-22', average: 655 },
+  ],
 };
 
 function flush() {
@@ -76,14 +81,87 @@ describe('TJMPage region filter (TJM-01)', () => {
     expect(select, 'region selector should be rendered').not.toBeNull();
     expect([...select.options].map((o) => o.value)).toContain('lyon');
 
-    // Initial (unfiltered) load has no region.
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined);
+    // Initial (unfiltered) load has no region and the default period 'all'.
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all');
 
     select.value = 'lyon';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await flush();
     await tick();
 
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, 'lyon');
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, 'lyon', 'all');
+  });
+
+  it('passes the selected period to getTJMAnalysis when a preset is chosen', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(TJMPage, { target });
+    await tick();
+    await flush();
+
+    const group = target.querySelector('[role="radiogroup"][aria-label*="Période"]');
+    expect(group, 'period radiogroup should be rendered').not.toBeNull();
+
+    const radios = [...group.querySelectorAll('[role="radio"]')];
+    expect(radios.map((r) => r.textContent.trim())).toEqual(['7 jours', '30 jours', 'Tout']);
+    expect(
+      radios.map((r) => r.getAttribute('aria-checked')),
+      'default period is "Tout"'
+    ).toEqual(['false', 'false', 'true']);
+
+    radios.find((r) => r.textContent.trim() === '7 jours')?.click();
+    await flush();
+    await tick();
+
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d');
+    expect(
+      group.querySelector('[data-period-option="7d"]')?.getAttribute('aria-checked'),
+      'aria-checked follows the selection'
+    ).toBe('true');
+  });
+
+  it('ignores a repeated selection of the already active period (no duplicate request)', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(TJMPage, { target });
+    await tick();
+    await flush();
+
+    const group = target.querySelector('[role="radiogroup"][aria-label*="Période"]');
+    const callCountBefore = getTJMAnalysis.mock.calls.length;
+
+    group.querySelector('[data-period-option="all"]')?.click();
+    await flush();
+    await tick();
+
+    expect(getTJMAnalysis.mock.calls.length).toBe(callCountBefore);
+  });
+
+  it('resets period and region to their defaults when the page becomes active again', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const stub = mount(TJMPageActivationStub, { target });
+    await tick();
+    await flush();
+
+    const group = target.querySelector('[role="radiogroup"][aria-label*="Période"]');
+    group.querySelector('[data-period-option="7d"]')?.click();
+    await flush();
+    await tick();
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d');
+
+    // Pages stay mounted under `inert`; leaving and coming back must restore
+    // the default period (models/tjm-analysis-period.model.md).
+    stub.setActive(false);
+    await tick();
+    stub.setActive(true);
+    await tick();
+    await flush();
+
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all');
+    expect(
+      group.querySelector('[data-period-option="all"]')?.getAttribute('aria-checked'),
+      'period resets to "Tout" on re-activation'
+    ).toBe('true');
   });
 });

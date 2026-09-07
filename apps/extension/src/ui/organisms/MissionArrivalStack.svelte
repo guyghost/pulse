@@ -101,11 +101,7 @@
       >
         <div class="flex items-start justify-between gap-4 border-b border-border-light px-4 py-3">
           <div class="min-w-0">
-            <p
-              class="mb-1 text-micro font-semibold uppercase tracking-[0.14em] text-blueprint-blue"
-            >
-              En attente
-            </p>
+            <p class="mb-1 eyebrow eyebrow--strong eyebrow--blue">En attente</p>
             <h2
               id="arrival-drawer-title"
               class="text-body-lg font-semibold text-text-primary outline-none"
@@ -116,7 +112,7 @@
               {countLabel}
             </h2>
             <p class="mt-1 text-meta leading-5 text-text-subtle">
-              Votre lecture reste en place jusqu’à l’actualisation.
+              Votre position de lecture reste en place jusqu’à l’actualisation.
             </p>
           </div>
 
@@ -168,7 +164,7 @@
             class="mx-4 mb-3 rounded-lg bg-status-red/10 px-3 py-2 text-meta text-status-red"
             role="alert"
           >
-            {errorMessage ?? 'Impossible d’actualiser la file. Réessayer.'}
+            {errorMessage ?? 'Impossible d’actualiser la file. Réessayez.'}
           </p>
         {/if}
 

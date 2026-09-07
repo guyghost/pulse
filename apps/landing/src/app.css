@@ -1515,6 +1515,11 @@ section[id] {
   color: var(--color-status-violet);
 }
 
+.feature-matrix__tier--soon {
+  background: color-mix(in srgb, var(--color-status-orange) 10%, var(--color-surface-white));
+  color: var(--color-status-orange);
+}
+
 @media (min-width: 1024px) {
   .feature-matrix__row {
     padding: var(--spacing-24) var(--spacing-8);

@@ -45,8 +45,8 @@ vi.mock('../../../src/lib/core/scoring/dedup', () => ({
   })),
 }));
 
-vi.mock('../../../src/lib/core/scoring/relevance', () => ({
-  scoreMission: vi.fn(() => ({
+vi.mock('../../../src/lib/core/scoring/relevance', () => {
+  const scoredResult = {
     total: 50,
     breakdown: {
       stack: 20,
@@ -56,8 +56,22 @@ vi.mock('../../../src/lib/core/scoring/relevance', () => ({
       seniorityBonus: 0,
       startDateBonus: 0,
     },
-  })),
-}));
+  };
+  return {
+    scoreMission: vi.fn(() => scoredResult),
+    scoreMissionWithPrepared: vi.fn(() => scoredResult),
+    prepareProfileScoring: vi.fn(() => ({
+      weights: { stack: 40, location: 20, tjm: 25, remote: 15 },
+      keywordSet: new Set<string>(),
+      hasKeywords: false,
+      location: '',
+      tjmMin: 0,
+      tjmMax: 0,
+      remote: 'any',
+      seniority: 'senior',
+    })),
+  };
+});
 
 vi.mock('../../../src/lib/shell/utils/connection-monitor', () => ({
   isOnline: vi.fn(() => true),

@@ -129,7 +129,7 @@
       aria-pressed={showNewOnly}
       title="Filtrer les nouvelles missions"
     >
-      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 eyebrow">
         <Icon name="sparkles" size={11} />
         Nouvelles
       </span>
@@ -148,7 +148,7 @@
       aria-pressed={selectedScoreBucket === 'strong'}
       title="Filtrer les missions prioritaires"
     >
-      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 eyebrow">
         <Icon name="target" size={11} />
         Note A
       </span>
@@ -163,7 +163,7 @@
       onclick={onToggleFavorites}
       title="Filtrer les favoris"
     >
-      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 eyebrow">
         <Icon name="star" size={11} />
         Favoris
       </span>
@@ -173,7 +173,7 @@
     </button>
 
     <div class="min-w-0 rounded-lg px-2 py-2">
-      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 eyebrow">
         <Icon name={brokenConnectorCount > 0 ? 'circle-alert' : 'shield-check'} size={11} />
         Sources
       </span>
@@ -189,9 +189,7 @@
 
   <div class="mt-3" aria-label="Distribution des missions par note">
     <div class="mb-1.5 flex items-center justify-between gap-3">
-      <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-        Notes des missions
-      </p>
+      <p class="eyebrow eyebrow--strong">Notes des missions</p>
       <p class="text-micro text-text-muted">{summary.visibleCount} visibles</p>
     </div>
 

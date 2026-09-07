@@ -157,9 +157,10 @@
         placeholder="Lead Frontend"
         class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         aria-invalid={Boolean(titleError)}
+        aria-describedby={titleError ? 'experience-title-error' : undefined}
       />
       {#if titleError}
-        <span class="text-caption text-status-red">{titleError}</span>
+        <span id="experience-title-error" class="text-caption text-status-red">{titleError}</span>
       {/if}
     </label>
     <label class="flex flex-col gap-1">
@@ -172,9 +173,12 @@
         placeholder="Acme"
         class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         aria-invalid={Boolean(companyError)}
+        aria-describedby={companyError ? 'experience-company-error' : undefined}
       />
       {#if companyError}
-        <span class="text-caption text-status-red">{companyError}</span>
+        <span id="experience-company-error" class="text-caption text-status-red"
+          >{companyError}</span
+        >
       {/if}
     </label>
     <label class="flex flex-col gap-1">
@@ -189,7 +193,7 @@
     </label>
   </div>
 
-  <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+  <div class="grid grid-cols-2 gap-3 sm:grid-cols-3">
     <label class="flex flex-col gap-1">
       <span class="text-caption font-medium text-text-secondary">Début</span>
       <input
@@ -198,9 +202,12 @@
         data-experience-focus="startDate"
         class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         aria-invalid={Boolean(startDateError)}
+        aria-describedby={startDateError ? 'experience-start-date-error' : undefined}
       />
       {#if startDateError}
-        <span class="text-caption text-status-red">{startDateError}</span>
+        <span id="experience-start-date-error" class="text-caption text-status-red"
+          >{startDateError}</span
+        >
       {/if}
     </label>
     <label class="flex flex-col gap-1">
@@ -213,7 +220,7 @@
         class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20 disabled:opacity-40"
       />
     </label>
-    <label class="flex items-end gap-2 pb-2">
+    <label class="col-span-2 flex items-end gap-2 pb-2 sm:col-span-1">
       <input
         type="checkbox"
         checked={isCurrent}

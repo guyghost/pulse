@@ -14,7 +14,7 @@ import type { CanonicalCandidateProfileDraft } from '../../core/profile-extracto
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AppError } from '../../core/errors/app-error';
-import type { TJMAnalysis, TJMRegion } from '../../core/types/tjm';
+import type { TJMAnalysis, TJMPeriod, TJMRegion } from '../../core/types/tjm';
 import type { SavedFeedView } from '../../core/types/feed-view';
 import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
@@ -98,6 +98,11 @@ export type BridgeMessage =
     }
   | { type: 'GET_FEED_MISSIONS' }
   | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
+  | { type: 'GET_FEED_MISSIONS_PAGE'; payload: { page: number; pageSize: number } }
+  | {
+      type: 'FEED_MISSIONS_PAGE_RESULT';
+      payload: { missions: Mission[]; total: number; hasMore: boolean };
+    }
   | { type: 'GET_FEED_FAVORITES' }
   | { type: 'FEED_FAVORITES_RESULT'; payload: Record<string, number> }
   | { type: 'SAVE_FEED_FAVORITES'; payload: Record<string, number> }
@@ -120,7 +125,10 @@ export type BridgeMessage =
   | { type: 'CONNECTED_ALERT_PREFERENCES_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_ALERT_HISTORY' }
   | { type: 'ALERT_HISTORY_RESULT'; payload: AlertHistoryEntry[] }
-  | { type: 'GET_TJM_ANALYSIS'; payload?: { profileStacks?: string[]; region?: TJMRegion } }
+  | {
+      type: 'GET_TJM_ANALYSIS';
+      payload?: { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod };
+    }
   | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMAnalysis | null } }
   | { type: 'GET_SEEN_MISSIONS' }
   | { type: 'SEEN_MISSIONS_RESULT'; payload: string[] }

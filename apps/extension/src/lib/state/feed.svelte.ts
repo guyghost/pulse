@@ -2,20 +2,40 @@ import type { Mission } from '$lib/core/types/mission';
 
 export type FeedState = 'empty' | 'loading' | 'loaded' | 'error';
 
-const recomputeFilteredMissions = (missions: Mission[], searchQuery: string): Mission[] => {
-  if (!searchQuery.trim()) {
+/**
+ * Normalized search haystack for one mission: same fields, same order, same
+ * space-join and lowercasing as the previous inline logic. Pure — computed
+ * once per mission when missions change, not on every search keystroke.
+ */
+const buildSearchHaystack = (mission: Mission): string =>
+  [
+    mission.title,
+    mission.client,
+    mission.description,
+    mission.location,
+    mission.source,
+    ...mission.stack,
+  ]
+    .filter((value): value is string => typeof value === 'string' && value.length > 0)
+    .join(' ')
+    .toLowerCase();
+
+/**
+ * Filters missions against a precomputed search index aligned with `missions`
+ * by position. Semantics unchanged: trimmed lowercase substring match over the
+ * joined searchable fields; empty/whitespace query returns missions untouched.
+ */
+const recomputeFilteredMissions = (
+  missions: Mission[],
+  searchIndex: string[],
+  searchQuery: string
+): Mission[] => {
+  const query = searchQuery.trim().toLowerCase();
+  if (!query) {
     return missions;
   }
 
-  const query = searchQuery.toLowerCase().trim();
-  return missions.filter((m) => {
-    const searchableText = [m.title, m.client, m.description, m.location, m.source, ...m.stack]
-      .filter((value): value is string => typeof value === 'string' && value.length > 0)
-      .join(' ')
-      .toLowerCase();
-
-    return searchableText.includes(query);
-  });
+  return missions.filter((_, index) => searchIndex[index].includes(query));
 };
 
 export function createFeedStore() {
@@ -24,7 +44,13 @@ export function createFeedStore() {
   let searchQuery = $state('');
   let error = $state<string | null>(null);
 
-  const filteredMissions = $derived(recomputeFilteredMissions(missions, searchQuery));
+  // Lowercased haystacks per mission, rebuilt only when `missions` changes —
+  // per-keystroke filtering reads this index instead of re-normalizing fields.
+  // Plain string[] on purpose: no reactive collection needed since the array
+  // is rebuilt wholesale on missions change.
+  const searchIndex = $derived(missions.map(buildSearchHaystack));
+
+  const filteredMissions = $derived(recomputeFilteredMissions(missions, searchIndex, searchQuery));
 
   return {
     get state() {

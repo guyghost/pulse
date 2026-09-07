@@ -67,17 +67,19 @@ export function formatTJM(
 }
 
 /**
- * Format a TJM range. Collapses to a single value when bounds are equal,
- * and to the fallback only when both bounds are missing.
+ * Format a TJM range. Collapses to a single value when bounds are equal, and
+ * renders an open-ended floor (« à partir de 500 €/jour ») when only the
+ * minimum is known (DAO #174) — pass `minOnlyPrefix` to label it.
  *
  * `formatTJMRange(600, 900)` → "600–900 €/j"
  * `formatTJMRange(700, 700)` → "700 €/j"
+ * `formatTJMRange(500, null, { minOnlyPrefix: 'à partir de', suffix: '/jour' })` → "à partir de 500 €/jour"
  * `formatTJMRange(null, null)` → "Non précisé"
  */
 export function formatTJMRange(
   min: number | null | undefined,
   max: number | null | undefined,
-  options: { fallback?: string; suffix?: string } = {}
+  options: { fallback?: string; suffix?: string; minOnlyPrefix?: string } = {}
 ): string {
   const hasMin = typeof min === 'number' && Number.isFinite(min) && min >= 0;
   const hasMax = typeof max === 'number' && Number.isFinite(max) && max >= 0;
@@ -87,9 +89,13 @@ export function formatTJMRange(
   if (hasMin && hasMax && min === max) {
     return formatTJM(min, options);
   }
+  const suffix = options.suffix ?? '/j';
+  if (hasMin && !hasMax) {
+    const prefix = options.minOnlyPrefix ? `${options.minOnlyPrefix} ` : '';
+    return `${prefix}${formatTJMAmount(min)} €${suffix}`;
+  }
   const lo = hasMin ? formatTJMAmount(min) : '—';
   const hi = hasMax ? formatTJMAmount(max) : '—';
-  const suffix = options.suffix ?? '/j';
   return `${lo}–${hi} €${suffix}`;
 }
 

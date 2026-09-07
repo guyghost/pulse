@@ -1,5 +1,5 @@
 /**
- * Pure helpers for the CV experience feed and cross-platform sync.
+ * Pure helpers for the CV experience feed.
  *
  * STRICTLY PURE: no Date, no async, no I/O, no side effects. Non-deterministic
  * values (`now`, id generation) are injected by the shell caller.
@@ -9,52 +9,6 @@
  */
 import type { Experience, ExperienceSource } from '../types/profile';
 import type { CandidateExperienceDraft } from '../profile-extractors/types';
-
-/** A platform target for the sync push (LinkedIn + mission connectors). */
-export interface PlatformSyncTarget {
-  id: string;
-  name: string;
-  profileUrl: string;
-}
-
-/** Build the per-platform text payload (same CV block for every target). */
-export function buildPlatformPayloads(
-  experiences: readonly Experience[],
-  targets: readonly PlatformSyncTarget[]
-): Map<string, string> {
-  const payload = formatExperiencePayload(experiences);
-  const map = new Map<string, string>();
-  for (const target of targets) {
-    map.set(target.id, payload);
-  }
-  return map;
-}
-
-/** Format the experiences into a copy-pasteable CV block. */
-export function formatExperiencePayload(experiences: readonly Experience[]): string {
-  if (experiences.length === 0) {
-    return '';
-  }
-
-  const blocks = experiences.map((exp) => {
-    const role = [exp.title, exp.company].filter(Boolean).join(' — ');
-    const contract = exp.employmentType ? ` · ${exp.employmentType}` : '';
-    const range = formatExperienceDateRange(exp);
-    const lines = [`${role}${contract}${range ? ` · ${range}` : ''}`];
-    if (exp.location) {
-      lines.push(exp.location);
-    }
-    if (exp.description) {
-      lines.push(exp.description);
-    }
-    if (exp.skills.length > 0) {
-      lines.push(`Stack: ${exp.skills.join(', ')}`);
-    }
-    return lines.join('\n');
-  });
-
-  return blocks.join('\n\n');
-}
 
 /** "2023 — présent" / "2023 — 2025" / "2023" / "" when no dates. */
 export function formatExperienceDateRange(
@@ -152,13 +106,14 @@ export function mergeExperiences(
     if (existingIdx >= 0) {
       const existing = result[existingIdx];
       const keepDescription = existing.source === 'manual' || draft.description.length === 0;
+      const refreshLinkedInLocation = existing.source === 'linkedin';
       const mergedIsCurrent = existing.isCurrent || draft.isCurrent;
       result[existingIdx] = {
         ...existing,
         skills: unionSkills(existing.skills, draft.skills),
         description: keepDescription ? existing.description : draft.description,
         employmentType: existing.employmentType ?? draft.employmentType,
-        location: existing.location ?? draft.location,
+        location: refreshLinkedInLocation ? draft.location : (existing.location ?? draft.location),
         endDate: mergedIsCurrent ? null : (existing.endDate ?? draftEnd ?? null),
         isCurrent: mergedIsCurrent,
         sourceExternalId: existing.sourceExternalId ?? draft.sourceExternalId,

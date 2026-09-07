@@ -149,7 +149,7 @@
     return {
       statusLabel: 'Signal exploitable',
       impact: 'Les missions de cette source peuvent alimenter la décision.',
-      action: 'Filtrez cette source si vous voulez investiguer son volume.',
+      action: 'Filtrez cette source si vous voulez examiner son volume.',
       severity: 'success',
     };
   }
@@ -286,9 +286,7 @@
       <div class="px-4 pt-3 pb-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-              Sources
-            </p>
+            <p class="eyebrow eyebrow--strong">Sources</p>
             {#if !isChecking}
               <span
                 class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-micro font-medium
@@ -404,7 +402,9 @@
               <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-micro">
                 <span class="text-text-muted">{formatMissionCount(missionCount)} dernier scan</span>
                 {#if source.lastSyncAt}
-                  <span class="text-text-muted">Sync {getRelativeTime(source.lastSyncAt)}</span>
+                  <span class="text-text-muted"
+                    >Synchronisé {getRelativeTime(source.lastSyncAt)}</span
+                  >
                 {/if}
                 {#if snap?.lastSuccessAt}
                   <span class="text-accent-green">Succès {getRelativeTime(snap.lastSuccessAt)}</span
@@ -511,7 +511,7 @@
                   <button
                     class="rounded-md px-1.5 py-0.5 text-micro font-mono font-medium transition-colors
                       {isFiltered
-                      ? 'bg-blueprint-blue/10 text-blueprint-blue'
+                      ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
                       : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
                     onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
                     aria-label={isFiltered
@@ -530,7 +530,7 @@
 
       {#if unhealthySnapshots.length > 0}
         <div class="border-t border-border-light px-4 py-3">
-          <p class="text-micro uppercase tracking-[0.15em] text-text-muted mb-2">Santé détaillée</p>
+          <p class="eyebrow mb-2">Santé détaillée</p>
           <div class="space-y-2">
             {#each unhealthySnapshots as item (item.connectorId)}
               <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />

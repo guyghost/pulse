@@ -4,6 +4,7 @@ import {
   saveConnectorStatuses,
   getConnectorStatuses,
   getMissions,
+  getMissionsPaginated,
   getMissionById,
   saveMissions,
   purgeOldMissions,
@@ -18,8 +19,8 @@ import type {
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
-import { analyzeTJMHistory } from '../lib/core/tjm-history';
-import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
+import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '../lib/core/tjm-history';
+import type { TJMHistory, TJMPeriod, TJMRegion } from '../lib/core/types/tjm';
 import {
   getFeedSavedViews,
   getFeedSortBy,
@@ -42,6 +43,7 @@ import {
 } from '../models/scan-lifecycle.machine';
 import { waitForScanRecovery } from './scan-recovery';
 import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
+import { withServiceWorkerKeepalive } from '../lib/shell/utils/keepalive';
 import { getConnectorIds, getConnectorsMeta } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
@@ -100,7 +102,10 @@ import {
 } from '../lib/shell/storage/tracking';
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
 import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
-import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
+import {
+  getGeneratedAssetsForMission,
+  saveGeneratedAsset,
+} from '../lib/shell/storage/generated-assets';
 import { isMissionTrackingPayload, validateMessage } from '../lib/shell/messaging/schemas';
 import {
   createSerializedApplicationTrackingError,
@@ -145,6 +150,14 @@ import { createCopilotCheckpointRepository } from '../lib/shell/copilot/checkpoi
 import { createCopilotTransport } from '../lib/shell/copilot/transport';
 import { getCopilotOrigins, isCopilotRolloutEnabled } from '../lib/shell/copilot/config';
 import { createCopilotBridgeHandler } from '../lib/shell/copilot/background-handler';
+import { generateAsset } from '../lib/shell/ai/mission-generator';
+import { generateFieldProposal } from '../lib/shell/form-assistant/local-generator';
+import { getFormAssistSettings, setFormAssistEnabled } from '../lib/shell/form-assistant/settings';
+// NOTE: pas d'import dynamique *runtime* (`await import()`) ici — interdit
+// dans un service worker MV3 (spec HTML, w3c/ServiceWorker#1356) et l'échec
+// est masqué en build packagé. Les références de types `import('...').T` sont
+// effacées à la compilation et donc sans effet. Tout module du worker doit
+// être importé statiquement.
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -168,31 +181,34 @@ function buildTJMAnalysis(
   history: TJMHistory,
   profileStacks: string[] | undefined,
   region: TJMRegion | undefined,
+  period: TJMPeriod | undefined,
   now: Date
 ) {
   const hasStackFilter = profileStacks !== undefined && profileStacks.length > 0;
   const hasRegionFilter = region !== undefined;
-
-  if (!hasStackFilter && !hasRegionFilter) {
-    return analyzeTJMHistory(history, now);
-  }
-
   const normalizedStacks = hasStackFilter
     ? new Set(profileStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean))
     : null;
 
+  const filteredByStackAndRegion =
+    !hasStackFilter && !hasRegionFilter
+      ? history
+      : {
+          records: history.records.filter((record) => {
+            if (normalizedStacks && !normalizedStacks.has(record.stack)) {
+              return false;
+            }
+            if (hasRegionFilter && record.region !== region) {
+              return false;
+            }
+            return true;
+          }),
+        };
+
+  // Period windowing is applied last so dataPoints reflects the window
+  // (see models/tjm-analysis-period.model.md).
   return analyzeTJMHistory(
-    {
-      records: history.records.filter((record) => {
-        if (normalizedStacks && !normalizedStacks.has(record.stack)) {
-          return false;
-        }
-        if (hasRegionFilter && record.region !== region) {
-          return false;
-        }
-        return true;
-      }),
-    },
+    filterTJMHistoryByPeriod(filteredByStackAndRegion, period ?? 'all', now),
     now
   );
 }
@@ -327,6 +343,40 @@ type BeginScanResult =
       operation: ActiveScanOperation;
       complete: () => Promise<ScanExecutionOutcome>;
     };
+
+// Post-save rescore orchestration (profile-state.model.md): serialized and
+// coalesced so concurrent SAVE_PROFILE messages never run overlapping
+// read-modify-write cycles over the mission store, and the final persisted
+// scores always match the latest saved profile.
+let postSaveRescoreInFlight = false;
+let nextPostSaveRescoreProfile: import('../lib/core/types/profile').UserProfile | null = null;
+
+function schedulePostSaveRescore(profile: import('../lib/core/types/profile').UserProfile): void {
+  nextPostSaveRescoreProfile = profile;
+  if (postSaveRescoreInFlight) {
+    return; // coalesced: the drain loop will pick the latest profile
+  }
+  postSaveRescoreInFlight = true;
+  void (async () => {
+    while (nextPostSaveRescoreProfile) {
+      const pendingProfile = nextPostSaveRescoreProfile;
+      nextPostSaveRescoreProfile = null;
+      try {
+        // The ack already closed the message channel, so the rescore holds
+        // the service worker alive itself (MV3 idle timeout).
+        const rescored = await withServiceWorkerKeepalive(async () =>
+          rescoreStoredMissions(pendingProfile, await requireSettingsReleaseSnapshot())
+        );
+        await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
+      } catch (err) {
+        if (import.meta.env.DEV) {
+          console.warn('[MissionPulse] Profile saved but mission rescore failed:', err);
+        }
+      }
+    }
+    postSaveRescoreInFlight = false;
+  })();
+}
 
 let activeScanOperation: ActiveScanOperation | null = null;
 const settledScanOperationIds = new Set<string>();
@@ -1335,24 +1385,19 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         try {
           await saveProfile(message.payload);
 
-          try {
-            const rescored = await rescoreStoredMissions(
-              message.payload,
-              await requireSettingsReleaseSnapshot()
-            );
-            await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
-          } catch (err) {
-            if (import.meta.env.DEV) {
-              console.warn('[MissionPulse] Profile saved but mission rescore failed:', err);
-            }
-          }
-
+          // Ack + broadcast depend only on persistence success. The rescore
+          // is a post-commit projection and must never delay the save ack
+          // (invariant 6 — profile-state.model.md, scan-flow precedent).
           sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
           chrome.runtime
             .sendMessage({ type: 'PROFILE_UPDATED', payload: message.payload })
             .catch(() => {
               // Side panel not open, ignore
             });
+
+          // Post-commit projection (serialized + coalesced, keepalive held —
+          // see profile-state.model.md "Post-save rescore orchestration").
+          schedulePostSaveRescore(message.payload);
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', message);
@@ -1361,7 +1406,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       })();
       return true;
     }
-
     if (
       message.type === 'GET_SETTINGS_RELEASE' ||
       message.type === 'GET_SETTINGS' ||
@@ -1431,6 +1475,22 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'GET_FEED_MISSIONS_PAGE') {
+      const { page, pageSize } = message.payload;
+      getMissionsPaginated({ page, pageSize, sortBy: 'date' })
+        .then((result) => {
+          sendResponse({ type: 'FEED_MISSIONS_PAGE_RESULT', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_MISSIONS_PAGE error:', err);
+          sendResponse({
+            type: 'FEED_MISSIONS_PAGE_RESULT',
+            payload: { missions: [], total: 0, hasMore: false },
+          });
+        });
+      return true;
+    }
+
     if (message.type === 'GET_TJM_ANALYSIS') {
       loadTJMHistory()
         .then((history) => {
@@ -1441,6 +1501,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
                 history,
                 message.payload?.profileStacks,
                 message.payload?.region,
+                message.payload?.period,
                 new Date()
               ),
             },
@@ -2199,13 +2260,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       const { missionId, generationType } = message.payload;
 
       // The local Gemini Nano kit is free in every legacy premium-flag state.
-      // Its module remains lazy-loaded so the worker pays the AI cost only when
-      // the user explicitly requests local generation.
       (async () => {
         try {
-          const { generateAsset } = await import('../lib/shell/ai/mission-generator');
-          const { saveGeneratedAsset } = await import('../lib/shell/storage/generated-assets');
-
           // Reuse the worker's existing mission/profile read paths (same
           // accessors as GET_FEED_MISSIONS / GET_PROFILE). Only a getAll
           // mission accessor is available, so filter by id.
@@ -2260,8 +2316,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // Source de vérité : src/models/form-assistant.model.md (Machine B).
     // Phase 1 : chemin local uniquement. Le moteur remote (Eve/Vercel) est Phase 2.
     if (message.type === 'FORM_ASSIST_STATUS') {
-      import('../lib/shell/form-assistant/settings')
-        .then(({ getFormAssistSettings }) => getFormAssistSettings())
+      getFormAssistSettings()
         .then((settings) => {
           sendResponse({
             type: 'FORM_ASSIST_STATUS_RESULT',
@@ -2280,8 +2335,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
     if (message.type === 'FORM_ASSIST_ENABLE') {
       const { enabled } = message.payload;
-      import('../lib/shell/form-assistant/settings')
-        .then(({ setFormAssistEnabled }) => setFormAssistEnabled(enabled))
+      setFormAssistEnabled(enabled)
         .then((settings) => {
           const enabledMessage = {
             type: 'FORM_ASSIST_ENABLED',
@@ -2329,9 +2383,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
       (async () => {
         try {
-          const { generateFieldProposal } =
-            await import('../lib/shell/form-assistant/local-generator');
-          const { getFormAssistSettings } = await import('../lib/shell/form-assistant/settings');
           const profile = await getProfile();
 
           const settings = await getFormAssistSettings();
@@ -2789,7 +2840,7 @@ chrome.action.onUserSettingsChanged?.addListener(async (change) => {
         type: 'basic',
         iconUrl: 'static/icons/icon-128.svg',
         title: 'MissionPulse',
-        message: 'Activez le scan automatique dans les parametres pour ne rater aucune mission.',
+        message: 'Activez le scan automatique dans les paramètres pour ne rater aucune mission.',
       });
     } catch {
       // Notifications permission not available

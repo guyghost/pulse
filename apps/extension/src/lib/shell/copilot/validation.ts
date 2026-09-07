@@ -184,11 +184,14 @@ export const CopilotTjmCoachFactsSchema = z
       .object({
         min: z.number().finite(),
         target: z.number().finite(),
-        max: z.number().finite(),
+        // DAO #174 : null = profil sans plafond (seul le minimum est collecté).
+        max: z.number().finite().nullable(),
         currency: z.literal('EUR'),
       })
       .strict()
-      .refine(({ min, target, max }) => min <= target && target <= max),
+      .refine(({ min, target, max }) =>
+        max === null ? min === target : min <= target && target <= max
+      ),
     market: z
       .object({
         matchedStacks: z.array(z.string().trim().min(1).max(120)).max(48),

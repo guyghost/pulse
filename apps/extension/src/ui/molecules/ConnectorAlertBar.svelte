@@ -37,9 +37,7 @@
         </p>
 
         <div class="mt-3 rounded-xl border border-status-red/15 bg-surface-white/70 px-3 py-2">
-          <p class="text-micro font-semibold uppercase tracking-[0.14em] text-status-red">
-            Impact opérationnel
-          </p>
+          <p class="eyebrow eyebrow--strong text-status-red">Impact opérationnel</p>
           <p class="mt-1 text-caption leading-4 text-text-secondary">
             Pulse peut sous-estimer les nouvelles missions tant que
             {brokenConnectors.length === 1
@@ -95,7 +93,7 @@
                   </button>
                 {:else}
                   <button
-                    class="rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/15 px-3 py-1.5 text-caption font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
+                    class="rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/15 px-3 py-1.5 text-caption font-medium text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/25"
                     onclick={() => onEnableAndScan(connector.connectorId)}
                   >
                     Activer &amp; scan

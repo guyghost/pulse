@@ -121,6 +121,92 @@ describe('profile store', () => {
     expect(snapshot.context.current).toEqual(profile);
   });
 
+  it('defers an external PROFILE_UPDATED that lands while saving (fresh merge base)', async () => {
+    // Regression (review on PR #316, invariant 7): the external broadcast
+    // used to be dropped in `saving`, so the saved payload stayed as
+    // `current` and the next save merged onto a stale base — clobbering the
+    // external writer's scoringWeights, experiences and availability.
+    let resolveSave: (value: UserProfile) => void = () => {};
+    const saveProfile = vi
+      .fn()
+      .mockImplementation(() => new Promise<UserProfile>((resolve) => (resolveSave = resolve)));
+    const store = createProfileStore({
+      loadProfile: vi.fn().mockResolvedValue(profile),
+      saveProfile,
+    });
+
+    await waitForSnapshot(store, (s) => s.matches('ready'));
+    const edited: UserProfile = { ...profile, jobTitle: 'Edited Title' };
+    store.send({ type: 'EDIT' });
+    store.send({ type: 'SUBMIT_PROFILE', profile: edited });
+    await waitForSnapshot(store, (s) => s.matches('saving'));
+
+    const external: UserProfile = { ...profile, jobTitle: 'External Title' };
+    store.send({ type: 'PROFILE_UPDATED', profile: external });
+    expect(store.snapshot.matches('saving')).toBe(true);
+
+    resolveSave(edited);
+    await waitForSnapshot(store, (s) => s.matches('ready'));
+    // The deferred external truth replaces the save echo once settled.
+    expect(store.snapshot.context.current).toEqual(external);
+    expect(store.snapshot.context.draft).toEqual(external);
+  });
+
+  it('applies a deferred external update after a failed save', async () => {
+    let rejectSave: (reason: Error) => void = () => {};
+    const saveProfile = vi
+      .fn()
+      .mockImplementation(() => new Promise<UserProfile>((_, reject) => (rejectSave = reject)));
+    const store = createProfileStore({
+      loadProfile: vi.fn().mockResolvedValue(profile),
+      saveProfile,
+    });
+
+    await waitForSnapshot(store, (s) => s.matches('ready'));
+    const edited: UserProfile = { ...profile, jobTitle: 'Edited Title' };
+    store.send({ type: 'EDIT' });
+    store.send({ type: 'SUBMIT_PROFILE', profile: edited });
+    await waitForSnapshot(store, (s) => s.matches('saving'));
+
+    const external: UserProfile = { ...profile, jobTitle: 'External Title' };
+    store.send({ type: 'PROFILE_UPDATED', profile: external });
+    rejectSave(new Error('IndexedDB unavailable'));
+
+    // The deferred external truth clears the error branch instead of
+    // stranding the store on a stale `error` state.
+    const snapshot = await waitForSnapshot(store, (s) => s.matches('ready'));
+    expect(snapshot.context.current).toEqual(external);
+    expect(snapshot.context.error).toBeNull();
+  });
+
+  it('keeps the editing draft when an external PROFILE_UPDATED arrives', async () => {
+    // Invariant 5 (profile-state.model.md): an external sync refreshes the
+    // persisted truth but never reverts the user's unsaved draft.
+    const saveProfile = vi.fn().mockImplementation(async (saved: UserProfile) => saved);
+    const store = createProfileStore({
+      loadProfile: vi.fn().mockResolvedValue(profile),
+      saveProfile,
+    });
+
+    await waitForSnapshot(store, (s) => s.matches('ready'));
+    store.send({ type: 'EDIT' });
+    expect(store.snapshot.matches('editing')).toBe(true);
+
+    const external: UserProfile = { ...profile, jobTitle: 'Imported Title' };
+    store.send({ type: 'PROFILE_UPDATED', profile: external });
+
+    expect(store.snapshot.matches('editing')).toBe(true);
+    expect(store.snapshot.context.current).toEqual(external);
+    expect(store.snapshot.context.draft).toEqual(profile);
+
+    // The user's submit wins over the external write.
+    const edited: UserProfile = { ...profile, jobTitle: 'Edited Title' };
+    store.send({ type: 'SUBMIT_PROFILE', profile: edited });
+    const snapshot = await waitForSnapshot(store, (s) => s.matches('ready'));
+    expect(saveProfile).toHaveBeenCalledWith(edited);
+    expect(snapshot.context.current).toEqual(edited);
+  });
+
   it('does not retry from error when there is no draft', async () => {
     const saveProfile = vi.fn();
     const store = createProfileStore({

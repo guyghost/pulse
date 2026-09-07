@@ -4,6 +4,31 @@ import type { UserProfile } from '../../src/lib/core/types/profile';
 import type { Mission } from '../../src/lib/core/types/mission';
 
 export const SIDE_PANEL = '/src/sidepanel/index.html';
+
+/**
+ * Active toutes les surfaces (onglets + couche connectée) pour un test e2e.
+ *
+ * Au lancement, `applications` et `connected` sont désactivés
+ * (`EXTENSION_SURFACE_FLAGS`). Les tests qui couvrent ces surfaces seedent
+ * l'override dev via localStorage avant le chargement du side panel — voir
+ * `apps/extension/src/models/surface-feature-flags.model.md` §5bis.
+ */
+export async function enableAllSurfaceFlags(page: Page) {
+  await page.addInitScript(() => {
+    window.localStorage.setItem(
+      '__missionpulse_dev_surface_flags',
+      JSON.stringify({
+        feed: true,
+        profile: true,
+        cv: true,
+        applications: true,
+        tjm: true,
+        settings: true,
+        connected: true,
+      })
+    );
+  });
+}
 export const FEED_SEARCH_PLACEHOLDER = 'Rechercher une mission…';
 
 export function feedSearchInput(page: Page): Locator {
@@ -16,6 +41,26 @@ export function mainNavigation(page: Page): Locator {
 
 export function navButton(page: Page, name: string): Locator {
   return mainNavigation(page).getByRole('button', { name });
+}
+
+type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data';
+
+/**
+ * Les réglages sont organisés en accordéon (`SettingsSectionId`, défini dans
+ * SettingsPage.svelte) et seule la section 'sources' est ouverte par défaut.
+ * Ce helper déplie la section demandée via les ids stables
+ * `settings-trigger-{id}` / `settings-panel-{id}`.
+ */
+export async function openSettingsSection(page: Page, sectionId: SettingsSectionId): Promise<void> {
+  const trigger = page.locator(`#settings-trigger-${sectionId}`);
+  const panel = page.locator(`#settings-panel-${sectionId}`);
+  // Échec rapide et diagnostic si l'id ne correspond plus au DOM (typo, refonte).
+  await expect(trigger).toBeVisible({ timeout: 2000 });
+  if (await panel.isVisible().catch(() => false)) {
+    return;
+  }
+  await trigger.click();
+  await expect(panel).toBeVisible();
 }
 
 export function missionCards(page: Page): Locator {
@@ -78,9 +123,9 @@ export function missionDetailsToggle(card: Locator): Locator {
 }
 
 /**
- * Ouvre le disclosure de la carte pour exposer les actions (masquer,
- * comparer, copier, ouvrir, investiguer). Le content-first redesign garde
- * ces actions dans la zone de détails repliée par défaut.
+ * Ouvre le disclosure de la carte pour exposer les actions détaillées
+ * (copier, ouvrir, investiguer). Les actions de triage (masquer,
+ * comparer, favori) sont visibles dès l'état réduit via le bandeau bas.
  */
 export async function expandMission(card: Locator) {
   const toggle = missionDetailsToggle(card);
@@ -290,7 +335,7 @@ export async function mockNoProfile(page: Page) {
  * Onboarding wizard — machine-driven 5-step flow (OnboardingFlow.svelte):
  * welcome → connecting (sources) → identity → preferences → skills →
  * notifying → persisting/scanning → completed. Guards live in the flow
- * machine: ≥1 source, firstName+jobTitle, tjmMin>0 ∧ tjmMax≥tjmMin, ≥1 keyword.
+ * machine: ≥1 source, firstName+jobTitle, tjmMin>0 (tjmMax supprimé, DAO #174), ≥1 keyword.
  */
 
 /** Welcome heading of the outcome-led onboarding screen. */
@@ -360,9 +405,8 @@ export async function fillIdentityStep(
 }
 
 /** Remplit l'étape critères (TJM) puis continue vers les compétences. */
-export async function fillPreferencesStep(page: Page, tjmMin = 500, tjmMax = 700) {
-  await page.getByLabel('TJM min (€)').fill(String(tjmMin));
-  await page.getByLabel('TJM max (€)').fill(String(tjmMax));
+export async function fillPreferencesStep(page: Page, tjmMin = 500) {
+  await page.getByLabel('TJM minimum (€)').fill(String(tjmMin));
   await clickContinue(page);
   await expect(page.getByRole('heading', { name: 'Vos compétences clés' })).toBeVisible();
 }
@@ -400,14 +444,13 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
     jobTitle = 'Développeur Fullstack',
     location = 'Paris',
     tjmMin = 500,
-    tjmMax = 700,
   } = profile;
   const keyword = profile.keywords?.[0] ?? 'React';
 
   await startOnboardingWizard(page);
   await connectFirstSource(page);
   await fillIdentityStep(page, { firstName, jobTitle, location });
-  await fillPreferencesStep(page, tjmMin, tjmMax);
+  await fillPreferencesStep(page, tjmMin);
   await fillSkillsStep(page, keyword);
   await submitOnboardingScan(page);
 }

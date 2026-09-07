@@ -495,7 +495,7 @@ test.describe('Feed', () => {
     await expect(arrivalStack).not.toBeVisible();
 
     await expandMission(partialCard);
-    const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
+    const investigateButton = partialCard.getByRole('button', { name: 'Analyser' });
     await expect(investigateButton).toBeEnabled();
     await investigateButton.click();
 
@@ -572,8 +572,8 @@ test.describe('Feed', () => {
       'aria-expanded',
       'true'
     );
-    // Filter panel uses role="group" with aria-label "Filtrer les missions"
-    const filterPanel = page.getByRole('group', { name: 'Filtrer les missions' });
+    // Filter panel uses role="dialog" (bottom sheet) titled "Filtrer les missions"
+    const filterPanel = page.getByRole('dialog', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
 
     const panelIsTopmost = await filterPanel.evaluate((panel) => {

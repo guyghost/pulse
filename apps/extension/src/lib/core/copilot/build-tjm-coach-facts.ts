@@ -80,10 +80,12 @@ export function buildTjmCoachFacts(
   }
   if (
     !Number.isFinite(profile.tjmMin) ||
-    !Number.isFinite(profile.tjmMax) ||
     profile.tjmMin <= 0 ||
-    profile.tjmMax > 5_000 ||
-    profile.tjmMin > profile.tjmMax ||
+    // DAO #174 : null = sans plafond, une borne explicite doit rester cohérente.
+    (profile.tjmMax !== null &&
+      (!Number.isFinite(profile.tjmMax) ||
+        profile.tjmMax > 5_000 ||
+        profile.tjmMin > profile.tjmMax)) ||
     (mission.tjm !== null &&
       (!Number.isFinite(mission.tjm) || mission.tjm <= 0 || mission.tjm > 5_000))
   ) {
@@ -117,7 +119,11 @@ export function buildTjmCoachFacts(
       missionDisplayedTjm: mission.tjm,
       profileBounds: {
         min: profile.tjmMin,
-        target: Math.round((profile.tjmMin + profile.tjmMax) / 2),
+        // Sans plafond, la cible redevient le plancher (seule ancre connue).
+        target:
+          profile.tjmMax !== null
+            ? Math.round((profile.tjmMin + profile.tjmMax) / 2)
+            : profile.tjmMin,
         max: profile.tjmMax,
         currency: 'EUR',
       },

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Availability } from '../../../src/lib/core/types/availability';
-import type { PlatformSyncTarget } from '../../../src/lib/core/cv/experience-helpers';
+import type { PlatformSyncTarget } from '../../../src/lib/core/availability/availability-helpers';
 import type { AvailabilityDeps } from '../../../src/lib/state/availability.svelte';
 import { createAvailabilityStore } from '../../../src/lib/state/availability.svelte';
 

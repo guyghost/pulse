@@ -170,12 +170,12 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
 
     await page
       .getByRole('navigation', { name: 'Main navigation' })
-      .getByRole('button', { name: 'Settings' })
+      .getByRole('button', { name: 'Réglages' })
       .dispatchEvent('click');
     await expect(
       page
         .getByRole('navigation', { name: 'Main navigation' })
-        .getByRole('button', { name: 'Settings' })
+        .getByRole('button', { name: 'Réglages' })
     ).toHaveAttribute('aria-current', 'page');
 
     await page

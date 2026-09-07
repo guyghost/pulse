@@ -12,6 +12,25 @@ const messageSubscription = vi.hoisted(() => ({
   handler: null as ((message: { type: string; payload: null }) => void) | null,
 }));
 
+// Surface flags: mutable map so tests can flip tabs on/off (launch defaults
+// disable `applications`, so scenarios that navigate there need it enabled).
+const surfaceFlags = vi.hoisted(() => ({
+  feed: true,
+  profile: true,
+  cv: true,
+  applications: true,
+  tjm: true,
+  settings: true,
+  connected: true,
+}));
+
+vi.mock('../../../src/lib/state/features.svelte', () => ({
+  features: {
+    surfaceFlags,
+    isTabEnabled: (tab: keyof typeof surfaceFlags) => surfaceFlags[tab] === true,
+  },
+}));
+
 vi.mock('../../../src/lib/shell/facades/settings.facade', () => ({
   getProfile,
   saveProfile,
@@ -49,6 +68,15 @@ async function flushBootstrap(): Promise<void> {
 describe('createAppNavigation bootstrap recovery', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.assign(surfaceFlags, {
+      feed: true,
+      profile: true,
+      cv: true,
+      applications: true,
+      tjm: true,
+      settings: true,
+      connected: true,
+    });
     getProfile.mockResolvedValue(null);
     saveProfile.mockResolvedValue(undefined);
     getFirstScanDone.mockResolvedValue(true);
@@ -187,5 +215,47 @@ describe('createAppNavigation bootstrap recovery', () => {
     expect(navigation.currentPage).toBe('profile');
     expect(navigation.previousPage).toBe('applications');
     expect(navigation.transitionDirection).toBe(-1);
+  });
+
+  it('refuses navigation to a disabled surface (strict no-op)', async () => {
+    surfaceFlags.applications = false;
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    navigation.navigate('applications');
+    expect(navigation.currentPage).toBe('feed');
+    expect(navigation.previousPage).toBe('feed');
+    expect(navigation.transitionDirection).toBe(1);
+  });
+
+  it('resolves internal navigation to the fallback home when the target is disabled', async () => {
+    surfaceFlags.feed = false;
+    surfaceFlags.applications = false;
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    // Boot lands on the first enabled tab (profile) when feed is disabled.
+    navigation.navigateWithFallback('feed');
+    expect(navigation.currentPage).toBe('profile');
+    // Same-page resolve: no transition recorded, history stays untouched.
+    expect(navigation.previousPage).toBe('feed');
+
+    navigation.navigateWithFallback('applications');
+    expect(navigation.currentPage).toBe('profile');
+  });
+
+  it('keeps navigateWithFallback a no-op for the current page and for onboarding', async () => {
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    navigation.navigateWithFallback('feed');
+    expect(navigation.currentPage).toBe('feed');
+    expect(navigation.previousPage).toBe('feed');
   });
 });

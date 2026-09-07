@@ -10,11 +10,11 @@ export default defineConfig({
     alias: [
       {
         find: /^@pulse\/ui$/,
-        replacement: resolve(__dirname, '../../packages/ui/src/index.ts'),
+        replacement: resolve(import.meta.dirname, '../../packages/ui/src/index.ts'),
       },
       {
         find: /^@pulse\/ui\/app\.css$/,
-        replacement: resolve(__dirname, '../../packages/ui/src/app.css'),
+        replacement: resolve(import.meta.dirname, '../../packages/ui/src/app.css'),
       },
     ],
     conditions: ['svelte', 'browser', 'import', 'module', 'default'],

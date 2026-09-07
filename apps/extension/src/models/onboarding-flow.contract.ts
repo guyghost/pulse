@@ -160,7 +160,7 @@ export function initialOnboardingFlowContext(input: OnboardingFlowInput): Onboar
       remote: seed.remote ?? 'any',
       keywords: seed.keywords ?? [],
       tjmMin: seed.tjmMin ?? 500,
-      tjmMax: seed.tjmMax ?? 800,
+      tjmMax: seed.tjmMax ?? null,
     },
     connectedSources: [],
     notifyEnabled: false,
@@ -223,7 +223,12 @@ export function canAdvanceStep(ctx: OnboardingFlowContext): boolean {
     case 'identity':
       return ctx.profile.firstName.trim().length > 0 && ctx.profile.jobTitle.trim().length > 0;
     case 'preferences':
-      return ctx.profile.tjmMin > 0 && ctx.profile.tjmMax >= ctx.profile.tjmMin;
+      // DAO #174 : le plafond n'est plus collecté (null = sans plafond) —
+      // seul le minimum conditionne l'avance dans le wizard.
+      return (
+        ctx.profile.tjmMin > 0 &&
+        (ctx.profile.tjmMax === null || ctx.profile.tjmMax >= ctx.profile.tjmMin)
+      );
     case 'skills':
       return ctx.profile.keywords.length > 0;
     default:

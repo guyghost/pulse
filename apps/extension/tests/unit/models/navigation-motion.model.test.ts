@@ -8,8 +8,8 @@ import {
 describe('navigation motion model', () => {
   it('keeps the six canonical product destinations unique and reachable', () => {
     expect(NAV_ITEMS.map((item) => item.page)).toEqual([
-      'feed',
       'profile',
+      'feed',
       'cv',
       'applications',
       'tjm',
@@ -36,5 +36,11 @@ describe('navigation motion model', () => {
     expect(getPagePosition('applications', currentPage)).toBe('current');
     expect(getPagePosition('tjm', currentPage)).toBe('after');
     expect(getPagePosition('settings', currentPage)).toBe('after');
+  });
+
+  it('keeps profile leftmost without making it the default route direction anchor', () => {
+    // profile is the leftmost pill; navigating feed → profile now moves backward.
+    expect(getPagePosition('profile', 'feed')).toBe('before');
+    expect(getPagePosition('feed', 'profile')).toBe('after');
   });
 });

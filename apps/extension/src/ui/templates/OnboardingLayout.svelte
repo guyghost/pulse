@@ -33,15 +33,15 @@
 
         <div class="mb-6 grid grid-cols-3 gap-2">
           <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="text-caption uppercase tracking-[0.18em] text-text-muted">Scan</p>
+            <p class="eyebrow eyebrow--caption">Scan</p>
             <p class="mt-2 text-body-lg font-semibold text-text-primary">Multi-source</p>
           </div>
           <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="text-caption uppercase tracking-[0.18em] text-text-muted">Notation</p>
+            <p class="eyebrow eyebrow--caption">Notation</p>
             <p class="mt-2 text-body-lg font-semibold text-text-primary">Pertinence</p>
           </div>
           <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="text-caption uppercase tracking-[0.18em] text-text-muted">TJM</p>
+            <p class="eyebrow eyebrow--caption">TJM</p>
             <p class="mt-2 text-body-lg font-semibold text-text-primary">Ajusté</p>
           </div>
         </div>

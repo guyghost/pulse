@@ -84,7 +84,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('Skeleton');
     expect(feedSource).toContain('store.experiences.length');
     expect(applicationsSource).toContain('type LoadingProgressStep');
-    expect(applicationsSource).toContain('Chargement candidatures');
+    expect(applicationsSource).toContain('Chargement des candidatures');
     expect(applicationsSource).toContain('Progression du chargement candidatures');
     expect(applicationsSource).toContain('Missions locales');
     expect(applicationsSource).toContain('Statuts de suivi');
@@ -190,7 +190,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain("nav.currentPage !== 'profile'");
     expect(source).not.toContain('const PREMIUM_LOCKS');
     expect(source).not.toContain('Premium verrouillé');
-    expect(source).not.toContain('NAV_ITEMS.filter');
+    // Nav filtering may only reflect launch surface flags — never premium status.
+    expect(source).toContain('features.isTabEnabled(item.page)');
+    expect(source).not.toContain('isPremium');
   });
 
   it('keeps the missions list as the primary surface, with counts inline in the header', () => {
@@ -228,15 +230,14 @@ describe('operational UI constraints', () => {
     expect(assistSource).toContain('soumet jamais le formulaire');
   });
 
-  it('keeps onboarding focused with duration and minimal shell navigation', () => {
+  it('keeps onboarding focused with minimal shell navigation', () => {
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
-    const wizardSource = readFileSync('src/ui/organisms/OnboardingWizard.svelte', 'utf8');
+    const flowSource = readFileSync('src/ui/organisms/OnboardingFlow.svelte', 'utf8');
 
     expect(appSource).toContain("nav.currentPage !== 'onboarding'");
-    expect(wizardSource).toContain('2 minutes');
-    expect(wizardSource).toContain('Modifiable ensuite');
-    expect(wizardSource).toContain('aria-label="Passer l’onboarding"');
-    expect(wizardSource).toContain('onclick={onSkip}');
+    expect(flowSource).toContain("type: 'SKIP'");
+    expect(flowSource).toContain('aria-label={`Progression de la configuration');
+    expect(flowSource).toContain('aria-valuenow={snapshot.progress.current}');
   });
 
   it('keeps Settings system actions aligned with the stated operational issue', () => {
@@ -253,11 +254,10 @@ describe('operational UI constraints', () => {
 
     expect(source).toContain('const settingsSections');
     expect(source).toContain('aria-label="Sections de réglages"');
-    expect(source).toContain('id="settings-sources"');
-    expect(source).toContain('id="settings-alerts"');
-    expect(source).toContain('id="settings-account"');
-    expect(source).toContain('id="settings-data"');
-    expect(source).toContain('function scrollToSettingsSection');
+    expect(source).toContain('id="settings-{section.id}"');
+    expect(source).toContain("type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data'");
+    expect(source).toContain('function toggleSettingsSection');
+    expect(source).toContain('aria-expanded={openSettingsSection === section.id}');
   });
 
   it('exposes scan frequency, latest trigger, and recent history in Settings', () => {
@@ -345,7 +345,7 @@ describe('operational UI constraints', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
     expect(source).toContain('primaryActionLabel: settings.isSavingProfile');
-    expect(source).toContain("? 'Sauvegarde...'");
+    expect(source).toContain("? 'Sauvegarde…'");
     expect(source).toContain("? 'Enregistrer'");
     expect(source).toContain(": 'Modifier le profil'");
     expect(source).toContain('if (settings.isSavingProfile)');
@@ -393,8 +393,8 @@ describe('operational UI constraints', () => {
     expect(dashboardSource).toContain('3 étapes pour alimenter le radar TJM');
     expect(dashboardSource).toContain('Alimenter le radar TJM');
     expect(dashboardSource).toContain('Ajuster mon TJM cible');
-    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
-    expect(appSource).toContain("onNavigateToFeed={() => nav.navigate('feed')}");
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
+    expect(appSource).toContain("onNavigateToFeed={() => nav.navigateWithFallback('feed')}");
   });
 
   it('routes missing CV source states to add-experience or retry', () => {
@@ -402,8 +402,7 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    // CvPage wires the sync panel + feed; the feed owns empty/error routing.
-    expect(cvSource).toContain('CvSyncPanel');
+    // CvPage wires the feed; the feed owns empty/error routing.
     expect(cvSource).toContain('ExperienceFeed');
     expect(cvSource).toContain('onNavigateToProfile');
     expect(feedSource).toContain('primaryActionLabel="Ajouter une expérience"');
@@ -411,7 +410,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('onPrimaryAction={() => store.reload()}');
     expect(feedSource).toContain('onPrimaryAction={() => store.newExperience()}');
     expect(feedSource).toContain('employmentType: null');
-    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
   });
 
   it('routes Applications story actions to the operationally recommended dossier', () => {
@@ -600,7 +599,6 @@ describe('operational UI constraints', () => {
   it('keeps feed undo and hidden-filter microcopy accented', () => {
     const feedStateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
-    const filterSource = readFileSync('src/ui/organisms/FilterBar.svelte', 'utf8');
 
     expect(feedStateSource).toContain('Favori retiré');
     expect(feedStateSource).toContain('Mission ajoutée aux favoris');
@@ -608,8 +606,7 @@ describe('operational UI constraints', () => {
     expect(feedStateSource).toContain('Mission masquée');
     expect(feedSource).toContain('Voir les ignorées');
     expect(feedSource).toContain('Raccourci clavier : h.');
-    expect(filterSource).toContain('Retire cette vue sauvegardée.');
-    expect(`${feedStateSource}\n${feedSource}\n${filterSource}`).not.toMatch(
+    expect(`${feedStateSource}\n${feedSource}`).not.toMatch(
       /retire|ajoutee|restauree|masquee|ignoree|sauvegardee/
     );
   });
@@ -662,7 +659,7 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Le radar ne doit pas être considéré fiable pour cette source.');
     expect(source).toContain('Relancez le diagnostic puis reconnectez si l’échec persiste.');
     expect(source).toContain('Les résultats peuvent être partiels ou retardés.');
-    expect(source).toContain('Filtrez cette source si vous voulez investiguer son volume.');
+    expect(source).toContain('Filtrez cette source si vous voulez examiner son volume.');
     expect(source).toContain("{isEnabled ? 'Relancer' : 'Activer'}");
     expect(source).not.toContain("'Re-check'");
   });

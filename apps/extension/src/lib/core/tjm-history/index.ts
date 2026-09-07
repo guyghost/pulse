@@ -9,10 +9,12 @@ import type { SeniorityLevel } from '../types/profile';
 import type {
   TJMAnalysis,
   TJMHistory,
+  TJMPeriod,
   TJMRange,
   TJMRecord,
   TJMRegion,
   TJMRegionInsight,
+  TJMSeriesPoint,
   TJMStackInsight,
   TJMStats,
   TJMTrend,
@@ -183,6 +185,45 @@ export const addRecords = (history: TJMHistory, newRecords: TJMRecord[]): TJMHis
 export const emptyHistory = (): TJMHistory => ({ records: [] });
 
 // ---------------------------------------------------------------------------
+// Period windowing (pure) — see models/tjm-analysis-period.model.md
+// ---------------------------------------------------------------------------
+
+/** Ordered presets exposed by the TJM dashboard, from narrowest to widest. */
+export const TJM_PERIODS: readonly TJMPeriod[] = ['7d', '30d', 'all'];
+
+/** Number of days each finite period preset covers. */
+const PERIOD_DAYS: Readonly<Record<Exclude<TJMPeriod, 'all'>, number>> = {
+  '7d': 7,
+  '30d': 30,
+};
+
+const toDateOnlyISO = (date: Date): string => date.toISOString().slice(0, 10);
+
+/**
+ * Keep only records dated within the period window ending at `now` (inclusive).
+ * 'all' returns the history unchanged (identity — never a copy).
+ *
+ * Pure: `now` is injected; record dates are ISO date-only strings, so lexical
+ * comparison matches chronological order.
+ */
+export const filterTJMHistoryByPeriod = (
+  history: TJMHistory,
+  period: TJMPeriod,
+  now: Date
+): TJMHistory => {
+  if (period === 'all') {
+    return history;
+  }
+
+  const cutoffMs = now.getTime() - PERIOD_DAYS[period] * MS_PER_DAY;
+  const cutoff = toDateOnlyISO(new Date(cutoffMs));
+
+  return {
+    records: history.records.filter((record) => record.date >= cutoff),
+  };
+};
+
+// ---------------------------------------------------------------------------
 // Statistics & Trend analysis (pure)
 // ---------------------------------------------------------------------------
 
@@ -346,6 +387,71 @@ export const getDominantTrendForMission = (history: TJMHistory, mission: Mission
 // ---------------------------------------------------------------------------
 
 const clampConfidence = (value: number): number => Math.max(0, Math.min(1, value));
+
+/**
+ * Aggregate records into a chronological market sparkline series.
+ *
+ * Groups records by date (sample-weighted average across stacks), sorts
+ * ascending, then resamples into at most `bucketCount` contiguous buckets so
+ * long histories stay readable at sparkline size.
+ *
+ * Invariants (models/tjm-market-overview.model.md): chronologically sorted,
+ * empty for empty input, every average > 0, at most one point per bucket.
+ */
+export const buildTJMSeries = (records: TJMRecord[], bucketCount = 12): TJMSeriesPoint[] => {
+  if (records.length === 0 || bucketCount < 1) {
+    return [];
+  }
+
+  const byDate = new Map<string, { total: number; weight: number }>();
+  for (const record of records) {
+    if (record.average <= 0 || record.sampleCount <= 0) {
+      continue;
+    }
+    const bucket = byDate.get(record.date) ?? { total: 0, weight: 0 };
+    bucket.total += record.average * record.sampleCount;
+    bucket.weight += record.sampleCount;
+    byDate.set(record.date, bucket);
+  }
+
+  // Carry each day's total weight so buckets resample with a sample-weighted
+  // average (model invariant), not a flat mean of daily averages.
+  const daily: Array<TJMSeriesPoint & { weight: number }> = [...byDate.entries()]
+    .map(([date, { total, weight }]) => ({
+      date,
+      average: Math.round(total / weight),
+      weight,
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  if (daily.length <= bucketCount) {
+    return daily.map(({ date, average }) => ({ date, average }));
+  }
+
+  // Resample into contiguous buckets of (roughly) equal size, preserving order.
+  const perBucket = daily.length / bucketCount;
+  const series: TJMSeriesPoint[] = [];
+  for (let i = 0; i < bucketCount; i++) {
+    const start = Math.floor(i * perBucket);
+    const end = i === bucketCount - 1 ? daily.length : Math.floor((i + 1) * perBucket);
+    const slice = daily.slice(start, Math.max(end, start + 1));
+    if (slice.length === 0) {
+      continue;
+    }
+    let total = 0;
+    let weight = 0;
+    for (const point of slice) {
+      total += point.average * point.weight;
+      weight += point.weight;
+    }
+    series.push({
+      // Bucket key = last date of the slice, so the point anchors the period end.
+      date: slice[slice.length - 1].date,
+      average: Math.round(total / weight),
+    });
+  }
+  return series;
+};
 
 const medianOf = (values: number[]): number => {
   if (values.length === 0) {
@@ -697,5 +803,6 @@ export const analyzeTJMHistory = (history: TJMHistory, now?: Date): TJMAnalysis 
     lastUpdated,
     topStacks,
     regionInsights: buildRegionInsights(history),
+    series: buildTJMSeries(history.records),
   };
 };

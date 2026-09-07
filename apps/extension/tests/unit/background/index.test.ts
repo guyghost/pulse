@@ -287,6 +287,7 @@ vi.stubGlobal('chrome', {
     setPanelBehavior: vi.fn(),
   },
   runtime: {
+    getPlatformInfo: vi.fn(async () => ({ os: 'mac', arch: 'arm64', nacl_arch: 'arm' }) as never),
     onMessage: {
       addListener: vi.fn(
         (
@@ -2147,6 +2148,68 @@ describe('background auto-scan notifications', () => {
       payload: [expect.objectContaining({ id: 'rescored-1', score: 96 })],
     });
     expect(sendResponse).toHaveBeenCalledWith({ type: 'PROFILE_RESULT', payload: profile });
+  });
+
+  it('acks SAVE_PROFILE before the rescore completes', async () => {
+    // Invariant 6 (profile-state.model.md): the save ack depends only on
+    // persistence; the rescore is a post-commit projection and must never
+    // delay PROFILE_RESULT (scan-flow precedent).
+    expect(messageListener).toBeTypeOf('function');
+    let resolveRescore: (missions: Mission[]) => void = () => {};
+    rescoreStoredMissions.mockImplementationOnce(
+      () => new Promise<Mission[]>((resolve) => (resolveRescore = resolve))
+    );
+
+    const sendResponse = vi.fn();
+    const handled = messageListener?.({ type: 'SAVE_PROFILE', payload: profile }, {}, sendResponse);
+
+    await vi.waitFor(() =>
+      expect(sendResponse).toHaveBeenCalledWith({ type: 'PROFILE_RESULT', payload: profile })
+    );
+    await vi.waitFor(() => expect(rescoreStoredMissions).toHaveBeenCalled());
+
+    resolveRescore([]);
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'MISSIONS_UPDATED' })
+      )
+    );
+    expect(handled).toBe(true);
+  });
+
+  it('serializes and coalesces concurrent post-save rescores (latest profile wins)', async () => {
+    // Model: profile-state.model.md "Post-save rescore orchestration" — at
+    // most one rescore in flight; profiles saved while a rescore runs are
+    // coalesced and the latest wins, so a slow first rescore can no longer
+    // broadcast a stale-profile projection over a fresher save.
+    expect(messageListener).toBeTypeOf('function');
+    let releaseFirst: (missions: Mission[]) => void = () => {};
+    rescoreStoredMissions.mockImplementationOnce(
+      () => new Promise<Mission[]>((resolve) => (releaseFirst = resolve))
+    );
+    rescoreStoredMissions.mockImplementationOnce(async () => [
+      makeMission({ id: 'rescored-2', score: 97 }),
+    ]);
+
+    const profileB = { ...profile, jobTitle: 'Architecte Cloud' };
+
+    messageListener?.({ type: 'SAVE_PROFILE', payload: profile }, {}, vi.fn());
+    messageListener?.({ type: 'SAVE_PROFILE', payload: profileB }, {}, vi.fn());
+
+    await vi.waitFor(() => expect(rescoreStoredMissions).toHaveBeenCalledTimes(1));
+    // Leave a window for a (buggy) eager second rescore to start.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    expect(rescoreStoredMissions).toHaveBeenCalledTimes(1);
+
+    releaseFirst([makeMission({ id: 'rescored-1', score: 96 })]);
+    await vi.waitFor(() => expect(rescoreStoredMissions).toHaveBeenCalledTimes(2));
+    expect(rescoreStoredMissions).toHaveBeenNthCalledWith(2, profileB, await readSettingsRelease());
+    await vi.waitFor(() =>
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'MISSIONS_UPDATED',
+        payload: [expect.objectContaining({ id: 'rescored-2' })],
+      })
+    );
   });
 
   it('routes profile page verification through the service worker shell', async () => {

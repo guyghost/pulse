@@ -1428,7 +1428,7 @@ export function deriveBackgroundSchedulingHandoffCapabilityManifestFacts(
     cleanupRecovery: {
       version: LOCAL_DATA_RESET_WIRE_VERSION,
       manifestDigest,
-      bundles: [cleanupBundles[0]!, cleanupBundles[1]!, cleanupBundles[2]!],
+      bundles: [cleanupBundles[0], cleanupBundles[1], cleanupBundles[2]],
     },
   };
   for (const entry of entries) {
@@ -1669,7 +1669,7 @@ export function deriveBackgroundSchedulingHandoffPayloadFacts(
     return null;
   }
   const connectorOrder = connectorOrderValues as string[];
-  if (connectorOrder.some((entry, index) => index > 0 && connectorOrder[index - 1]! >= entry)) {
+  if (connectorOrder.some((entry, index) => index > 0 && connectorOrder[index - 1] >= entry)) {
     return null;
   }
   const writerTransfer = parseHandoffWriterTransfer(record.writerTransfer);
@@ -1965,7 +1965,7 @@ function parseBackgroundSchedulingHandoffCleanupRecovery(
   return {
     version: LOCAL_DATA_RESET_WIRE_VERSION,
     manifestDigest: record.manifestDigest,
-    bundles: [parsed[0]!, parsed[1]!, parsed[2]!],
+    bundles: [parsed[0], parsed[1], parsed[2]],
   };
 }
 
@@ -2986,7 +2986,7 @@ export function issueBackgroundSchedulingHandoffReplacementLane(input: {
     (bundle, cleanupCasAttempt): BackgroundSchedulingHandoffWorkerBoundCleanupTokenV1 => ({
       version: LOCAL_DATA_RESET_WIRE_VERSION,
       kind: 'BACKGROUND_HANDOFF_WORKER_BOUND_CLEANUP_TOKEN',
-      tokenId: input.cleanupTokenIds[cleanupCasAttempt]!,
+      tokenId: input.cleanupTokenIds[cleanupCasAttempt],
       resetId: reference.resetId,
       sidecarId: reference.sidecarId,
       handoffId: reference.handoffId,
