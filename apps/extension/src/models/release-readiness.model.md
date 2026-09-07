@@ -2860,8 +2860,8 @@ complete transport bytes once, bounds them by
 step output; a pathname, later rehash or upload result cannot replace that
 pre-upload commitment.
 
-Before upload, `actions/attest` at the exact reviewed commit for v4.2.0
-(`f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6`) receives only explicit
+Before upload, `actions/attest` at the exact reviewed commit for v4.2.2
+(`1e69f48acb82d1966a394da916b4c1698aa569d6`) receives only explicit
 `subject-name: missionpulse-sealed-candidate` and
 `subject-digest: sha256:<captured digest>`; `subject-path`, checksums discovery
 and automatic artifact discovery are forbidden. GitHub OIDC/Sigstore signs that
