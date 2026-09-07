@@ -8,9 +8,9 @@ connector so the user can paste it manually.
 
 Modeled as two cooperating state machines in a Svelte 5 runes module
 (`src/lib/state/availability.svelte.ts`), per the project standard (runes over
-XState — see `profile-state.model.md`). It deliberately mirrors the CV sync
-machine (`cv-experience-sync.model.md`) since the push transport is identical:
-clipboard + open URL. No backend, no stored credentials — local-first.
+XState — see `profile-state.model.md`). Availability owns this guided-paste
+transport independently: the CV manual synchronization workflow has been
+retired. No backend, no stored credentials — local-first.
 
 The LLM never decides a transition here. **Le LLM produit des signaux ; le
 modèle décide.** (No LLM is involved in this feature at all.)
@@ -18,9 +18,9 @@ modèle décide.** (No LLM is involved in this feature at all.)
 ## Why not auto-write?
 
 The extension cannot mutate platform state directly: it has no stored
-credentials and no backend. As with the CV sync, the "push" is a **guided
-paste**: copy the formatted payload, open the platform's profile page, let the
-user paste. This is the only transport compatible with the architecture.
+credentials and no backend. The availability "push" is a **guided paste**:
+copy the formatted payload, open the platform's profile page, let the user
+paste. This is the only transport compatible with the architecture.
 
 ## Domain entities
 
@@ -310,8 +310,8 @@ Location: `src/lib/core/availability/availability-helpers.ts`.
 
 ## UI placement
 
-A new organism `AvailabilityPanel.svelte` (edit form + push list, mirroring the
-CV `CvSyncPanel` layout) is inserted at the **top** of `ApplicationsPage.svelte`
+A new organism `AvailabilityPanel.svelte` (edit form + push list in a standalone
+status card) is inserted at the **top** of `ApplicationsPage.svelte`
 (before the existing pipeline section), so availability is the first action in
 the Suivi tab. It receives the store + the platform targets from the facade.
 

@@ -134,10 +134,16 @@ class MetricsCollector {
   }
 
   /**
-   * Récupère les métriques filtrées par nom
+   * Récupère les métriques filtrées par nom. `*` agit comme joker ; tout le
+   * reste du motif est échappé (CodeQL js/incomplete-sanitization).
    */
   getMetricsByName(namePattern: string): Metric[] {
-    const regex = new RegExp(namePattern.replace('*', '.*'));
+    const regex = new RegExp(
+      namePattern
+        .split('*')
+        .map((part) => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+        .join('.*')
+    );
     return this.metrics.filter((m) => regex.test(m.name));
   }
 

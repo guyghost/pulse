@@ -25,7 +25,7 @@
     emptyDescription = undefined,
     userSeniority = null,
     userTjmMin = 0,
-    userTjmMax = 0,
+    userTjmMax = null,
     onRetry,
     onOpenProfile,
     onOpenFeed,
@@ -37,7 +37,8 @@
     emptyDescription?: string | undefined;
     userSeniority?: SeniorityLevel | null;
     userTjmMin?: number;
-    userTjmMax?: number;
+    /** DAO #174 : null = profil sans plafond. */
+    userTjmMax?: number | null;
     onRetry?: () => void;
     onOpenProfile?: () => void;
     onOpenFeed?: () => void;
@@ -57,10 +58,12 @@
   // An inverted target (min > max, both defined) is incoherent: do not derive a
   // median/delta from it, otherwise the dashboard would display a misleading
   // positioning and écart. Surfaced as an explicit validation state instead.
-  const isTargetInverted = $derived(userTjmMin > 0 && userTjmMax > 0 && userTjmMin > userTjmMax);
+  const isTargetInverted = $derived(
+    userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0)
+  );
   const userTargetMedian = $derived(
-    userTjmMin > 0 && userTjmMax > 0 && !isTargetInverted
-      ? Math.round((userTjmMin + userTjmMax) / 2)
+    userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted
+      ? Math.round((userTjmMin + (userTjmMax ?? 0)) / 2)
       : null
   );
   const userTargetDelta = $derived(
@@ -69,7 +72,7 @@
       : null
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
-  const hasTjmTarget = $derived(userTjmMin > 0 && userTjmMax > 0 && !isTargetInverted);
+  const hasTjmTarget = $derived(userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted);
   const selectedLevelLabel = $derived.by(() => {
     const key = userSeniority ?? 'confirmed';
     return levels.find((level) => level.key === key)?.label ?? 'Confirmé';

@@ -506,6 +506,7 @@ describe('tested dist seal', () => {
   it('keeps the repository MV3 matrix committed, canonical, nonempty and exact', () => {
     const bytes = readFileSync(resolve(import.meta.dirname, '../../mv3/scenarios.v1.json'));
     expect(parseCommittedScenarioInventory(bytes)).toEqual([
+      'form-assistant.enable-contract',
       'harness.bootstrap-diagnostics',
       'harness.late-diagnostic',
       'harness.page-console',

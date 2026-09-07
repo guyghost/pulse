@@ -59,18 +59,24 @@ export async function extractLinkedInExperiencesFromDom(
     }
 
     const placeValue = workModeSuffixMatch?.[1] ?? value;
-    const placeSegments = placeValue.split(/\s*,\s*/);
+    const surroundingAreaMatch = placeValue.match(/^(.+?)\s+et\s+périphérie$/i);
+    const strictPlaceValue = surroundingAreaMatch?.[1] ?? placeValue;
+    const placeSegments = strictPlaceValue.split(/\s*,\s*/);
+    const placeTokens = placeSegments.flatMap((segment) => segment.split(/\s+/));
+    const hasOnlyPlaceTokens = placeTokens.every(
+      (token) =>
+        placeConnectorPattern.test(token) || /^[\p{Lu}\d][\p{L}\p{M}\d.'’()/-]*$/u.test(token)
+    );
+    const isCommaDelimitedPlace = placeSegments.length >= 2 && hasOnlyPlaceTokens;
+    const isStandalonePlace =
+      placeSegments.length === 1 &&
+      placeTokens.length <= 4 &&
+      !/[.!?;:]$/.test(strictPlaceValue) &&
+      hasOnlyPlaceTokens;
     return (
       placeValue.length <= 120 &&
-      placeSegments.length >= 2 &&
-      placeSegments.every((segment) =>
-        segment
-          .split(/\s+/)
-          .every(
-            (token) =>
-              placeConnectorPattern.test(token) || /^[\p{Lu}\d][\p{L}\p{M}\d.'’()/-]*$/u.test(token)
-          )
-      )
+      placeTokens.length > 0 &&
+      (isCommaDelimitedPlace || isStandalonePlace)
     );
   };
 
@@ -272,6 +278,7 @@ export async function extractLinkedInExperiencesFromDom(
     'a[href*="profilePosition="]',
     'a[href*="/details/experience/edit/forms/"]',
   ].join(', ');
+  const ownerPositionSelector = 'a[href*="/details/experience/edit/forms/"]';
   const rowDiscoverySelector = [
     strongPositionSelector,
     '[data-view-name="profile-component-entity"]',
@@ -291,6 +298,51 @@ export async function extractLinkedInExperiencesFromDom(
     inheritedCompany: string | undefined;
   }
 
+  const ownerPositionId = (marker: Element): string | undefined => {
+    const href = marker.getAttribute('href');
+    if (!href) {
+      return undefined;
+    }
+
+    try {
+      const id = new URL(href, window.location.href).pathname.match(
+        /\/details\/experience\/edit\/forms\/([^/]+)\/?$/i
+      )?.[1];
+      if (!id) {
+        return undefined;
+      }
+      const normalized = decodeURIComponent(id).trim().toLocaleLowerCase();
+      return normalized || undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const generatedOwnerCard = (marker: Element, root: Element): Element => {
+    const positionId = ownerPositionId(marker);
+    if (!positionId) {
+      return marker;
+    }
+
+    let owner = marker;
+    for (
+      let ancestor = marker.parentElement;
+      ancestor && ancestor !== root;
+      ancestor = ancestor.parentElement
+    ) {
+      const ownerMarkers = [
+        ...(ancestor.matches(ownerPositionSelector) ? [ancestor] : []),
+        ...ancestor.querySelectorAll(ownerPositionSelector),
+      ];
+      const distinctPositionIds = new Set(ownerMarkers.map(ownerPositionId).filter(Boolean));
+      if (distinctPositionIds.size !== 1 || !distinctPositionIds.has(positionId)) {
+        break;
+      }
+      owner = ancestor;
+    }
+    return owner;
+  };
+
   const rowOwner = (candidate: Element, root: Element): Element => {
     const structuralOwner = candidate.closest('[role="listitem"], li, .pvs-list__paged-list-item');
     if (structuralOwner && root.contains(structuralOwner)) {
@@ -298,7 +350,13 @@ export async function extractLinkedInExperiencesFromDom(
     }
 
     const semanticOwner = candidate.closest('[data-view-name="profile-component-entity"]');
-    return semanticOwner && root.contains(semanticOwner) ? semanticOwner : candidate;
+    if (semanticOwner && root.contains(semanticOwner)) {
+      return semanticOwner;
+    }
+
+    return candidate.matches(ownerPositionSelector)
+      ? generatedOwnerCard(candidate, root)
+      : candidate;
   };
 
   const positionIdentity = (marker: Element): string | undefined => {
@@ -323,11 +381,9 @@ export async function extractLinkedInExperiencesFromDom(
     }
     try {
       const parsedHref = new URL(href, window.location.href);
-      const ownerPositionId = parsedHref.pathname.match(
-        /\/details\/experience\/edit\/forms\/([^/]+)\/?$/i
-      )?.[1];
-      if (ownerPositionId) {
-        const normalizedOwnerPositionId = normalize(ownerPositionId);
+      const ownerPositionIdValue = ownerPositionId(marker);
+      if (ownerPositionIdValue) {
+        const normalizedOwnerPositionId = normalize(ownerPositionIdValue);
         return normalizedOwnerPositionId
           ? `owner-position:${normalizedOwnerPositionId}`
           : undefined;
@@ -510,7 +566,8 @@ export async function extractLinkedInExperiencesFromDom(
               index !== adjacentSkillsIndex &&
               !line.prose &&
               !isDurationLine(line.text) &&
-              !isActionLine(line.text)
+              !isActionLine(line.text) &&
+              isLikelyLocationLine(line.text)
           )
         : -1;
     const proseLocationIndex =

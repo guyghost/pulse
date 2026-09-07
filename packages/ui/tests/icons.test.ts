@@ -17,7 +17,15 @@ describe('Icon registry', () => {
   });
 
   it('IconName type covers key icons', () => {
-    const essential: IconName[] = ['search', 'x', 'check', 'chevron-down', 'star', 'loader'];
+    const essential: IconName[] = [
+      'search',
+      'x',
+      'check',
+      'chevron-down',
+      'star',
+      'loader',
+      'list-filter',
+    ];
     for (const name of essential) {
       expect(iconPaths[name]).toBeDefined();
     }

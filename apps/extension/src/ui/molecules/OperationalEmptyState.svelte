@@ -55,7 +55,7 @@
           ? 'bg-status-orange/10 text-status-orange'
           : severity === 'critical'
             ? 'bg-status-red/10 text-status-red'
-            : 'bg-blueprint-blue/8 text-blueprint-blue'
+            : 'bg-blueprint-blue/8 text-blueprint-blue-on-tint'
   );
 </script>
 

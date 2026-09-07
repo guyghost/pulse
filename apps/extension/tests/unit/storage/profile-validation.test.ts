@@ -96,9 +96,30 @@ describe('UserProfileSchema — validation Zod', () => {
   });
 
   it('accepte un TJM minimum sans TJM maximum', () => {
-    const profile = { ...validProfile(), tjmMin: 800, tjmMax: 0 };
+    const profile = { ...validProfile(), tjmMin: 800, tjmMax: null };
     const result = UserProfileSchema.safeParse(profile);
     expect(result.success).toBe(true);
+  });
+
+  it('migre la sentinelle historique tjmMax 0 vers null — sans plafond (DAO #174)', () => {
+    const parsed = UserProfileSchema.parse({ ...validProfile(), tjmMax: 0 });
+    expect(parsed.tjmMax).toBeNull();
+  });
+
+  it('migre l’ancien défaut tjmMax 9999 vers null — sans plafond (DAO #174)', () => {
+    const parsed = UserProfileSchema.parse({ ...validProfile(), tjmMax: 9999 });
+    expect(parsed.tjmMax).toBeNull();
+  });
+
+  it('conserve une vraie borne haute saisie (DAO #174)', () => {
+    const parsed = UserProfileSchema.parse({ ...validProfile(), tjmMax: 900 });
+    expect(parsed.tjmMax).toBe(900);
+  });
+
+  it('comble un tjmMax absent par null (rétrocompat lecture, DAO #174)', () => {
+    const { tjmMax: _omitted, ...withoutMax } = validProfile();
+    const parsed = UserProfileSchema.parse(withoutMax);
+    expect(parsed.tjmMax).toBeNull();
   });
 
   it('rejette tjmMin > 5000', () => {

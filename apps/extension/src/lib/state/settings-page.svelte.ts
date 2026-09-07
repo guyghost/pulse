@@ -107,7 +107,7 @@ export class SettingsPageController {
   profileRemote = $state<UserProfile['remote']>('any');
   seniority = $state<UserProfile['seniority']>('senior');
   tjmMin = $state(0);
-  tjmMax = $state(0);
+  tjmMax = $state<number | null>(null);
   profileKeywords = $state<string[]>([]);
   keywordInput = $state('');
   editingProfile = $state(false);
@@ -282,7 +282,7 @@ export class SettingsPageController {
     this.profileRemote = profile.remote ?? 'any';
     this.seniority = profile.seniority ?? 'senior';
     this.tjmMin = profile.tjmMin ?? 0;
-    this.tjmMax = profile.tjmMax ?? 0;
+    this.tjmMax = profile.tjmMax ?? null;
     this.profileKeywords = profile.keywords ?? [];
   }
 
@@ -548,19 +548,15 @@ export class SettingsPageController {
       const current = this.currentProfile ?? (await getProfile());
       const nextKeywords = appendUniqueNormalized(this.profileKeywords, this.keywordInput);
       const nextTjmMin = normalizeDailyRate(this.tjmMin);
-      const nextTjmMax = normalizeDailyRate(this.tjmMax);
-
-      if (nextTjmMax > 0 && nextTjmMin > nextTjmMax) {
-        this.profileError = 'Le TJM maximum doit être supérieur ou égal au TJM minimum';
-        return;
-      }
+      // DAO #174 : plus de plafond collecté dans le formulaire — on persiste
+      // null (sans plafond). Toute borne legacy préexistante est écrasée.
 
       const normalized = normalizeProfileDraft({
         firstName: normalizeTextInput(this.firstName),
         jobTitle: normalizeTextInput(this.jobTitle),
         location: normalizeTextInput(this.profileLocation),
         tjmMin: nextTjmMin,
-        tjmMax: nextTjmMax,
+        tjmMax: null,
         keywords: nextKeywords,
         remote: this.profileRemote,
         seniority: this.seniority,

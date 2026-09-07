@@ -41,7 +41,7 @@
     <span
       class="relative flex h-7 w-7 items-center justify-center rounded-full {pct >= 100
         ? 'bg-accent-green/15 text-accent-green'
-        : 'bg-blueprint-blue/10 text-blueprint-blue'}"
+        : 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'}"
     >
       {#if pct >= 100}
         <Icon name="check" class="h-4 w-4" />
@@ -56,7 +56,7 @@
     {#each steps as s (s.label)}
       <span
         class="flex h-5 w-5 items-center justify-center rounded-full transition-colors {s.filled
-          ? 'bg-blueprint-blue/12 text-blueprint-blue'
+          ? 'bg-blueprint-blue/12 text-blueprint-blue-on-tint'
           : 'bg-subtle-gray text-text-muted'}"
         title={s.label}
       >

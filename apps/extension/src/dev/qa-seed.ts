@@ -466,7 +466,7 @@ function buildIncompleteProfile(): UserProfile {
     firstName: '',
     keywords: [],
     tjmMin: 0,
-    tjmMax: 0,
+    tjmMax: null,
     location: '',
     remote: 'hybrid',
     seniority: 'senior',

@@ -36,9 +36,9 @@ test.describe('Onboarding', () => {
       location: 'Paris',
     });
 
-    // Preferences (Étape 3/5) — TJM obligatoires (tjmMin > 0, tjmMax ≥ tjmMin).
-    await page.getByLabel('TJM min (€)').fill('550');
-    await page.getByLabel('TJM max (€)').fill('750');
+    // Preferences (Étape 3/5) — TJM minimum requis (tjmMin > 0, sans plafond
+    // depuis DAO #174 : le champ « TJM max » n'existe plus).
+    await page.getByLabel('TJM minimum (€)').fill('550');
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
     // Skills (Étape 4/5) — au moins un mot-clé.

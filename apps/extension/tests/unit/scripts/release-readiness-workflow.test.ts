@@ -5,8 +5,8 @@ import {
   inspectPrivilegedWorkflow,
 } from '../../../scripts/release-readiness/workflow-policy';
 
-const CHECKOUT_SHA = 'de0fac2e4500dabe0009e67214ff5f5447ce83dd';
-const ATTEST_SHA = 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6';
+const CHECKOUT_SHA = '3d3c42e5aac5ba805825da76410c181273ba90b1';
+const ATTEST_SHA = '1e69f48acb82d1966a394da916b4c1698aa569d6';
 const UPLOAD_SHA = '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
 const VERIFY_UPLOAD_DIGEST_STEP = `      - id: verify-upload-digest
         name: Verify the uploaded transport digest

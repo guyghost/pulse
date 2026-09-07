@@ -216,8 +216,10 @@ describe('parser-utils', () => {
       expect(stripHtml('&nbsp;Tom &amp; Jerry&amp;co')).toBe('Tom & Jerry&co');
     });
 
-    it('decodes &lt; &gt; &quot; &#39;', () => {
-      expect(stripHtml('&lt;tag&gt; &quot;quoted&quot; l&#39;eau')).toBe('<tag> "quoted" l\'eau');
+    it('decodes &lt; &gt; &quot; &#39; without resurrecting markup (DAO security)', () => {
+      // Entités décodées AVANT le strip : &lt;tag&gt; devient <tag> puis est
+      // supprimé — les entités ne peuvent pas ressusciter du markup.
+      expect(stripHtml('&lt;tag&gt; &quot;quoted&quot; l&#39;eau')).toBe('"quoted" l\'eau');
     });
 
     it('decodes numeric entities (decimal)', () => {

@@ -1261,7 +1261,8 @@ export async function sealTestedDistCli(
       '--filter',
       '@pulse/extension',
       'verify-manifest',
-      options.dist,
+      // verify-manifest expects the manifest FILE (a directory read throws EISDIR).
+      join(options.dist, 'manifest.json'),
       '--post-build',
       '--expected-version',
       input.committedVersion,
