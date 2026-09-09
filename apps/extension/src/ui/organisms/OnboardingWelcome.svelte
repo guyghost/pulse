@@ -70,7 +70,7 @@
     <button
       type="button"
       onclick={onStart}
-      class="h-12 w-full rounded-2xl bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 ease-out hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+      class="h-12 w-full rounded-lg bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 ease-out hover:brightness-105 active:scale-[0.99] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
     >
       Commencer
     </button>

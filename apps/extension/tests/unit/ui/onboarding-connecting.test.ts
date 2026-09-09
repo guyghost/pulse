@@ -131,6 +131,36 @@ describe('OnboardingFlow — connecting (P0-B)', () => {
     expect(onVerifySource).toHaveBeenCalledWith('free-work');
   });
 
+  it('B-opt : « Scanner maintenant » proposé quand une session est prête, émet SKIP', async () => {
+    const onEvent = vi.fn();
+    const { target } = mountFlow(makeSnapshot({ connectedSources: ['free-work'] }), { onEvent });
+    await tick();
+
+    const scanNow = Array.from(target.querySelectorAll('button')).find((b) =>
+      b.textContent?.trim().startsWith('Scanner maintenant')
+    ) as HTMLButtonElement;
+    expect(scanNow).toBeDefined();
+    scanNow.click();
+    expect(onEvent).toHaveBeenCalledWith({ type: 'SKIP' });
+    // L'escape hatch « sans source » n'a pas de sens quand une source est prête.
+    expect(
+      Array.from(target.querySelectorAll('button')).some((b) =>
+        b.textContent?.trim().startsWith('Continuer sans source')
+      )
+    ).toBe(false);
+  });
+
+  it('B-opt : « Scanner maintenant » absent sans source connectée', async () => {
+    const { target } = mountFlow(makeSnapshot());
+    await tick();
+
+    expect(
+      Array.from(target.querySelectorAll('button')).some((b) =>
+        b.textContent?.trim().startsWith('Scanner maintenant')
+      )
+    ).toBe(false);
+  });
+
   it('un échec de vérification propose « Réessayer »', async () => {
     const onVerifySource = vi.fn();
     const { target } = mountFlow(makeSnapshot(), {

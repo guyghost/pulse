@@ -182,6 +182,11 @@ Hypothèse non-binding : option recommandée d’abord pour livrer en une PR ; o
 
 Si une source devient `ready` sur `connecting` :
 
+- ✅ **Implémenté (2026-09-09)** : CTA « Scanner maintenant » affiché quand ≥ 1 source
+  prête — émet `SKIP` (→ `START_SCAN { partial: true }`, `notifyEnabled: false`), le
+  wizard reste accessible au return via la bannière A2 (« profil à compléter »).
+  Copy : « Scan partiel avec vos sources connectées — affinez le profil ensuite. »
+
 - CTA alternatif `Scanner maintenant` → transition directe `scanning` avec `START_SCAN { partial: true }` + profil défaut, puis feed, puis soft-prompt « Complétez votre profil » (A2).
 - Le wizard reste accessible depuis feed/profil.
 
