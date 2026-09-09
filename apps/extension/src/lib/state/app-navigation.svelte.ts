@@ -225,16 +225,20 @@ export function createAppNavigation() {
     }
 
     if (profile === null) {
-      void import('$lib/core/profile/normalize-profile')
-        .then(({ withProfileDefaults }) => {
-          if (disposed || profile !== null) {
-            return;
-          }
+      // P0-A1 : la seed est attendue (plus de fire-and-forget) pour supprimer
+      // la course profile=null au mount du feed. Reste non fatale : le filet
+      // shell du chemin scan (ensureDurableProfileBeforeScan) couvre sinon.
+      try {
+        const { withProfileDefaults } = await import('$lib/core/profile/normalize-profile');
+        if (!disposed && profile === null) {
           const seededProfile = withProfileDefaults({});
           profile = seededProfile;
-          saveProfile(seededProfile).catch(() => {});
-        })
-        .catch(() => {});
+          await saveProfile(seededProfile);
+        }
+      } catch {
+        // best-effort : la navigation continue, le profil défaut sera
+        // re-persisté au prochain scan.
+      }
     }
 
     hasCompletedOnboarding = true;

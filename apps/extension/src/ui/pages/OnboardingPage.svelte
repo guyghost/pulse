@@ -34,6 +34,7 @@
   } from '$lib/core/types/alert-preferences';
   import { createFeedStore } from '$lib/state/feed.svelte';
   import { createFeedController } from '$lib/shell/facades/feed-controller.svelte';
+  import { ensureDurableProfileBeforeScan } from '$lib/shell/onboarding/ensure-durable-profile';
   import { getConnectorsMeta } from '$lib/shell/connectors/meta';
 
   const { onComplete }: { onComplete?: () => Promise<boolean> | boolean } = $props();
@@ -137,6 +138,15 @@
     }
     // START_SCAN
     try {
+      // P0-A1 : un profil durable doit exister avant tout scan — le chemin
+      // nominal passe par PERSIST_PROFILE, mais SKIP/partiel saute directement
+      // à START_SCAN. Non bloquant : un échec n'annule pas le scan.
+      await ensureDurableProfileBeforeScan({
+        getProfile,
+        saveProfile,
+        getDraft: () => controller.getSnapshot().profile,
+        warn: (message, err) => console.warn('[Onboarding]', message, err),
+      });
       // Persist the sources the user marked as connected so the service worker
       // scans exactly those (and the feed honors them on next mount).
       await applyConnectedSources(effect.attemptId);
