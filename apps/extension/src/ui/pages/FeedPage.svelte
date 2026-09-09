@@ -900,6 +900,13 @@
     await setFeedTourSeen();
   }
 
+  /** Point d'entrée visible du tour (revue design DAO #176) : la modal
+      d'aide propose de le rejouer — ferme l'aide puis réouvre le tour. */
+  function replayTourFromHelp(): void {
+    page.showShortcutsHelp = false;
+    window.dispatchEvent(new Event('feed-tour:open'));
+  }
+
   async function advanceTour() {
     if (tourStepIndex >= tourSteps.length - 1) {
       await closeTour();
@@ -997,7 +1004,7 @@
       <section
         bind:this={feedHeroCard}
         data-testid="feed-hero-card"
-        class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
+        class="section-card-strong relative overflow-visible rounded-xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
           ? 'z-40'
           : ''} {feedChromeCompact ? 'border-blueprint-blue/10 shadow-subtle-3' : ''}"
       >
@@ -1635,7 +1642,7 @@
 {/if}
 
 {#if KeyboardShortcutsHelp}
-  <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} />
+  <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} onReplayTour={replayTourFromHelp} />
 {/if}
 
 {#if activeTourStep && FeedTourOverlay}
@@ -1670,7 +1677,7 @@
 
 {#if page.comparisonMissionIds.length > 0 && !arrivalDrawerExpanded}
   <div
-    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
+    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
       ? 'bottom-40'
       : 'bottom-24'}"
   >
