@@ -21,7 +21,7 @@
 </script>
 
 {#if brokenConnectors.length > 0}
-  <div class="mx-4 mb-3 rounded-2xl border border-status-red/30 bg-status-red/10 px-4 py-3">
+  <div class="mx-4 mb-3 rounded-xl border border-status-red/30 bg-status-red/10 px-4 py-3">
     <div class="flex items-start gap-3">
       <div
         class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/15"

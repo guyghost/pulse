@@ -99,7 +99,7 @@
 >
   <div
     bind:this={dialogElement}
-    class="w-full max-w-md rounded-3xl border border-border-light bg-surface-white p-6 shadow-2xl"
+    class="w-full max-w-md rounded-xl border border-border-light bg-surface-white p-6 shadow-2xl"
     role="dialog"
     tabindex="-1"
     aria-labelledby="backup-restore-title"
@@ -143,7 +143,7 @@
 
     <!-- Content -->
     {#if error}
-      <div class="mb-5 rounded-2xl border border-status-red/20 bg-status-red/8 p-4">
+      <div class="mb-5 rounded-lg border border-status-red/20 bg-status-red/8 p-4">
         <p class="eyebrow eyebrow--strong text-status-red">Restauration bloquée</p>
         <p class="mt-2 text-body-lg leading-5 text-text-primary">{getErrorMessage(error)}</p>
         <p class="mt-2 text-meta leading-5 text-text-subtle">
@@ -200,7 +200,7 @@
         </div>
       </div>
 
-      <div class="mb-4 rounded-2xl border border-status-orange/25 bg-status-orange/8 p-4">
+      <div class="mb-4 rounded-lg border border-status-orange/25 bg-status-orange/8 p-4">
         <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-orange">
           <Icon name="alert-triangle" size={13} class="shrink-0" />
           Décision requise
@@ -231,7 +231,7 @@
 
       {#if restoreError}
         <div
-          class="mb-4 rounded-2xl border border-status-red/20 bg-status-red/8 p-3"
+          class="mb-4 rounded-lg border border-status-red/20 bg-status-red/8 p-3"
           role="alert"
           aria-live="assertive"
         >

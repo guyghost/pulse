@@ -399,7 +399,7 @@
     {/if}
     {#if semanticReason}
       <span
-        class="inline-flex items-center gap-1 rounded-full border border-blueprint-blue/15 bg-blueprint-blue/5 px-2 py-0.5 text-micro text-blueprint-blue"
+        class="inline-flex items-center gap-1 rounded-full border border-blueprint-blue/15 bg-blueprint-blue/5 px-2 py-0.5 text-micro text-blueprint-blue-on-tint"
       >
         {semanticReason}
       </span>
@@ -676,7 +676,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
