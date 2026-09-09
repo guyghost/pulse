@@ -159,8 +159,8 @@ Grille : hiérarchie visuelle / densité / accessibilité / cohérence tokens / 
 2. ~~MissionComparison — distillation~~ → **déjà implémenté** (§4, preuves en code).
 3. ~~Undo toast sur Masquer/Favori~~ → **déjà implémenté** (§4, preuves en code).
 4. ~~Line-length `max-w-prose`~~ → **livré en passe 2** (§4).
-5. Aide : **raccourcis déjà câblés** (`?`) ; resurfacer le tour → nécessite `FeedPage.svelte`, regroupé avec le lot FeedPage ci-dessous.
-6. **Sweep `FeedPage.svelte`** des `rounded-2xl` restants + tout le lot dépendant de FeedPage, après merge du changeset `build-feed-story` en cours.
+5. ~~Aide visible~~ → **livré** : la modal d'aide propose « Revoir la visite guidée » (prop `onReplayTour` sur `KeyboardShortcutsHelp`, routée vers l'événement `feed-tour:open` déjà branché dans FeedPage).
+6. ~~Sweep `FeedPage.svelte`~~ → **livré** après merge du changeset P0-A3 (PR #376) : hero card et pill d'arrivée `rounded-2xl` → `rounded-xl` ; `rounded-b-2xl` du header sticky conservé (barre plein-bord, non une carte). Restent du plan P0 : A1/A2 (persist profil), B (connecting session réelle).
 7. **Décision design review** : rayon des CTA (8px spec vs langage arrondi actuel) ; persistance de l'état déplié des cartes. E2E : `tests/e2e/helpers.ts` documente déjà la cible (triade repliée, `expandMission` avant copier/ouvrir/investiguer) — les specs e2e l'utilisent déjà.
 
 Chaque item est indépendant, testable, et respecte les principes §3.

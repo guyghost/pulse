@@ -8,7 +8,10 @@
     type ShortcutConfig,
   } from '$lib/shell/utils/keyboard-shortcuts';
 
-  let { isOpen = $bindable(false) }: { isOpen?: boolean } = $props();
+  let {
+    isOpen = $bindable(false),
+    onReplayTour = null,
+  }: { isOpen?: boolean; onReplayTour?: (() => void) | null } = $props();
   let modalRoot = $state<HTMLDivElement | undefined>(undefined);
   let dialogElement = $state<HTMLDivElement | undefined>(undefined);
 
@@ -53,6 +56,10 @@
     if (!requestModalClose(modalRoot ?? null, 'explicit')) {
       closeModal();
     }
+  }
+
+  function handleReplayTour(): void {
+    onReplayTour?.();
   }
 </script>
 
@@ -156,14 +163,25 @@
       <footer class="shrink-0 border-t border-border-light bg-surface-white px-4 py-3">
         <div class="flex items-center justify-between gap-3">
           <p class="text-caption leading-4 text-text-subtle">Désactivés pendant la saisie</p>
-          <button
-            type="button"
-            class="shrink-0 rounded-lg bg-blueprint-blue-strong px-3.5 py-2 text-meta font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90"
-            onclick={handleExplicitClose}
-            data-modal-acknowledgement
-          >
-            J'ai compris
-          </button>
+          <div class="flex shrink-0 items-center gap-2">
+            {#if onReplayTour}
+              <button
+                type="button"
+                class="rounded-lg border border-border-light px-3.5 py-2 text-meta font-medium text-text-secondary transition-colors hover:bg-page-canvas hover:text-text-primary"
+                onclick={handleReplayTour}
+              >
+                Revoir la visite guidée
+              </button>
+            {/if}
+            <button
+              type="button"
+              class="rounded-lg bg-blueprint-blue-strong px-3.5 py-2 text-meta font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90"
+              onclick={handleExplicitClose}
+              data-modal-acknowledgement
+            >
+              J'ai compris
+            </button>
+          </div>
         </div>
       </footer>
     </div>

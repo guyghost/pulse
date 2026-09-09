@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { mount, tick, unmount } from 'svelte';
 import KeyboardShortcutsHelp from '../../../src/ui/molecules/KeyboardShortcutsHelp.svelte';
@@ -214,5 +214,45 @@ describe('KeyboardShortcutsHelp — SET-05 idiomatic reactive grouping', () => {
 
     await unmount(shortcuts);
     await unmount(comparison);
+  });
+
+  it('propose de revoir la visite guidée quand le callback est fourni (revue design DAO #176)', async () => {
+    const onReplayTour = vi.fn();
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const instance = mount(KeyboardShortcutsHelp, {
+      target,
+      props: { isOpen: true, onReplayTour },
+    });
+    await tick();
+
+    // modalFocus téléporte le dialog dans l'overlay root (document.body) :
+    // interroger le document, pas la cible de montage.
+    const replayButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Revoir la visite guidée'
+    ) as HTMLButtonElement;
+    expect(replayButton).toBeDefined();
+
+    replayButton.click();
+    expect(onReplayTour).toHaveBeenCalledOnce();
+
+    await unmount(instance);
+  });
+
+  it('ne rend pas le bouton de visite sans callback (molecule sans dépendance au tour)', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const instance = mount(KeyboardShortcutsHelp, {
+      target,
+      props: { isOpen: true },
+    });
+    await tick();
+
+    const replayButton = Array.from(document.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'Revoir la visite guidée'
+    );
+    expect(replayButton).toBeUndefined();
+
+    await unmount(instance);
   });
 });
