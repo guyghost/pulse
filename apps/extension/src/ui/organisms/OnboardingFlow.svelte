@@ -23,12 +23,19 @@
     onEvent,
     onRetry,
     navFailed = false,
+    sourceVerifications = {},
+    onVerifySource = null,
+    onOpenSource = null,
   }: {
     snapshot: OnboardingFlowSnapshot;
     sources: { id: string; name: string }[];
     onEvent: (event: OnboardingFlowEvent) => void;
     onRetry?: () => void;
     navFailed?: boolean;
+    /** P0-B — état de vérification de session par source (absent = idle). */
+    sourceVerifications?: Record<string, 'ready' | 'session-missing' | 'unavailable' | 'checking'>;
+    onVerifySource?: ((sourceId: string) => void) | null;
+    onOpenSource?: ((sourceId: string) => void) | null;
   } = $props();
 
   // Local mirrors of inputs, synced FROM the snapshot (single source of truth).
@@ -149,35 +156,87 @@
         Connectez vos sources
       </h2>
       <p class="mt-2 text-sm text-text-secondary">
-        Sélectionnez les plateformes où vous avez déjà une session Chrome active. Pulse se charge du
-        reste.
+        Pulse vérifie qu'une session Chrome active existe pour chaque plateforme. Sans session, la
+        source ne peut pas remonter vos missions.
       </p>
 
       <ul class="mt-5 space-y-2">
         {#each sources as s (s.id)}
-          {@const selected = snapshot.connectedSources.includes(s.id)}
+          {@const ready = snapshot.connectedSources.includes(s.id)}
+          {@const verification = sourceVerifications[s.id]}
           <li>
-            <button
-              type="button"
-              aria-pressed={selected}
-              onclick={() =>
-                onEvent({
-                  type: selected ? 'DISCONNECT_SOURCE' : 'CONNECT_SOURCE',
-                  sourceId: s.id,
-                })}
-              class="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-all duration-150 active:scale-[0.99] {selected
+            <div
+              class="flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 {ready
                 ? 'border-blueprint-blue/40 bg-blueprint-blue/8'
-                : 'border-border-light bg-surface-white hover:border-blueprint-blue/20'}"
+                : 'border-border-light bg-surface-white'}"
             >
-              <span class="text-sm font-medium text-text-primary">{s.name}</span>
-              <span
-                class="flex h-5 w-5 items-center justify-center rounded-full border transition-colors {selected
-                  ? 'border-blueprint-blue bg-blueprint-blue text-white'
-                  : 'border-border-light bg-surface-white'}"
-              >
-                {#if selected}<Icon name="check" class="h-3 w-3" />{/if}
+              <span class="min-w-0">
+                <span class="block truncate text-sm font-medium text-text-primary">{s.name}</span>
+                <span
+                  class="mt-0.5 flex items-center gap-1.5 text-caption leading-4 {ready
+                    ? 'text-blueprint-blue-on-tint'
+                    : verification === 'checking'
+                      ? 'text-text-subtle'
+                      : verification === 'session-missing'
+                        ? 'text-status-orange'
+                        : verification === 'unavailable'
+                          ? 'text-text-muted'
+                          : 'text-text-subtle'}"
+                >
+                  {#if ready}
+                    <Icon name="check" size={12} />
+                    Session détectée
+                  {:else if verification === 'checking'}
+                    <Icon name="loader-2" size={12} class="animate-spin" />
+                    Vérification…
+                  {:else if verification === 'session-missing'}
+                    Pas de session — connectez-vous puis revenez ici
+                  {:else if verification === 'unavailable'}
+                    Vérification impossible
+                  {:else}
+                    Session Chrome requise
+                  {/if}
+                </span>
               </span>
-            </button>
+              <span class="flex shrink-0 items-center gap-2">
+                {#if !ready && verification === 'session-missing' && onOpenSource}
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/10 px-3 py-1.5 text-caption font-medium text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/20"
+                    onclick={() => onOpenSource(s.id)}
+                  >
+                    <Icon name="external-link" size={12} />
+                    Ouvrir {s.name}
+                  </button>
+                {/if}
+                {#if !ready && (verification === 'unavailable' || verification === undefined) && onVerifySource}
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded-lg border border-border-light px-3 py-1.5 text-caption font-medium text-text-secondary transition-colors hover:bg-page-canvas hover:text-text-primary {verification ===
+                    'unavailable'
+                      ? ''
+                      : 'border-blueprint-blue/25 bg-blueprint-blue/10 text-blueprint-blue-on-tint hover:bg-blueprint-blue/20'}"
+                    onclick={() => onVerifySource(s.id)}
+                  >
+                    {#if verification === 'unavailable'}
+                      <Icon name="refresh-cw" size={12} />
+                      Réessayer
+                    {:else}
+                      <Icon name="plug" size={12} />
+                      Connecter
+                    {/if}
+                  </button>
+                {/if}
+                {#if ready}
+                  <span
+                    class="flex h-5 w-5 items-center justify-center rounded-full border border-blueprint-blue bg-blueprint-blue text-white"
+                    aria-hidden="true"
+                  >
+                    <Icon name="check" class="h-3 w-3" />
+                  </span>
+                {/if}
+              </span>
+            </div>
           </li>
         {/each}
       </ul>
@@ -202,6 +261,21 @@
         Continuer
       </button>
     </div>
+    {#if snapshot.connectedSources.length === 0}
+      <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
+        <button
+          type="button"
+          onclick={() => onEvent({ type: 'SKIP' })}
+          class="cursor-pointer text-caption font-medium text-text-subtle underline decoration-border-light underline-offset-4 transition-colors hover:text-text-primary"
+        >
+          Continuer sans source
+        </button>
+        <p class="text-center text-micro leading-4 text-text-muted">
+          Vous pourrez connecter une plateforme plus tard. Le premier scan risque de ne rien
+          remonter.
+        </p>
+      </div>
+    {/if}
   </section>
 {:else if snapshot.phase === 'wizard'}
   <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
