@@ -2,6 +2,7 @@
   // Re-export types from core for backward compatibility
   export type {
     FeedStory,
+    FeedStoryActionId,
     FeedStoryInput,
     FeedStorySeverity,
   } from '$lib/core/feed/build-feed-story';
@@ -410,6 +411,34 @@
       }));
   });
 
+  const enabledConnectorCount = $derived(controller.enabledConnectorIds.size);
+
+  const sessionReadyCount = $derived.by(() => {
+    const enabled = controller.enabledConnectorIds;
+    return controller.sourceStatuses.filter(
+      (source) => enabled.has(source.connectorId) && source.sessionStatus === 'connected'
+    ).length;
+  });
+
+  /** Prefer Free-Work, else first enabled source lacking a session, else first enabled. */
+  const reconnectTarget = $derived.by(() => {
+    const enabled = controller.enabledConnectorIds;
+    const statuses = controller.sourceStatuses.filter((source) => enabled.has(source.connectorId));
+    const prefer =
+      statuses.find((source) => source.connectorId === 'free-work') ??
+      statuses.find((source) => source.sessionStatus !== 'connected') ??
+      statuses[0] ??
+      null;
+    if (prefer) {
+      return { name: prefer.name, url: prefer.url };
+    }
+    const meta =
+      connectorMetas.find((item) => item.id === 'free-work') ?? connectorMetas[0] ?? null;
+    return meta
+      ? { name: meta.name, url: meta.url }
+      : { name: 'Free-Work', url: 'https://www.free-work.com' };
+  });
+
   function getMissionScore(mission: Mission): number {
     return getCanonicalMissionScore(mission) ?? 0;
   }
@@ -489,6 +518,9 @@
       filterActive: page.filterActive,
       totalMissionCount: page.totalMissions,
       searchQuery: page.searchQuery,
+      enabledConnectorCount,
+      sessionReadyCount,
+      reconnectPlatformName: reconnectTarget.name,
     })
   );
 
@@ -622,60 +654,51 @@
   }
 
   function handleFeedStoryPrimaryAction(): void {
-    if (page.error) {
-      handleMissionFeedScanAction();
-      return;
+    // Route from the story's stable action id (model decides; shell executes).
+    switch (feedStory.primaryActionId) {
+      case 'retry-scan':
+      case 'start-scan':
+        handleMissionFeedScanAction();
+        return;
+      case 'offline-noop':
+        return;
+      case 'scroll-feed':
+        if (feedStory.statusLabel === 'À traiter' && page.dashboardSummary.newCount > 0) {
+          if (!page.showNewOnly) {
+            page.toggleNewOnly();
+          }
+        } else if (feedStory.statusLabel === 'Priorités prêtes' && alertMatchCount > 0) {
+          showAlertOnly = true;
+        }
+        if (hasVisibleFeedMissions) {
+          void scrollToMissionFeed();
+        }
+        return;
+      case 'recheck-sources':
+        // Disabled connectors stay disabled — enabling is deliberate.
+        for (const broken of brokenConnectors) {
+          void controller.recheckConnector(broken.connectorId);
+        }
+        return;
+      case 'clear-filters':
+      case 'clear-search':
+        handleClearMissionFilters();
+        return;
+      case 'open-platform':
+        handleOpenExternalUrl(reconnectTarget.url);
+        void showToast('Connectez-vous dans l’onglet, puis revenez ici — on revérifie la session.');
+        void controller.checkSourceSessions();
+        return;
+      case 'enable-sources':
+        showAdvancedControls = true;
+        void controller.checkSourceSessions();
+        return;
+      case 'adjust-profile':
+        onNavigateToProfile?.();
+        return;
+      default:
+        handleMissionFeedScanAction();
     }
-
-    if (page.isOffline) {
-      if (hasVisibleFeedMissions) {
-        void scrollToMissionFeed();
-      }
-      return;
-    }
-
-    if (brokenConnectors.length > 0) {
-      // The story is the single attention surface for broken sources: recheck
-      // every broken connector. Disabled connectors stay disabled — enabling
-      // is a deliberate user transition (health panel / settings), never implicit.
-      for (const broken of brokenConnectors) {
-        void controller.recheckConnector(broken.connectorId);
-      }
-      return;
-    }
-
-    if (page.dashboardSummary.newCount > 0) {
-      if (!page.showNewOnly) {
-        page.toggleNewOnly();
-      }
-      void scrollToMissionFeed();
-      return;
-    }
-
-    if (alertMatchCount > 0) {
-      showAlertOnly = true;
-      void scrollToMissionFeed();
-      return;
-    }
-
-    // Empty state: filters hide all cached missions → clear filters (not Profile)
-    if (page.dashboardSummary.visibleCount === 0 && page.filterActive && page.totalMissions > 0) {
-      handleClearMissionFilters();
-      return;
-    }
-
-    // Empty state: scanned but no matches → route to Profile
-    if (page.dashboardSummary.visibleCount === 0 && controller.lastScanAt !== null) {
-      onNavigateToProfile?.();
-      return;
-    }
-
-    if (hasVisibleFeedMissions) {
-      void scrollToMissionFeed();
-      return;
-    }
-
-    handleMissionFeedScanAction();
   }
 
   function handleClearMissionFilters(): void {

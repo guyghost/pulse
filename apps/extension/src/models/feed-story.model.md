@@ -74,21 +74,24 @@ rendent aucune ligne (gating par sévérité, ci-dessus).
 
 Six états distincts, avec **précédence stricte** (de haut en bas) :
 
-| État                  | Sévérité    | Condition                                                                            | Intention                                                      |
-| --------------------- | ----------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `error-cached`        | `incident`  | `error != null && visibleCount > 0`                                                  | Données en cache disponibles, scan interrompu                  |
-| `error-critical`      | `critical`  | `error != null && visibleCount === 0`                                                | Aucune donnée disponible, scan impossible                      |
-| `offline`             | `incident`  | `isOffline`                                                                          | Hors ligne, données en cache disponibles                       |
-| `broken-sources`      | `critical`  | `brokenConnectorCount > 0`                                                           | Sources cassées, feed incomplet                                |
-| `new-missions`        | `attention` | `newCount > 0`                                                                       | Nouvelles missions à traiter, prioritaires ou non              |
-| `priority-ready`      | `success`   | `alertEnabled && highScoreCount > 0 && newCount === 0`                               | Missions prioritaires disponibles (seuil dépassé)              |
-| `filtered-empty`      | `attention` | `visibleCount === 0 && filterActive && totalMissionCount > 0`                        | **Des missions existent mais les filtres les masquent toutes** |
-| `scanned-empty`       | `attention` | `visibleCount === 0 && hasCompletedScan && !(filterActive && totalMissionCount > 0)` | **Scan terminé, 0 résultat — ajuster le profil**               |
-| `never-scanned-empty` | `neutral`   | `visibleCount === 0 && !hasCompletedScan`                                            | Premier lancement, inviter au scan                             |
-| `feed-ready`          | `success`   | _défaut final_                                                                       | Feed prêt, aucune action requise                               |
+| État                  | Sévérité    | Condition                                                                                                     | Intention                                                      |
+| --------------------- | ----------- | ------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `error-cached`        | `incident`  | `error != null && visibleCount > 0`                                                                           | Données en cache disponibles, scan interrompu                  |
+| `error-critical`      | `critical`  | `error != null && visibleCount === 0`                                                                         | Aucune donnée disponible, scan impossible                      |
+| `offline`             | `incident`  | `isOffline`                                                                                                   | Hors ligne, données en cache disponibles                       |
+| `broken-sources`      | `critical`  | `brokenConnectorCount > 0`                                                                                    | Sources cassées, feed incomplet                                |
+| `new-missions`        | `attention` | `newCount > 0`                                                                                                | Nouvelles missions à traiter, prioritaires ou non              |
+| `priority-ready`      | `success`   | `alertEnabled && highScoreCount > 0 && newCount === 0`                                                        | Missions prioritaires disponibles (seuil dépassé)              |
+| `filtered-empty`      | `attention` | `visibleCount === 0 && filterActive && totalMissionCount > 0`                                                 | **Des missions existent mais les filtres les masquent toutes** |
+| `no-enabled-empty`    | `attention` | `visibleCount === 0 && hasCompletedScan && enabledConnectorCount === 0`                                       | **Aucune source activée — choisir une source**                 |
+| `no-session-empty`    | `attention` | `visibleCount === 0 && hasCompletedScan && enabledConnectorCount > 0 && sessionReadyCount === 0`              | **Sessions absentes — ouvrir la plateforme**                   |
+| `scanned-empty`       | `attention` | `visibleCount === 0 && hasCompletedScan && sessionReadyCount > 0 && !(filterActive && totalMissionCount > 0)` | **Scan terminé, 0 match — ajuster le profil**                  |
+| `never-scanned-empty` | `neutral`   | `visibleCount === 0 && !hasCompletedScan`                                                                     | Premier lancement, inviter au scan                             |
+| `feed-ready`          | `success`   | _défaut final_                                                                                                | Feed prêt, aucune action requise                               |
 
 **Précédence** : erreur > offline > sources cassées > nouvelles > prioritaires >
-filtered-empty > scanned-empty > never-scanned > feed-ready.
+filtered-empty > no-enabled-empty > no-session-empty > scanned-empty > never-scanned >
+feed-ready.
 
 ### Distinction des empty states
 
@@ -97,17 +100,26 @@ un premier scan" — ambiguïté P0 quand un scan a **déjà terminé** et légi
 trouvé zéro match, ou quand des **filtres actifs** masquent toutes les missions
 en cache.
 
-Trois signaux discriminants ordonnés (le premier qui matche gagne, dans le
+Cinq signaux discriminants ordonnés (le premier qui matche gagne, dans le
 bucket `visibleCount === 0`) :
 
 1. **`filterActive && totalMissionCount > 0`** → `filtered-empty` (attention,
    CTA « Effacer les filtres »). Des missions existent en cache mais les filtres
    les masquent toutes. L'utilisateur doit ajuster/effacer ses filtres, **pas**
    modifier son profil ni relancer un scan.
-2. **`hasCompletedScan`** (dérivé de `controller.lastScanAt != null`) →
-   `scanned-empty` (attention, CTA profil). Un scan a terminé et légitimement
-   trouvé zéro match.
-3. sinon → `never-scanned-empty` (neutral, CTA scan). Premier lancement.
+2. **`hasCompletedScan && enabledConnectorCount === 0`** → `no-enabled-empty`
+   (attention, CTA « Choisir une source » / `enable-sources`).
+3. **`hasCompletedScan && sessionReadyCount === 0`** → `no-session-empty`
+   (attention, CTA « Ouvrir {plateforme} » / `open-platform`). Ne pas router
+   vers le profil : la cause est l'absence de session navigateur.
+4. **`hasCompletedScan`** (dérivé de `controller.lastScanAt != null`) →
+   `scanned-empty` (attention, CTA profil / `adjust-profile`). Un scan a
+   terminé avec sessions OK et légitimement trouvé zéro match.
+5. sinon → `never-scanned-empty` (neutral, CTA scan / `start-scan`). Premier
+   lancement.
+
+`primaryActionId` est l'identifiant stable consommé par `FeedPage` pour router
+le CTA (la copy FR peut évoluer sans casser le wiring).
 
 Invariant : `lastScanAt` est monotone (uniquement mis à jour sur succès scan),
 donc `hasCompletedScan` est un edge-detector fiable. Cf. `scan-lifecycle.model.md`
@@ -205,9 +217,9 @@ interface FeedStory {
 | `never-scanned-empty` | `Lancer le scan`          | `handleMissionFeedScanAction()`         |
 | `feed-ready`          | `Voir le feed`            | `scrollToMissionFeed()`                 |
 
-**Nouveauté** : `filtered-empty` efface les filtres (les missions existent en
-cache) ; `scanned-empty` route vers la page **Profile** pour ajuster les
-critères — ni l'un ni l'autre ne lance un scan intempestif.
+**Nouveauté** : `filtered-empty` efface les filtres ; `no-session-empty` ouvre
+la plateforme ; `no-enabled-empty` ouvre le panneau sources ; `scanned-empty`
+route vers **Profile** — aucun de ces empty states ne lance un scan intempestif.
 
 ## Implémentation — résolveur pur
 
@@ -223,6 +235,9 @@ const feedStory = $derived(
   buildFeedStory({
     // ...inputs existants
     hasCompletedScan: controller.lastScanAt != null,
+    enabledConnectorCount,
+    sessionReadyCount,
+    reconnectPlatformName: reconnectTarget.name,
   })
 );
 ```
@@ -232,12 +247,13 @@ const feedStory = $derived(
 1. La story **ne bloque jamais** le feed — elle est un guide contextuel.
 2. Aucune transition produit n'est créée ici — pure projection.
 3. `buildFeedStory` est **testable sans mocks** (fonction pure).
-4. `scanned-empty`, `filtered-empty` et `never-scanned-empty` sont **mutuellement
-   exclusifs** : la précédence ordonne `filtered-empty` > `scanned-empty` >
-   `never-scanned` dans le bucket `visibleCount === 0`.
+4. Les empty states du bucket `visibleCount === 0` sont **mutuellement
+   exclusifs** : `filtered-empty` > `no-enabled-empty` > `no-session-empty` >
+   `scanned-empty` > `never-scanned`.
 5. Le handler `scanned-empty` **ne lance jamais de scan** — il route vers Profile.
-   Le handler `filtered-empty` **ne lance jamais de scan ni ne route vers Profile**
-   — il efface les filtres.
+   `no-session-empty` ouvre une URL plateforme (`open-platform`).
+   `no-enabled-empty` ouvre le panneau sources (`enable-sources`).
+   `filtered-empty` efface les filtres — jamais Profile ni scan.
 6. `hasCompletedScan` est monotone (une fois `true`, reste `true` sauf reset app).
 7. `filtered-empty` ne peut se produire que si `totalMissionCount > 0` (des
    missions en cache) ET `filterActive` (filtres qui les masquent).

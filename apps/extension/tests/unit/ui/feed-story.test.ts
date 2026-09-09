@@ -11,6 +11,9 @@ const baseInput = {
   filterActive: false,
   totalMissionCount: 0,
   searchQuery: '',
+  enabledConnectorCount: 1,
+  sessionReadyCount: 1,
+  reconnectPlatformName: 'Free-Work',
 };
 
 describe('buildFeedStory', () => {
