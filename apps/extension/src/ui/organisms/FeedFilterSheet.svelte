@@ -344,7 +344,7 @@
               </div>
             {/each}
             {#if zeroSourceCount > 0}
-              <div class="flex items-center gap-2 pt-0.5 text-micro text-text-muted">
+              <div class="flex items-center gap-2 pt-0.5 text-micro text-text-subtle">
                 <Icon name="database" size={13} />
                 <span>
                   {zeroSourceCount} connecteur{zeroSourceCount > 1 ? 's' : ''} sans mission

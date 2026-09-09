@@ -165,7 +165,7 @@
                   type: selected ? 'DISCONNECT_SOURCE' : 'CONNECT_SOURCE',
                   sourceId: s.id,
                 })}
-              class="flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-left transition-all duration-150 active:scale-[0.99] {selected
+              class="flex w-full items-center justify-between rounded-lg border px-4 py-3 text-left transition-all duration-150 active:scale-[0.99] {selected
                 ? 'border-blueprint-blue/40 bg-blueprint-blue/8'
                 : 'border-border-light bg-surface-white hover:border-blueprint-blue/20'}"
             >
@@ -302,7 +302,7 @@
 
           <aside
             aria-label="Aperçu de correspondance"
-            class="rounded-2xl border border-border-light bg-surface-white p-4"
+            class="rounded-lg border border-border-light bg-surface-white p-4"
           >
             <p class="eyebrow eyebrow--caption">Aperçu en direct</p>
             <div class="mt-2 flex items-center gap-3">
@@ -414,7 +414,7 @@
         Recevez une notification Chrome quand une mission notée A correspond à votre profil.
       </p>
 
-      <div class="mt-5 rounded-2xl border border-border-light bg-surface-white p-4">
+      <div class="mt-5 rounded-lg border border-border-light bg-surface-white p-4">
         <div class="flex items-start justify-between gap-4">
           <div>
             <p class="text-sm font-semibold text-text-primary">Notifications de missions</p>

@@ -59,7 +59,7 @@
   );
 </script>
 
-<section class="rounded-2xl border px-4 py-5 {toneClass}">
+<section class="rounded-xl border px-4 py-5 {toneClass}">
   <div class="flex items-start gap-3">
     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {iconClass}">
       <Icon name={icon} size={18} />

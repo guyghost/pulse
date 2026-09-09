@@ -400,7 +400,7 @@
             {autoRefresh ? 'Auto actif' : 'Auto pause'}
           </button>
           <button
-            class="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-subtle-gray hover:text-blueprint-blue"
+            class="rounded-lg p-1.5 text-text-secondary transition-colors hover:bg-subtle-gray hover:text-blueprint-blue-on-tint"
             onclick={refresh}
             aria-label="Rafraîchir le diagnostic"
             title="Rafraîchir le diagnostic"
@@ -420,7 +420,7 @@
     </div>
 
     <div class="mx-auto max-w-6xl space-y-4 p-4">
-      <section class="rounded-2xl border p-4 {toneClasses(operationalSummary.tone)}">
+      <section class="rounded-xl border p-4 {toneClasses(operationalSummary.tone)}">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div class="min-w-0">
             <p class="eyebrow eyebrow--strong eyebrow--inherit">
