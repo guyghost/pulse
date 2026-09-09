@@ -24,6 +24,9 @@ const DEFAULT_INPUT: FeedStoryInput = {
   filterActive: false,
   totalMissionCount: 0,
   searchQuery: '',
+  enabledConnectorCount: 1,
+  sessionReadyCount: 1,
+  reconnectPlatformName: 'Free-Work',
 };
 
 describe('buildFeedStory', () => {
@@ -298,6 +301,7 @@ describe('buildFeedStory', () => {
       expect(result.description).toContain('Ajustez vos critères');
       expect(result.primaryActionLabel).toBe('Ajuster le profil');
       expect(result.primaryActionIcon).toBe('user');
+      expect(result.primaryActionId).toBe('adjust-profile');
     });
 
     it('returns neutral never-scanned when never scanned', () => {
@@ -313,6 +317,7 @@ describe('buildFeedStory', () => {
       expect(result.description).toContain('Connectez ou vérifiez les sources');
       expect(result.primaryActionLabel).toBe('Lancer le scan');
       expect(result.primaryActionIcon).toBe('play');
+      expect(result.primaryActionId).toBe('start-scan');
     });
 
     it('scanned-empty takes precedence over never-scanned when both conditions could apply', () => {
@@ -325,6 +330,80 @@ describe('buildFeedStory', () => {
 
       expect(result.severity).toBe('attention');
       expect(result.title).toContain('Aucune mission ne correspond');
+      expect(result.primaryActionId).toBe('adjust-profile');
+    });
+
+    it('returns no-session empty when scanned with enabled sources but zero sessions', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 2,
+        sessionReadyCount: 0,
+        reconnectPlatformName: 'LeHibou',
+      });
+
+      expect(result.severity).toBe('attention');
+      expect(result.statusLabel).toBe('Sources déconnectées');
+      expect(result.title).toBe('Aucune session plateforme détectée');
+      expect(result.description).toContain('LeHibou');
+      expect(result.primaryActionLabel).toBe('Ouvrir LeHibou');
+      expect(result.primaryActionIcon).toBe('external-link');
+      expect(result.primaryActionId).toBe('open-platform');
+      expect(result.evidence.some((e) => e.label === 'Sessions')).toBe(true);
+    });
+
+    it('returns no-enabled empty when scanned with zero enabled connectors', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 0,
+        sessionReadyCount: 0,
+      });
+
+      expect(result.statusLabel).toBe('Aucune source');
+      expect(result.title).toBe('Aucune source activée');
+      expect(result.primaryActionLabel).toBe('Choisir une source');
+      expect(result.primaryActionId).toBe('enable-sources');
+    });
+
+    it('no-enabled takes precedence over no-session', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 0,
+        sessionReadyCount: 0,
+      });
+
+      expect(result.primaryActionId).toBe('enable-sources');
+    });
+
+    it('no-session takes precedence over profile scanned-empty', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 1,
+        sessionReadyCount: 0,
+      });
+
+      expect(result.primaryActionId).toBe('open-platform');
+      expect(result.primaryActionLabel).not.toBe('Ajuster le profil');
+    });
+
+    it('defaults reconnect platform name to Free-Work when null', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 1,
+        sessionReadyCount: 0,
+        reconnectPlatformName: null,
+      });
+
+      expect(result.primaryActionLabel).toBe('Ouvrir Free-Work');
     });
   });
 
