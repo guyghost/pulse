@@ -248,7 +248,7 @@
       <button
         type="button"
         onclick={() => onEvent({ type: 'BACK' })}
-        class="h-12 flex-1 rounded-2xl border border-border-light bg-surface-white text-sm font-medium text-text-secondary transition-colors hover:bg-subtle-gray"
+        class="h-12 flex-1 rounded-lg border border-border-light bg-surface-white text-sm font-medium text-text-secondary transition-colors hover:bg-subtle-gray"
       >
         Retour
       </button>
@@ -256,7 +256,7 @@
         type="button"
         disabled={snapshot.connectedSources.length === 0}
         onclick={() => onEvent({ type: 'NEXT' })}
-        class="h-12 flex-[2] rounded-2xl bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+        class="h-12 flex-[2] rounded-lg bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Continuer
       </button>
@@ -273,6 +273,20 @@
         <p class="text-center text-micro leading-4 text-text-muted">
           Vous pourrez connecter une plateforme plus tard. Le premier scan risque de ne rien
           remonter.
+        </p>
+      </div>
+    {:else}
+      <!-- B-opt : la valeur d'abord — scanner dès qu'une session est prouve, le wizard après. -->
+      <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
+        <button
+          type="button"
+          onclick={() => onEvent({ type: 'SKIP' })}
+          class="cursor-pointer text-caption font-medium text-blueprint-blue-on-tint underline decoration-blueprint-blue/30 underline-offset-4 transition-colors hover:text-blueprint-blue"
+        >
+          Scanner maintenant
+        </button>
+        <p class="text-center text-micro leading-4 text-text-muted">
+          Scan partiel avec vos sources connectées — affinez le profil ensuite.
         </p>
       </div>
     {/if}
@@ -460,7 +474,7 @@
       <button
         type="button"
         onclick={() => onEvent({ type: 'BACK' })}
-        class="h-12 flex-1 rounded-2xl border border-border-light bg-surface-white text-sm font-medium text-text-secondary hover:bg-subtle-gray"
+        class="h-12 flex-1 rounded-lg border border-border-light bg-surface-white text-sm font-medium text-text-secondary hover:bg-subtle-gray"
       >
         Retour
       </button>
@@ -468,7 +482,7 @@
         type="button"
         disabled={!snapshot.canAdvance}
         onclick={() => onEvent({ type: 'NEXT' })}
-        class="h-12 flex-[2] rounded-2xl bg-blueprint-blue text-sm font-semibold text-white transition-transform active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+        class="h-12 flex-[2] rounded-lg bg-blueprint-blue text-sm font-semibold text-white transition-transform active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
       >
         Continuer
       </button>
@@ -513,14 +527,14 @@
       <button
         type="button"
         onclick={() => onEvent({ type: 'BACK' })}
-        class="h-12 flex-1 rounded-2xl border border-border-light bg-surface-white text-sm font-medium text-text-secondary hover:bg-subtle-gray"
+        class="h-12 flex-1 rounded-lg border border-border-light bg-surface-white text-sm font-medium text-text-secondary hover:bg-subtle-gray"
       >
         Retour
       </button>
       <button
         type="button"
         onclick={() => onEvent({ type: 'NEXT' })}
-        class="h-12 flex-[2] rounded-2xl bg-blueprint-blue text-sm font-semibold text-white transition-transform active:scale-[0.99] enabled:hover:brightness-105"
+        class="h-12 flex-[2] rounded-lg bg-blueprint-blue text-sm font-semibold text-white transition-transform active:scale-[0.99] enabled:hover:brightness-105"
       >
         Lancer mon premier scan
       </button>
@@ -572,7 +586,7 @@
       <button
         type="button"
         onclick={onRetry}
-        class="mt-5 h-11 rounded-2xl bg-blueprint-blue px-6 text-sm font-semibold text-white transition-transform active:scale-[0.99] hover:brightness-105"
+        class="mt-5 h-11 rounded-lg bg-blueprint-blue px-6 text-sm font-semibold text-white transition-transform active:scale-[0.99] hover:brightness-105"
       >
         Réessayer
       </button>
