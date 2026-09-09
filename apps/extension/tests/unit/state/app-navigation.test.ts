@@ -258,4 +258,50 @@ describe('createAppNavigation bootstrap recovery', () => {
     expect(navigation.currentPage).toBe('feed');
     expect(navigation.previousPage).toBe('feed');
   });
+
+  it('attend la seed du profil avant de résoudre completeOnboarding (P0-A1, plus de fire-and-forget)', async () => {
+    const seedWrite = deferred<void>();
+    saveProfile.mockReturnValueOnce(seedWrite.promise);
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    const completion = navigation.completeOnboarding();
+    // L'import dynamique de la seed prend plusieurs microtasks : on attend
+    // que l'écriture démarre.
+    await vi.waitFor(() => {
+      expect(saveProfile).toHaveBeenCalledTimes(1);
+    });
+
+    // Tant que l'écriture de la seed est en attente, completeOnboarding
+    // ne résout pas (plus de fire-and-forget).
+    let settled = false;
+    void completion.then(() => {
+      settled = true;
+    });
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(settled).toBe(false);
+
+    seedWrite.resolve();
+    await expect(completion).resolves.toBe(true);
+    expect(navigation.currentPage).toBe('feed');
+    // La seed persistée est un profil défaut (champs vides).
+    const seededProfile = saveProfile.mock.calls[0][0] as UserProfile;
+    expect(seededProfile.firstName).toBe('');
+    expect(seededProfile.keywords).toEqual([]);
+  });
+
+  it('résout completeOnboarding même si l’écriture de la seed échoue (non fatal, P0-A1)', async () => {
+    saveProfile.mockRejectedValueOnce(new Error('storage indisponible'));
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    await expect(navigation.completeOnboarding()).resolves.toBe(true);
+    expect(navigation.currentPage).toBe('feed');
+    expect(saveProfile).toHaveBeenCalledTimes(1);
+  });
 });

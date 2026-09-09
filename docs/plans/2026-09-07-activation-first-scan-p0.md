@@ -121,10 +121,10 @@ Nouveau :
 
 ### A5. Critères de done P0-A
 
-- [ ] SKIP ou scan partiel laisse un profil IndexedDB lisible au mount feed.
-- [ ] Empty post-scan sans session n’invite **pas** à « Ajuster le profil ».
-- [ ] CTA primaire ouvre une plateforme réelle.
-- [ ] Tests unitaires verts sur `buildFeedStory` + chemin persist.
+- [x] SKIP ou scan partiel laisse un profil IndexedDB lisible au mount feed _(A1 : `ensureDurableProfileBeforeScan` dans le shell onboarding + seed attendue dans `completeOnboarding`)_.
+- [x] Empty post-scan sans session n’invite **pas** à « Ajuster le profil » _(A3, PR #376)_.
+- [x] CTA primaire ouvre une plateforme réelle _(A3, PR #376)_.
+- [x] Tests unitaires verts sur `buildFeedStory` + chemin persist _(A3 + `mergeDraftOntoDefault` + `ensure-durable-profile` + `app-navigation`)_.
 
 ---
 
