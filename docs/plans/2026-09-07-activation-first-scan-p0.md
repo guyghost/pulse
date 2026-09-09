@@ -196,10 +196,25 @@ Si une source devient `ready` sur `connecting` :
 
 ## Critères de done P0-B
 
-- [ ] Impossible de croire qu’une case cochée sans session = connecté.
-- [ ] Au moins un chemin mesurable : 1 session réelle → scan → missions **ou** empty story sessions (A3) si DOM/parser fail.
-- [ ] Aucun credential stocké.
-- [ ] Tests couvrant session_missing → open tab → recheck → ready.
+- [x] Impossible de croire qu’une case cochée sans session = connecté _(la case à cocher a disparu : chaque source affiche un état de session vérifié via `detectSession` — ready / pas de session / vérification impossible)_.
+- [x] Au moins un chemin mesurable : 1 session réelle → scan → missions **ou** empty story sessions (A3) si DOM/parser fail _(ready → `SOURCE_SESSION` → NEXT → scan ; A3 couvre l’empty)_.
+- [x] Aucun credential stocké _(cookies via `detectSession`, zéro stockage)_.
+- [x] Tests couvrant session_missing → open tab → recheck → ready _(niveaux module `verify-source-session` + UI `onboarding-connecting` ; le wiring focus de la page reste à couvrir e2e)_.
+
+### Implémentation P0-B (PR 2026-09-09) — option recommandée
+
+- `shell/onboarding/verify-source-session.ts` : vérification par source via le registry
+  existant (`getConnectors` + `detectSession`), I/O injectées ; `openSourceInNewTab`
+  (chrome.tabs, fallback `window.open` en dev).
+- `OnboardingFlow.svelte` (connecting) : états par source (idle / checking / ready /
+  session-missing / unavailable), CTA « Ouvrir {source} », « Réessayer », escape hatch
+  « Continuer sans source » (SKIP) affiché quand 0 source prête, copy honnête.
+- `OnboardingPage` : orchestration locale (états hors machine), `SOURCE_SESSION` émis
+  vers le flow quand ready, persistance immédiate de `settings.enabledConnectors`,
+  re-check au retour de focus pour les sources sans session.
+- **Écart documenté** : `autoScan=false` sur skip (règle `onboarding-source`) non appliqué —
+  la machine source n’est pas montée (option recommandée du plan). SKIP scanne toujours ;
+  l’empty state A3 rend le résultat honnête.
 
 ---
 
