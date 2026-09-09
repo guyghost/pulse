@@ -106,9 +106,9 @@ Grille : hiérarchie visuelle / densité / accessibilité / cohérence tokens / 
 
 ---
 
-## 4. Changements appliqués dans cette passe (DAO #176)
+## 4. Changements appliqués (DAO #176)
 
-### A. Contraste & tokens AA
+### Passe 1 — A. Contraste & tokens AA
 
 | Fichier                            | Changement                                                                                                    | Motif                                                 |
 | ---------------------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
@@ -117,7 +117,7 @@ Grille : hiérarchie visuelle / densité / accessibilité / cohérence tokens / 
 | `molecules/MissionCard.svelte`     | chip sémantique `bg-blueprint-blue/5` : `text-blueprint-blue` → `text-blueprint-blue-on-tint`                 | aligne le token dédié + marge AA sur micro-texte      |
 | `organisms/FeedFilterSheet.svelte` | ligne de coverage : `text-text-muted` → `text-text-subtle`                                                    | uniformise le rail de filtres (convention du fichier) |
 
-### B. Rayons — retour à l'échelle DESIGN.md
+### Passe 1 — B. Rayons — retour à l'échelle DESIGN.md
 
 | Fichier                                    | Avant         | Après        | Rôle                                 |
 | ------------------------------------------ | ------------- | ------------ | ------------------------------------ |
@@ -134,17 +134,34 @@ Grille : hiérarchie visuelle / densité / accessibilité / cohérence tokens / 
 
 **Exclusions volontaires** : `FeedPage.svelte` (changeset P0 en cours sur `develop` — sweep à reporter après merge), CTA onboarding `rounded-2xl` (décision design ouverte), chip icône `FeedTourOverlay` (icône décorative, seuil 3:1 respecté).
 
+### Passe 2 — Densité du tri (roadmap §5, items 1 & 4)
+
+| Fichier                             | Changement                                                                                                                                                                                                                          | Motif                                                                                                                                                                              |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `molecules/MissionCard.svelte`      | Barre repliée : triade de tri uniquement (masquer, comparer, favori) — ≤ 4 affordances avec le chevron d'expansion ; copier, ouvrir et le CTA « Analyser » rejoignent la barre à l'état déplié, après la triade (positions stables) | P1 07-07 : surcharge d'actions repliées (≤ 7 affordances > mémoire de travail) ; aligne la carte sur la design cible déjà documentée dans `tests/e2e/helpers.ts` (`expandMission`) |
+| `molecules/MissionCard.svelte`      | Transitions de suivi : état déplié uniquement (le badge de statut d'en-tête reste l'annonce repliée)                                                                                                                                | idem                                                                                                                                                                               |
+| `molecules/MissionCard.svelte`      | Description dépliée : `max-w-prose` (~65ch) en plus de `line-clamp-2`                                                                                                                                                               | P2 07-07 : ligne > 80ch (×26 au détecteur)                                                                                                                                         |
+| `tests/unit/ui/MissionCard.test.ts` | 4 tests réalignés sur la nouvelle spec (actions détaillées dépliées, ordre de tabulation, transitions dépliées)                                                                                                                     | spec évolue avec le design                                                                                                                                                         |
+
+### Items constatés déjà implémentés (vérification en code, 2026-09-09)
+
+| Item roadmap                        | État             | Preuve                                                                                                                                                                                                                        |
+| ----------------------------------- | ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2. MissionComparison — distillation | ✅ déjà en place | `primaryFields` (Note+TJM) par défaut, 7 champs derrière « Afficher tous les détails » (`aria-expanded`), grille 2×2 remplacée par un chip inline unique, colonne recommandée surlignée `bg-blueprint-blue/5` + bordure bleue |
+| 3. Undo toast masquer/favori        | ✅ déjà en place | `feed-page.svelte.ts` : `handleToggleFavorite` → toast « Annuler » ; `handleHide` → `hideUndo.request()` (« Mission masquée/restaurée », modèle `undo-window.model.md`)                                                       |
+| 5. Aide visible (partie raccourcis) | ✅ déjà câblée   | `FeedPage.svelte` : `showShortcutsHelp` + import lazy `KeyboardShortcutsHelp` (déclencheur `?`). La partie « resurfacer le tour » exige d'éditer `FeedPage.svelte` → reportée avec le lot FeedPage                            |
+
 ---
 
-## 5. Roadmap des P1 restants (passes suivantes, ordre recommandé)
+## 5. Roadmap des passes suivantes (ordre recommandé)
 
-1. **MissionCard — réduction des actions repliées** (P1 07-07) : ≤ 4 affordances visibles ; « Investiguer → » et transitions de tracking en état déplié ; copy/open en menu ⋯ hover. Fichiers : `MissionCard.svelte` + tests UI.
-2. **MissionComparison — distillation** (P1 28-07) : repli par défaut sur Titre/Stack/Score/TJM/Action, table complète derrière « Voir tous les détails », suppression de la grille « Decision Evidence », colonne recommandée surlignée `border-blueprint-blue/40`.
-3. **Undo toast sur Masquer/Favori** (P2) : câbler `createUndoController` (déjà présent dans `feed-page.svelte.ts`) à un toast 5 s « Mission masquée • Annuler ».
-4. **Line-length** : cap `max-w-prose` (≈ 70ch) sur les descriptions de mission.
-5. **Aide visible** (10/40 au 28-07) : resurfacer le tour existant + raccourcis clavier (`KeyboardShortcutsHelp` existe).
-6. **Sweep `FeedPage.svelte`** des `rounded-2xl` restants, après merge du changeset `build-feed-story` en cours.
-7. **Décision design review** : rayon des CTA (8px spec vs langage arrondi actuel) ; persistance de l'état déplié des cartes.
+1. ~~MissionCard — réduction des actions repliées~~ → **livré en passe 2** (§4).
+2. ~~MissionComparison — distillation~~ → **déjà implémenté** (§4, preuves en code).
+3. ~~Undo toast sur Masquer/Favori~~ → **déjà implémenté** (§4, preuves en code).
+4. ~~Line-length `max-w-prose`~~ → **livré en passe 2** (§4).
+5. Aide : **raccourcis déjà câblés** (`?`) ; resurfacer le tour → nécessite `FeedPage.svelte`, regroupé avec le lot FeedPage ci-dessous.
+6. **Sweep `FeedPage.svelte`** des `rounded-2xl` restants + tout le lot dépendant de FeedPage, après merge du changeset `build-feed-story` en cours.
+7. **Décision design review** : rayon des CTA (8px spec vs langage arrondi actuel) ; persistance de l'état déplié des cartes. E2E : `tests/e2e/helpers.ts` documente déjà la cible (triade repliée, `expandMission` avant copier/ouvrir/investiguer) — les specs e2e l'utilisent déjà.
 
 Chaque item est indépendant, testable, et respecte les principes §3.
 
