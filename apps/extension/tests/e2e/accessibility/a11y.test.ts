@@ -36,12 +36,17 @@ test.describe('Accessibility', () => {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('heading', { name: 'Connectez vos sources' })).toBeVisible();
 
-    // Sélection de la première source au clavier (Entrée sur le bouton).
-    const firstSource = page.getByRole('button', { name: 'Free-Work', exact: true });
-    await firstSource.focus();
-    await expect(firstSource).toBeFocused();
+    // Connexion de la source au clavier (flux P0-B : vérification de session).
+    const connectSource = page
+      .getByRole('listitem')
+      .filter({ hasText: 'Free-Work' })
+      .getByRole('button', { name: 'Connecter', exact: true });
+    await connectSource.focus();
+    await expect(connectSource).toBeFocused();
     await page.keyboard.press('Enter');
-    await expect(firstSource).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('listitem').filter({ hasText: 'Free-Work' })).toContainText(
+      'Session détectée'
+    );
 
     // Tab jusqu'au bouton « Continuer » sans dépendre d'un nombre fixe de contrôles.
     const continueButton = page.getByRole('button', { name: 'Continuer', exact: true });
@@ -347,7 +352,10 @@ test.describe('Accessibility', () => {
 
     expect(isDisabled || hasAriaDisabled).toBe(true);
 
-    await page.getByRole('button', { name: 'Free-Work', exact: true }).click();
+    // Flux P0-B : la source se connecte via vérification de session.
+    const freeWorkRow = page.getByRole('listitem').filter({ hasText: 'Free-Work' });
+    await freeWorkRow.getByRole('button', { name: 'Connecter', exact: true }).click();
+    await expect(freeWorkRow).toContainText('Session détectée');
     await expect(continueBtn).toBeEnabled();
   });
 
