@@ -26,6 +26,8 @@
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import ScanSummaryCard from '../organisms/ScanSummary.svelte';
+  import ScanRunsPanel from '../organisms/ScanRunsPanel.svelte';
+  import { createScanRunsStore } from '$lib/state/scan-runs.svelte';
   import {
     buildScanSummary,
     type ScanSummary as ScanSummaryData,
@@ -73,6 +75,10 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
+  const scanRuns = createScanRunsStore({
+    getLiveStatuses: () => controller.connectorStatuses,
+    getPersistedStatuses: () => controller.persistedStatuses,
+  });
   const connectorMetas = getConnectorsMeta();
   const sourceShortLabels: Record<MissionSource, string> = {
     'free-work': 'Free-Work',
@@ -1198,6 +1204,8 @@
                 total={controller.scanProgress.total}
                 statuses={controller.connectorStatuses}
               />
+
+              <ScanRunsPanel items={scanRuns.items} />
 
               {#if feedStoryNeedsAttention}
                 <div class="mt-3">
