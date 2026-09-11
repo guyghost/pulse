@@ -24,7 +24,10 @@ test.describe('Onboarding', () => {
     await expect(page.getByRole('heading', { name: 'Connectez vos sources' })).toBeVisible();
     const continueButton = page.getByRole('button', { name: 'Continuer', exact: true });
     await expect(continueButton).toBeDisabled();
-    await page.getByRole('button', { name: 'Free-Work', exact: true }).click();
+    // Flux P0-B : la source se connecte via vérification de session, pas un toggle.
+    const freeWorkRow = page.getByRole('listitem').filter({ hasText: 'Free-Work' });
+    await freeWorkRow.getByRole('button', { name: 'Connecter', exact: true }).click();
+    await expect(freeWorkRow).toContainText('Session détectée');
     await expect(continueButton).toBeEnabled();
     await continueButton.click();
 

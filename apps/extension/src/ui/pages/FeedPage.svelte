@@ -59,6 +59,8 @@
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
+  import { getScanSignalStats } from '$lib/shell/storage/scan-signal-stats';
+  import type { DedupStats } from '$lib/core/connectors/source-health-signals';
 
   const {
     onNavigateToOnboarding,
@@ -180,6 +182,8 @@
     $state(null);
   let FeedTourOverlay: typeof import('../molecules/FeedTourOverlay.svelte').default | null =
     $state(null);
+  let SourceHealthSignalsCard:
+    typeof import('../organisms/SourceHealthSignalsCard.svelte').default | null = $state(null);
 
   function loadFeedContent(): void {
     if (!VirtualMissionFeed) {
@@ -288,6 +292,11 @@
         FeedTourOverlay = module.default;
       });
     }
+    if (!SourceHealthSignalsCard) {
+      import('../organisms/SourceHealthSignalsCard.svelte').then((module) => {
+        SourceHealthSignalsCard = module.default;
+      });
+    }
   }
 
   $effect(() => {
@@ -296,6 +305,16 @@
       loadFeedChrome();
       bootstrapTrackingStore();
       void reviewQueue.load();
+    });
+  });
+
+  // Signaux de santé : stats de dédup persistées par le service worker,
+  // rechargées après chaque scan (dépendance sur l'horodatage du dernier scan).
+  let scanSignalStats = $state<DedupStats | null>(null);
+  $effect(() => {
+    const _lastScanAt = controller.lastScanAt;
+    void getScanSignalStats().then((stats) => {
+      scanSignalStats = stats;
     });
   });
 
@@ -1180,6 +1199,14 @@
                     onReconnect={handleOpenExternalUrl}
                   />
                 {/if}
+                {#if SourceHealthSignalsCard}
+                  <SourceHealthSignalsCard
+                    healthRecords={controller.parserHealthRecords}
+                    persistedStatuses={controller.persistedStatuses}
+                    missions={page.missions}
+                    dedupStats={scanSignalStats}
+                  />
+                {/if}
                 {#if FeedActionDashboard}
                   <FeedActionDashboard
                     summary={page.dashboardSummary}
@@ -1274,6 +1301,14 @@
                       onToggleConnector={(id) => controller.handleToggleConnector(id)}
                       onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
                       onReconnect={handleOpenExternalUrl}
+                    />
+                  {/if}
+                  {#if SourceHealthSignalsCard}
+                    <SourceHealthSignalsCard
+                      healthRecords={controller.parserHealthRecords}
+                      persistedStatuses={controller.persistedStatuses}
+                      missions={page.missions}
+                      dedupStats={scanSignalStats}
                     />
                   {/if}
                   {#if page.totalMissions > 0}
