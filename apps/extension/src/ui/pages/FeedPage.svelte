@@ -148,6 +148,8 @@
     $state(null);
   let FeedActionDashboard: typeof import('../organisms/FeedActionDashboard.svelte').default | null =
     $state(null);
+  let TimeToReviewCard: typeof import('../organisms/TimeToReviewCard.svelte').default | null =
+    $state(null);
   let ConnectorStatusList: typeof import('../molecules/ConnectorStatusList.svelte').default | null =
     $state(null);
   let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
@@ -186,6 +188,11 @@
     if (!FeedActionDashboard) {
       import('../organisms/FeedActionDashboard.svelte').then((module) => {
         FeedActionDashboard = module.default;
+      });
+    }
+    if (!TimeToReviewCard) {
+      import('../organisms/TimeToReviewCard.svelte').then((module) => {
+        TimeToReviewCard = module.default;
       });
     }
     if (!ConnectorStatusList) {
@@ -1165,6 +1172,9 @@
                     onSetScoreBucket={page.setSelectedScoreBucket}
                   />
                 {/if}
+                {#if TimeToReviewCard}
+                  <TimeToReviewCard />
+                {/if}
               {/if}
             {:else}
               <!-- Full: hero with description, progress, stats -->
@@ -1257,6 +1267,9 @@
                         onSetScoreBucket={page.setSelectedScoreBucket}
                       />
                     {/if}
+                  {/if}
+                  {#if TimeToReviewCard}
+                    <TimeToReviewCard />
                   {/if}
                 {/if}
 
