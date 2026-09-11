@@ -51,6 +51,7 @@ import {
   consumeDeepLinkIntent,
   subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
+import { journalFirstViews } from '$lib/shell/storage/review-journal';
 import { rankStacksByCount } from '$lib/core/filters/stack-ranking';
 import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
@@ -325,6 +326,8 @@ export function createFeedPageState(
       const nextSeenIds = markAsSeen(Array.from(seenIds), [missionId]);
       await saveSeenIds(nextSeenIds);
       seenIds = nextSeenIds;
+      // Time to review : la pile d'arrivée compte comme consultation utilisateur.
+      journalFirstViews([missionId], feedStore.missions).catch(() => {});
     },
     onStateChanged: (nextState) => {
       arrivalQueueState = nextState;
@@ -884,10 +887,13 @@ export function createFeedPageState(
       return;
     }
 
-    const nextSeenIds = markAsSeen(Array.from(seenIds), [...pendingSeenIds]);
+    const viewedIds = [...pendingSeenIds];
+    const nextSeenIds = markAsSeen(Array.from(seenIds), viewedIds);
     pendingSeenIds = new Set();
     seenIds = nextSeenIds;
     saveSeenIds(nextSeenIds).catch(() => {});
+    // Time to review : consultation utilisateur au moment du mark-seen feed.
+    journalFirstViews(viewedIds, feedStore.missions).catch(() => {});
   }
 
   function scheduleSeenFlush(): void {
