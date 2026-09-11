@@ -29,10 +29,11 @@ La story card ne s'affiche **que si la sévérité projetée nécessite une acti
 | `success`, `neutral` (états calmes, feed prêt) | **Non**       | Le contenu (missions) parle ; le compte vit dans l'en-tête compact |
 
 Le gating vit dans `FeedPage.svelte` (`feedStoryNeedsAttention`, dérivé pur de
-`feedStory.severity`). `buildFeedStory()` continue de projeter **tous** les
-états — c'est la couche présentation qui filtre les états calmes. Le hero
-compact porte le compte de missions (`visibleCount`) inline : pas de strip
-redondant pour dire « tout va bien ».
+`feedStory.severity`, puis `storyShownInHero` qui exige aussi des missions
+visibles). `buildFeedStory()` continue de projeter **tous** les états — c'est
+la couche présentation qui filtre les états calmes **et** déplace les empty
+vers la liste. Le hero compact porte le compte de missions (`visibleCount`)
+inline : pas de strip redondant pour dire « tout va bien ».
 
 ### Une seule surface d'attention connecteurs
 
@@ -48,11 +49,28 @@ alors une information distincte, pas une duplication.
 
 Invariant de couplage rendu : `storyCoversConnectors` n'est vrai **que si la
 story inline est effectivement rendue**, c'est-à-dire quand le bloc hero-content
-est actif (`heroCompact` OU contrôles avancés OU chrome busy OU résumé de scan).
-La story inline ne vit que dans ce bloc ; avec **0 mission et un feed inactif**
-(aucune des quatre conditions), elle n'apparaît pas et le `ConnectorAlertBar`
-redevient la surface canonique — une source cassée ne doit **jamais** produire
-zéro avertissement visible.
+est actif (`heroCompact` OU contrôles avancés OU chrome busy OU résumé de scan)
+**et** que des missions restent visibles. La story inline ne vit que dans ce
+bloc ; avec **0 mission**, l'empty opérationnel est rendu **une seule fois**
+dans la liste (`emptyStory` / `resolveFeedEmptySurface`) et le
+`ConnectorAlertBar` redevient la surface canonique connecteurs — une source
+cassée ne doit **jamais** produire zéro avertissement visible.
+
+### Une seule surface empty
+
+`visibleCount === 0` ne doit jamais produire deux empty concurrents (story
+hero + empty générique `VirtualMissionFeed`). `resolveFeedEmptySurface()`
+désigne un seul owner :
+
+| Surface        | Condition                                                                 | Rendu                                                                 |
+| -------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `none`         | liste en cours de chargement, ou au moins une mission visible             | pas d'empty                                                           |
+| `hero`         | story empty **déjà** rendue dans le hero (missions dashboard = 0 + strip) | la liste reste silencieuse (`suppressEmptyState`)                     |
+| `list-story`   | feed vide, hero silencieux                                                | `VirtualMissionFeed` rend la story (`emptyStory`) — copy et CTA uniques |
+| `list-local`   | la liste est vide mais le dashboard a encore des missions (filtre overlay) | empty local filtres, sans reprendre le never-scanned générique        |
+
+`VirtualMissionFeed` **n'a plus** de copy hardcodée « Lancez un premier scan… ».
+Cette phrase vit uniquement dans `buildFeedStory` (`never-scanned-empty`).
 
 ### Rendu inline — ligne calme (2026, inspiration Notion iOS)
 
@@ -261,6 +279,9 @@ const feedStory = $derived(
    `never-scanned-empty`.
 9. La copy française est grammaticalement correcte pour 0, 1 et plusieurs
    missions, y compris les adjectifs `nouvelle(s)` et `prioritaire(s)`.
+10. Un feed vide n'a **qu'une** surface empty. Si le hero affiche déjà la
+    story empty, la liste ne rend rien. Sinon la liste rend `emptyStory`
+    (jamais un second « Lancez un premier scan » hardcodé).
 
 ## Cas de test obligatoires
 

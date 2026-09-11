@@ -8,7 +8,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildFeedStory, type FeedStoryInput } from '$lib/core/feed/build-feed-story';
+import {
+  buildFeedStory,
+  resolveFeedEmptySurface,
+  type FeedStoryInput,
+} from '$lib/core/feed/build-feed-story';
 
 const DEFAULT_INPUT: FeedStoryInput = {
   error: null,
@@ -585,6 +589,24 @@ describe('buildFeedStory', () => {
       expect(result.statusLabel).toBe('Priorités prêtes');
     });
 
+    it('scanned-empty and never-scanned never share the same CTA', () => {
+      const scanned = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+      });
+      const neverScanned = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: false,
+      });
+
+      expect(scanned.primaryActionId).toBe('adjust-profile');
+      expect(neverScanned.primaryActionId).toBe('start-scan');
+      expect(scanned.title).not.toBe(neverScanned.title);
+      expect(scanned.primaryActionLabel).not.toBe(neverScanned.primaryActionLabel);
+    });
+
     it('scanned-empty > never-scanned (same visibleCount)', () => {
       const scanned = buildFeedStory({
         ...DEFAULT_INPUT,
@@ -600,5 +622,59 @@ describe('buildFeedStory', () => {
       expect(scanned.severity).toBe('attention');
       expect(neverScanned.severity).toBe('neutral');
     });
+  });
+});
+
+describe('resolveFeedEmptySurface', () => {
+  it('returns none while the list is loading or has missions', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: true,
+        storyVisibleCount: 0,
+        storyRenderedInHero: false,
+      })
+    ).toBe('none');
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 4,
+        isLoading: false,
+        storyVisibleCount: 4,
+        storyRenderedInHero: true,
+      })
+    ).toBe('none');
+  });
+
+  it('gives the hero exclusive ownership when it already shows the empty story', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 0,
+        storyRenderedInHero: true,
+      })
+    ).toBe('hero');
+  });
+
+  it('gives the list the story when the hero is silent on an empty feed', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 0,
+        storyRenderedInHero: false,
+      })
+    ).toBe('list-story');
+  });
+
+  it('keeps a local list empty when an overlay hides missions still in the dashboard', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 8,
+        storyRenderedInHero: true,
+      })
+    ).toBe('list-local');
   });
 });

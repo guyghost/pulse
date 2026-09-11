@@ -267,9 +267,12 @@ test.describe('Feed', () => {
           await page.evaluate(() => {
             window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: 'empty' }));
           });
-          return feedRegion(page)
-            .getByText(/Aucune mission/)
-            .isVisible();
+          return (
+            (await feedRegion(page).getByTestId('feed-list-empty').count()) > 0 ||
+            (await feedRegion(page)
+              .getByText(/Aucune mission|Lancez un premier scan|Aucune donnée/)
+              .isVisible())
+          );
         },
         { timeout: 10_000 }
       )

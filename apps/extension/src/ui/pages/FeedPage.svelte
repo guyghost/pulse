@@ -33,7 +33,7 @@
     buildScanSummary,
     type ScanSummary as ScanSummaryData,
   } from '$lib/core/scan/scan-summary';
-  import { buildFeedStory } from '$lib/core/feed/build-feed-story';
+  import { buildFeedStory, resolveFeedEmptySurface } from '$lib/core/feed/build-feed-story';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { Mission, MissionSource } from '$lib/core/types/mission';
@@ -576,6 +576,22 @@
       feedStory.severity === 'incident' ||
       feedStory.severity === 'attention'
   );
+  const heroContentVisible = $derived(
+    page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible
+  );
+  // Empty-feed stories belong to the list (`emptyStory`), not the hero strip.
+  // The hero only keeps attention stories while missions remain visible.
+  const storyShownInHero = $derived(
+    feedStoryNeedsAttention && heroContentVisible && page.dashboardSummary.visibleCount > 0
+  );
+  const feedEmptySurface = $derived(
+    resolveFeedEmptySurface({
+      listCount: visibleFeedMissionCount,
+      isLoading: feedIsColdLoading,
+      storyVisibleCount: page.dashboardSummary.visibleCount,
+      storyRenderedInHero: storyShownInHero,
+    })
+  );
   // When connector health is the top-severity signal (no error, not offline),
   // the inline story owns the connector attention and the ConnectorAlertBar
   // panel must not stack a second strip over the feed — but only while the
@@ -588,7 +604,7 @@
       !page.error &&
       !page.isOffline &&
       brokenConnectors.length > 0 &&
-      (page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible)
+      heroContentVisible
   );
 
   // The toolbar under the hero only carries auxiliary chrome (refinement
@@ -1100,7 +1116,7 @@
             </Tooltip>
           {/if}
         {/snippet}
-        {#if page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible}
+        {#if heroContentVisible}
           <div class="px-5 {page.heroCompact ? 'pt-3 pb-1.5' : 'pt-4 pb-0'}">
             {#if page.heroCompact}
               <!-- Compact: quiet title row — the missions lead, chrome follows -->
@@ -1163,7 +1179,7 @@
                 </div>
               {/if}
 
-              {#if feedStoryNeedsAttention}
+              {#if storyShownInHero}
                 <div class="mt-1.5">
                   <OperationalStoryCard
                     eyebrow="À faire maintenant"
@@ -1259,7 +1275,7 @@
 
               <ScanRunsPanel items={scanRuns.items} />
 
-              {#if feedStoryNeedsAttention}
+              {#if storyShownInHero}
                 <div class="mt-3">
                   <OperationalStoryCard
                     eyebrow="À faire maintenant"
@@ -1587,6 +1603,9 @@
           onRetry={handleMissionFeedScanAction}
           onStartScan={handleMissionFeedScanAction}
           onClearFilters={handleClearMissionFilters}
+          emptyStory={feedEmptySurface === 'list-story' ? feedStory : null}
+          suppressEmptyState={feedEmptySurface === 'hero'}
+          onEmptyPrimaryAction={handleFeedStoryPrimaryAction}
           tourStep={activeTourStep?.id ?? null}
         />
       {:else}

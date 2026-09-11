@@ -86,6 +86,35 @@ function formatMissionAction(
   return `Voir les ${formatStoryMissionCount(count)}${adjectivePlural ? ` ${adjectivePlural}` : ''}`;
 }
 
+export type FeedEmptySurface = 'none' | 'hero' | 'list-story' | 'list-local';
+
+/**
+ * Single owner for the feed empty presentation.
+ *
+ * The operational story (`buildFeedStory`) is the source of truth. The list
+ * must not render a second generic empty when the hero already shows that
+ * story, and must render the story itself when the hero is silent (idle
+ * empty / never-scanned). A list emptied by a local overlay (alert-only)
+ * while missions remain in the dashboard is `list-local`.
+ */
+export function resolveFeedEmptySurface(input: {
+  listCount: number;
+  isLoading: boolean;
+  storyVisibleCount: number;
+  storyRenderedInHero: boolean;
+}): FeedEmptySurface {
+  if (input.isLoading || input.listCount > 0) {
+    return 'none';
+  }
+  if (input.storyVisibleCount === 0 && input.storyRenderedInHero) {
+    return 'hero';
+  }
+  if (input.storyVisibleCount === 0) {
+    return 'list-story';
+  }
+  return 'list-local';
+}
+
 export function buildFeedStory(input: FeedStoryInput): FeedStory {
   const {
     error,

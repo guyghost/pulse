@@ -487,10 +487,29 @@ describe('operational UI constraints', () => {
     // (content-first: triage shortcuts ride along, they don't lead).
     expect(source).toContain('aria-label="Presets métier du feed"');
     expect(source).toContain('page.applyDecisionPreset(preset.id)');
-    // The story strip only renders when the feed needs attention (calm states
-    // project to no strip — see feed-story.model.md).
-    expect(source).toContain('{#if feedStoryNeedsAttention}');
+    // The story strip only renders when the feed needs attention AND missions
+    // remain visible. Empty-feed stories are owned by the list (`emptyStory`).
+    expect(source).toContain('{#if storyShownInHero}');
+    expect(source).toContain('resolveFeedEmptySurface');
+    expect(source).toContain('emptyStory={feedEmptySurface === \'list-story\' ? feedStory : null}');
+    expect(source).toContain('suppressEmptyState={feedEmptySurface === \'hero\'}');
     expect(source).not.toContain('feedActionQueue');
+  });
+
+  it('keeps a single feed empty surface owned by buildFeedStory', () => {
+    const storySource = readFileSync('src/lib/core/feed/build-feed-story.ts', 'utf8');
+    const virtualFeedSource = readFileSync('src/ui/organisms/VirtualMissionFeed.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(storySource).toContain('export function resolveFeedEmptySurface');
+    expect(storySource).toContain("title: 'Lancez un premier scan pour voir vos missions'");
+    expect(feedSource).toContain('emptyStory={feedEmptySurface === \'list-story\' ? feedStory : null}');
+    expect(feedSource).toContain('suppressEmptyState={feedEmptySurface === \'hero\'}');
+    expect(virtualFeedSource).toContain('emptyStory');
+    expect(virtualFeedSource).toContain('suppressEmptyState');
+    expect(virtualFeedSource).toContain('data-testid="feed-list-empty"');
+    // Generic never-scanned copy must not be hardcoded in the list organism.
+    expect(virtualFeedSource).not.toContain('Lancez un premier scan pour voir vos missions');
   });
 
   it('keeps the compact feed story aligned and unclipped at side-panel width', () => {
