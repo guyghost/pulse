@@ -15,6 +15,7 @@
     type SourceStatus,
   } from '$lib/shell/facades/feed-controller.svelte';
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
+  import { createReviewQueueState } from '$lib/state/review-queue.svelte';
   import {
     STATUS_LABELS,
     type ApplicationStatus,
@@ -73,6 +74,7 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
+  const reviewQueue = createReviewQueueState();
   const connectorMetas = getConnectorsMeta();
   const sourceShortLabels: Record<MissionSource, string> = {
     'free-work': 'Free-Work',
@@ -148,6 +150,8 @@
     $state(null);
   let FeedActionDashboard: typeof import('../organisms/FeedActionDashboard.svelte').default | null =
     $state(null);
+  let ReviewQueuePanel: typeof import('../organisms/ReviewQueuePanel.svelte').default | null =
+    $state(null);
   let ConnectorStatusList: typeof import('../molecules/ConnectorStatusList.svelte').default | null =
     $state(null);
   let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
@@ -186,6 +190,11 @@
     if (!FeedActionDashboard) {
       import('../organisms/FeedActionDashboard.svelte').then((module) => {
         FeedActionDashboard = module.default;
+      });
+    }
+    if (!ReviewQueuePanel) {
+      import('../organisms/ReviewQueuePanel.svelte').then((module) => {
+        ReviewQueuePanel = module.default;
       });
     }
     if (!ConnectorStatusList) {
@@ -273,7 +282,13 @@
       loadFeedContent();
       loadFeedChrome();
       bootstrapTrackingStore();
+      void reviewQueue.load();
     });
+  });
+
+  // Review queue: re-derives flagged entries whenever missions or parser health change.
+  $effect(() => {
+    reviewQueue.sync(page.missions, controller.parserHealthRecords);
   });
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
@@ -1258,6 +1273,14 @@
                       />
                     {/if}
                   {/if}
+                {/if}
+
+                {#if ReviewQueuePanel}
+                  <ReviewQueuePanel
+                    entries={reviewQueue.entries}
+                    onKeep={(id) => reviewQueue.keep(id)}
+                    onDismiss={(id) => reviewQueue.dismiss(id)}
+                  />
                 {/if}
 
                 {#if !feedIsColdLoading && controller.lastScanAt}
