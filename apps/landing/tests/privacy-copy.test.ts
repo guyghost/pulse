@@ -38,7 +38,7 @@ describe('connected privacy copy', () => {
     expect(privacyPage).toContain("L'exécution plateforme reste locale dans votre navigateur");
     expect(privacyPage).toContain('snapshots normalisés via Supabase');
     expect(privacyPage).toContain('Nous ne synchronisons pas les mots de passe');
-    expect(storeListing).toContain('dashboard connecté optionnel');
+    expect(storeListing).toContain('Dashboard connecté optionnel');
     expect(storeListing).toContain('snapshots normalisés via Supabase');
     expect(privacyPolicy).toContain('snapshots normalisés via Supabase');
     expect(privacyPolicy).toContain('Nous ne synchronisons pas les mots de passe');

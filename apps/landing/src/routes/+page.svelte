@@ -12,7 +12,10 @@
   let showDeferredContent = $state(false);
   let shortcutsOpen = $state(false);
 
-  const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
+  const configuredChromeStoreUrl = env.PUBLIC_CHROME_STORE_URL?.trim() || '';
+  const chromeStoreUrl = configuredChromeStoreUrl || '#install';
+  const chromeStoreIsExternal = /^https?:\/\//.test(configuredChromeStoreUrl);
+  const installCtaLabel = "Installer l'extension gratuite";
   const showcaseSteps: { id: ShowcaseStep; label: string }[] = [
     { id: 'scanner', label: 'Scanner' },
     { id: 'qualifier', label: 'Qualifier' },
@@ -422,13 +425,11 @@
       <div class="hero__bottom-bar">
         <p class="hero__description">
           Free-Work, LeHibou, Hiway et Cherry Pick dans un seul feed, scoré selon votre stack, votre
-          TJM et votre remote. Le dernier scan a remonté 42 missions, dont 8 à contacter maintenant.
+          TJM et votre remote.
         </p>
 
         <div class="hero__actions">
-          <a href={chromeStoreUrl} class="btn btn--primary btn--lg"
-            >Installer l'extension gratuite</a
-          >
+          <a href={chromeStoreUrl} class="btn btn--primary btn--lg">{installCtaLabel}</a>
           <a href="#shortlist" class="btn btn--secondary btn--lg">Voir la shortlist quotidienne</a>
         </div>
       </div>
@@ -538,7 +539,8 @@
 
           {#if activeShowcaseStep === 'scanner'}
             <div class="app-preview__body">
-              <div class="score-flow" aria-label="Résumé du scan">
+              <div class="score-flow" aria-label="Exemple de résumé du scan">
+                <p class="score-flow__example-badge">Exemple</p>
                 <article class="score-card">
                   <span class="score-card__label">Trouvées</span>
                   <strong>42</strong>
@@ -1056,8 +1058,8 @@
           <a
             href={chromeStoreUrl}
             class="btn btn--primary btn--lg"
-            target="_blank"
-            rel="noopener noreferrer"
+            target={chromeStoreIsExternal ? '_blank' : undefined}
+            rel={chromeStoreIsExternal ? 'noopener noreferrer' : undefined}
             data-primary-cta
           >
             <svg
@@ -1074,7 +1076,7 @@
               <polyline points="7 10 12 15 17 10" />
               <line x1="12" y1="15" x2="12" y2="3" />
             </svg>
-            Installer sur Chrome Web Store
+            {installCtaLabel}
           </a>
         </div>
       </div>
