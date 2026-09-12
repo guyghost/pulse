@@ -59,6 +59,14 @@ describe('P0 launch copy (Comex / Tor)', () => {
     );
   });
 
+  it('drops public TJM range and seniority gate from the long Store description', () => {
+    expect(storeListing).toContain('Pensé pour les freelances tech, France & remote');
+    expect(storeListing).not.toContain('3+ ans');
+    expect(storeListing).not.toContain('TJM 450-900');
+    expect(storeListing).not.toContain('450–900');
+    expect(storeListing).not.toContain('450-900€');
+  });
+
   it('keeps the launch surfaces free of connected, Premium, or paid promises', () => {
     const forbidden = [
       'Premium',
