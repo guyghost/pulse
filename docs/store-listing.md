@@ -26,7 +26,7 @@ LeHibou, Hiway et Cherry Pick dans un panneau latéral unique, score les
 meilleures opportunités et aide à transformer la veille en pipeline de
 candidatures.
 
-Pensé pour les développeurs freelances 3+ ans, TJM 450-900€, qui surveillent des requêtes comme `missions freelance Java`, `mission freelance Spring Boot`, `TJM développeur freelance` ou `Free-Work LeHibou alternative`.
+Pensé pour les freelances tech, France & remote, qui surveillent des requêtes comme `missions freelance Java`, `mission freelance Spring Boot`, `TJM développeur freelance` ou `Free-Work LeHibou alternative`.
 
 ### Fonctionnalités
 
