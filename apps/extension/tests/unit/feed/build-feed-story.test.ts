@@ -8,7 +8,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { buildFeedStory, type FeedStoryInput } from '$lib/core/feed/build-feed-story';
+import {
+  buildFeedStory,
+  resolveFeedEmptySurface,
+  type FeedStoryInput,
+} from '$lib/core/feed/build-feed-story';
 
 const DEFAULT_INPUT: FeedStoryInput = {
   error: null,
@@ -24,6 +28,9 @@ const DEFAULT_INPUT: FeedStoryInput = {
   filterActive: false,
   totalMissionCount: 0,
   searchQuery: '',
+  enabledConnectorCount: 1,
+  sessionReadyCount: 1,
+  reconnectPlatformName: 'Free-Work',
 };
 
 describe('buildFeedStory', () => {
@@ -298,6 +305,7 @@ describe('buildFeedStory', () => {
       expect(result.description).toContain('Ajustez vos critères');
       expect(result.primaryActionLabel).toBe('Ajuster le profil');
       expect(result.primaryActionIcon).toBe('user');
+      expect(result.primaryActionId).toBe('adjust-profile');
     });
 
     it('returns neutral never-scanned when never scanned', () => {
@@ -313,6 +321,7 @@ describe('buildFeedStory', () => {
       expect(result.description).toContain('Connectez ou vérifiez les sources');
       expect(result.primaryActionLabel).toBe('Lancer le scan');
       expect(result.primaryActionIcon).toBe('play');
+      expect(result.primaryActionId).toBe('start-scan');
     });
 
     it('scanned-empty takes precedence over never-scanned when both conditions could apply', () => {
@@ -325,6 +334,80 @@ describe('buildFeedStory', () => {
 
       expect(result.severity).toBe('attention');
       expect(result.title).toContain('Aucune mission ne correspond');
+      expect(result.primaryActionId).toBe('adjust-profile');
+    });
+
+    it('returns no-session empty when scanned with enabled sources but zero sessions', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 2,
+        sessionReadyCount: 0,
+        reconnectPlatformName: 'LeHibou',
+      });
+
+      expect(result.severity).toBe('attention');
+      expect(result.statusLabel).toBe('Sources déconnectées');
+      expect(result.title).toBe('Aucune session plateforme détectée');
+      expect(result.description).toContain('LeHibou');
+      expect(result.primaryActionLabel).toBe('Ouvrir LeHibou');
+      expect(result.primaryActionIcon).toBe('external-link');
+      expect(result.primaryActionId).toBe('open-platform');
+      expect(result.evidence.some((e) => e.label === 'Sessions')).toBe(true);
+    });
+
+    it('returns no-enabled empty when scanned with zero enabled connectors', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 0,
+        sessionReadyCount: 0,
+      });
+
+      expect(result.statusLabel).toBe('Aucune source');
+      expect(result.title).toBe('Aucune source activée');
+      expect(result.primaryActionLabel).toBe('Choisir une source');
+      expect(result.primaryActionId).toBe('enable-sources');
+    });
+
+    it('no-enabled takes precedence over no-session', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 0,
+        sessionReadyCount: 0,
+      });
+
+      expect(result.primaryActionId).toBe('enable-sources');
+    });
+
+    it('no-session takes precedence over profile scanned-empty', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 1,
+        sessionReadyCount: 0,
+      });
+
+      expect(result.primaryActionId).toBe('open-platform');
+      expect(result.primaryActionLabel).not.toBe('Ajuster le profil');
+    });
+
+    it('defaults reconnect platform name to Free-Work when null', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+        enabledConnectorCount: 1,
+        sessionReadyCount: 0,
+        reconnectPlatformName: null,
+      });
+
+      expect(result.primaryActionLabel).toBe('Ouvrir Free-Work');
     });
   });
 
@@ -506,6 +589,24 @@ describe('buildFeedStory', () => {
       expect(result.statusLabel).toBe('Priorités prêtes');
     });
 
+    it('scanned-empty and never-scanned never share the same CTA', () => {
+      const scanned = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: true,
+      });
+      const neverScanned = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        hasCompletedScan: false,
+      });
+
+      expect(scanned.primaryActionId).toBe('adjust-profile');
+      expect(neverScanned.primaryActionId).toBe('start-scan');
+      expect(scanned.title).not.toBe(neverScanned.title);
+      expect(scanned.primaryActionLabel).not.toBe(neverScanned.primaryActionLabel);
+    });
+
     it('scanned-empty > never-scanned (same visibleCount)', () => {
       const scanned = buildFeedStory({
         ...DEFAULT_INPUT,
@@ -521,5 +622,59 @@ describe('buildFeedStory', () => {
       expect(scanned.severity).toBe('attention');
       expect(neverScanned.severity).toBe('neutral');
     });
+  });
+});
+
+describe('resolveFeedEmptySurface', () => {
+  it('returns none while the list is loading or has missions', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: true,
+        storyVisibleCount: 0,
+        storyRenderedInHero: false,
+      })
+    ).toBe('none');
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 4,
+        isLoading: false,
+        storyVisibleCount: 4,
+        storyRenderedInHero: true,
+      })
+    ).toBe('none');
+  });
+
+  it('gives the hero exclusive ownership when it already shows the empty story', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 0,
+        storyRenderedInHero: true,
+      })
+    ).toBe('hero');
+  });
+
+  it('gives the list the story when the hero is silent on an empty feed', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 0,
+        storyRenderedInHero: false,
+      })
+    ).toBe('list-story');
+  });
+
+  it('keeps a local list empty when an overlay hides missions still in the dashboard', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 8,
+        storyRenderedInHero: true,
+      })
+    ).toBe('list-local');
   });
 });

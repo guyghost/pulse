@@ -60,3 +60,50 @@ export function isDefaultProfile(profile: UserProfile): boolean {
     (profile.scoringWeights?.remote ?? 0) === DEFAULT_PROFILE.scoringWeights.remote
   );
 }
+
+/**
+ * Champs de draft pris en compte par {@link mergeDraftOntoDefault}.
+ * Structurellement compatible avec `OnboardingProfileDraft` (models/)
+ * sans importer la couche models depuis le core.
+ */
+export interface ProfileDraftOverlay {
+  firstName?: string;
+  jobTitle?: string;
+  location?: string;
+  remote?: UserProfile['remote'];
+  keywords?: readonly string[];
+  tjmMin?: number;
+  tjmMax?: number | null;
+}
+
+function nonEmpty(value: string | undefined): string {
+  const trimmed = value?.trim() ?? '';
+  return trimmed.length > 0 ? trimmed : '';
+}
+
+/**
+ * P0-A1 (docs/plans/2026-09-07-activation-first-scan-p0.md) : overlay des
+ * champs de draft non vides sur un profil de base (existant ou défaut).
+ * Le base gagne toujours : un draft vide ne dégrade jamais un profil
+ * durable. Pur — zéro I/O, testable sans mocks.
+ */
+export function mergeDraftOntoDefault(draft: ProfileDraftOverlay, base: UserProfile): UserProfile {
+  const firstName = nonEmpty(draft.firstName);
+  const jobTitle = nonEmpty(draft.jobTitle);
+  const location = nonEmpty(draft.location);
+  const keywords = draft.keywords ?? [];
+  const tjmMin = typeof draft.tjmMin === 'number' && draft.tjmMin > 0 ? draft.tjmMin : 0;
+  const tjmMax = draft.tjmMax ?? null;
+  const remote = draft.remote && draft.remote !== 'any' ? draft.remote : null;
+
+  return {
+    ...base,
+    firstName: firstName || base.firstName,
+    jobTitle: jobTitle || base.jobTitle,
+    location: location || base.location,
+    keywords: keywords.length > 0 ? [...keywords] : [...(base.keywords ?? [])],
+    tjmMin: tjmMin > 0 ? tjmMin : base.tjmMin,
+    tjmMax: tjmMax !== null ? tjmMax : (base.tjmMax ?? null),
+    remote: remote ?? base.remote,
+  };
+}

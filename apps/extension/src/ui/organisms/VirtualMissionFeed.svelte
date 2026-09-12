@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import type { MissionDwellSignal } from '$lib/core/feed/mission-arrival-queue';
+  import type { FeedStory } from '$lib/core/feed/build-feed-story';
   import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
@@ -40,6 +41,9 @@
     onRetry,
     onStartScan,
     onClearFilters,
+    emptyStory = null,
+    suppressEmptyState = false,
+    onEmptyPrimaryAction,
   }: {
     missions?: Mission[];
     isLoading?: boolean;
@@ -71,6 +75,11 @@
     onRetry?: () => void;
     onStartScan?: () => void;
     onClearFilters?: () => void;
+    /** Operational empty from `buildFeedStory` — single source of copy/CTA. */
+    emptyStory?: FeedStory | null;
+    /** Parent already rendered the empty story — do not show a second card. */
+    suppressEmptyState?: boolean;
+    onEmptyPrimaryAction?: () => void;
   } = $props();
 
   // Unwrap Svelte 5 $state proxy — proxied arrays aren't iterable in template context
@@ -151,7 +160,7 @@
 <div class="flex flex-col gap-3">
   {#if isLoading && sortedMissions.length === 0}
     {#each Array(3) as _, i (i)}
-      <div class="section-card rounded-2xl p-4 space-y-3">
+      <div class="section-card rounded-xl p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
@@ -162,6 +171,25 @@
         <Skeleton width="100%" height="3rem" />
       </div>
     {/each}
+  {:else if suppressEmptyState && sortedMissions.length === 0}
+    <!-- Parent already rendered the operational empty story. Stay silent. -->
+  {:else if emptyStory && sortedMissions.length === 0}
+    <div data-testid="feed-list-empty">
+      <OperationalEmptyState
+        title={emptyStory.title}
+        description={error && emptyStory.primaryActionId === 'retry-scan'
+          ? error
+          : emptyStory.description}
+        severity={emptyStory.severity}
+        statusLabel={emptyStory.statusLabel}
+        icon={emptyStory.primaryActionIcon}
+        proofLabel="Feed actuel"
+        proofValue="0 mission"
+        primaryActionLabel={emptyStory.primaryActionLabel}
+        primaryActionIcon={emptyStory.primaryActionIcon}
+        onPrimaryAction={onEmptyPrimaryAction ?? onStartScan}
+      />
+    </div>
   {:else if error && sortedMissions.length === 0}
     <OperationalEmptyState
       title="Impossible de récupérer les missions"
@@ -178,43 +206,25 @@
       onPrimaryAction={onRetry}
       onSecondaryAction={onClearFilters}
     />
+  {:else if sortedMissions.length === 0 && filterActive}
+    <OperationalEmptyState
+      title={searchQuery.trim()
+        ? `Aucune mission pour « ${searchQuery.trim()} »`
+        : 'Aucune mission ne correspond à cette décision'}
+      description={searchQuery.trim()
+        ? 'Des missions sont disponibles, mais aucune ne correspond à cette recherche.'
+        : 'Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan.'}
+      severity="attention"
+      statusLabel={searchQuery.trim() ? 'Recherche sans résultat' : 'Filtre trop strict'}
+      icon="filter-x"
+      proofLabel="Résultat filtré"
+      proofValue="0 mission"
+      primaryActionLabel={searchQuery.trim() ? 'Effacer la recherche' : 'Réinitialiser les filtres'}
+      primaryActionIcon="filter-x"
+      onPrimaryAction={onClearFilters}
+    />
   {:else if sortedMissions.length === 0}
-    {#if filterActive}
-      <OperationalEmptyState
-        title={searchQuery.trim()
-          ? `Aucune mission pour « ${searchQuery.trim()} »`
-          : 'Aucune mission ne correspond à cette décision'}
-        description={searchQuery.trim()
-          ? 'Des missions sont disponibles, mais aucune ne correspond à cette recherche.'
-          : 'Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan.'}
-        severity="attention"
-        statusLabel={searchQuery.trim() ? 'Recherche sans résultat' : 'Filtre trop strict'}
-        icon="filter-x"
-        proofLabel="Résultat filtré"
-        proofValue="0 mission"
-        primaryActionLabel={searchQuery.trim()
-          ? 'Effacer la recherche'
-          : 'Réinitialiser les filtres'}
-        primaryActionIcon="filter-x"
-        secondaryActionLabel="Relancer le scan"
-        secondaryActionIcon="refresh-cw"
-        onPrimaryAction={onClearFilters}
-        onSecondaryAction={onStartScan}
-      />
-    {:else}
-      <OperationalEmptyState
-        title="Lancez un premier scan pour voir vos missions"
-        description="Aucune mission n’est encore disponible. Lancez un scan pour récupérer les missions depuis vos sources connectées."
-        severity="neutral"
-        statusLabel="Aucune donnée"
-        icon="radar"
-        proofLabel="Feed actuel"
-        proofValue="0 mission"
-        primaryActionLabel="Lancer le scan"
-        primaryActionIcon="play"
-        onPrimaryAction={onStartScan}
-      />
-    {/if}
+    <!-- No generic never-scanned fallback — `buildFeedStory` owns that copy. -->
   {:else}
     {#if error}
       <div class="section-card rounded-xl flex items-center gap-3 px-4 py-3">

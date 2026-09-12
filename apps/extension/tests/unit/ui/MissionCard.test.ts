@@ -218,35 +218,29 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
-  it('regroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
+  it('réserve copier, ouvrir et Analyser à l’état déplié (revue design DAO #176)', async () => {
     const target = mountCard();
     await tick();
 
-    const actionLabels = [
+    const detailLabels = [
       'Copier le lien de la mission',
       'Ouvrir la mission sur la plateforme source',
-      'Masquer la mission',
-      'Ajouter la mission à la comparaison',
-      'Ajouter la mission aux favoris',
     ];
 
-    // État replié (défaut) : toutes les actions restent visibles sur la même ligne.
-    for (const label of actionLabels) {
-      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
+    // État replié : seule la triade de tri est rendue, pas le CTA « Analyser ».
+    for (const label of detailLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(0);
     }
-    expect(target.textContent).toContain('Analyser');
+    expect(target.textContent).not.toContain('Analyser');
 
-    // État déplié : la région de détails n'introduit aucun bouton dupliqué.
+    // État déplié : les actions d'action rejoignent la barre, sans doublon.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
     disclosure.click();
     await tick();
 
-    const details = target.querySelector('[role="region"]');
-    expect(details).not.toBeNull();
-    expect(details!.querySelectorAll('button')).toHaveLength(0);
-    for (const label of actionLabels) {
+    for (const label of detailLabels) {
       expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
     }
     expect(target.textContent).toContain('Analyser');
@@ -354,9 +348,22 @@ describe('MissionCard', () => {
     expect(firstId).not.toBe(secondId);
   });
 
-  it('expose le statut courant et les transitions dans un groupe nommé', async () => {
+  it('réserve les transitions de suivi à l’état déplié (revue design DAO #176)', async () => {
     const onStatusTransition = vi.fn();
     const target = mountCard({ trackingStatus: 'detected', onStatusTransition });
+    await tick();
+
+    // Replié : le badge de statut d'en-tête suffit, pas de groupe de transitions.
+    expect(
+      target.querySelector(
+        '[role="group"][aria-label="Statut de la mission Developpeur fullstack TypeScript"]'
+      )
+    ).toBeNull();
+
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
     await tick();
 
     const group = target.querySelector(
@@ -380,6 +387,13 @@ describe('MissionCard', () => {
       isStatusTransitionPending: true,
       onStatusTransition: vi.fn(),
     });
+    await tick();
+
+    // Les transitions vivent dans l'état déplié (revue design DAO #176).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
     await tick();
 
     const group = target.querySelector(
@@ -687,20 +701,17 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
         (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
       );
 
-    // État réduit (défaut) : disclosure → note → les six actions sur une ligne.
+    // État réduit (défaut) : disclosure → note → triade de tri.
     const collapsedLabels = [
       'Afficher les détails de la mission Developpeur fullstack TypeScript',
       'Pourquoi cette note ?',
-      'Copier le lien de la mission',
-      'Ouvrir la mission sur la plateforme source',
       'Masquer la mission',
       'Ajouter la mission à la comparaison',
       'Ajouter la mission aux favoris',
-      'Analyser',
     ];
     expect(labels()).toEqual(collapsedLabels);
 
-    // État déplié : la barre d'actions reste complète et inchangée.
+    // État déplié : les actions d'action et le CTA rejoignent la barre.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -710,6 +721,9 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
     expect(labels()).toEqual([
       'Masquer les détails de la mission Developpeur fullstack TypeScript',
       ...collapsedLabels.slice(1),
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Analyser',
     ]);
   });
 

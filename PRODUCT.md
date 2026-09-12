@@ -8,19 +8,27 @@ web — extension Chrome (Manifest V3) : side panel HTML/CSS/JS, pas d'app nativ
 
 ## Users
 
-Freelances tech (développeurs, designers, DevOps, etc.) en France/Europe qui chassent des missions sur plusieurs plateformes (Free-Work, LeHibou, Hiway, Collective, Cherry Pick, Malt) et doivent décider rapidement lesquelles méritent une candidature. Ils travaillent sur ordinateur portable, souvent dans des fenêtres de focus courtes entre deux contrats ou en veille en arrière-plan pendant les temps morts.
+Freelances tech (développeurs, designers, DevOps, etc.) en France/Europe qui chassent des missions sur plusieurs plateformes et doivent décider rapidement lesquelles méritent une candidature. Le build défaut en expose **quatre** : Free-Work, LeHibou, Hiway et Cherry Pick. Malt et Collective existent dans le code mais restent hors build défaut. Ils travaillent sur ordinateur portable, souvent dans des fenêtres de focus courtes entre deux contrats ou en veille en arrière-plan pendant les temps morts.
 
-Le job à faire : faire émerger les missions à plus fort signal du bruit de six job boards qui se chevauchent, scorer chaque mission selon l'adéquation au profil (stack, TJM, remote, séniorité, urgence), et agir — sans subir le clutter et la charge cognitive des marketplaces sources.
+Le job à faire : faire émerger les missions à plus fort signal du bruit de plusieurs job boards qui se chevauchent, scorer chaque mission selon l'adéquation au profil (stack, TJM, remote, séniorité, urgence), et agir — sans subir le clutter et la charge cognitive des marketplaces sources.
 
 ## Product Purpose
 
-MissionPulse est une extension Chrome local-first qui agrège les missions freelance de six plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
+MissionPulse est une extension Chrome local-first qui agrège les missions freelance des **quatre plateformes défaut** (Free-Work, LeHibou, Hiway, Cherry Pick) en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Malt et Collective restent hors de ce build défaut. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
 
 La réussite se mesure par une recherche plus rapide, une qualification plus simple, et moins d'opportunités ratées.
 
 ## Positioning
 
 Le différenciateur qu'un concurrent ne peut pas copier aisément : **le noyau est 100% local-first**. MissionPulse utilise les sessions navigateur existantes de l'utilisateur — scraping, déduplication, scoring et stockage vivent entièrement dans le navigateur (IndexedDB + chrome.storage), sans compte requis, sans credentials de plateforme stockés, zéro télémétrie. Un mode connecté optionnel existe (appairage opt-in avec le dashboard missionpulse.app pour les entitlements premium), mais il n'est jamais requis : l'extension fonctionne intégralement sans compte ni backend. Là où un agrégateur classique déporte les données côté serveur, MissionPulse calcule tout localement : déduplication et scoring cross-plateformes, tendance TJM, et scoring sémantique optionnel via Gemini Nano (IA on-device). C'est l'antidote local aux marketplaces, pas un énième job board.
+
+Angles publics figés (Comex v3) — copy de présentation, pas une preuve d'usage :
+
+1. Un radar, pas quatre onglets.
+2. Le score propose. Tu tranches.
+3. Gratuit pour chasser. 10 €/an pour aller plus vite.
+
+Public ICP : freelance tech, France et remote. Pas de fourchette TJM publique.
 
 ## Operating Context
 
@@ -30,7 +38,7 @@ Le différenciateur qu'un concurrent ne peut pas copier aisément : **le noyau e
 
 ## Capabilities and Constraints
 
-- 6 connecteurs plateformes (Free-Work, LeHibou, Hiway, Collective, Cherry Pick, Malt) : parsers purs testables, connecteurs I/O dans le shell ; un DOM source qui change produit une `ConnectorError` typée et les autres connecteurs continuent.
+- 4 connecteurs plateformes défaut (Free-Work, LeHibou, Hiway, Cherry Pick) : parsers purs testables, connecteurs I/O dans le shell ; un DOM source qui change produit une `ConnectorError` typée et les autres connecteurs continuent. Malt et Collective restent implémentés mais exclus du build défaut (`connectors.config.json`).
 - Local-first : IndexedDB + `chrome.storage` ; aucun compte requis, aucun credential de plateforme stocké, zéro télémétrie. Mode connecté optionnel (appairage dashboard via deviceSecret local, entitlements premium) — opt-in, jamais requis pour le fonctionnement local.
 - Scoring déterministe local (relevance) + scoring sémantique optionnel via Gemini Nano avec cache 7 jours, non-bloquant s'il est indisponible.
 - Contraintes MV3 : service worker non persistant, pas d'API payante, pas de scraping côté serveur.

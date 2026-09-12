@@ -2,6 +2,7 @@
   // Re-export types from core for backward compatibility
   export type {
     FeedStory,
+    FeedStoryActionId,
     FeedStoryInput,
     FeedStorySeverity,
   } from '$lib/core/feed/build-feed-story';
@@ -14,6 +15,7 @@
     type SourceStatus,
   } from '$lib/shell/facades/feed-controller.svelte';
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
+  import { createReviewQueueState } from '$lib/state/review-queue.svelte';
   import {
     STATUS_LABELS,
     type ApplicationStatus,
@@ -25,11 +27,13 @@
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import ScanSummaryCard from '../organisms/ScanSummary.svelte';
+  import ScanRunsPanel from '../organisms/ScanRunsPanel.svelte';
+  import { createScanRunsStore } from '$lib/state/scan-runs.svelte';
   import {
     buildScanSummary,
     type ScanSummary as ScanSummaryData,
   } from '$lib/core/scan/scan-summary';
-  import { buildFeedStory } from '$lib/core/feed/build-feed-story';
+  import { buildFeedStory, resolveFeedEmptySurface } from '$lib/core/feed/build-feed-story';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { Mission, MissionSource } from '$lib/core/types/mission';
@@ -55,6 +59,8 @@
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
+  import { getScanSignalStats } from '$lib/shell/storage/scan-signal-stats';
+  import type { DedupStats } from '$lib/core/connectors/source-health-signals';
 
   const {
     onNavigateToOnboarding,
@@ -72,6 +78,11 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
+  const reviewQueue = createReviewQueueState();
+  const scanRuns = createScanRunsStore({
+    getLiveStatuses: () => controller.connectorStatuses,
+    getPersistedStatuses: () => controller.persistedStatuses,
+  });
   const connectorMetas = getConnectorsMeta();
   const sourceShortLabels: Record<MissionSource, string> = {
     'free-work': 'Free-Work',
@@ -147,6 +158,10 @@
     $state(null);
   let FeedActionDashboard: typeof import('../organisms/FeedActionDashboard.svelte').default | null =
     $state(null);
+  let TimeToReviewCard: typeof import('../organisms/TimeToReviewCard.svelte').default | null =
+    $state(null);
+  let ReviewQueuePanel: typeof import('../organisms/ReviewQueuePanel.svelte').default | null =
+    $state(null);
   let ConnectorStatusList: typeof import('../molecules/ConnectorStatusList.svelte').default | null =
     $state(null);
   let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
@@ -167,6 +182,8 @@
     $state(null);
   let FeedTourOverlay: typeof import('../molecules/FeedTourOverlay.svelte').default | null =
     $state(null);
+  let SourceHealthSignalsCard:
+    typeof import('../organisms/SourceHealthSignalsCard.svelte').default | null = $state(null);
 
   function loadFeedContent(): void {
     if (!VirtualMissionFeed) {
@@ -185,6 +202,16 @@
     if (!FeedActionDashboard) {
       import('../organisms/FeedActionDashboard.svelte').then((module) => {
         FeedActionDashboard = module.default;
+      });
+    }
+    if (!TimeToReviewCard) {
+      import('../organisms/TimeToReviewCard.svelte').then((module) => {
+        TimeToReviewCard = module.default;
+      });
+    }
+    if (!ReviewQueuePanel) {
+      import('../organisms/ReviewQueuePanel.svelte').then((module) => {
+        ReviewQueuePanel = module.default;
       });
     }
     if (!ConnectorStatusList) {
@@ -265,6 +292,11 @@
         FeedTourOverlay = module.default;
       });
     }
+    if (!SourceHealthSignalsCard) {
+      import('../organisms/SourceHealthSignalsCard.svelte').then((module) => {
+        SourceHealthSignalsCard = module.default;
+      });
+    }
   }
 
   $effect(() => {
@@ -272,7 +304,23 @@
       loadFeedContent();
       loadFeedChrome();
       bootstrapTrackingStore();
+      void reviewQueue.load();
     });
+  });
+
+  // Signaux de santé : stats de dédup persistées par le service worker,
+  // rechargées après chaque scan (dépendance sur l'horodatage du dernier scan).
+  let scanSignalStats = $state<DedupStats | null>(null);
+  $effect(() => {
+    const _lastScanAt = controller.lastScanAt;
+    void getScanSignalStats().then((stats) => {
+      scanSignalStats = stats;
+    });
+  });
+
+  // Review queue: re-derives flagged entries whenever missions or parser health change.
+  $effect(() => {
+    reviewQueue.sync(page.missions, controller.parserHealthRecords);
   });
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
@@ -410,6 +458,34 @@
       }));
   });
 
+  const enabledConnectorCount = $derived(controller.enabledConnectorIds.size);
+
+  const sessionReadyCount = $derived.by(() => {
+    const enabled = controller.enabledConnectorIds;
+    return controller.sourceStatuses.filter(
+      (source) => enabled.has(source.connectorId) && source.sessionStatus === 'connected'
+    ).length;
+  });
+
+  /** Prefer Free-Work, else first enabled source lacking a session, else first enabled. */
+  const reconnectTarget = $derived.by(() => {
+    const enabled = controller.enabledConnectorIds;
+    const statuses = controller.sourceStatuses.filter((source) => enabled.has(source.connectorId));
+    const prefer =
+      statuses.find((source) => source.connectorId === 'free-work') ??
+      statuses.find((source) => source.sessionStatus !== 'connected') ??
+      statuses[0] ??
+      null;
+    if (prefer) {
+      return { name: prefer.name, url: prefer.url };
+    }
+    const meta =
+      connectorMetas.find((item) => item.id === 'free-work') ?? connectorMetas[0] ?? null;
+    return meta
+      ? { name: meta.name, url: meta.url }
+      : { name: 'Free-Work', url: 'https://www.free-work.com' };
+  });
+
   function getMissionScore(mission: Mission): number {
     return getCanonicalMissionScore(mission) ?? 0;
   }
@@ -489,6 +565,9 @@
       filterActive: page.filterActive,
       totalMissionCount: page.totalMissions,
       searchQuery: page.searchQuery,
+      enabledConnectorCount,
+      sessionReadyCount,
+      reconnectPlatformName: reconnectTarget.name,
     })
   );
 
@@ -496,6 +575,22 @@
     feedStory.severity === 'critical' ||
       feedStory.severity === 'incident' ||
       feedStory.severity === 'attention'
+  );
+  const heroContentVisible = $derived(
+    page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible
+  );
+  // Empty-feed stories belong to the list (`emptyStory`), not the hero strip.
+  // The hero only keeps attention stories while missions remain visible.
+  const storyShownInHero = $derived(
+    feedStoryNeedsAttention && heroContentVisible && page.dashboardSummary.visibleCount > 0
+  );
+  const feedEmptySurface = $derived(
+    resolveFeedEmptySurface({
+      listCount: visibleFeedMissionCount,
+      isLoading: feedIsColdLoading,
+      storyVisibleCount: page.dashboardSummary.visibleCount,
+      storyRenderedInHero: storyShownInHero,
+    })
   );
   // When connector health is the top-severity signal (no error, not offline),
   // the inline story owns the connector attention and the ConnectorAlertBar
@@ -509,7 +604,7 @@
       !page.error &&
       !page.isOffline &&
       brokenConnectors.length > 0 &&
-      (page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible)
+      heroContentVisible
   );
 
   // The toolbar under the hero only carries auxiliary chrome (refinement
@@ -622,60 +717,51 @@
   }
 
   function handleFeedStoryPrimaryAction(): void {
-    if (page.error) {
-      handleMissionFeedScanAction();
-      return;
+    // Route from the story's stable action id (model decides; shell executes).
+    switch (feedStory.primaryActionId) {
+      case 'retry-scan':
+      case 'start-scan':
+        handleMissionFeedScanAction();
+        return;
+      case 'offline-noop':
+        return;
+      case 'scroll-feed':
+        if (feedStory.statusLabel === 'À traiter' && page.dashboardSummary.newCount > 0) {
+          if (!page.showNewOnly) {
+            page.toggleNewOnly();
+          }
+        } else if (feedStory.statusLabel === 'Priorités prêtes' && alertMatchCount > 0) {
+          showAlertOnly = true;
+        }
+        if (hasVisibleFeedMissions) {
+          void scrollToMissionFeed();
+        }
+        return;
+      case 'recheck-sources':
+        // Disabled connectors stay disabled — enabling is deliberate.
+        for (const broken of brokenConnectors) {
+          void controller.recheckConnector(broken.connectorId);
+        }
+        return;
+      case 'clear-filters':
+      case 'clear-search':
+        handleClearMissionFilters();
+        return;
+      case 'open-platform':
+        handleOpenExternalUrl(reconnectTarget.url);
+        void showToast('Connectez-vous dans l’onglet, puis revenez ici — on revérifie la session.');
+        void controller.checkSourceSessions();
+        return;
+      case 'enable-sources':
+        showAdvancedControls = true;
+        void controller.checkSourceSessions();
+        return;
+      case 'adjust-profile':
+        onNavigateToProfile?.();
+        return;
+      default:
+        handleMissionFeedScanAction();
     }
-
-    if (page.isOffline) {
-      if (hasVisibleFeedMissions) {
-        void scrollToMissionFeed();
-      }
-      return;
-    }
-
-    if (brokenConnectors.length > 0) {
-      // The story is the single attention surface for broken sources: recheck
-      // every broken connector. Disabled connectors stay disabled — enabling
-      // is a deliberate user transition (health panel / settings), never implicit.
-      for (const broken of brokenConnectors) {
-        void controller.recheckConnector(broken.connectorId);
-      }
-      return;
-    }
-
-    if (page.dashboardSummary.newCount > 0) {
-      if (!page.showNewOnly) {
-        page.toggleNewOnly();
-      }
-      void scrollToMissionFeed();
-      return;
-    }
-
-    if (alertMatchCount > 0) {
-      showAlertOnly = true;
-      void scrollToMissionFeed();
-      return;
-    }
-
-    // Empty state: filters hide all cached missions → clear filters (not Profile)
-    if (page.dashboardSummary.visibleCount === 0 && page.filterActive && page.totalMissions > 0) {
-      handleClearMissionFilters();
-      return;
-    }
-
-    // Empty state: scanned but no matches → route to Profile
-    if (page.dashboardSummary.visibleCount === 0 && controller.lastScanAt !== null) {
-      onNavigateToProfile?.();
-      return;
-    }
-
-    if (hasVisibleFeedMissions) {
-      void scrollToMissionFeed();
-      return;
-    }
-
-    handleMissionFeedScanAction();
   }
 
   function handleClearMissionFilters(): void {
@@ -877,6 +963,13 @@
     await setFeedTourSeen();
   }
 
+  /** Point d'entrée visible du tour (revue design DAO #176) : la modal
+      d'aide propose de le rejouer — ferme l'aide puis réouvre le tour. */
+  function replayTourFromHelp(): void {
+    page.showShortcutsHelp = false;
+    window.dispatchEvent(new Event('feed-tour:open'));
+  }
+
   async function advanceTour() {
     if (tourStepIndex >= tourSteps.length - 1) {
       await closeTour();
@@ -974,7 +1067,7 @@
       <section
         bind:this={feedHeroCard}
         data-testid="feed-hero-card"
-        class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
+        class="section-card-strong relative overflow-visible rounded-xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
           ? 'z-40'
           : ''} {feedChromeCompact ? 'border-blueprint-blue/10 shadow-subtle-3' : ''}"
       >
@@ -1023,7 +1116,7 @@
             </Tooltip>
           {/if}
         {/snippet}
-        {#if page.heroCompact || showAdvancedControls || feedChromeBusy || scanSummaryVisible}
+        {#if heroContentVisible}
           <div class="px-5 {page.heroCompact ? 'pt-3 pb-1.5' : 'pt-4 pb-0'}">
             {#if page.heroCompact}
               <!-- Compact: quiet title row — the missions lead, chrome follows -->
@@ -1086,7 +1179,7 @@
                 </div>
               {/if}
 
-              {#if feedStoryNeedsAttention}
+              {#if storyShownInHero}
                 <div class="mt-1.5">
                   <OperationalStoryCard
                     eyebrow="À faire maintenant"
@@ -1122,6 +1215,14 @@
                     onReconnect={handleOpenExternalUrl}
                   />
                 {/if}
+                {#if SourceHealthSignalsCard}
+                  <SourceHealthSignalsCard
+                    healthRecords={controller.parserHealthRecords}
+                    persistedStatuses={controller.persistedStatuses}
+                    missions={page.missions}
+                    dedupStats={scanSignalStats}
+                  />
+                {/if}
                 {#if FeedActionDashboard}
                   <FeedActionDashboard
                     summary={page.dashboardSummary}
@@ -1134,6 +1235,9 @@
                     onToggleFavorites={page.toggleFavoritesFilter}
                     onSetScoreBucket={page.setSelectedScoreBucket}
                   />
+                {/if}
+                {#if TimeToReviewCard}
+                  <TimeToReviewCard />
                 {/if}
               {/if}
             {:else}
@@ -1169,7 +1273,9 @@
                 statuses={controller.connectorStatuses}
               />
 
-              {#if feedStoryNeedsAttention}
+              <ScanRunsPanel items={scanRuns.items} />
+
+              {#if storyShownInHero}
                 <div class="mt-3">
                   <OperationalStoryCard
                     eyebrow="À faire maintenant"
@@ -1213,6 +1319,14 @@
                       onReconnect={handleOpenExternalUrl}
                     />
                   {/if}
+                  {#if SourceHealthSignalsCard}
+                    <SourceHealthSignalsCard
+                      healthRecords={controller.parserHealthRecords}
+                      persistedStatuses={controller.persistedStatuses}
+                      missions={page.missions}
+                      dedupStats={scanSignalStats}
+                    />
+                  {/if}
                   {#if page.totalMissions > 0}
                     {#if FeedActionDashboard}
                       <FeedActionDashboard
@@ -1228,6 +1342,17 @@
                       />
                     {/if}
                   {/if}
+                  {#if TimeToReviewCard}
+                    <TimeToReviewCard />
+                  {/if}
+                {/if}
+
+                {#if ReviewQueuePanel}
+                  <ReviewQueuePanel
+                    entries={reviewQueue.entries}
+                    onKeep={(id) => reviewQueue.keep(id)}
+                    onDismiss={(id) => reviewQueue.dismiss(id)}
+                  />
                 {/if}
 
                 {#if !feedIsColdLoading && controller.lastScanAt}
@@ -1478,6 +1603,9 @@
           onRetry={handleMissionFeedScanAction}
           onStartScan={handleMissionFeedScanAction}
           onClearFilters={handleClearMissionFilters}
+          emptyStory={feedEmptySurface === 'list-story' ? feedStory : null}
+          suppressEmptyState={feedEmptySurface === 'hero'}
+          onEmptyPrimaryAction={handleFeedStoryPrimaryAction}
           tourStep={activeTourStep?.id ?? null}
         />
       {:else}
@@ -1612,7 +1740,7 @@
 {/if}
 
 {#if KeyboardShortcutsHelp}
-  <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} />
+  <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} onReplayTour={replayTourFromHelp} />
 {/if}
 
 {#if activeTourStep && FeedTourOverlay}
@@ -1647,7 +1775,7 @@
 
 {#if page.comparisonMissionIds.length > 0 && !arrivalDrawerExpanded}
   <div
-    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
+    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
       ? 'bottom-40'
       : 'bottom-24'}"
   >

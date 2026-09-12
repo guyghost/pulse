@@ -77,6 +77,7 @@ import {
 } from '../lib/shell/storage/connector-health';
 import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagnostic-export';
 import { getAllParserHealth } from '../lib/shell/scan/parser-health';
+import { getScanSignalStats, saveScanSignalStats } from '../lib/shell/storage/scan-signal-stats';
 import {
   clearFeedTourSeen,
   getFeedTourSeen,
@@ -1173,6 +1174,24 @@ async function persistPostCommitEffects(
 ): Promise<void> {
   const { missions, errors } = result;
   const now = Date.now();
+
+  // Fire-and-forget: signal stats are non-critical and must not delay the
+  // post-commit projection (nor perturb notification ordering).
+  void (async () => {
+    try {
+      const prevStats = await getScanSignalStats();
+      await saveScanSignalStats(
+        prevStats,
+        {
+          rawCount: result.sourceMissions.length,
+          mergedCount: Math.max(0, result.sourceMissions.length - missions.length),
+        },
+        new Date(now)
+      );
+    } catch {
+      // Signal stats are non-critical.
+    }
+  })();
 
   if (missions.length > 0) {
     try {

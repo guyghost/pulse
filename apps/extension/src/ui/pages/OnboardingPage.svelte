@@ -34,13 +34,19 @@
   } from '$lib/core/types/alert-preferences';
   import { createFeedStore } from '$lib/state/feed.svelte';
   import { createFeedController } from '$lib/shell/facades/feed-controller.svelte';
+  import { ensureDurableProfileBeforeScan } from '$lib/shell/onboarding/ensure-durable-profile';
+  import {
+    openSourceInNewTab,
+    verifySourceSession,
+    type SourceVerificationStatus,
+  } from '$lib/shell/onboarding/verify-source-session';
   import { getConnectorsMeta } from '$lib/shell/connectors/meta';
 
   const { onComplete }: { onComplete?: () => Promise<boolean> | boolean } = $props();
 
   // Inputs (injected, non-deterministic values live in the shell).
   const attemptId = `onb_${crypto.randomUUID()}`;
-  const sources = getConnectorsMeta().map(({ id, name }) => ({ id, name }));
+  const sources = getConnectorsMeta().map(({ id, name, url }) => ({ id, name, url }));
 
   const controller = createOnboardingFlowController({ attemptId, sources });
   let snapshot = $state(controller.getSnapshot());
@@ -109,6 +115,67 @@
     void runEffect(effect);
   });
 
+  // ── P0-B — vérification de session par source ─────────────────────────
+  // La machine ne reçoit que l'issue (SOURCE_SESSION) ; les états
+  // intermédiaires restent locaux (plan : « erreurs affichées localement »).
+  const sourceVerifications = $state<Record<string, SourceVerificationStatus | 'checking'>>({});
+
+  async function handleVerifySource(sourceId: string): Promise<void> {
+    if (sourceVerifications[sourceId] === 'checking') {
+      return;
+    }
+    sourceVerifications[sourceId] = 'checking';
+    const result = await verifySourceSession(sourceId);
+    sourceVerifications[sourceId] = result.status;
+    if (result.status === 'ready') {
+      onSourceSessionReady(sourceId);
+    }
+  }
+
+  /** Session prouvée → la machine l'ajoute aux sources connectées + persistance durable. */
+  function onSourceSessionReady(sourceId: string): void {
+    controller.send({ type: 'SOURCE_SESSION', sourceId, hasSession: true });
+    void persistEnabledSource(sourceId);
+  }
+
+  /** Persistance immédiate dans settings.enabledConnectors (pas seulement au START_SCAN). */
+  async function persistEnabledSource(sourceId: string): Promise<void> {
+    try {
+      const settings = await getSettings();
+      if (settings.enabledConnectors.includes(sourceId)) {
+        return;
+      }
+      await setSettings({
+        ...settings,
+        enabledConnectors: [...settings.enabledConnectors, sourceId],
+      });
+      feedController.enabledConnectorIds.add(sourceId);
+    } catch {
+      // Non-fatal : applyConnectedSources refusionnera au START_SCAN.
+    }
+  }
+
+  function handleOpenSource(sourceId: string): void {
+    const source = sources.find((s) => s.id === sourceId);
+    if (source?.url) {
+      void openSourceInNewTab(source.url);
+    }
+  }
+
+  // Retour de focus après ouverture de la plateforme : re-vérifier les
+  // sources sans session (plan P0-B, interaction 2).
+  $effect(() => {
+    const recheckPending = (): void => {
+      for (const [id, status] of Object.entries(sourceVerifications)) {
+        if (status === 'session-missing') {
+          void handleVerifySource(id);
+        }
+      }
+    };
+    window.addEventListener('focus', recheckPending);
+    return () => window.removeEventListener('focus', recheckPending);
+  });
+
   async function runEffect(effect: OnboardingFlowEffect): Promise<void> {
     if (effect.kind === 'PERSIST_PROFILE') {
       try {
@@ -137,6 +204,15 @@
     }
     // START_SCAN
     try {
+      // P0-A1 : un profil durable doit exister avant tout scan — le chemin
+      // nominal passe par PERSIST_PROFILE, mais SKIP/partiel saute directement
+      // à START_SCAN. Non bloquant : un échec n'annule pas le scan.
+      await ensureDurableProfileBeforeScan({
+        getProfile,
+        saveProfile,
+        getDraft: () => controller.getSnapshot().profile,
+        warn: (message, err) => console.warn('[Onboarding]', message, err),
+      });
       // Persist the sources the user marked as connected so the service worker
       // scans exactly those (and the feed honors them on next mount).
       await applyConnectedSources(effect.attemptId);
@@ -219,7 +295,16 @@
 </script>
 
 {#snippet wizardContent()}
-  <OnboardingFlow {snapshot} {sources} onEvent={handleEvent} onRetry={retryFinalize} {navFailed} />
+  <OnboardingFlow
+    {snapshot}
+    {sources}
+    onEvent={handleEvent}
+    onRetry={retryFinalize}
+    {navFailed}
+    {sourceVerifications}
+    onVerifySource={handleVerifySource}
+    onOpenSource={handleOpenSource}
+  />
 {/snippet}
 
 <OnboardingLayout content={wizardContent} showHeader={snapshot.phase !== 'welcome'} />

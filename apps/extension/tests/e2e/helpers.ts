@@ -192,7 +192,16 @@ export function feedRegion(page: Page): Locator {
 }
 
 export async function expectFeedEmptyState(page: Page, timeout = 5000) {
-  await expect(feedRegion(page).getByText(/Aucune mission/)).toBeVisible({ timeout });
+  const empty = feedRegion(page).getByTestId('feed-list-empty');
+  if ((await empty.count()) > 0) {
+    await expect(empty).toBeVisible({ timeout });
+    return;
+  }
+  await expect(
+    feedRegion(page).getByText(
+      /Aucune mission|Lancez un premier scan|Aucune donnée|Aucune source|Aucune session|Aucune correspondance/
+    )
+  ).toBeVisible({ timeout });
 }
 
 export async function waitForDevPanel(page: Page) {
@@ -374,10 +383,15 @@ export async function startOnboardingWizard(page: Page) {
 
 /** Connecte la première source proposée puis passe à l'étape identité. */
 export async function connectFirstSource(page: Page, sourceName = 'Free-Work') {
-  const source = page.getByRole('button', { name: sourceName, exact: true });
-  await expect(source).toBeVisible();
-  await source.click();
-  await expect(source).toHaveAttribute('aria-pressed', 'true');
+  // Flux P0-B (#379) : les sources ne sont plus des toggles directs — un clic
+  // sur « Connecter » déclenche la vérification de session du connecteur et la
+  // source devient prête (« Session détectée ») quand detectSession() réussit.
+  const row = page.getByRole('listitem').filter({ hasText: sourceName });
+  await expect(row).toBeVisible();
+  const connectButton = row.getByRole('button', { name: 'Connecter', exact: true });
+  await expect(connectButton).toBeVisible();
+  await connectButton.click();
+  await expect(row).toContainText('Session détectée');
   await clickContinue(page);
   await expect(page.getByRole('heading', { name: 'Qui êtes-vous ?' })).toBeVisible();
 }
