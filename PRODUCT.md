@@ -22,6 +22,14 @@ La réussite se mesure par une recherche plus rapide, une qualification plus sim
 
 Le différenciateur qu'un concurrent ne peut pas copier aisément : **le noyau est 100% local-first**. MissionPulse utilise les sessions navigateur existantes de l'utilisateur — scraping, déduplication, scoring et stockage vivent entièrement dans le navigateur (IndexedDB + chrome.storage), sans compte requis, sans credentials de plateforme stockés, zéro télémétrie. Un mode connecté optionnel existe (appairage opt-in avec le dashboard missionpulse.app pour les entitlements premium), mais il n'est jamais requis : l'extension fonctionne intégralement sans compte ni backend. Là où un agrégateur classique déporte les données côté serveur, MissionPulse calcule tout localement : déduplication et scoring cross-plateformes, tendance TJM, et scoring sémantique optionnel via Gemini Nano (IA on-device). C'est l'antidote local aux marketplaces, pas un énième job board.
 
+Angles publics figés (Comex v3) — copy de présentation, pas une preuve d'usage :
+
+1. Un radar, pas quatre onglets.
+2. Le score propose. Tu tranches.
+3. Gratuit pour chasser. 10 €/an pour aller plus vite.
+
+Public ICP : freelance tech, France et remote. Pas de fourchette TJM publique.
+
 ## Operating Context
 
 - Side panel Chrome, ouvert à côté des onglets de travail ; fenêtres de focus courtes — le feed doit se scanner en moins d'une minute.

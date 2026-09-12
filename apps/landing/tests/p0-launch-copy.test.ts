@@ -12,13 +12,25 @@ const privacyPage = readFileSync(resolve(landingDir, 'src/routes/privacy/+page.s
 const storeListing = readFileSync(resolve(repoDir, 'docs/store-listing.md'), 'utf8');
 
 describe('P0 launch copy (Comex / Tor)', () => {
-  it('keeps the hero platforms sentence and drops the fake 42/8 scan proof', () => {
+  it('keeps the Comex v3 hero line and subline, and drops the fake 42/8 scan proof', () => {
+    expect(homePage).toContain('4 plateformes.');
+    expect(homePage).toContain('1 feed.');
+    expect(homePage).toContain('Tu décides.');
     expect(homePage).toContain(
-      'Free-Work, LeHibou, Hiway et Cherry Pick dans un seul feed, scoré selon votre stack, votre'
+      'Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote.'
     );
-    expect(homePage).toContain('TJM et votre remote.');
+    expect(homePage).toContain('Dans le navigateur. Sans compte.');
+    expect(homePage).toContain('Freelance tech · France &amp; remote');
+    expect(homePage).not.toContain('TJM 450-900');
+    expect(homePage).not.toContain('450–900');
     expect(homePage).not.toContain('Le dernier scan a remonté 42 missions');
     expect(homePage).not.toContain('8 à contacter maintenant');
+  });
+
+  it('exposes the three frozen public angles', () => {
+    expect(homePage).toContain('Un radar, pas quatre onglets.');
+    expect(homePage).toContain('Le score propose. Tu tranches.');
+    expect(homePage).toContain('Gratuit pour chasser. 10 €/an pour aller plus vite.');
   });
 
   it('labels the scanner 42/31/8 counters as an illustrative Exemple', () => {

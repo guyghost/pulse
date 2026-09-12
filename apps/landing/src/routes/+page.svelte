@@ -71,7 +71,7 @@
     upcomingFeatures.length > 0 ? ` À venir : ${upcomingFeatures.join(', ')}.` : '';
 
   const metaTitle = 'MissionPulse — Centralisez votre veille missions freelance';
-  const socialDescription = `4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. L'exécution reste locale dans votre navigateur : scan, scoring, radar TJM, profil/CV${trackingLive ? ', suivi de candidatures' : ''}.${connectedLive ? ' Le compte connecté (optionnel) ouvre les générations IA distantes.' : ''}${upcomingSentence}`;
+  const socialDescription = `4 plateformes. 1 feed. Tu décides. Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote. Dans le navigateur. Sans compte.${upcomingSentence}`;
 
   const platforms: { name: string; logo: string }[] = [
     { name: 'Free-Work', logo: '/logos/free-work.png' },
@@ -263,7 +263,7 @@
   <meta name="title" content={metaTitle} />
   <meta
     name="description"
-    content="MissionPulse est le radar quotidien des freelances tech français: 4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant."
+    content="4 plateformes. 1 feed. Tu décides. Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote. Dans le navigateur. Sans compte."
   />
   <meta
     name="keywords"
@@ -419,13 +419,13 @@
       </div>
 
       <h1 class="hero__title">
-        4 plateformes.<br />1 feed scoré.<br /><span class="light-text">Zéro doublon.</span>
+        4 plateformes.<br />1 feed.<br /><span class="light-text">Tu décides.</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          Free-Work, LeHibou, Hiway et Cherry Pick dans un seul feed, scoré selon votre stack, votre
-          TJM et votre remote.
+          Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote.
+          Dans le navigateur. Sans compte.
         </p>
 
         <div class="hero__actions">
@@ -435,9 +435,7 @@
       </div>
 
       <div class="hero__meta" aria-label="Positionnement MissionPulse">
-        <span class="hero__meta-item">Développeurs 3+ ans</span>
-        <span class="hero__meta-item">TJM 450-900€</span>
-        <span class="hero__meta-item">France &amp; remote</span>
+        <span class="hero__meta-item">Freelance tech · France &amp; remote</span>
       </div>
     </div>
   </div>
@@ -836,8 +834,9 @@
       <div class="section-header">
         <h2 class="section-title fade-in">Ce que vous obtenez</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          L'extension offre le scan, le scoring{trackingLive ? ', le suivi' : ''}, le radar TJM et
-          le profil/CV{connectedLive
+          Le score propose. Tu tranches. L'extension offre le scan, le scoring{trackingLive
+            ? ', le suivi'
+            : ''}, le radar TJM et le profil/CV{connectedLive
             ? '. Le compte connecté ouvre les générations IA distantes'
             : '. Les générations IA distantes arrivent au moment du compte connecté'}; la
           synchronisation multi-appareils est à venir.
@@ -920,7 +919,8 @@
       <div class="section-header">
         <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Commencez par scanner localement dans l'extension, sans compte{connectedLive
+          Gratuit pour chasser. 10 €/an pour aller plus vite. Commencez par scanner localement dans
+          l'extension, sans compte{connectedLive
             ? ', puis connectez-vous quand vous voulez piloter la conversion. Le dashboard connecté optionnel synchronise votre shortlist'
             : '. Le compte connecté et le dashboard associé arrivent prochainement'}; les sessions
           plateforme restent dans le navigateur.
@@ -1014,7 +1014,8 @@
       <div class="section-header">
         <h2 class="section-title fade-in">4 plateformes connectées</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Les principales sources de missions freelance tech en France, dans un seul feed.
+          Un radar, pas quatre onglets. Les principales sources de missions freelance tech en
+          France, dans un seul feed.
         </p>
       </div>
 
