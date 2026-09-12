@@ -491,8 +491,8 @@ describe('operational UI constraints', () => {
     // remain visible. Empty-feed stories are owned by the list (`emptyStory`).
     expect(source).toContain('{#if storyShownInHero}');
     expect(source).toContain('resolveFeedEmptySurface');
-    expect(source).toContain('emptyStory={feedEmptySurface === \'list-story\' ? feedStory : null}');
-    expect(source).toContain('suppressEmptyState={feedEmptySurface === \'hero\'}');
+    expect(source).toContain("emptyStory={feedEmptySurface === 'list-story' ? feedStory : null}");
+    expect(source).toContain("suppressEmptyState={feedEmptySurface === 'hero'}");
     expect(source).not.toContain('feedActionQueue');
   });
 
@@ -503,8 +503,10 @@ describe('operational UI constraints', () => {
 
     expect(storySource).toContain('export function resolveFeedEmptySurface');
     expect(storySource).toContain("title: 'Lancez un premier scan pour voir vos missions'");
-    expect(feedSource).toContain('emptyStory={feedEmptySurface === \'list-story\' ? feedStory : null}');
-    expect(feedSource).toContain('suppressEmptyState={feedEmptySurface === \'hero\'}');
+    expect(feedSource).toContain(
+      "emptyStory={feedEmptySurface === 'list-story' ? feedStory : null}"
+    );
+    expect(feedSource).toContain("suppressEmptyState={feedEmptySurface === 'hero'}");
     expect(virtualFeedSource).toContain('emptyStory');
     expect(virtualFeedSource).toContain('suppressEmptyState');
     expect(virtualFeedSource).toContain('data-testid="feed-list-empty"');

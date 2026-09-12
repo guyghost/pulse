@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildFeedStory, resolveFeedEmptySurface } from '../../../src/lib/core/feed/build-feed-story';
+import {
+  buildFeedStory,
+  resolveFeedEmptySurface,
+} from '../../../src/lib/core/feed/build-feed-story';
 
 const baseInput = {
   isOffline: false,
