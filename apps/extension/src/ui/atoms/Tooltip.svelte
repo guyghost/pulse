@@ -54,9 +54,9 @@
     isOpen = false;
   }
 
-  // WCAG 1.4.13 (dismissible) : Escape ferme le tooltip sans déplacer le
-  // focus. Le handler est exposé au déclencheur via le snippet children —
-  // c'est l'élément focusable qui doit porter l'écoute clavier.
+  // WCAG 1.4.13 (dismissible): Escape closes the tooltip without moving
+  // focus. The handler is exposed to the trigger via the children snippet —
+  // the focusable element must carry the keyboard listener.
   function handleKeydown(event: KeyboardEvent) {
     if (event.key === 'Escape' && isOpen) {
       close();

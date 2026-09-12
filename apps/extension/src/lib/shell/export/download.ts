@@ -1,34 +1,34 @@
 /**
- * Téléchargement de fichiers dans le navigateur
- * Shell = I/O : interaction avec le DOM
+ * File downloads in the browser
+ * Shell = I/O: DOM interaction
  */
 
 /**
- * Télécharge un fichier avec le contenu, nom et type MIME spécifiés
+ * Downloads a file with the given content, name and MIME type
  */
 export function downloadFile(content: string, filename: string, mimeType: string): void {
-  // Créer un Blob avec le contenu
+  // Create a Blob with the content
   const blob = new Blob([content], { type: mimeType });
 
-  // Créer une URL objet pour le blob
+  // Create an object URL for the blob
   const url = URL.createObjectURL(blob);
 
-  // Créer un élément lien temporaire
+  // Create a temporary link element
   const link = document.createElement('a');
   link.href = url;
   link.download = filename;
 
-  // Ajouter au DOM, cliquer, puis supprimer
+  // Append to the DOM, click, then remove
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
 
-  // Libérer l'URL objet
+  // Revoke the object URL
   URL.revokeObjectURL(url);
 }
 
 /**
- * Télécharge des données JSON
+ * Downloads JSON data
  */
 export function downloadJSON(data: unknown, filename: string): void {
   const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
@@ -36,23 +36,23 @@ export function downloadJSON(data: unknown, filename: string): void {
 }
 
 /**
- * Télécharge un fichier CSV
+ * Downloads a CSV file
  */
 export function downloadCSV(csv: string, filename: string): void {
-  // Ajouter BOM UTF-8 pour Excel
+  // Add UTF-8 BOM for Excel
   const content = '\ufeff' + csv;
   downloadFile(content, filename, 'text/csv;charset=utf-8');
 }
 
 /**
- * Télécharge un fichier Markdown
+ * Downloads a Markdown file
  */
 export function downloadMarkdown(md: string, filename: string): void {
   downloadFile(md, filename, 'text/markdown;charset=utf-8');
 }
 
 /**
- * Télécharge un fichier texte
+ * Downloads a text file
  */
 export function downloadText(text: string, filename: string): void {
   downloadFile(text, filename, 'text/plain;charset=utf-8');
@@ -70,7 +70,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 /**
- * Télécharge un fichier en détectant le type MIME depuis l'extension
+ * Downloads a file, detecting the MIME type from the extension
  */
 export function downloadWithAutoMime(content: string, filename: string): void {
   const ext = filename.slice(filename.lastIndexOf('.'));

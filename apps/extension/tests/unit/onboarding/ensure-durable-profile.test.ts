@@ -40,7 +40,7 @@ describe('ensureDurableProfileBeforeScan (P0-A1)', () => {
     const saved = deps.saveProfile.mock.calls[0][0] as UserProfile;
     expect(saved.firstName).toBe('Guy');
     expect(saved.tjmMin).toBe(600);
-    // Le reste du profil défaut est conservé.
+    // The rest of the default profile is preserved.
     expect(saved.scoringWeights).toEqual(existing.scoringWeights);
   });
 

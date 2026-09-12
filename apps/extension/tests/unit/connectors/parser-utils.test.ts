@@ -217,8 +217,8 @@ describe('parser-utils', () => {
     });
 
     it('decodes &lt; &gt; &quot; &#39; without resurrecting markup (DAO security)', () => {
-      // Entités décodées AVANT le strip : &lt;tag&gt; devient <tag> puis est
-      // supprimé — les entités ne peuvent pas ressusciter du markup.
+      // Entities decoded BEFORE stripping: &lt;tag&gt; becomes <tag> then is
+      // removed — entities cannot resurrect markup.
       expect(stripHtml('&lt;tag&gt; &quot;quoted&quot; l&#39;eau')).toBe('"quoted" l\'eau');
     });
 

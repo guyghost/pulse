@@ -32,7 +32,7 @@
     onEvent: (event: OnboardingFlowEvent) => void;
     onRetry?: () => void;
     navFailed?: boolean;
-    /** P0-B — état de vérification de session par source (absent = idle). */
+    /** P0-B — per-source session verification state (absent = idle). */
     sourceVerifications?: Record<string, 'ready' | 'session-missing' | 'unavailable' | 'checking'>;
     onVerifySource?: ((sourceId: string) => void) | null;
     onOpenSource?: ((sourceId: string) => void) | null;
@@ -276,7 +276,7 @@
         </p>
       </div>
     {:else}
-      <!-- B-opt : la valeur d'abord — scanner dès qu'une session est prouve, le wizard après. -->
+      <!-- B-opt: value first — scan as soon as a session is verified, wizard after. -->
       <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
         <button
           type="button"

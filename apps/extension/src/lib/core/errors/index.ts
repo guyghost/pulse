@@ -1,8 +1,8 @@
 /**
- * Exports du système d'erreurs
+ * Error system exports
  */
 
-// Types et interfaces
+// Types and interfaces
 export type {
   BaseAppError,
   ErrorType,

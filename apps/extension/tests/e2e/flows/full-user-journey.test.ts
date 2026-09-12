@@ -69,7 +69,7 @@ baseTest.describe('Full User Journey', () => {
 
     await page.reload();
 
-    // Profil persisté : l'onboarding ne se réaffiche pas après rechargement.
+    // Persisted profile: onboarding doesn't reappear after reload.
     await expect(page.getByRole('button', { name: 'Commencer', exact: true })).not.toBeVisible({
       timeout: 5000,
     });

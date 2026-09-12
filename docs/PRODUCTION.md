@@ -1,32 +1,32 @@
-# MissionPulse — Production Deployment Checklist
+# MissionPulse — Checklist de déploiement production
 
-Procedure updated: 2026-07-21. A fresh clean candidate seal is still required before any production claim.
+Procédure mise à jour : 2026-07-21. Un seal de candidat propre et frais reste requis avant toute revendication de production.
 
-## Architecture overview
+## Vue d'ensemble de l'architecture
 
-| App                | Stack                       | Deploy target                             | Domain                       |
+| App                | Stack                       | Cible de déploiement                      | Domaine                      |
 | ------------------ | --------------------------- | ----------------------------------------- | ---------------------------- |
-| `@pulse/landing`   | SvelteKit + Eve             | Vercel (web + private Eve sibling)        | `missionpulse.app`           |
+| `@pulse/landing`   | SvelteKit + Eve             | Vercel (web + service frère Eve privé)    | `missionpulse.app`           |
 | `@pulse/dashboard` | SvelteKit + adapter-vercel  | Vercel (microfrontend, `/dashboard`)      | `missionpulse.app/dashboard` |
 | `@pulse/extension` | Svelte 5 + Vite + CRXJS MV3 | Chrome Web Store (ZIP via GitHub Release) | N/A                          |
-| `@pulse/ui`        | Svelte package              | Built as dependency                       | N/A                          |
+| `@pulse/ui`        | Package Svelte              | Build comme dépendance                    | N/A                          |
 
-Landing and dashboard are wired via `apps/landing/microfrontends.json` (Vercel microfrontends).
+Landing et dashboard sont reliés via `apps/landing/microfrontends.json` (microfrontends Vercel).
 
 ---
 
-## Pre-deploy verification (local / CI)
+## Vérifications pré-déploiement (local / CI)
 
 ```bash
 pnpm install --frozen-lockfile
 pnpm deploy:preflight
 ```
 
-`deploy:preflight` runs format, lint, typecheck, test, build, manifest verify, env documentation checks, and dev-artifact scan.
+`deploy:preflight` exécute format, lint, typecheck, test, build, vérification du manifest, checks de documentation env et scan des artefacts de dev.
 
-CI (`.github/workflows/ci.yml`) runs lint, format, typecheck, test, build, manifest verification and browser gates. Its uploaded `dist/` is explicitly unsealed inspection evidence, not a Store package.
+La CI (`.github/workflows/ci.yml`) exécute lint, format, typecheck, test, build, vérification du manifest et gates navigateur. Son `dist/` uploadé est explicitement une preuve d'inspection non scellée, pas un package Store.
 
-Extension packaging (`.github/workflows/release.yml`) is manual and consumes an already archived seal plus the exact tested `dist/`. It packages and independently re-verifies those bytes, then stops at `package_validated`. It neither changes versions nor submits to Chrome Web Store.
+Le packaging de l'extension (`.github/workflows/release.yml`) est manuel et consomme un seal déjà archivé plus le `dist/` exact testé. Il package et re-vérifie indépendamment ces octets, puis s'arrête à `package_validated`. Il ne change ni les versions ni ne soumet au Chrome Web Store.
 
 Les vérifications de santé des connecteurs restent disponibles localement via les fixtures et
 `pnpm --filter @pulse/extension health-check`. Aucun workflow planifié ni créateur automatique
@@ -34,128 +34,129 @@ d'issues n'est actif.
 
 ---
 
-## Environment variables
+## Variables d'environnement
 
 ### Landing (`apps/landing/.env.example`)
 
-| Variable                                   | Scope   | Required            | Purpose                             |
-| ------------------------------------------ | ------- | ------------------- | ----------------------------------- |
-| `PUBLIC_SUPABASE_URL`                      | public  | yes                 | Supabase project URL                |
-| `PUBLIC_SUPABASE_ANON_KEY`                 | public  | yes                 | Supabase anon key (client-safe)     |
-| `PUBLIC_CHROME_STORE_URL`                  | public  | recommended         | Install CTA link                    |
-| `PUBLIC_LANDING_URL`                       | public  | recommended         | Canonical site URL (redirects, OG)  |
-| `SUPABASE_SERVICE_ROLE_KEY`                | private | yes (server)        | Admin client (webhooks, credits)    |
-| `GLM_API_KEY`                              | private | for `/api/generate` | Zhipu GLM API                       |
-| `GLM_MODEL`                                | private | optional            | Default `glm-4-flash`               |
-| `LEMON_SQUEEZY_API_KEY`                    | private | for checkout        | Lemon Squeezy API                   |
-| `LEMON_SQUEEZY_STORE_ID`                   | private | for checkout        | Store ID                            |
-| `LEMON_SQUEEZY_WEBHOOK_SECRET`             | private | for webhooks        | HMAC verification                   |
-| `LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID` | private | for checkout        | Credit pack variant                 |
-| `LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID`     | private | for checkout        | Credit pack variant                 |
-| `LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID`   | private | for checkout        | Credit pack variant                 |
-| `MISSIONPULSE_PERF_CACHE_HTML`             | private | optional            | Set `1` to cache HTML 5 min         |
-| `COPILOT_SESSION_SIGNING_SECRET`           | private | Copilot pilot       | Signs short extension sessions      |
-| `COPILOT_ROLLOUT_ENABLED`                  | private | Copilot pilot       | Exact `true`; otherwise fail closed |
-| `COPILOT_ROLLOUT_USER_IDS`                 | private | Copilot pilot       | Explicit internal user allowlist    |
-| `COPILOT_EXTENSION_REDIRECT_URIS`          | private | Copilot pilot       | Exact Chrome Identity callbacks     |
-| `CRON_SECRET`                              | private | Copilot pilot       | Authenticates receipt maintenance   |
-| `MISSIONPULSE_EVE_ENABLED`                 | private | Copilot pilot       | Exact `true`; otherwise fail closed |
-| `MISSIONPULSE_EVE_BASE_URL`                | private | Copilot pilot       | Same-project Eve protocol origin    |
-| `MISSIONPULSE_EVE_TIMEOUT_MS`              | private | optional            | Bounded Eve request deadline        |
+| Variable                                   | Périmètre | Requise              | Rôle                                        |
+| ------------------------------------------ | --------- | -------------------- | ------------------------------------------- |
+| `PUBLIC_SUPABASE_URL`                      | public    | oui                  | URL du projet Supabase                      |
+| `PUBLIC_SUPABASE_ANON_KEY`                 | public    | oui                  | Clé anon Supabase (sûre côté client)        |
+| `PUBLIC_CHROME_STORE_URL`                  | public    | recommandé           | Lien du CTA d'installation                  |
+| `PUBLIC_LANDING_URL`                       | public    | recommandé           | URL canonique du site (redirections, OG)    |
+| `SUPABASE_SERVICE_ROLE_KEY`                | privée    | oui (serveur)        | Client admin (webhooks, crédits)            |
+| `GLM_API_KEY`                              | privée    | pour `/api/generate` | API Zhipu GLM                               |
+| `GLM_MODEL`                                | privée    | optionnel            | Défaut `glm-4-flash`                        |
+| `LEMON_SQUEEZY_API_KEY`                    | privée    | pour le checkout     | API Lemon Squeezy                           |
+| `LEMON_SQUEEZY_STORE_ID`                   | privée    | pour le checkout     | Store ID                                    |
+| `LEMON_SQUEEZY_WEBHOOK_SECRET`             | privée    | pour les webhooks    | Vérification HMAC                           |
+| `LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID` | privée    | pour le checkout     | Variant du pack de crédits                  |
+| `LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID`     | privée    | pour le checkout     | Variant du pack de crédits                  |
+| `LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID`   | privée    | pour le checkout     | Variant du pack de crédits                  |
+| `MISSIONPULSE_PERF_CACHE_HTML`             | privée    | optionnel            | Mettre `1` pour cacher le HTML 5 min        |
+| `COPILOT_SESSION_SIGNING_SECRET`           | privée    | pilote Copilot       | Signe les sessions éphémères extension      |
+| `COPILOT_ROLLOUT_ENABLED`                  | privée    | pilote Copilot       | Exactement `true` ; sinon fail closed       |
+| `COPILOT_ROLLOUT_USER_IDS`                 | privée    | pilote Copilot       | Allowlist explicite d'utilisateurs internes |
+| `COPILOT_EXTENSION_REDIRECT_URIS`          | privée    | pilote Copilot       | Callbacks Chrome Identity exacts            |
+| `CRON_SECRET`                              | privée    | pilote Copilot       | Authentifie la maintenance des reçus        |
+| `MISSIONPULSE_EVE_ENABLED`                 | privée    | pilote Copilot       | Exactement `true` ; sinon fail closed       |
+| `MISSIONPULSE_EVE_BASE_URL`                | privée    | pilote Copilot       | Origine du protocole Eve du même projet     |
+| `MISSIONPULSE_EVE_TIMEOUT_MS`              | privée    | optionnel            | Échéance bornée des requêtes Eve            |
 
 ### Dashboard (`apps/dashboard/.env.example`)
 
-| Variable                     | Scope      | Required    | Purpose                          |
-| ---------------------------- | ---------- | ----------- | -------------------------------- |
-| `PUBLIC_SUPABASE_URL`        | public     | yes         | Same Supabase project as landing |
-| `PUBLIC_SUPABASE_ANON_KEY`   | public     | yes         | Anon key                         |
-| `PUBLIC_LANDING_URL`         | public     | yes         | Auth redirects, login links      |
-| `PUBLIC_CHROME_STORE_URL`    | public     | recommended | Extension install link           |
-| `PUBLIC_DASHBOARD_BASE_PATH` | build-time | optional    | Default `/dashboard`             |
+| Variable                     | Périmètre  | Requise    | Rôle                                |
+| ---------------------------- | ---------- | ---------- | ----------------------------------- |
+| `PUBLIC_SUPABASE_URL`        | public     | oui        | Même projet Supabase que la landing |
+| `PUBLIC_SUPABASE_ANON_KEY`   | public     | oui        | Clé anon                            |
+| `PUBLIC_LANDING_URL`         | public     | oui        | Redirections auth, liens de login   |
+| `PUBLIC_CHROME_STORE_URL`    | public     | recommandé | Lien d'installation de l'extension  |
+| `PUBLIC_DASHBOARD_BASE_PATH` | build-time | optionnel  | Défaut `/dashboard`                 |
 
 ### Extension
 
-Production defaults are compiled at build time: account linking uses
-`https://missionpulse.app`, while bearer Copilot calls use the cookieless
-`https://copilot.missionpulse.app`. The latter is the only MissionPulse Copilot
-`host_permission`. Any origin change requires the matching `VITE_COPILOT_*_ORIGIN`
-build variables, manifest update, verification and CWS resubmission.
+Les défauts de production sont compilés au build : le lien de compte utilise
+`https://missionpulse.app`, tandis que les appels Copilot bearer utilisent le domaine
+sans cookie `https://copilot.missionpulse.app`. Ce dernier est la seule `host_permission`
+Copilot de MissionPulse. Tout changement d'origine exige les variables de build
+`VITE_COPILOT_*_ORIGIN` correspondantes, une mise à jour du manifest, une vérification et
+une re-soumission au CWS.
 
-### Turbo remote cache
+### Cache distant Turbo
 
-`turbo.json` `build.env` tracks: `PUBLIC_CHROME_STORE_URL`, `PUBLIC_LANDING_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `PUBLIC_SUPABASE_URL`.
+`turbo.json` `build.env` suit : `PUBLIC_CHROME_STORE_URL`, `PUBLIC_LANDING_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `PUBLIC_SUPABASE_URL`.
 
 ---
 
-## Vercel deployment
+## Déploiement Vercel
 
-### Landing (root project)
+### Landing (projet racine)
 
-1. Connect repo; set root directory to `apps/landing` (or use monorepo with Turborepo on Vercel).
-2. Build command: `pnpm build` (from repo root with filter) or `vite build` in app.
-3. Install: `pnpm install --frozen-lockfile` from monorepo root.
-4. Set all landing env vars in Vercel project settings (Production + Preview).
-5. Enable Vercel microfrontends; `microfrontends.json` routes `/dashboard` to dashboard app.
-6. Attach both custom domains: `missionpulse.app` and the cookieless
-   `copilot.missionpulse.app` to this same project.
-7. Keep `configureVercelJson: false`: the reviewed sibling SvelteKit/Eve services
-   and `/eve/v1/**` rewrite are committed explicitly in `apps/landing/vercel.json`.
-8. Keep the rollout flag and user allowlist closed until Eve retention/deletion
-   and uncertain-outcome reconciliation have verified operator procedures.
-9. Keep private Copilot KPI exports disabled until the public privacy promise has
-   been reviewed. Net credits are measurable; Eve monetary cost and Premium
-   retention remain explicitly unavailable without provider billing and verified
-   subscription-history sources.
-10. Set a random `CRON_SECRET` of at least 16 characters. The committed daily
-    Vercel Cron calls `/api/internal/copilot/receipt-maintenance`, whose
-    service-role RPC physically drains receipts after their 90-day expiry.
-    Alert when the last successful invocation is older than 25 hours; this is
-    the operational deletion target, not a stronger public SLA. One invocation
-    is capped at 100 batches of 1,000 rows; exhausting that budget returns 503
-    and must trigger the same alert.
+1. Connecter le repo ; définir le répertoire racine à `apps/landing` (ou utiliser le monorepo avec Turborepo sur Vercel).
+2. Commande de build : `pnpm build` (depuis la racine avec filter) ou `vite build` dans l'app.
+3. Installation : `pnpm install --frozen-lockfile` depuis la racine du monorepo.
+4. Définir toutes les variables d'env de la landing dans les réglages du projet Vercel (Production + Preview).
+5. Activer les microfrontends Vercel ; `microfrontends.json` route `/dashboard` vers l'app dashboard.
+6. Attacher les deux domaines personnalisés : `missionpulse.app` et le sans-cookie
+   `copilot.missionpulse.app` à ce même projet.
+7. Garder `configureVercelJson: false` : les services frères SvelteKit/Eve révisés et la
+   réécriture `/eve/v1/**` sont commités explicitement dans `apps/landing/vercel.json`.
+8. Garder le flag de rollout et l'allowlist d'utilisateurs fermés tant que la
+   rétention/suppression Eve et la réconciliation des résultats incertains n'ont pas validé les
+   procédures opérateur.
+9. Garder les exports de KPI Copilot privés désactivés tant que la promesse de confidentialité
+   publique n'a pas été révisée. Les crédits nets sont mesurables ; le coût monétaire Eve et la
+   rétention Premium restent explicitement indisponibles sans facturation fournisseur ni sources
+   d'historique d'abonnement vérifiées.
+10. Définir un `CRON_SECRET` aléatoire d'au moins 16 caractères. Le Vercel Cron quotidien
+    commité appelle `/api/internal/copilot/receipt-maintenance`, dont le RPC service-role draine
+    physiquement les reçus après leur expiration de 90 jours. Alerter quand la dernière
+    invocation réussie date de plus de 25 heures ; c'est la cible opérationnelle de suppression,
+    pas un SLA public plus fort. Une invocation est plafonnée à 100 lots de 1 000 lignes ;
+    l'épuisement de ce budget retourne un 503 et doit déclencher la même alerte.
 
 ### Dashboard (microfrontend)
 
-1. Separate Vercel project or microfrontend child; package `@pulse/dashboard`.
-2. `PUBLIC_DASHBOARD_BASE_PATH=/dashboard` must match `svelte.config.js` `kit.paths.base`.
-3. Share Supabase public keys with landing; set `PUBLIC_LANDING_URL=https://missionpulse.app`.
+1. Projet Vercel séparé ou enfant microfrontend ; package `@pulse/dashboard`.
+2. `PUBLIC_DASHBOARD_BASE_PATH=/dashboard` doit correspondre à `kit.paths.base` de `svelte.config.js`.
+3. Partager les clés publiques Supabase avec la landing ; définir `PUBLIC_LANDING_URL=https://missionpulse.app`.
 
-### Security headers
+### Headers de sécurité
 
-`apps/landing/vercel.json` and `apps/dashboard/vercel.json` set:
+`apps/landing/vercel.json` et `apps/dashboard/vercel.json` définissent :
 
 - `X-Content-Type-Options: nosniff`
 - `X-Frame-Options: DENY`
 - `X-XSS-Protection: 1; mode=block`
 - `Referrer-Policy: strict-origin-when-cross-origin`
 - `Strict-Transport-Security` (HSTS)
-- Dashboard only: `X-Robots-Tag: noindex, nofollow`
+- Dashboard uniquement : `X-Robots-Tag: noindex, nofollow`
 
-`hooks.server.ts` in both apps only adds optional HTML cache when `MISSIONPULSE_PERF_CACHE_HTML=1`.
+`hooks.server.ts` dans les deux apps n'ajoute le cache HTML optionnel que si `MISSIONPULSE_PERF_CACHE_HTML=1`.
 
-### Auth cookies
+### Cookies d'authentification
 
-Supabase SSR (`createSupabaseServerClient`) delegates cookie `httpOnly`, `secure`, and `sameSite` to `@supabase/ssr`. On HTTPS (Vercel production), auth cookies are set securely. No custom cookie overrides needed.
+Supabase SSR (`createSupabaseServerClient`) délègue `httpOnly`, `secure` et `sameSite` des cookies à `@supabase/ssr`. Sur HTTPS (production Vercel), les cookies d'auth sont posés de façon sécurisée. Aucun override personnalisé nécessaire.
 
-OAuth callback: `apps/landing/src/routes/api/auth/callback/+server.ts` → redirects to `/dashboard` by default.
+Callback OAuth : `apps/landing/src/routes/api/auth/callback/+server.ts` → redirige vers `/dashboard` par défaut.
 
 ### Supabase
 
-1. Production Supabase project with Auth (email, passkey if enabled).
-2. Redirect URLs: `https://missionpulse.app/api/auth/callback`, local dev URLs for preview.
-3. Apply migrations:
+1. Projet Supabase de production avec Auth (email, passkey si activé).
+2. URLs de redirection : `https://missionpulse.app/api/auth/callback`, URLs de dev local pour la preview.
+3. Appliquer les migrations :
 
 ```bash
-# One-time: link CLI to production project
+# One-shot : lier la CLI au projet de production
 supabase link --project-ref <your-project-ref> --workdir apps/landing
 
-# Push all migrations in apps/landing/supabase/migrations/
+# Pousser toutes les migrations de apps/landing/supabase/migrations/
 supabase db push --workdir apps/landing
 ```
 
-4. Store `SUPABASE_SERVICE_ROLE_KEY` only in Vercel server env (never `PUBLIC_*`).
-5. Before a Copilot deployment, run the physical database contract after local
-   Supabase is started and reset:
+4. Stocker `SUPABASE_SERVICE_ROLE_KEY` uniquement dans l'env serveur Vercel (jamais `PUBLIC_*`).
+5. Avant un déploiement Copilot, exécuter le contrat physique de base de données après avoir
+   démarré et réinitialisé Supabase local :
 
 ```bash
 pnpm --filter @pulse/landing test:db
@@ -163,17 +164,17 @@ pnpm --filter @pulse/landing test:db
 
 ### Lemon Squeezy
 
-1. Configure webhook URL: `https://missionpulse.app/api/webhooks/lemon`
-2. Set `LEMON_SQUEEZY_WEBHOOK_SECRET` in Vercel.
-3. Map credit pack variant IDs in env.
+1. Configurer l'URL de webhook : `https://missionpulse.app/api/webhooks/lemon`
+2. Définir `LEMON_SQUEEZY_WEBHOOK_SECRET` dans Vercel.
+3. Mapper les IDs de variants de packs de crédits dans l'env.
 
 ---
 
 ## Chrome Web Store
 
-### Build artifact
+### Artefact de build
 
-The candidate version must already be committed consistently in the root package, extension package and source manifest. Never bump it inside a release workflow. On the exact clean commit, run the complete local/build/packaged-MV3 gate and seal its immutable evidence:
+La version candidate doit déjà être commitée de façon cohérente dans le package racine, le package extension et le manifest source. Ne jamais la bumper dans un workflow de release. Sur le commit propre exact, exécuter la gate complète local/build/MV3-packagé et sceller ses preuves immuables :
 
 ```bash
 pnpm --filter @pulse/extension release:seal-candidate -- \
@@ -182,9 +183,9 @@ pnpm --filter @pulse/extension release:seal-candidate -- \
   --output output/playwright/mv3-evidence/tested-dist-seal.json
 ```
 
-The input must bind the exact clean commit, committed version, Node/pnpm versions, lockfile, connector configuration, effective built manifest, complete nonempty committed MV3 scenario inventory, aggregate report, zero skips/failures/runtime diagnostics, and identical tree receipts before and after browser exercise. A per-test file is not aggregate evidence.
+L'entrée doit lier le commit propre exact, la version commitée, les versions Node/pnpm, le lockfile, la configuration des connecteurs, le manifest buildé effectif, l'inventaire complet non vide de scénarios MV3 commité, le rapport agrégé, zéro skip/failure/diagnostic runtime, et des reçus d'arbre identiques avant et après l'exercice navigateur. Un fichier par test n'est pas une preuve agrégée.
 
-After the seal exists, the flow is package-only. Do not install, build, bump, resolve connectors, delete or rewrite `dist`:
+Une fois le seal existant, le flux est package-only. Ne pas installer, builder, bumper, résoudre les connecteurs, supprimer ni réécrire `dist` :
 
 ```bash
 pnpm --filter @pulse/extension package:sealed -- \
@@ -202,20 +203,20 @@ pnpm --filter @pulse/extension verify:release-artifact -- \
   --extract-fresh /tmp/missionpulse-0.2.2-consumer-check
 ```
 
-The accepted bundle contains exactly the immutable ownership marker, canonical STORE ZIP, exact checksum sidecar and JCS validation record. Recompute the ZIP SHA-256 after every upload/download and immediately before any Store handoff.
+Le bundle accepté contient exactement le marqueur d'ownership immuable, le ZIP STORE canonique, le sidecar de checksum exact et l'enregistrement de validation JCS. Recalculer le SHA-256 du ZIP après chaque upload/download et immédiatement avant tout handoff Store.
 
-### Release automation
+### Automatisation de release
 
-Start `release.yml` manually with the source commit/version and the exact Actions run/artifact that archived `tested-dist-seal.json` with its tested `dist/`. The workflow invokes the same package-only runner and verifies the downloaded artifact in a separate job. Its maximum state is `package_validated`.
+Lancer `release.yml` manuellement avec le commit/version source et le run/artifact Actions exact qui a archivé `tested-dist-seal.json` avec son `dist/` testé. Le workflow invoque le même runner package-only et vérifie l'artifact téléchargé dans un job séparé. Son état maximal est `package_validated`.
 
-After `consumer-verify` passes, the `release-publish` job publishes the result as a versioned GitHub Release. The operator first pushes the immutable `v<version>` tag at the sealed source commit from their machine (the workflow GITHUB_TOKEN cannot push tags over workflow-changing commits, and tagging a release is an operator decision). The job then:
+Après le passage de `consumer-verify`, le job `release-publish` publie le résultat en GitHub Release versionnée. L'opérateur pousse d'abord le tag immuable `v<version>` au commit scellé depuis sa machine (le GITHUB_TOKEN du workflow ne peut pas pousser de tags sur des commits modifiant le workflow, et taguer une release est une décision d'opérateur). Le job ensuite :
 
-1. verifies the remote tag exists and points exactly at the sealed commit (fail-closed otherwise);
-2. re-checks the bundle checksum against the sidecar and the packaging job's digest;
-3. creates the GitHub Release from that tag (`--verify-tag`) and uploads `missionpulse.zip`, `missionpulse.zip.sha256` and `validation.json` as release assets;
-4. refuses to mutate an existing release — a published release is immutable.
+1. vérifie que le tag distant existe et pointe exactement vers le commit scellé (fail-closed sinon) ;
+2. revérifie le checksum du bundle contre le sidecar et le digest du job de packaging ;
+3. crée la GitHub Release depuis ce tag (`--verify-tag`) et upload `missionpulse.zip`, `missionpulse.zip.sha256` et `validation.json` comme assets de release ;
+4. refuse de muter une release existante — une release publiée est immuable.
 
-Full sequence for one version:
+Séquence complète pour une version :
 
 ```bash
 git tag "v0.2.2" "5fd443dc1c7a" && git push origin "v0.2.2"
@@ -223,83 +224,83 @@ gh workflow run release.yml --ref main \
   -f source_commit="5fd443dc1c7a…" -f expected_version="0.2.2" -f evidence_run_id="<seal-run-id>"
 ```
 
-The GitHub Release is the durable store handoff point: download `missionpulse.zip` from the release page, recompute its SHA-256, and compare it against the release's `missionpulse.zip.sha256` before uploading to the Chrome Web Store dashboard.
+La GitHub Release est le point de handoff durable vers le Store : télécharger `missionpulse.zip` depuis la page de release, recalculer son SHA-256, et le comparer au `missionpulse.zip.sha256` de la release avant tout upload vers le dashboard Chrome Web Store.
 
-### Chrome Web Store boundary
+### Frontière Chrome Web Store
 
-There is no automatic provider publication. Store readiness requires a structured, authorized receipt covering listing completeness, privacy disclosure, permission justification, all four credential-presence checks, and a known-good rollback target. Credentials remain in the operator/provider secret store and must never enter local evidence:
+Il n'y a aucune publication fournisseur automatique. La readiness Store exige un reçu structuré et autorisé couvrant la complétude de la fiche, la déclaration de confidentialité, la justification des permissions, les quatre checks de présence d'identifiants et une cible de rollback connue et bonne. Les identifiants restent dans le secret store de l'opérateur/fournisseur et ne doivent jamais entrer dans les preuves locales :
 
 - `CHROME_EXTENSION_ID`
 - `CHROME_CLIENT_ID`
 - `CHROME_CLIENT_SECRET`
 - `CHROME_REFRESH_TOKEN`
 
-Submission, observation, production promotion and rollback are external receipt-driven transitions. A green local package does not claim any of them.
+La soumission, l'observation, la promotion en production et le rollback sont des transitions externes pilotées par reçus. Un package local vert ne revendique aucun d'entre eux.
 
-### Manifest checklist
+### Checklist du manifest
 
-- Version aligned with `package.json` (currently `0.2.2`)
-- `minimum_chrome_version`: `114`
-- Permissions: sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting, activeTab, identity
-- Host permissions: shipped mission connectors + the configured Supabase project +
-  the cookieless Copilot API only
-- LinkedIn: `optional_host_permissions` only
+- Version alignée avec `package.json` (actuellement `0.2.2`)
+- `minimum_chrome_version` : `114`
+- Permissions : sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting, activeTab, identity
+- Host permissions : connecteurs de missions livrés + le projet Supabase configuré +
+  l'API Copilot sans cookie uniquement
+- LinkedIn : `optional_host_permissions` uniquement
 
-### Dev code tree-shaking
+### Tree-shaking du code dev
 
-Verified: production `dist/` contains no `bootstrapDevMode`, `DevPanel`, `chrome-stubs`, or `qa-seed`. All `src/dev/` imports are behind `import.meta.env.DEV` dynamic imports.
-
----
-
-## DNS & domains
-
-| Record             | Target                                                        |
-| ------------------ | ------------------------------------------------------------- |
-| `missionpulse.app` | Vercel landing project                                        |
-| `www`              | Redirect to apex (recommended)                                |
-| `copilot`          | Same Vercel landing project; no account cookies or browser UI |
-
-Preview deployments use `*.vercel.app`; add Supabase redirect URLs per preview if testing auth.
+Vérifié : le `dist/` de production ne contient ni `bootstrapDevMode`, ni `DevPanel`, ni `chrome-stubs`, ni `qa-seed`. Tous les imports de `src/dev/` sont derrière des imports dynamiques `import.meta.env.DEV`.
 
 ---
 
-## Post-deploy smoke tests
+## DNS & domaines
 
-- [ ] Landing home loads over HTTPS
-- [ ] `/login`, `/register`, `/register/passkey` work
-- [ ] OAuth callback sets session cookie; redirect to `/dashboard`
-- [ ] Dashboard loads authenticated state; unauthenticated redirects to landing login
-- [ ] `/api/generate` returns 503 without `GLM_API_KEY` (or 200 when configured)
-- [ ] `copilot.missionpulse.app/api/copilot/entitlement` rejects missing bearer credentials and never relies on account cookies
-- [ ] Eve health is deployed through the committed sibling-service rewrite, while Eve session routes reject browser calls without Vercel OIDC
-- [ ] Receipt maintenance rejects a missing/wrong bearer, succeeds with the Vercel `CRON_SECRET`, and its last successful run is less than 25 hours old
-- [ ] `private.copilot_job_facts` is inaccessible to `anon` and `authenticated`; no public Copilot metrics route exists
-- [ ] Extension loads in Chrome; side panel opens; scan runs on a connected platform
-- [ ] Extension syncs with Supabase (host permission for project URL)
+| Enregistrement     | Cible                                                                |
+| ------------------ | -------------------------------------------------------------------- |
+| `missionpulse.app` | Projet landing Vercel                                                |
+| `www`              | Redirection vers l'apex (recommandé)                                 |
+| `copilot`          | Même projet landing Vercel ; aucun cookie de compte ni UI navigateur |
+
+Les déploiements de preview utilisent `*.vercel.app` ; ajouter les URLs de redirection Supabase par preview si l'auth est testée.
 
 ---
 
-## Known gaps (non-blocking for build)
+## Smoke tests post-déploiement
 
-| Priority | Item                                                                                         | Owner |
-| -------- | -------------------------------------------------------------------------------------------- | ----- |
-| High     | Configure Vercel env vars (see tables above)                                                 | Ops   |
-| High     | Supabase production project + migrations (`apps/landing/supabase/migrations/`)               | Ops   |
-| High     | Supabase Auth redirect URLs: `https://missionpulse.app/api/auth/callback`                    | Ops   |
-| High     | Lemon Squeezy webhook: `https://missionpulse.app/api/webhooks/lemon`                         | Ops   |
-| High     | Chrome Web Store GitHub secrets for release workflow                                         | Ops   |
-| Medium   | Hardcoded Supabase URL in extension manifest — changing project requires code + CWS resubmit | Dev   |
-| Low      | CSP not configured (rely on Vercel headers + SvelteKit defaults)                             | Dev   |
+- [ ] La home de la landing charge en HTTPS
+- [ ] `/login`, `/register`, `/register/passkey` fonctionnent
+- [ ] Le callback OAuth pose le cookie de session ; redirection vers `/dashboard`
+- [ ] Le dashboard charge l'état authentifié ; non authentifié redirige vers le login de la landing
+- [ ] `/api/generate` retourne 503 sans `GLM_API_KEY` (ou 200 si configurée)
+- [ ] `copilot.missionpulse.app/api/copilot/entitlement` rejette les credentials bearer manquants et ne s'appuie jamais sur les cookies de compte
+- [ ] La santé Eve est déployée via la réécriture commitée en services frères, tandis que les routes de session Eve rejettent les appels navigateur sans Vercel OIDC
+- [ ] La maintenance des reçus rejette un bearer manquant/erroné, réussit avec le `CRON_SECRET` Vercel, et son dernier run réussi date de moins de 25 heures
+- [ ] `private.copilot_job_facts` est inaccessible à `anon` et `authenticated` ; aucune route publique de métriques Copilot n'existe
+- [ ] L'extension se charge dans Chrome ; le side panel s'ouvre ; un scan s'exécute sur une plateforme connectée
+- [ ] L'extension se synchronise avec Supabase (host permission pour l'URL du projet)
 
 ---
 
-## Suggested commit before deploy
+## Manques connus (non bloquants pour le build)
 
-Stage production-relevant changes only (exclude `reports/performance/`):
+| Priorité | Élément                                                                                                | Propriétaire |
+| -------- | ------------------------------------------------------------------------------------------------------ | ------------ |
+| Haute    | Configurer les variables d'env Vercel (voir tables ci-dessus)                                          | Ops          |
+| Haute    | Projet Supabase de production + migrations (`apps/landing/supabase/migrations/`)                       | Ops          |
+| Haute    | URLs de redirection Supabase Auth : `https://missionpulse.app/api/auth/callback`                       | Ops          |
+| Haute    | Webhook Lemon Squeezy : `https://missionpulse.app/api/webhooks/lemon`                                  | Ops          |
+| Haute    | Secrets GitHub Chrome Web Store pour le workflow de release                                            | Ops          |
+| Moyenne  | URL Supabase en dur dans le manifest de l'extension — changer de projet exige code + re-soumission CWS | Dev          |
+| Basse    | CSP non configurée (s'appuyer sur les headers Vercel + défauts SvelteKit)                              | Dev          |
 
-- Landing auth refactor (`hooks.server.ts`, `auth-cookie.ts`, login/register routes)
-- Dashboard `hooks.server.ts`
-- Extension performance/connector changes (if tested)
-- `docs/PRODUCTION.md`, updated `.env.example` files
+---
 
-Do **not** commit `.env` files or `SUPABASE_SERVICE_ROLE_KEY`.
+## Commit suggéré avant déploiement
+
+Stager uniquement les changements pertinents pour la production (exclure `reports/performance/`) :
+
+- Refactor auth de la landing (`hooks.server.ts`, `auth-cookie.ts`, routes login/register)
+- `hooks.server.ts` du dashboard
+- Changements performance/connecteurs de l'extension (si testés)
+- `docs/PRODUCTION.md`, fichiers `.env.example` mis à jour
+
+Ne **pas** committer de fichiers `.env` ni `SUPABASE_SERVICE_ROLE_KEY`.

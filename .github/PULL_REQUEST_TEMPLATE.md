@@ -1,8 +1,8 @@
-## Summary
+## Résumé
 
 -
 
-## Verification
+## Vérification
 
 - [ ] `pnpm format:check`
 - [ ] `pnpm lint`
@@ -12,7 +12,7 @@
 
 ## Checklist
 
-- [ ] No secrets, cookies, session tokens, or generated release artifacts committed
-- [ ] Core code remains pure; I/O stays in shell modules
-- [ ] Svelte changes use Svelte 5 runes only
-- [ ] Documentation updated when behavior or setup changes
+- [ ] Aucun secret, cookie, token de session ou artefact de release généré n'est commité
+- [ ] Le code Core reste pur ; l'I/O reste dans les modules shell
+- [ ] Les changements Svelte utilisent uniquement les runes Svelte 5
+- [ ] Documentation mise à jour quand le comportement ou la configuration changent

@@ -4,16 +4,16 @@ import { classifyField } from './classify-field';
 const MAX_LABEL_LEN = 120;
 const MAX_PLACEHOLDER_LEN = 200;
 
-// Motifs retirés du texte envoyé à l'IA : URLs, emails, numéros de téléphone.
-// On évite ainsi de faire transiter de la PII captée accidentellement dans un
-// label ou un placeholder.
+// Patterns stripped from text sent to the AI: URLs, emails, phone numbers.
+// This prevents accidentally captured PII in a label or placeholder from
+// reaching the model.
 const URL_RE = /\bhttps?:\/\/\S+/gi;
 const EMAIL_RE = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/gi;
 const PHONE_RE = /(?:\+?\d[\d\s().-]{7,}\d)/g;
 
 /**
- * Nettoie un texte de métadonnée : retire PII accidentelle, normalise les
- * espaces, plafonne la longueur. Pur.
+ * Sanitizes a metadata text: strips accidental PII, normalizes whitespace,
+ * caps length. Pure.
  */
 function sanitizeText(text: string, maxLen: number): string {
   return text
@@ -26,11 +26,11 @@ function sanitizeText(text: string, maxLen: number): string {
 }
 
 /**
- * Sanitise les métadonnées brutes d'un champ puis le classifie.
- * Le FieldDescriptor retourné est la seule forme autorisée à franchir le
- * bridge vers le service worker / Eve.
+ * Sanitizes a field's raw metadata then classifies it.
+ * The returned FieldDescriptor is the only form allowed to cross the
+ * bridge to the service worker / Eve.
  *
- * Pur, déterministe.
+ * Pure, deterministic.
  */
 export function sanitizeFieldDescriptor(raw: RawFieldInput): FieldDescriptor {
   const label = sanitizeText(raw.label, MAX_LABEL_LEN);

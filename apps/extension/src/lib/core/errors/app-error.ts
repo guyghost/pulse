@@ -1,10 +1,10 @@
 /**
- * Système d'erreurs typé pour MissionPulse
+ * Typed error system for MissionPulse
  *
- * Règles:
- * - Core = pure, pas d'I/O (pas de console.log, pas de Date.now())
- * - Les erreurs sont sérialisables (pour postMessage)
- * - Timestamp injecté depuis Shell
+ * Rules:
+ * - Core = pure, no I/O (no console.log, no Date.now())
+ * - Errors are serializable (for postMessage)
+ * - Timestamp injected from Shell
  */
 
 // ============================================================================
@@ -22,7 +22,7 @@ export interface BaseAppError {
 }
 
 // ============================================================================
-// Erreurs spécifiques (discriminating union)
+// Specific errors (discriminating union)
 // ============================================================================
 
 export interface NetworkError extends BaseAppError {
@@ -57,7 +57,7 @@ export interface ValidationError extends BaseAppError {
   readonly received?: unknown;
 }
 
-/** Union discriminating de toutes les erreurs applicatives */
+/** Discriminating union of all application errors */
 export type AppError =
   NetworkError | StorageError | ParsingError | ConnectorError | ValidationError;
 
@@ -208,7 +208,7 @@ export function createValidationError(
 // Helpers
 // ============================================================================
 
-/** Détermine si une erreur est retryable (pour la logique de retry) */
+/** Determines whether an error is retryable (for retry logic) */
 export function isRetryable(error: AppError): boolean {
   if (error.type === 'network') {
     return error.retryable;
@@ -216,12 +216,12 @@ export function isRetryable(error: AppError): boolean {
   return error.recoverable;
 }
 
-/** Détermine si une erreur est fatale (non recoverable) */
+/** Determines whether an error is fatal (non-recoverable) */
 export function isFatal(error: AppError): boolean {
   return !error.recoverable;
 }
 
-/** Convertit une erreur en objet plain sérialisable (pour postMessage) */
+/** Converts an error into a serializable plain object (for postMessage) */
 export function serializeError(error: AppError): Record<string, unknown> {
   return {
     type: error.type,
@@ -255,7 +255,7 @@ export function serializeError(error: AppError): Record<string, unknown> {
   };
 }
 
-/** Reconstruit une erreur depuis un objet sérialisé (après postMessage) */
+/** Rebuilds an error from a serialized object (after postMessage) */
 export function deserializeError(data: Record<string, unknown>): AppError {
   const base = {
     message: String(data.message),

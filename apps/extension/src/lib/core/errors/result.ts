@@ -1,7 +1,7 @@
 /**
- * Pattern Result<T, E> inspiré de Rust
+ * Rust-inspired Result<T, E> pattern
  *
- * Permet une gestion d'erreurs explicite sans exceptions
+ * Enables explicit error handling without exceptions
  *
  * Usage:
  *   function mayFail(): Result<string, AppError> {
@@ -19,27 +19,27 @@
 
 import type { AppError } from './app-error';
 
-/** Résultat succès */
+/** Successful result */
 export interface Ok<T> {
   readonly ok: true;
   readonly value: T;
 }
 
-/** Résultat erreur */
+/** Error result */
 export interface Err<E> {
   readonly ok: false;
   readonly error: E;
 }
 
-/** Union Result<T, E> */
+/** Result<T, E> union */
 export type Result<T, E = AppError> = Ok<T> | Err<E>;
 
-/** Crée un résultat succès */
+/** Creates a successful result */
 export function ok<T>(value: T): Ok<T> {
   return { ok: true, value };
 }
 
-/** Crée un résultat erreur */
+/** Creates an error result */
 export function err<E>(error: E): Err<E> {
   return { ok: false, error };
 }
@@ -54,7 +54,7 @@ export function isErr<T, E>(result: Result<T, E>): result is Err<E> {
   return result.ok === false;
 }
 
-/** Transforme la valeur en cas de succès */
+/** Transforms the value on success */
 export function map<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E> {
   if (result.ok) {
     return ok(fn(result.value));
@@ -62,7 +62,7 @@ export function map<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<
   return result;
 }
 
-/** Transforme la valeur en cas de succès avec une fonction pouvant échouer */
+/** Transforms the value on success with a fallible function */
 export function flatMap<T, U, E>(
   result: Result<T, E>,
   fn: (value: T) => Result<U, E>
@@ -73,7 +73,7 @@ export function flatMap<T, U, E>(
   return result;
 }
 
-/** Transforme l'erreur en cas d'échec */
+/** Transforms the error on failure */
 export function mapErr<T, E, F>(result: Result<T, E>, fn: (error: E) => F): Result<T, F> {
   if (result.ok) {
     return result;
@@ -81,12 +81,12 @@ export function mapErr<T, E, F>(result: Result<T, E>, fn: (error: E) => F): Resu
   return err(fn(result.error));
 }
 
-/** Récupère la valeur ou une valeur par défaut */
+/** Returns the value or a default */
 export function unwrapOr<T, E>(result: Result<T, E>, defaultValue: T): T {
   return result.ok ? result.value : defaultValue;
 }
 
-/** Récupère la valeur ou lance une exception */
+/** Returns the value or throws */
 export function unwrap<T, E>(result: Result<T, E>): T {
   if (result.ok) {
     return result.value;
@@ -94,12 +94,12 @@ export function unwrap<T, E>(result: Result<T, E>): T {
   throw new Error(`Called unwrap on Err: ${JSON.stringify(result.error)}`);
 }
 
-/** Récupère la valeur ou undefined */
+/** Returns the value or undefined */
 export function unwrapOptional<T, E>(result: Result<T, E>): T | undefined {
   return result.ok ? result.value : undefined;
 }
 
-/** Exécute un callback selon le cas */
+/** Invokes a callback depending on the case */
 export function match<T, E, U>(
   result: Result<T, E>,
   handlers: {

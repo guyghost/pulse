@@ -81,7 +81,7 @@ export function buildTjmCoachFacts(
   if (
     !Number.isFinite(profile.tjmMin) ||
     profile.tjmMin <= 0 ||
-    // DAO #174 : null = sans plafond, une borne explicite doit rester cohérente.
+    // DAO #174: null = no ceiling, an explicit bound must stay consistent.
     (profile.tjmMax !== null &&
       (!Number.isFinite(profile.tjmMax) ||
         profile.tjmMax > 5_000 ||

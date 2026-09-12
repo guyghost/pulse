@@ -1,16 +1,16 @@
 import type { Metric, ScanMetrics, CacheMetrics } from '../../core/metrics/types';
 
 /**
- * Collecteur de métriques
- * Shell = I/O et side effects autorisés
- * Mode dev uniquement (tree-shaken en prod)
+ * Metrics collector
+ * Shell = I/O and side effects allowed
+ * Dev mode only (tree-shaken in prod)
  */
 class MetricsCollector {
   private metrics: Metric[] = [];
   private maxSize = 1000;
 
   /**
-   * Enregistre une métrique
+   * Records a metric
    */
   record(metric: Metric): void {
     if (!import.meta.env.DEV) {
@@ -19,14 +19,14 @@ class MetricsCollector {
 
     this.metrics.push(metric);
 
-    // Limiter la taille pour éviter les fuites mémoire
+    // Limit the size to avoid memory leaks
     if (this.metrics.length > this.maxSize) {
       this.metrics = this.metrics.slice(-this.maxSize);
     }
   }
 
   /**
-   * Enregistre une métrique de timing
+   * Records a timing metric
    */
   recordTiming(operation: string, durationMs: number, tags?: Record<string, string>): void {
     this.record({
@@ -39,12 +39,12 @@ class MetricsCollector {
   }
 
   /**
-   * Enregistre les métriques d'un scan complet
+   * Records the metrics of a full scan
    */
   recordScanMetrics(metrics: ScanMetrics): void {
     const timestamp = Date.now();
 
-    // Durée totale
+    // Total duration
     this.record({
       name: 'scan.duration',
       value: metrics.durationMs,
@@ -71,7 +71,7 @@ class MetricsCollector {
       });
     }
 
-    // Taux de déduplication
+    // Deduplication ratio
     this.record({
       name: 'scan.dedup_ratio',
       value: metrics.dedupRatio,
@@ -92,7 +92,7 @@ class MetricsCollector {
   }
 
   /**
-   * Enregistre les métriques de cache
+   * Records cache metrics
    */
   recordCacheMetrics(name: string, metrics: CacheMetrics): void {
     const timestamp = Date.now();
@@ -127,15 +127,15 @@ class MetricsCollector {
   }
 
   /**
-   * Récupère toutes les métriques
+   * Retrieves all metrics
    */
   getMetrics(): Metric[] {
     return [...this.metrics];
   }
 
   /**
-   * Récupère les métriques filtrées par nom. `*` agit comme joker ; tout le
-   * reste du motif est échappé (CodeQL js/incomplete-sanitization).
+   * Retrieves metrics filtered by name. `*` acts as a wildcard; the rest of
+   * the pattern is escaped (CodeQL js/incomplete-sanitization).
    */
   getMetricsByName(namePattern: string): Metric[] {
     const regex = new RegExp(
@@ -148,7 +148,7 @@ class MetricsCollector {
   }
 
   /**
-   * Calcule la moyenne d'une métrique
+   * Computes the average of a metric
    */
   getAverage(name: string): number {
     const metrics = this.metrics.filter((m) => m.name === name);
@@ -160,21 +160,21 @@ class MetricsCollector {
   }
 
   /**
-   * Récupère la dernière valeur d'une métrique
+   * Retrieves the last value of a metric
    */
   getLast(name: string): Metric | undefined {
     return this.metrics.filter((m) => m.name === name).sort((a, b) => b.timestamp - a.timestamp)[0];
   }
 
   /**
-   * Efface toutes les métriques
+   * Clears all metrics
    */
   clear(): void {
     this.metrics = [];
   }
 
   /**
-   * Exporte les métriques en JSON (pour debug)
+   * Exports metrics as JSON (for debugging)
    */
   export(): string {
     return JSON.stringify(

@@ -1,6 +1,6 @@
 /**
- * Export des missions en différents formats
- * Core = pur : zéro I/O, zéro async, zéro side effect
+ * Mission export in various formats
+ * Core = pure: zero I/O, zero async, zero side effects
  */
 
 import type { Mission } from '../types/mission';
@@ -16,8 +16,8 @@ export interface ExportOptions {
 }
 
 /**
- * Formate une date selon le format spécifié
- * Pure function - injection de la date de référence pour testabilité
+ * Formats a date according to the specified format
+ * Pure function - reference date injected for testability
  */
 function formatDate(date: Date, format: 'iso' | 'locale' | 'relative', now: Date): string {
   switch (format) {
@@ -85,7 +85,7 @@ export function exportMissionsToJSON(
 }
 
 /**
- * Échappe une valeur pour CSV
+ * Escapes a value for CSV
  * Pure function
  */
 function escapeCSV(value: string | null | undefined): string {
@@ -93,7 +93,7 @@ function escapeCSV(value: string | null | undefined): string {
     return '';
   }
   const str = String(value);
-  // Si contient des caractères spéciaux, entourer de guillemets et échapper
+  // Contains special characters → quote and escape
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
@@ -295,8 +295,8 @@ export function exportMissionsToMarkdown(
 }
 
 /**
- * Génère un nom de fichier pour l'export
- * Pure function - injection de la date pour testabilité
+ * Generates a filename for the export
+ * Pure function - date injected for testability
  */
 export function generateFilename(prefix: string, format: ExportFormat, now: Date): string {
   const timestamp = now.toISOString().split('T')[0]; // YYYY-MM-DD
@@ -309,8 +309,8 @@ export function generateFilename(prefix: string, format: ExportFormat, now: Date
 }
 
 /**
- * Exporte les missions dans le format spécifié
- * Fonction utilitaire qui délègue aux fonctions spécifiques
+ * Exports missions in the specified format
+ * Utility function delegating to format-specific functions
  * Pure function
  */
 export function exportMissions(missions: Mission[], options: ExportOptions, now: Date): string {

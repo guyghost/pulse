@@ -1,12 +1,12 @@
-# Architecture Decisions
+# Décisions d'architecture
 
 [<- Retour](../README.md)
 
-## Decisions
+## Décisions
 
-- [001 - Functional Core and Imperative Shell](./001-functional-core-imperative-shell.md)
-- [002 - XState State Management](./002-xstate-state-management.md)
-- [003 - Connector Architecture](./003-connector-architecture.md)
-- [004 - Result Pattern Error Handling](./004-result-pattern-error-handling.md)
-- [005 - Storage Hierarchy](./005-storage-hierarchy.md)
-- [006 - Remote AI Provider Boundary](./006-remote-ai-provider-boundary.md)
+- [001 - Functional Core et Imperative Shell](./001-functional-core-imperative-shell.md)
+- [002 - Gestion d'état avec XState](./002-xstate-state-management.md)
+- [003 - Architecture des connecteurs](./003-connector-architecture.md)
+- [004 - Gestion d'erreurs avec le pattern Result](./004-result-pattern-error-handling.md)
+- [005 - Hiérarchie de stockage](./005-storage-hierarchy.md)
+- [006 - Frontière avec le fournisseur IA distant](./006-remote-ai-provider-boundary.md)

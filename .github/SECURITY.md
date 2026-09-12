@@ -1,27 +1,27 @@
-# Security Policy
+# Politique de sécurité
 
-MissionPulse is a browser extension that reads local browser sessions for supported freelance platforms. Please report security issues privately.
+MissionPulse est une extension navigateur qui lit les sessions locales du navigateur pour les plateformes freelance supportées. Merci de signaler les problèmes de sécurité en privé.
 
-## Supported Versions
+## Versions supportées
 
-Security fixes target the current `main` branch and the latest tagged release.
+Les correctifs de sécurité ciblent la branche `main` courante et la dernière release taguée.
 
-## Reporting a Vulnerability
+## Signaler une vulnérabilité
 
-Open a private GitHub security advisory for this repository, or contact the maintainers through the address listed in the public project profile.
+Ouvrez un GitHub security advisory privé pour ce dépôt, ou contactez les mainteneurs via l'adresse indiquée sur le profil public du projet.
 
-Please include:
+Merci d'inclure :
 
-- Affected version or commit.
-- Clear reproduction steps.
-- Impact and data exposure scope.
-- Whether secrets, cookies, or session tokens are involved.
+- La version ou le commit affecté.
+- Des étapes de reproduction claires.
+- L'impact et le périmètre d'exposition des données.
+- Si des secrets, cookies ou tokens de session sont impliqués.
 
-Do not open a public issue for an unpatched vulnerability.
+N'ouvrez pas d'issue publique pour une vulnérabilité non corrigée.
 
-## Security Expectations
+## Attentes de sécurité
 
-- No credentials or platform session tokens are stored in the repository.
-- Local `.env` and `.env.local` files are ignored by git.
-- Browser cookies are used only through Chrome extension APIs for supported connectors.
-- The extension core must remain pure and testable, with I/O isolated in the shell layer.
+- Aucun identifiant ni token de session plateforme n'est stocké dans le dépôt.
+- Les fichiers locaux `.env` et `.env.local` sont ignorés par git.
+- Les cookies navigateur ne sont utilisés que via les API d'extension Chrome pour les connecteurs supportés.
+- Le cœur de l'extension doit rester pur et testable, avec l'I/O isolée dans la couche shell.

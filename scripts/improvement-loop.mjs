@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Boucle d'amélioration locale — gate unifiée avant PR.
+ * Local improvement loop — unified gate before PR.
  */
 
 import { execSync } from 'node:child_process';

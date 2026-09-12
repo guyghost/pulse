@@ -306,7 +306,7 @@
     window.dispatchEvent(new CustomEvent('dev:clear-cache'));
   }
 
-  // Réagir aux changements de connexion via le singleton store
+  // React to connection changes via the singleton store
   let prevConnectionStatus = $state(connection.status);
   $effect(() => {
     const current = connection.status;

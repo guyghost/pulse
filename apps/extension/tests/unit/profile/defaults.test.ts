@@ -34,7 +34,7 @@ describe('mergeDraftOntoDefault (P0-A1)', () => {
     expect(merged.tjmMax).toBe(800);
     expect(merged.location).toBe('Nantes');
     expect(merged.remote).toBe('full');
-    // Le reste du profil défaut est préservé (poids de scoring notamment).
+    // The rest of the default profile is preserved (scoring weights notably).
     expect(merged.scoringWeights).toEqual(base.scoringWeights);
     expect(merged.seniority).toBe(base.seniority);
   });
@@ -66,7 +66,7 @@ describe('mergeDraftOntoDefault (P0-A1)', () => {
 
   it('tjmMax : le base gagne quand le draft ne définit pas (null = non défini)', () => {
     const base = { ...createDefaultProfile(), tjmMax: 900 };
-    // draft.tjmMax null = « non défini » → base conservé.
+    // draft.tjmMax null = "undefined" → base preserved.
     const merged = mergeDraftOntoDefault({ tjmMax: null }, base);
     expect(merged.tjmMax).toBe(900);
     // draft.tjmMax explicite → draft gagne.

@@ -7,19 +7,19 @@ import type {
 } from './types';
 
 /**
- * Table de vérité du sélecteur de moteur (Machine B, transition
- * `entitlement → generating`).
+ * Engine selector truth table (Machine B, `entitlement → generating`
+ * transition).
  *
- * - `remote` n'est choisi QUE si : préférence remote + entitlement actif +
- *   consentement accordé. Aucun de ces trois ne peut être implicite.
- * - `local` (Gemini Nano) exige `availability === 'available'`.
- *   `'after-download'` ⇒ local non prêt.
- * - Sinon `none` (aucune proposition possible).
+ * - `remote` is chosen ONLY if: remote preference + active entitlement +
+ *   consent granted. None of the three can be implicit.
+ * - `local` (Gemini Nano) requires `availability === 'available'`.
+ *   `'after-download'` ⇒ local not ready.
+ * - Otherwise `none` (no proposal possible).
  *
- * Invariant (LLM ne décide pas) : cette fonction est pure et ne consulte
- * aucune sortie d'IA. La décision est une table de vérité déterministe.
+ * Invariant (the LLM does not decide): this function is pure and consults no
+ * AI output. The decision is a deterministic truth table.
  *
- * Pur, déterministe, sans I/O.
+ * Pure, deterministic, no I/O.
  */
 export function selectFormAssistEngine(
   preference: EnginePreference,

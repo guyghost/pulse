@@ -82,10 +82,10 @@ function nonEmpty(value: string | undefined): string {
 }
 
 /**
- * P0-A1 (docs/plans/2026-09-07-activation-first-scan-p0.md) : overlay des
- * champs de draft non vides sur un profil de base (existant ou défaut).
- * Le base gagne toujours : un draft vide ne dégrade jamais un profil
- * durable. Pur — zéro I/O, testable sans mocks.
+ * P0-A1 (docs/plans/2026-09-07-activation-first-scan-p0.md): overlay of
+ * non-empty draft fields onto a base profile (existing or default).
+ * The base always wins: an empty draft never degrades a durable profile.
+ * Pure — zero I/O, testable without mocks.
  */
 export function mergeDraftOntoDefault(draft: ProfileDraftOverlay, base: UserProfile): UserProfile {
   const firstName = nonEmpty(draft.firstName);

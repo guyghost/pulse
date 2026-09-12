@@ -72,8 +72,8 @@ export interface UserProfile {
   keywords: string[];
   tjmMin: number;
   /**
-   * Plafond de TJM souhaité. `null` = sans plafond : seul le minimum est
-   * comparé par le scoring. L'UI ne collecte plus de maximum (DAO #174).
+   * Desired TJM ceiling. `null` = no ceiling: only the minimum is
+   * compared by scoring. The UI no longer collects a maximum (DAO #174).
    */
   tjmMax: number | null;
   location: string;

@@ -3,8 +3,8 @@ import type { FieldProposal } from './types';
 const MAX_PROPOSAL_LEN = 4000;
 
 /**
- * Retire les fences markdown (```…) qu'un LLM peut ajouter malgré la consigne.
- * Pur.
+ * Strips markdown fences (```…) that an LLM may add despite instructions.
+ * Pure.
  */
 function stripCodeFences(raw: string): string {
   const trimmed = raw.trim();
@@ -17,18 +17,17 @@ function stripCodeFences(raw: string): string {
 }
 
 /**
- * Détection d'un sentinelle "vide" : l'LLM peut renvoyer `""` ou `''` (avec ou
- * sans espaces) pour signaler qu'il n'a pas de valeur. On rejette ces cas
- * plutôt que de proposer le texte littéral `"\""`.
+ * Detects an "empty" sentinel: the LLM may return `""` or `''` (with or
+ * without spaces) to signal it has no value. Reject these cases instead of
+ * proposing the literal `"\""` text.
  */
 function isEmptySentinel(text: string): boolean {
   return /^["'“”‘’\s]*$/.test(text);
 }
 
 /**
- * Retire un niveau d'encadrement par des guillemets (simples, doubles, ou
- * typographiques). Certains LLM entourent systématiquement la valeur proposée
- * de guillemets.
+ * Strips one level of quote wrapping (single, double, or typographic).
+ * Some LLMs systematically wrap the proposed value in quotes.
  */
 function stripSurroundingQuotes(text: string): string {
   if (text.length < 2) {
@@ -46,9 +45,9 @@ function stripSurroundingQuotes(text: string): string {
 
 /**
  * Transforme la sortie brute d'un LLM en FieldProposal canonical, ou `null`
- * si vide/invalide.
+ * when empty/invalid.
  *
- * Pur, déterministe, sans I/O.
+ * Pure, deterministic, no I/O.
  */
 export function parseFieldProposal(raw: string): FieldProposal | null {
   if (typeof raw !== 'string') {

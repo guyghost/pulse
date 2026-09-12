@@ -1,7 +1,7 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
 import type { ConnectionInfo } from '../../../src/lib/shell/utils/connection-monitor';
 
-// Capturer le callback pour simuler des événements de connexion
+// Capture the callback to simulate connection events
 let connectionCallback: ((info: ConnectionInfo) => void) | null = null;
 
 vi.mock('../../../src/lib/shell/utils/connection-monitor', () => ({
@@ -25,7 +25,7 @@ describe('connection store', () => {
 
   it('starts in unknown state', () => {
     const store = createConnectionStore();
-    // subscribeToConnection appelle immédiatement le callback — mais dans les tests,
+    // subscribeToConnection invokes the callback immediately — but in tests,
     // le mock ne l'appelle pas automatiquement, donc le statut reste 'unknown'
     expect(store.status).toBe('unknown');
     expect(store.lastOnlineTime).toBeNull();
@@ -113,7 +113,7 @@ describe('connection store', () => {
     connectionCallback!({ status: 'offline' });
     expect(store.status).toBe('offline');
 
-    // Vérifier que le timer est annulé (pas de transition vers online)
+    // Check that the timer is cancelled (no transition to online)
     vi.advanceTimersByTime(500);
     expect(store.status).toBe('offline');
     store.destroy();

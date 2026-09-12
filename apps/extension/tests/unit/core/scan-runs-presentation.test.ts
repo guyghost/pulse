@@ -10,7 +10,7 @@ import type {
   PersistedConnectorStatus,
 } from '../../../src/lib/core/types/connector-status';
 
-// Semaine de référence : lundi 7 septembre 2026 → dimanche 13 septembre 2026 (locale).
+// Reference week: Monday September 7 2026 → Sunday September 13 2026 (local).
 const NOW = new Date(2026, 8, 10, 14, 30).getTime(); // jeudi 10 sept. 14:30
 const WEEK_START = new Date(2026, 8, 7, 0, 0, 0, 0).getTime(); // lundi 7 sept. 00:00
 const TUE = new Date(2026, 8, 8, 9, 0).getTime();

@@ -1,7 +1,7 @@
 /**
- * Types de statut des connecteurs pour le modèle d'acteurs XState 5
+ * Connector status types for the XState 5 actor model
  *
- * Règles Core : pure, pas d'I/O, pas de Date.now()
+ * Core rules: pure, no I/O, no Date.now()
  */
 
 import type { AppError } from '../errors/app-error';
@@ -37,7 +37,7 @@ export interface PersistedConnectorStatus {
 // Factory functions
 // ============================================================================
 
-/** Crée un statut initial pour un connecteur (état 'pending', tout à zéro) */
+/** Creates an initial status for a connector ('pending' state, all zero) */
 export function createInitialStatus(connectorId: string, connectorName: string): ConnectorStatus {
   return {
     connectorId,
@@ -51,7 +51,7 @@ export function createInitialStatus(connectorId: string, connectorName: string):
   };
 }
 
-/** Convertit un ConnectorStatus terminal en PersistedConnectorStatus sérialisable */
+/** Converts a terminal ConnectorStatus into a serializable PersistedConnectorStatus */
 export function toPersistedStatus(status: ConnectorStatus, now: number): PersistedConnectorStatus {
   const lastState: 'done' | 'error' = status.state === 'error' ? 'error' : 'done';
 

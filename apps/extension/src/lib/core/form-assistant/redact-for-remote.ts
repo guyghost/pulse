@@ -1,16 +1,16 @@
 import type { FieldDescriptor, RemoteFieldRequest } from './types';
 import type { UserProfile } from '../types/profile';
 
-/** Garde-fou : nombre max de compétences projetées vers Eve. */
+/** Guardrail: max number of skills projected to Eve. */
 const MAX_KEYWORDS = 16;
 
 /**
- * Projette le profil vers un objet ne contenant QUE les champs professionnels
- * allowlistés (jamais d'email/téléphone : le profil n'en contient pas, et
- * `experiences.description` est exclu). Utilisé pour construire la requête
- * envoyée à Eve (Phase 2).
+ * Projects the profile into an object containing ONLY the allowlisted
+ * professional fields (never email/phone: the profile doesn't contain any, and
+ * `experiences.description` is excluded). Used to build the request sent to
+ * Eve (Phase 2).
  *
- * Pur, déterministe, sans I/O.
+ * Pure, deterministic, no I/O.
  */
 export function redactForRemote(field: FieldDescriptor, profile: UserProfile): RemoteFieldRequest {
   const safe: Record<string, string | string[]> = {};

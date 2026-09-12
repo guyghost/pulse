@@ -3,7 +3,7 @@ import type { UserProfile } from '../types/profile';
 import type { SemanticResult } from '../types/type-guards';
 import { SemanticResultSchema } from '../types/schemas';
 
-// Ré-export pour compatibilité avec les modules existants
+// Re-export for compatibility with existing modules
 export type { SemanticResult } from '../types/type-guards';
 
 export function buildScoringPrompt(mission: Mission, profile: UserProfile): string {

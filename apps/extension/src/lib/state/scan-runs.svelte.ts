@@ -1,9 +1,9 @@
 /**
- * Store d'état de la carte « Scans de la semaine » (Svelte 5 runes).
+ * State store of the "Scans of the week" card (Svelte 5 runes).
  *
- * Shell uniquement : `Date.now()` est appelé ici, jamais dans le core.
- * Dérivation pure via `buildScanRunSummaries` — aucune transition d'état.
- * Modèle : src/models/scan-runs-week.model.md
+ * Shell only: `Date.now()` is called here, never in the core.
+ * Pure derivation via `buildScanRunSummaries` — no state transitions.
+ * Model: src/models/scan-runs-week.model.md
  */
 
 import {
@@ -15,16 +15,16 @@ import {
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
 
 export interface ScanRunsStoreInputs {
-  /** Statuts live du scan en cours (map réactive du feed controller). */
+  /** Live statuses of the running scan (reactive map from the feed controller). */
   getLiveStatuses: () => Map<string, ConnectorStatus>;
-  /** Statuts persistés du dernier run par connecteur. */
+  /** Persisted statuses of the last run per connector. */
   getPersistedStatuses: () => PersistedConnectorStatus[];
 }
 
 export interface ScanRunsStore {
-  /** Items de la semaine courante, triés selon le modèle. */
+  /** Items of the current week, sorted per the model. */
   readonly items: ScanRunItem[];
-  /** Nombre de runs affichés (= items.length, limite : 1 run max par connecteur). */
+  /** Number of displayed runs (= items.length, limit: 1 run max per connector). */
   readonly runCount: number;
 }
 

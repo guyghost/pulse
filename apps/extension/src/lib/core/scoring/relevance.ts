@@ -67,8 +67,8 @@ export const prepareProfileScoring = (profile: UserProfile): PreparedScoringProf
     hasKeywords: profile.keywords.length > 0,
     location: profile.location,
     tjmMin: profile.tjmMin,
-    // null = sans plafond (DAO #174) : rawTjmScore traite max <= 0 comme
-    // « plancher seul comparé » — on traduit la sémantique en sentinelle locale.
+    // null = no ceiling (DAO #174): rawTjmScore treats max <= 0 as
+    // "floor-only comparison" — we translate that semantics into a local sentinel.
     tjmMax: profile.tjmMax ?? 0,
     remote: profile.remote,
     seniority: profile.seniority,

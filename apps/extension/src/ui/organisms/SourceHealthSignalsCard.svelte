@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
-   * SourceHealthSignalsCard — carte « Santé des sources » (organisme).
-   * 4 signaux de risque agrégés avec jauges demi-cercle, dérivés à 100 %
-   * des enregistrements persistés via le core pur `computeSourceHealthSignals`.
-   * Modèle : src/models/source-health-signals.model.md
+   * SourceHealthSignalsCard — "Santé des sources" card (organism).
+   * 4 aggregated risk signals with half-circle gauges, derived 100%
+   * from persisted records via the pure core `computeSourceHealthSignals`.
+   * Model: src/models/source-health-signals.model.md
    */
   import { Icon } from '@pulse/ui';
   import GaugeArc from '../atoms/GaugeArc.svelte';
@@ -40,8 +40,8 @@
     )
   );
 
-  // Modèle §4 : la ligne la plus préoccupante passe en bleu uniquement
-  // si sa sévérité est warn ou alert — tout gris quand tout va bien.
+  // Model §4: the most concerning line turns blue only if its severity is
+  // warn or alert — all gray when everything is fine.
   const highlightId = $derived.by(() => {
     const first = result.signals[0];
     return first && first.severity !== 'ok' ? first.id : null;

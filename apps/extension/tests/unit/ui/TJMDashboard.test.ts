@@ -80,7 +80,7 @@ describe('TJMDashboard inverted target validation (TJM-02)', () => {
     expect(rendered).toContain('inversée');
     expect(rendered).toContain('700€');
     expect(rendered).toContain('400€');
-    // The positioning card (which derives a median/écart) must stay hidden.
+    // The positioning card (which derives a median/spread) must stay hidden.
     expect(rendered).not.toContain('Votre positionnement');
     expect(rendered).toContain('Invalide');
   });

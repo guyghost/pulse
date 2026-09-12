@@ -58,7 +58,7 @@ describe('ToastStore', () => {
     }
 
     expect(store.toasts).toHaveLength(5);
-    // Le plus ancien (Toast 1) doit avoir été évincé
+    // The oldest one (Toast 1) must have been evicted
     expect(store.toasts[0].message).toBe('Toast 2');
     expect(store.toasts[4].message).toBe('Toast 6');
     store.destroy();

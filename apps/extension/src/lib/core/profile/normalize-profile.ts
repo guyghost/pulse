@@ -73,8 +73,8 @@ export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile 
 
 export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfileResult {
   const tjmMin = normalizeDailyRate(input.tjmMin);
-  // DAO #174 : le plafond n'est plus collecté — null (sans plafond) sauf si un
-  // appelant legacy passe encore une borne explicite.
+  // DAO #174: the ceiling is no longer collected — null (no ceiling) unless a
+  // legacy caller still passes an explicit bound.
   const tjmMax =
     input.tjmMax === null || input.tjmMax === undefined ? null : normalizeDailyRate(input.tjmMax);
 

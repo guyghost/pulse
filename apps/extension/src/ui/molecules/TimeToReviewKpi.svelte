@@ -1,8 +1,8 @@
 <script lang="ts">
   /**
-   * KPI atomique de la carte « Time to review ».
-   * Molecule : props uniquement, aucun état, aucune dépendance shell.
-   * `improved` pilote la couleur du delta (bleu = amélioration), null = neutre.
+   * Atomic KPI of the "Time to review" card.
+   * Molecule: props only, no state, no shell dependency.
+   * `improved` drives the delta color (blue = improvement), null = neutral.
    */
   const {
     label,

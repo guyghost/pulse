@@ -1,15 +1,25 @@
 # @pulse/ui
 
-Shared Atomic Design component library for MissionPulse.
+Bibliothèque de composants Atomic Design partagée pour MissionPulse.
 
 ## Usage
 
 ```svelte
 <script>
-  import { Button, Badge, Chip, Icon, Skeleton, GlassCard, GlowButton, Toast, Indicator } from '@pulse/ui';
+  import {
+    Button,
+    Badge,
+    Chip,
+    Icon,
+    Skeleton,
+    GlassCard,
+    GlowButton,
+    Toast,
+    Indicator,
+  } from '@pulse/ui';
 </script>
 
-<!-- Import design tokens (single source of truth) -->
+<!-- Import des design tokens (source de vérité unique) -->
 <style>
   @import '@pulse/ui/app.css';
 </style>
@@ -17,19 +27,19 @@ Shared Atomic Design component library for MissionPulse.
 
 ## Atoms
 
-| Component | Props | Description |
-|-----------|-------|-------------|
-| `Button` | `variant: 'primary' \| 'secondary' \| 'ghost'`, `size: 'sm' \| 'md' \| 'lg'`, `disabled`, `loading`, `class`, `onclick`, `children` | Standard button |
-| `Badge` | `label`, `variant: 'tech' \| 'status' \| 'source' \| 'success' \| 'warning' \| 'error'`, `size: 'sm' \| 'md'`, `class` | Inline label |
-| `Chip` | `label`, `selected`, `size: 'sm' \| 'md' \| 'lg'`, `disabled`, `class`, `onclick` | Selectable chip |
-| `Icon` | `name: IconName`, `size: number`, `class` | Icon from registry |
-| `Skeleton` | `variant: 'text' \| 'circle' \| 'card'`, `width`, `height`, `class` | Loading placeholder |
-| `Indicator` | `status: 'online' \| 'offline' \| 'error' \| 'idle'`, `size: 'sm' \| 'md' \| 'lg'`, `pulse`, `class` | Status dot |
-| `GlassCard` | `variant: 'default' \| 'elevated' \| 'glow'`, `padding: 'none' \| 'sm' \| 'md' \| 'lg'`, `class`, `onclick`, `children` | Card container |
-| `GlowButton` | `variant: 'primary' \| 'secondary' \| 'outline'`, `size: 'sm' \| 'md' \| 'lg'`, `disabled`, `loading`, `class`, `onclick`, `children` | Emphasized button |
-| `Toast` | `message`, `type: 'info' \| 'error' \| 'success' \| 'warning'`, `class`, `onDismiss` | Alert toast |
+| Composant    | Props                                                                                                                                 | Description               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| `Button`     | `variant: 'primary' \| 'secondary' \| 'ghost'`, `size: 'sm' \| 'md' \| 'lg'`, `disabled`, `loading`, `class`, `onclick`, `children`   | Bouton standard           |
+| `Badge`      | `label`, `variant: 'tech' \| 'status' \| 'source' \| 'success' \| 'warning' \| 'error'`, `size: 'sm' \| 'md'`, `class`                | Label en ligne            |
+| `Chip`       | `label`, `selected`, `size: 'sm' \| 'md' \| 'lg'`, `disabled`, `class`, `onclick`                                                     | Chip sélectionnable       |
+| `Icon`       | `name: IconName`, `size: number`, `class`                                                                                             | Icône du registre         |
+| `Skeleton`   | `variant: 'text' \| 'circle' \| 'card'`, `width`, `height`, `class`                                                                   | Placeholder de chargement |
+| `Indicator`  | `status: 'online' \| 'offline' \| 'error' \| 'idle'`, `size: 'sm' \| 'md' \| 'lg'`, `pulse`, `class`                                  | Point de statut           |
+| `GlassCard`  | `variant: 'default' \| 'elevated' \| 'glow'`, `padding: 'none' \| 'sm' \| 'md' \| 'lg'`, `class`, `onclick`, `children`               | Conteneur de carte        |
+| `GlowButton` | `variant: 'primary' \| 'secondary' \| 'outline'`, `size: 'sm' \| 'md' \| 'lg'`, `disabled`, `loading`, `class`, `onclick`, `children` | Bouton mis en avant       |
+| `Toast`      | `message`, `type: 'info' \| 'error' \| 'success' \| 'warning'`, `class`, `onDismiss`                                                  | Toast d'alerte            |
 
-## Icons
+## Icônes
 
 ```svelte
 <script>
@@ -40,7 +50,7 @@ Shared Atomic Design component library for MissionPulse.
 <Icon name="chevron-right" class="text-text-muted" />
 ```
 
-Available icons: `search`, `x`, `check`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `refresh-cw`, `settings`, `briefcase`, `trending-up`, `trending-down`, `plus`, `minus`, `star`, `loader`, `arrow-right`, `info`, `alert-circle`, `check-circle`, `x-circle`, `link`, `external-link`, `eye`, `eye-off`, `download`, `clock`, and more.
+Icônes disponibles : `search`, `x`, `check`, `chevron-right`, `chevron-left`, `chevron-down`, `chevron-up`, `refresh-cw`, `settings`, `briefcase`, `trending-up`, `trending-down`, `plus`, `minus`, `star`, `loader`, `arrow-right`, `info`, `alert-circle`, `check-circle`, `x-circle`, `link`, `external-link`, `eye`, `eye-off`, `download`, `clock`, et plus.
 
 ## Actions
 
@@ -49,22 +59,23 @@ Available icons: `search`, `x`, `check`, `chevron-right`, `chevron-left`, `chevr
   import { ripple, onVisible } from '@pulse/ui';
 </script>
 
-<div use:ripple>Click me for ripple effect</div>
-<div use:onVisible={() => console.log('visible!')}>Lazy load trigger</div>
+<div use:ripple>Cliquez pour l'effet ripple</div>
+<div use:onVisible={() => console.log('visible!')}>Déclencheur de lazy load</div>
 ```
 
 ## Design Tokens
 
-Import `@pulse/ui/app.css` to get the full design system (TailwindCSS 4 `@theme` block):
-- Colors (`blueprint-blue`, `text-primary`, `status-red`, etc.)
-- Typography scale
-- Spacing
-- Border radius
-- Shadows
+Importer `@pulse/ui/app.css` pour obtenir le design system complet (bloc `@theme` TailwindCSS 4) :
 
-## Architecture Rules
+- Couleurs (`blueprint-blue`, `text-primary`, `status-red`, etc.)
+- Échelle typographique
+- Espacements
+- Rayons de bordure
+- Ombres
 
-1. **Atoms import nothing from `$lib/state/` or `$lib/core/`** — all data via props
-2. **Atoms dispatch via callback props** — never direct state mutations
-3. **Every atom accepts `class` prop** — escape hatch for one-off styling
-4. **Standard sizes**: `sm | md | lg` across all atoms
+## Règles d'architecture
+
+1. **Les atoms n'importent rien depuis `$lib/state/` ou `$lib/core/`** — toutes les données via props
+2. **Les atoms communiquent via callback props** — jamais de mutation d'état directe
+3. **Chaque atom accepte une prop `class`** — échappatoire pour un style ponctuel
+4. **Tailles standard** : `sm | md | lg` sur tous les atoms

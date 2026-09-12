@@ -49,8 +49,8 @@ export async function launchContext({ storageState = undefined, viewport = VIEWP
   const consoleAll = [];
   const pageFailures = [];
   const page = await context.newPage();
-  // Surface flags: le QA couvre tous les onglets (Suivi, dashboard connecté).
-  // Au lancement ces surfaces sont désactivées — on seed l'override dev pour
+  // Surface flags: QA covers all tabs (Applications, connected dashboard).
+  // At launch these surfaces are disabled — we seed the dev override to
   // les rendre visibles dans chaque contexte QA (cf. surface-feature-flags.model.md §5bis).
   await page.addInitScript(() => {
     window.localStorage.setItem(

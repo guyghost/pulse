@@ -1,25 +1,30 @@
-# ADR-001: Functional Core, Imperative Shell
+# ADR-001 : Functional Core, Imperative Shell
 
-## Status
-Accepted
+## Statut
 
-## Context
-MissionPulse is a Chrome extension running across 2 main contexts (Service Worker, Side Panel). Sharing state and debugging across these contexts is hard. We needed an architecture that maximizes testability and keeps business logic predictable despite the inherently side-effect-heavy Chrome extension environment.
+Accepté
 
-## Decision
-Adopt the Functional Core, Imperative Shell (FC&IS) pattern:
+## Contexte
 
-- **Core** (`src/lib/core/`): Pure functions only. Parsers (`core/connectors/*-parser.ts`), scoring/dedup (`core/scoring/`), type definitions, error types, and data transformations. No I/O, no `Date.now()`, no `console.log` -- timestamps are injected as parameters.
-- **Shell** (`src/lib/shell/`): All side effects. Connectors performing HTTP fetches, IndexedDB/chrome.storage access, Chrome messaging bridge, and notification services.
+MissionPulse est une extension Chrome s'exécutant dans 2 contextes principaux (Service Worker, Side Panel). Partager l'état et déboguer entre ces contextes est difficile. Il nous fallait une architecture maximisant la testabilité et gardant la logique métier prévisible, malgré un environnement d'extension Chrome intrinsèquement riche en effets de bord.
 
-The boundary is enforced by convention: Core modules never import from Shell. Shell imports Core types and calls Core pure functions to transform data.
+## Décision
 
-Examples:
-- `core/connectors/freework-parser.ts` (pure HTML-to-Mission transform) vs `shell/connectors/freework.connector.ts` (fetches HTML, calls parser)
-- `core/errors/app-error.ts` (type definitions + factory functions) vs `shell/errors/error-handler.ts` (logging, toast side effects)
+Adopter le pattern Functional Core, Imperative Shell (FC&IS) :
 
-## Consequences
-- **Positive**: Core functions are trivially unit-testable without mocks. Parsers can be tested with HTML fixtures. Scoring logic is deterministic. Bug surface for cross-context issues is confined to Shell.
-- **Positive**: Errors are serializable plain objects (required for `postMessage` between contexts), which the pure Core pattern naturally encourages.
-- **Negative**: Requires discipline to keep Core pure. New contributors must understand the boundary.
-- **Negative**: Some duplication between Core types and Shell wrappers (e.g., parser + connector pairs).
+- **Core** (`src/lib/core/`) : fonctions pures uniquement. Parsers (`core/connectors/*-parser.ts`), scoring/déduplication (`core/scoring/`), définitions de types, types d'erreurs et transformations de données. Pas d'I/O, pas de `Date.now()`, pas de `console.log` — les timestamps sont injectés en paramètres.
+- **Shell** (`src/lib/shell/`) : tous les effets de bord. Connecteurs effectuant les fetchs HTTP, accès IndexedDB/chrome.storage, bridge de messaging Chrome et services de notification.
+
+La frontière est appliquée par convention : les modules Core n'importent jamais depuis le Shell. Le Shell importe les types du Core et appelle les fonctions pures du Core pour transformer les données.
+
+Exemples :
+
+- `core/connectors/freework-parser.ts` (transformation pure HTML → Mission) vs `shell/connectors/freework.connector.ts` (récupère le HTML, appelle le parser)
+- `core/errors/app-error.ts` (définitions de types + factory functions) vs `shell/errors/error-handler.ts` (logging, effets de bord toast)
+
+## Conséquences
+
+- **Positif** : les fonctions du Core sont trivialement testables en unitaire sans mocks. Les parsers se testent avec des fixtures HTML. La logique de scoring est déterministe. La surface de bug des problèmes inter-contextes est confinée au Shell.
+- **Positif** : les erreurs sont des objets simples sérialisables (requis pour `postMessage` entre contextes), ce que le pattern Core pur encourage naturellement.
+- **Négatif** : demande de la discipline pour garder le Core pur. Les nouveaux contributeurs doivent comprendre la frontière.
+- **Négatif** : une certaine duplication entre les types Core et les wrappers Shell (paires parser + connecteur par exemple).

@@ -1,14 +1,14 @@
 /**
- * Journal de première consultation (voir src/models/time-to-review.model.md).
- * Pur : aucune I/O, aucune horloge — les horodatages arrivent en ISO du shell.
+ * First-viewed journal (see src/models/time-to-review.model.md).
+ * Pure: no I/O, no clock — timestamps arrive as ISO from the shell.
  */
 
 export interface FirstViewedEntry {
-  /** ISO 8601 de la première consultation (vue dans le feed). */
+  /** ISO 8601 of the first review (seen in the feed). */
   firstViewedAt: string;
   /**
-   * Snapshot ISO de Mission.scrapedAt pris au moment du journaling, pour que
-   * le journal reste autoportant si la mission est purgée de l'IndexedDB.
+   * ISO snapshot of Mission.scrapedAt taken at journaling time, so the
+   * journal stays self-contained if the mission is purged from IndexedDB.
    */
   capturedAt: string | null;
 }
@@ -40,8 +40,8 @@ export function coerceIso(value: unknown): string | null {
 }
 
 /**
- * First-write-wins : la première consultation d'une mission n'est jamais écrasée.
- * Déterministe (ordre d'insertion), plafonné à MAX_REVIEW_JOURNAL.
+ * First-write-wins: a mission's first review is never overwritten.
+ * Deterministic (insertion order), capped at MAX_REVIEW_JOURNAL.
  */
 export function mergeFirstViewed(
   current: ReviewJournal,
@@ -62,7 +62,7 @@ export function mergeFirstViewed(
   return capReviewJournal(merged);
 }
 
-/** Plafonne le journal en évinçant les consultations les plus anciennes. */
+/** Caps the journal by evicting the oldest reviews. */
 export function capReviewJournal(
   journal: ReviewJournal,
   limit: number = MAX_REVIEW_JOURNAL

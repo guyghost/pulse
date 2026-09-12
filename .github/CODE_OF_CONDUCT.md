@@ -1,21 +1,21 @@
-# Code of Conduct
+# Code de conduite
 
-MissionPulse aims to be a useful, privacy-conscious open source project. Contributors are expected to keep discussions technical, respectful, and focused on the work.
+MissionPulse se veut un projet open source utile et attentif à la vie privée. Les contributeurs sont attendus pour garder des discussions techniques, respectueuses et centrées sur le travail.
 
-## Expected Behavior
+## Comportement attendu
 
-- Be direct and respectful.
-- Assume good intent, but be precise when a change creates risk.
-- Keep feedback about code, design, documentation, or process.
-- Respect privacy: do not post credentials, session data, personal profiles, or private customer/platform data.
+- Être direct et respectueux.
+- Supposer la bonne intention, mais être précis quand un changement crée un risque.
+- Garder les retours centrés sur le code, le design, la documentation ou le processus.
+- Respecter la vie privée : ne pas publier d'identifiants, de données de session, de profils personnels ni de données privées clients/plateformes.
 
-## Unacceptable Behavior
+## Comportement inacceptable
 
-- Harassment, insults, threats, or discriminatory language.
-- Publishing private information without consent.
-- Repeated off-topic disruption.
-- Attempts to bypass project security or privacy safeguards.
+- Harcèlement, insultes, menaces ou propos discriminatoires.
+- Publication d'informations privées sans consentement.
+- Disruption hors-sujet répétée.
+- Tentatives de contourner les garde-fous de sécurité ou de confidentialité du projet.
 
-## Enforcement
+## Application
 
-Maintainers may edit, hide, or remove comments and may limit participation when needed to keep the project safe and productive.
+Les mainteneurs peuvent modifier, masquer ou supprimer des commentaires et peuvent limiter la participation si nécessaire pour garder le projet sûr et productif.

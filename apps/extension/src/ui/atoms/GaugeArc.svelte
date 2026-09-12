@@ -1,17 +1,17 @@
 <script lang="ts">
   /**
-   * GaugeArc — jauge demi-cercle SVG (atome, props only).
-   * L'arc de fond est gris clair, l'arc de valeur couvre `ratio` (0..1)
-   * du demi-cercle. La couleur est pilotée par la prop `color`.
+   * GaugeArc — SVG half-circle gauge (atom, props only).
+   * The background arc is light gray; the value arc covers `ratio` (0..1)
+   * of the half-circle. Color is driven by the `color` prop.
    */
   const {
     ratio,
     color = 'gray',
     title,
   }: {
-    /** Longueur de l'arc de valeur, entre 0 et 1 */
+    /** Value arc length, between 0 and 1 */
     ratio: number;
-    /** 'blue' = blueprint-blue (ligne préoccupante), 'gray' = neutre */
+    /** 'blue' = blueprint-blue (concerning line), 'gray' = neutral */
     color?: 'blue' | 'gray';
     /** Accessible description of the gauge value */
     title?: string;

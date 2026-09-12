@@ -30,7 +30,7 @@ import {
 import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
 import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
-/** Mutex pour empêcher les scans concurrents */
+/** Mutex to prevent concurrent scans */
 let scanInProgress = false;
 
 /**
@@ -41,7 +41,7 @@ export function isScanRunning(): boolean {
 }
 
 /**
- * Erreur de scan avec code typé
+ * Scan error with typed code
  */
 export class ScanError extends Error {
   constructor(
@@ -71,9 +71,9 @@ export interface ScanResult {
   sourceMissions: Mission[];
   duplicateRelations: MissionDuplicateRelation[];
   errors: { connectorId: string; message: string }[];
-  /** Profil résolu utilisé pour le scoring déterministe (pour l'enrichissement sémantique post-terminal). */
+  /** Resolved profile used for deterministic scoring (for post-terminal semantic enrichment). */
   profile?: UserProfile;
-  /** True si le profil résolu était le profil par défaut (l'enrichissement sémantique est alors ignoré). */
+  /** True when the resolved profile was the default profile (semantic enrichment is then skipped). */
   usingDefaultProfile?: boolean;
   /** Snapshot de `settings.maxSemanticPerScan` pour l'enrichissement post-terminal. */
   maxSemanticPerScan?: number;
@@ -86,8 +86,8 @@ export interface ScanProgressInfo {
 }
 
 /**
- * Progression détaillée d'un connecteur individuel pendant le scan.
- * Utilisé pour les messages bridge SCAN_PROGRESS.
+ * Detailed progress of an individual connector during the scan.
+ * Used for SCAN_PROGRESS bridge messages.
  */
 export interface ConnectorScanState {
   connectorId: string;
@@ -99,7 +99,7 @@ export interface ConnectorScanState {
 }
 
 /**
- * Callback de progression détaillé avec état par connecteur.
+ * Detailed progress callback with per-connector state.
  */
 export type DetailedProgressCallback = (info: {
   phase: 'connecting' | 'scanning' | 'post-processing' | 'done';
@@ -131,19 +131,19 @@ export type ScanRuntimeEvent =
   | { type: 'NETWORK_OFFLINE' };
 
 export interface ScanOptions {
-  /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
+  /** Delay between pages of the same connector in ms (default: 500) */
   pageDelayMs?: number;
-  /** Callback de progression détaillé (pour bridge SCAN_PROGRESS) */
+  /** Detailed progress callback (for SCAN_PROGRESS bridge) */
   onDetailedProgress?: DetailedProgressCallback;
-  /** Callback appelé quand un connecteur réussit, avant le résultat final global */
+  /** Callback invoked when a connector succeeds, before the global final result */
   onConnectorResult?: ConnectorResultCallback;
-  /** Événements runtime consommés en direct par l'acteur de cycle de vie. */
+  /** Runtime events consumed live by the lifecycle actor. */
   onLifecycleEvent?: (event: ScanRuntimeEvent) => void;
-  /** Override explicite du profil utilisé pour le scan */
+  /** Explicit override of the profile used for the scan */
   profileOverride?: UserProfile;
-  /** Liste de connecteurs figée par l'opération admise (health/first scan). */
+  /** Connector list frozen by the admitted operation (health/first scan). */
   connectorIdsOverride?: readonly string[];
-  /** Snapshot Settings immuable admis avec l'opération. */
+  /** Immutable Settings snapshot admitted with the operation. */
   settingsSnapshot?: SettingsReleaseSnapshot;
 }
 
@@ -154,7 +154,7 @@ export async function runScan(
 ): Promise<ScanResult> {
   throwIfScanCancelled(signal);
 
-  // Mutex : empêcher les scans concurrents
+  // Mutex: prevent concurrent scans
   if (scanInProgress) {
     throw new ScanError('Un scan est déjà en cours. Veuillez patienter.', 'MUTEX');
   }
@@ -196,7 +196,7 @@ async function _runScanInternal(
     throwIfScanCancelled(signal);
   }
 
-  // Vérifier la connexion avant de scanner
+  // Check connectivity before scanning
   if (!isOnline()) {
     emitLifecycle({ type: 'NETWORK_OFFLINE' });
     throw new ScanError(
@@ -286,7 +286,7 @@ async function _runScanInternal(
     }
   }
 
-  // Initialiser les états par connecteur pour le progress détaillé
+  // Initialize per-connector states for detailed progress
   for (const connector of connectors) {
     connectorStates.push({
       connectorId: connector.id,
@@ -394,7 +394,7 @@ async function _runScanInternal(
     emitDetailed('scanning', index, connectors.length);
 
     // --- Circuit Breaker ---
-    // runWithCircuitBreaker gère : open → skip, half-open → probe, closed → execute
+    // runWithCircuitBreaker handles: open → skip, half-open → probe, closed → execute
     const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal, {
       onRetryableFailure: (error, attempt) => {
         if (stateIdx >= 0) {
@@ -435,7 +435,7 @@ async function _runScanInternal(
     // Sync alarme de sonde (schedule si open, cancel si closed/half-open)
     syncProbeAlarm(circuitRun.snapshot).catch(() => {});
 
-    // Émissions bridge health (best-effort — panel peut être fermé)
+    // Health bridge emissions (best-effort — panel may be closed)
     chrome.runtime
       .sendMessage({
         type: 'CONNECTOR_HEALTH_UPDATED',
@@ -548,7 +548,7 @@ async function _runScanInternal(
       } catch {
         // Partial UI updates are best-effort; the final scan result remains canonical.
       }
-      // Toast de récupération si le circuit revient à closed depuis open/half-open
+      // Recovery toast when the circuit returns to closed from open/half-open
       if (
         circuitRun.snapshot.circuitState === 'closed' &&
         circuitRun.snapshot.consecutiveFailures === 0 &&
@@ -684,7 +684,7 @@ async function _runScanInternal(
     }),
   ];
 
-  // Calculer et enregistrer les métriques du scan
+  // Compute and record scan metrics
   const scanDuration = Math.round(performance.now() - scanStartTime);
   const missionsPerConnector: Record<string, number> = {};
   for (const result of connectorResults) {

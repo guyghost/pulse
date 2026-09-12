@@ -1,7 +1,7 @@
 /**
- * Store réactif pour gérer l'état de connexion réseau
- * Remplace connectionMachine (XState) par des runes Svelte 5
- * États: unknown, online, offline, reconnecting, slow
+ * Reactive store for network connection state
+ * Replaces connectionMachine (XState) with Svelte 5 runes
+ * States: unknown, online, offline, reconnecting, slow
  */
 
 import { subscribeToConnection, type ConnectionInfo } from '$lib/shell/utils/connection-monitor';
@@ -50,7 +50,7 @@ export function createConnectionStore(): ConnectionStore {
     } else {
       // info.status === 'online' ou 'unknown'
       if (status === 'offline') {
-        // Passage par l'état reconnecting avec délai de 500ms
+        // Go through the reconnecting state with a 500ms delay
         status = 'reconnecting';
         downlink = info.downlink;
         rtt = info.rtt;

@@ -77,7 +77,7 @@ export async function getConnectors(ids: string[]): Promise<PlatformConnector[]>
 }
 
 // ============================================================================
-// Détection de session avec gestion d'erreurs typées
+// Session detection with typed error handling
 // ============================================================================
 
 export interface DetectionResult {
@@ -87,8 +87,8 @@ export interface DetectionResult {
 }
 
 /**
- * Détecte la session pour un connecteur avec gestion d'erreurs
- * @returns Result avec la détection ou l'erreur
+ * Detects the session for a connector with error handling
+ * @returns Result with the detection or the error
  */
 export async function detectConnectorSession(
   connector: PlatformConnector,
@@ -97,7 +97,7 @@ export async function detectConnectorSession(
   const result = await connector.detectSession(now);
 
   if (!result.ok) {
-    // Gère l'erreur pour le logging/toast
+    // Handle the error for logging/toast
     handleError(result.error);
 
     return result;
@@ -113,8 +113,8 @@ export async function detectConnectorSession(
 }
 
 /**
- * Détecte les sessions pour tous les connecteurs avec gestion d'erreurs
- * Continue même si certains connecteurs échouent
+ * Detects sessions for all connectors with error handling
+ * Continues even if some connectors fail
  */
 export async function detectAllConnectorSessions(
   connectors: PlatformConnector[],
@@ -144,7 +144,7 @@ export async function detectAllConnectorSessions(
 }
 
 /**
- * Vérifie si une erreur de détection est retryable
+ * Checks whether a detection error is retryable
  */
 export function isDetectionRetryable(error: AppError): boolean {
   return isRetryable(error);

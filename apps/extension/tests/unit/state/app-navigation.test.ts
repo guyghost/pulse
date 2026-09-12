@@ -269,13 +269,13 @@ describe('createAppNavigation bootstrap recovery', () => {
 
     const completion = navigation.completeOnboarding();
     // L'import dynamique de la seed prend plusieurs microtasks : on attend
-    // que l'écriture démarre.
+    // the write starts.
     await vi.waitFor(() => {
       expect(saveProfile).toHaveBeenCalledTimes(1);
     });
 
-    // Tant que l'écriture de la seed est en attente, completeOnboarding
-    // ne résout pas (plus de fire-and-forget).
+    // While the seed write is pending, completeOnboarding
+    // doesn't resolve (no more fire-and-forget).
     let settled = false;
     void completion.then(() => {
       settled = true;
@@ -287,7 +287,7 @@ describe('createAppNavigation bootstrap recovery', () => {
     seedWrite.resolve();
     await expect(completion).resolves.toBe(true);
     expect(navigation.currentPage).toBe('feed');
-    // La seed persistée est un profil défaut (champs vides).
+    // The persisted seed is a default profile (empty fields).
     const seededProfile = saveProfile.mock.calls[0][0] as UserProfile;
     expect(seededProfile.firstName).toBe('');
     expect(seededProfile.keywords).toEqual([]);

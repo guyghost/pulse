@@ -46,7 +46,7 @@ describe('redactForRemote — allowlist', () => {
     const out = redactForRemote(field, makeProfile());
     expect(out.profile).not.toHaveProperty('email');
     expect(out.profile).not.toHaveProperty('phone');
-    // experiences.description est exclu : pas de clé experiences.
+    // experiences.description is excluded: no experiences key.
     expect(out.profile).not.toHaveProperty('experiences');
   });
 

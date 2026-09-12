@@ -1,10 +1,10 @@
 /**
- * Exports du module de gestion d'erreurs Shell
+ * Shell error-handling module exports
  *
- * Ce module contient la logique I/O pour la gestion d'erreurs:
- * - Logging console
- * - Envoi à un service de monitoring
- * - Affichage de toasts
+ * This module contains the I/O logic for error handling:
+ * - Console logging
+ * - Sending to a monitoring service
+ * - Displaying toasts
  */
 
 export {

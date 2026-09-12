@@ -78,11 +78,11 @@ test.describe('Scan Lifecycle', () => {
     await expect(filterPanel).toBeVisible();
 
     // Le sheet ouvert couvre le toggle (scrim) — la fermeture passe par son
-    // bouton dédié introduit par le redesign bottom-sheet.
+    // dedicated button introduced by the bottom-sheet redesign.
     await page.getByRole('button', { name: 'Fermer les filtres et revenir au feed' }).click();
     await expect(filterPanel).not.toBeVisible();
 
-    // Le toggle revient à son état initial une fois la feuille fermée.
+    // The toggle returns to its initial state once the sheet is closed.
     await expect(page.getByRole('button', { name: 'Afficher les filtres' })).toHaveAttribute(
       'aria-expanded',
       'false'

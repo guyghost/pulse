@@ -34,7 +34,7 @@ export abstract class BaseConnector implements PlatformConnector {
   }
 
   /**
-   * Détecte si l'utilisateur a une session active sur la plateforme.
+   * Detects whether the user has an active session on the platform.
    * Each connector MUST implement this — the base fetch-based approach is unreliable
    * because SPAs return HTTP 200 regardless of authentication state.
    *
@@ -214,8 +214,8 @@ export abstract class BaseConnector implements PlatformConnector {
   ): Promise<Result<Mission[], AppError>>;
 
   /**
-   * Récupère la date de dernière synchronisation
-   * Retourne un Result<Date | null, AppError>
+   * Retrieves the last synchronization date
+   * Returns a Result<Date | null, AppError>
    */
   async getLastSync(now: number): Promise<Result<Date | null, AppError>> {
     try {
@@ -239,8 +239,8 @@ export abstract class BaseConnector implements PlatformConnector {
   }
 
   /**
-   * Définit la date de dernière synchronisation
-   * Retourne un Result<void, AppError>
+   * Sets the last synchronization date
+   * Returns a Result<void, AppError>
    */
   protected async setLastSync(now: number): Promise<Result<void, AppError>> {
     try {

@@ -1,11 +1,11 @@
 /**
- * Probe Scheduler — Gestion des alarms chrome pour les probes de récupération.
+ * Probe Scheduler — Management of chrome alarms for recovery probes.
  *
- * Quand un connecteur entre en état `open`, on enregistre une alarme chrome
- * qui se déclenchera après `probeIntervalMs`. L'alarme est nommée de façon
- * unique par connecteur : `probe:{connectorId}`.
+ * When a connector enters the `open` state, a chrome alarm is registered
+ * that fires after `probeIntervalMs`. The alarm is named uniquely per
+ * connector: `probe:{connectorId}`.
  *
- * Shell only : I/O, chrome.alarms. Core n'importe jamais ce module.
+ * Shell only: I/O, chrome.alarms. Core never imports this module.
  */
 
 import type { ConnectorHealthSnapshot, HealthThresholds } from '../../core/types/health';
@@ -55,11 +55,11 @@ export function connectorIdFromAlarm(alarmName: string): string | null {
 // ============================================================================
 
 /**
- * Enregistre une alarme de sonde pour un connecteur en état `open`.
- * Idempotent : si une alarme existe déjà pour ce connecteur, elle est remplacée.
+ * Registers a probe alarm for a connector in the `open` state.
+ * Idempotent: if an alarm already exists for this connector, it is replaced.
  *
- * @param connectorId  ID du connecteur
- * @param thresholds   Seuils de configuration (pour `probeIntervalMs`)
+ * @param connectorId  Connector ID
+ * @param thresholds   Configuration thresholds (for `probeIntervalMs`)
  */
 export async function scheduleProbe(
   connectorId: string,
@@ -69,9 +69,9 @@ export async function scheduleProbe(
   const name = probeAlarmName(connectorId);
   const expectedWhenMs = nowMs + thresholds.probeIntervalMs;
 
-  // Supprimer l'ancienne alarme si elle existe (idempotence), puis prouver
-  // localement la création one-shot exacte. Le ledger/actor durable reste un
-  // contrat séparé documenté dans background-scheduling.model.md.
+  // Delete the old alarm if it exists (idempotency), then prove the exact
+  // one-shot creation locally. The durable ledger/actor remains a separate
+  // contract documented in background-scheduling.model.md.
   await chrome.alarms.clear(name);
   await chrome.alarms.create(name, { when: expectedWhenMs });
   const readBack = await chrome.alarms.get(name);
@@ -204,15 +204,15 @@ export async function reconcileProbeAlarmsLocally(
 // ============================================================================
 
 /**
- * Synchronise les alarmes de sonde avec l'état de santé d'un connecteur.
+ * Synchronizes probe alarms with a connector's health state.
  *
- * - Si le snapshot est `open` → schedule une probe
- * - Si le snapshot est `closed` ou `half-open` → annule l'alarme
+ * - If the snapshot is `open` → schedule a probe
+ * - If the snapshot is `closed` or `half-open` → cancel the alarm
  *
- * À appeler après chaque `saveHealthSnapshot` pour maintenir la cohérence.
+ * Call after each `saveHealthSnapshot` to maintain consistency.
  *
- * @param snapshot   Snapshot mis à jour
- * @param thresholds Seuils de configuration
+ * @param snapshot   Updated snapshot
+ * @param thresholds Configuration thresholds
  */
 export async function syncProbeAlarm(
   snapshot: ConnectorHealthSnapshot,

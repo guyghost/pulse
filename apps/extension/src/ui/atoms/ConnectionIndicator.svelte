@@ -78,7 +78,7 @@
     showDetails = false;
   }
 
-  // Fermer les détails quand on clique ailleurs
+  // Close the details when clicking elsewhere
   $effect(() => {
     if (!showDetails) {
       return;

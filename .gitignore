@@ -39,6 +39,8 @@ reports/performance/
 .env
 .env.*
 !.env.example
-
-# DAO governance state
 .dao/
+.impeccable
+
+# Generated QA/perf artifacts
+reports/

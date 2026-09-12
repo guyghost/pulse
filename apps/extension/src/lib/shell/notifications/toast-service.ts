@@ -5,8 +5,8 @@ import { sendMessage } from '../messaging/bridge';
 let toastStore: ToastStore | null = null;
 
 /**
- * Initialise le service de toast.
- * A appeler une fois au démarrage de l'app dans le side panel.
+ * Initializes the toast service.
+ * Call once at app startup in the side panel.
  */
 export function initToastService(): ToastStore {
   if (!toastStore) {
@@ -16,8 +16,8 @@ export function initToastService(): ToastStore {
 }
 
 /**
- * Retourne l'instance du store de toasts.
- * Retourne null si non initialisé.
+ * Returns the toast store instance.
+ * Returns null if not initialized.
  */
 export function getToastActor(): ToastStore | null {
   return toastStore;
@@ -63,7 +63,7 @@ export function showToastAction(
 }
 
 /**
- * Ferme un toast spécifique par ID.
+ * Dismisses a specific toast by ID.
  */
 export function dismissToast(id: number): void {
   if (toastStore) {
@@ -81,8 +81,8 @@ export function dismissAllToasts(): void {
 }
 
 /**
- * Arrête le service de toast.
- * A appeler quand l'app est détruite.
+ * Stops the toast service.
+ * Call when the app is destroyed.
  */
 export function stopToastService(): void {
   if (toastStore) {

@@ -15,7 +15,7 @@ test.describe('Onboarding', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    // Welcome → connecting (Étape 1/5) : « Continuer » reste bloqué sans source.
+    // Welcome → connecting (Step 1/5): "Continuer" stays blocked without a source.
     await expect(
       page.getByRole('heading', { name: 'Toutes vos missions freelance' })
     ).toBeVisible();
@@ -24,14 +24,14 @@ test.describe('Onboarding', () => {
     await expect(page.getByRole('heading', { name: 'Connectez vos sources' })).toBeVisible();
     const continueButton = page.getByRole('button', { name: 'Continuer', exact: true });
     await expect(continueButton).toBeDisabled();
-    // Flux P0-B : la source se connecte via vérification de session, pas un toggle.
+    // P0-B flow: the source connects via session verification, not a toggle.
     const freeWorkRow = page.getByRole('listitem').filter({ hasText: 'Free-Work' });
     await freeWorkRow.getByRole('button', { name: 'Connecter', exact: true }).click();
     await expect(freeWorkRow).toContainText('Session détectée');
     await expect(continueButton).toBeEnabled();
     await continueButton.click();
 
-    // Identity (Étape 2/5) — champs rattachés à leurs labels (wrapping label).
+    // Identity (Step 2/5) — fields attached to their labels (wrapping label).
     await expect(page.getByRole('heading', { name: 'Qui êtes-vous ?' })).toBeVisible();
     await fillIdentityStep(page, {
       firstName: 'Guy',
@@ -39,12 +39,12 @@ test.describe('Onboarding', () => {
       location: 'Paris',
     });
 
-    // Preferences (Étape 3/5) — TJM minimum requis (tjmMin > 0, sans plafond
+    // Preferences (Step 3/5) — minimum TJM required (tjmMin > 0, no ceiling
     // depuis DAO #174 : le champ « TJM max » n'existe plus).
     await page.getByLabel('TJM minimum (€)').fill('550');
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
-    // Skills (Étape 4/5) — au moins un mot-clé.
+    // Skills (Step 4/5) — at least one keyword.
     await expect(page.getByRole('heading', { name: 'Vos compétences clés' })).toBeVisible();
     await page.locator('#onboarding-skill-input').fill('React');
     await page.locator('#onboarding-skill-input').press('Enter');
@@ -83,11 +83,11 @@ test.describe('Onboarding', () => {
 
     await startOnboardingWizard(page);
     await connectFirstSource(page);
-    // Rôle textbox : distingue du checkbox « Métier » du CopilotPanel (build
+    // Textbox role: distinguishes from the CopilotPanel's "Métier" checkbox (build
     // CI avec VITE_COPILOT_ROLLOUT_ENABLED=true).
     await page.getByRole('textbox', { name: 'Métier', exact: true }).fill('Dev React');
-    // toHaveCount(1) laisse finir le fade (120ms) de l'étape précédente avant
-    // l'assertion d'état (sinon deux « Continuer » coexistent — strict mode).
+    // toHaveCount(1) lets the previous step's fade (120ms) finish before
+    // the state assertion (otherwise two "Continuer" coexist — strict mode).
     const continueButton = page.getByRole('button', { name: 'Continuer', exact: true });
     await expect(continueButton).toHaveCount(1);
     await expect(continueButton).toBeDisabled();

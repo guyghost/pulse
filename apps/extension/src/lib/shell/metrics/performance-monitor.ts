@@ -1,8 +1,8 @@
 import { metricsCollector } from './collector';
 
 /**
- * Web Vitals et métriques de performance navigateur
- * Mode dev uniquement
+ * Web Vitals and browser performance metrics
+ * Dev mode only
  */
 
 interface WebVitals {
@@ -20,8 +20,8 @@ const webVitals: WebVitals = {
 };
 
 /**
- * Initialise le monitoring des performances web
- * À appeler une fois au démarrage de l'application
+ * Initializes web performance monitoring
+ * Call once at application startup
  */
 export function initPerformanceMonitoring(): void {
   if (!import.meta.env.DEV || typeof window === 'undefined') {
@@ -47,7 +47,7 @@ export function initPerformanceMonitoring(): void {
       });
       lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
     } catch {
-      // LCP non supporté
+      // LCP not supported
     }
 
     // FCP et autres paint metrics
@@ -67,7 +67,7 @@ export function initPerformanceMonitoring(): void {
       });
       paintObserver.observe({ entryTypes: ['paint'] });
     } catch {
-      // Paint observer non supporté
+      // Paint observer not supported
     }
 
     // CLS
@@ -93,7 +93,7 @@ export function initPerformanceMonitoring(): void {
       });
       clsObserver.observe({ entryTypes: ['layout-shift'] });
     } catch {
-      // CLS non supporté
+      // CLS not supported
     }
 
     // First Input Delay via Event Timing
@@ -115,7 +115,7 @@ export function initPerformanceMonitoring(): void {
       });
       fidObserver.observe({ entryTypes: ['first-input'] });
     } catch {
-      // FID non supporté
+      // FID not supported
     }
 
     // Long tasks — useful for feed freezes during large mission updates.
@@ -132,13 +132,13 @@ export function initPerformanceMonitoring(): void {
       });
       longTaskObserver.observe({ entryTypes: ['longtask'] });
     } catch {
-      // Long Task API non supportée
+      // Long Task API not supported
     }
   }
 
   // Navigation Timing
   if (typeof performance !== 'undefined' && performance.getEntriesByType) {
-    // Attendre que la navigation soit complète
+    // Wait for navigation to complete
     setTimeout(() => {
       const navEntries = performance.getEntriesByType(
         'navigation'
@@ -176,14 +176,14 @@ export function initPerformanceMonitoring(): void {
 }
 
 /**
- * Récupère les Web Vitals actuels
+ * Retrieves current Web Vitals
  */
 export function getWebVitals(): WebVitals {
   return { ...webVitals };
 }
 
 /**
- * Mesure manuelle d'une entrée de performance
+ * Manual measurement of a performance entry
  */
 export function measurePerformanceEntry(name: string): void {
   if (!import.meta.env.DEV || typeof performance === 'undefined') {

@@ -57,7 +57,7 @@
   const selectedMarketRange = $derived(analysis ? analysis[userSeniority ?? 'confirmed'] : null);
   // An inverted target (min > max, both defined) is incoherent: do not derive a
   // median/delta from it, otherwise the dashboard would display a misleading
-  // positioning and écart. Surfaced as an explicit validation state instead.
+  // positioning and spread. Surfaced as an explicit validation state instead.
   const isTargetInverted = $derived(
     userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0)
   );

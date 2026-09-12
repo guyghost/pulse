@@ -1,9 +1,9 @@
 /**
  * Content script — Form Assistant widget (Shadow DOM, closed).
  *
- * Floating UI anchored near the focused field. Isolé du CSS de la page hôte
- * via un shadow root closed. Aucune logique métier : se contente d'afficher des
- * états et d'émettre des callbacks (trigger / accept / dismiss).
+ * Floating UI anchored near the focused field. Isolated from the host page CSS
+ * via a closed shadow root. No business logic: only displays states and emits
+ * callbacks (trigger / accept / dismiss).
  *
  * Les états reflètent la Machine A (src/models/form-assistant.model.md).
  */
@@ -119,8 +119,8 @@ export class FormAssistWidget {
 
   private handleClick = (event: Event): void => {
     const target = event.target as HTMLElement | null;
-    // Les clics peuvent tomber sur un enfant (ex : <span class="mp-dot">) sans
-    // `data-action`. On remonte jusqu'à l'ancêtre portant l'action.
+    // Clicks may land on a child (e.g. <span class="mp-dot">) without a
+    // `data-action`. Walk up to the ancestor carrying the action.
     const actionable = target?.closest('[data-action]') as HTMLElement | null;
     if (!actionable) {
       return;
@@ -146,7 +146,7 @@ export class FormAssistWidget {
     const preferredLeft = rect.left;
     this.root.style.top = `${Math.round(top)}px`;
     this.root.style.left = `${Math.round(Math.min(Math.max(margin, preferredLeft), maxLeft))}px`;
-    // Si débordement vertical (champ en bas de page), on passe au-dessus.
+    // On vertical overflow (field near the bottom of the page), flip above.
     const rootHeight = this.root.offsetHeight || 120;
     if (top + rootHeight > window.innerHeight - margin) {
       this.root.style.top = `${Math.round(Math.max(margin, rect.top - rootHeight - margin))}px`;
@@ -154,8 +154,8 @@ export class FormAssistWidget {
   }
 
   /**
-   * Indique si un nœud DOM appartient au widget (host ou son shadow tree).
-   * Utilisé par l'orchestrateur pour ignorer les focus/clics internes au widget.
+   * Whether a DOM node belongs to the widget (host or its shadow tree).
+   * Used by the orchestrator to ignore focus/clicks internal to the widget.
    */
   isHostElement(node: Node | null): boolean {
     return node !== null && this.host.contains(node);

@@ -1,8 +1,8 @@
 /**
- * Circuit Breaker — Fonction pure de transition d'état.
+ * Circuit Breaker — Pure state transition function.
  *
- * Règles Core : zéro I/O, zéro async, zéro side effect.
- * `now` est toujours injecté depuis le Shell — jamais Date.now() ici.
+ * Core rules: zero I/O, zero async, zero side effects.
+ * `now` is always injected from the Shell — never Date.now() here.
  */
 
 import type {
@@ -13,18 +13,18 @@ import type {
 import { DEFAULT_HEALTH_THRESHOLDS } from '../types/health';
 
 /**
- * Calcule le prochain health snapshot après un appel connecteur.
+ * Computes the next health snapshot after a connector call.
  *
- * Transitions d'état :
+ * State transitions:
  *   closed    + failure × N   → open
- *   open      + elapsed > T   → half-open  (via timestamp, pas d'appel direct)
+ *   open      + elapsed > T   → half-open  (via timestamp, no direct call)
  *   half-open + success       → closed
  *   half-open + failure       → open
  *
- * @param current   Snapshot courant
- * @param result    Résultat de l'appel (success/failure + latence)
- * @param now       Timestamp courant en ms (injecté depuis Shell)
- * @param thresholds Seuils configurables (défaut: DEFAULT_HEALTH_THRESHOLDS)
+ * @param current   Current snapshot
+ * @param result    Call result (success/failure + latency)
+ * @param now       Current timestamp in ms (injected from Shell)
+ * @param thresholds Configurable thresholds (default: DEFAULT_HEALTH_THRESHOLDS)
  */
 export function computeNextHealth(
   current: ConnectorHealthSnapshot,
@@ -32,7 +32,7 @@ export function computeNextHealth(
   now: number,
   thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
 ): ConnectorHealthSnapshot {
-  // Mise à jour fenêtre glissante des latences
+  // Update the rolling latency window
   const latencies = appendLatency(
     current.recentLatenciesMs,
     result.latencyMs,
@@ -47,8 +47,8 @@ export function computeNextHealth(
 }
 
 /**
- * Détermine si un circuit en état `open` doit passer en `half-open`.
- * À appeler avant chaque tentative d'appel sur un circuit ouvert.
+ * Determines whether an `open` circuit should move to `half-open`.
+ * Call before each attempt on an open circuit.
  *
  * @param snapshot  Snapshot courant
  * @param now       Timestamp courant en ms
@@ -66,8 +66,8 @@ export function shouldAttemptProbe(
 }
 
 /**
- * Retourne un snapshot identique mais avec l'état passé à `half-open`.
- * Utilisé par le Shell pour marquer qu'une sonde va être tentée.
+ * Returns an identical snapshot with the state moved to `half-open`.
+ * Used by the Shell to mark that a probe is about to be attempted.
  */
 export function transitionToHalfOpen(
   snapshot: ConnectorHealthSnapshot,
@@ -98,7 +98,7 @@ function handleSuccess(
     totalSuccesses: current.totalSuccesses + 1,
     lastSuccessAt: now,
     recentLatenciesMs: latencies,
-    // On met à jour lastStateChangeAt uniquement si on change d'état
+    // Update lastStateChangeAt only when the state actually changes
     lastStateChangeAt: wasOpenOrHalfOpen ? now : current.lastStateChangeAt,
   };
 }
@@ -112,7 +112,7 @@ function handleFailure(
   const consecutiveFailures = current.consecutiveFailures + 1;
   const totalFailures = current.totalFailures + 1;
 
-  // half-open + failure → open immédiatement
+  // half-open + failure → open immediately
   if (current.circuitState === 'half-open') {
     return {
       ...current,

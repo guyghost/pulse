@@ -54,8 +54,8 @@ describe('classifyField — spécificité (ordre des règles)', () => {
     expect(classifyField(raw('Lettre de motivation')).kind).toBe('cover-letter');
   });
   it('"nom de l\'entreprise" → free-text (pas full-name)', () => {
-    // "entreprise" est un marqueur org/user : on ne doit PAS dériver un kind "name"
-    // pour éviter de proposer le nom du freelance.
+    // "entreprise" is an org/user marker: we must NOT derive a "name" kind
+    // to avoid proposing the freelancer's name.
     expect(classifyField(raw("Nom de l'entreprise")).kind).toBe('free-text');
   });
   it('"company name" → free-text (pas full-name)', () => {

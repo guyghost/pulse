@@ -21,7 +21,7 @@
 
   // Calm icon vocabulary: green/muted check for success & quiet, blue
   // circle-alert (never red) for partial. Red is reserved for the "sources à
-  // vérifier" evidence number — color is never the only signal.
+  // vérifier" evidence number (FR copy) — color is never the only signal.
   const iconName = $derived<IconName>(summary.tone === 'partial' ? 'circle-alert' : 'check-circle');
 
   const chipClass = $derived(

@@ -5,9 +5,9 @@ import { describe, it } from 'vitest';
  *
  * Ce test est un tripwire : il throw par design tant que le blocker
  * `release-runtime.transport-consumer-capability-issuer-missing` n'est pas
- * résolu (aucun consommateur de transport production ne détient encore le
- * chemin d'enregistrement private verified-payload ; l'exécution raw DTO est
- * interdite). Ne pas dé-skiper sans suivre le runbook de tests/SKIPS.md.
+ * resolved (no production transport consumer holds the private
+ * verified-payload registration path yet; raw DTO execution is forbidden).
+ * Do not unskip without following the tests/SKIPS.md runbook.
  */
 const RELEASE_BLOCKER_CODE = 'release-runtime.transport-consumer-capability-issuer-missing';
 

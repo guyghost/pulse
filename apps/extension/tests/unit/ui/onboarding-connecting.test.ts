@@ -142,7 +142,7 @@ describe('OnboardingFlow — connecting (P0-B)', () => {
     expect(scanNow).toBeDefined();
     scanNow.click();
     expect(onEvent).toHaveBeenCalledWith({ type: 'SKIP' });
-    // L'escape hatch « sans source » n'a pas de sens quand une source est prête.
+    // The "no source" escape hatch makes no sense when a source is ready.
     expect(
       Array.from(target.querySelectorAll('button')).some((b) =>
         b.textContent?.trim().startsWith('Continuer sans source')

@@ -37,7 +37,7 @@ describe('classifyError', () => {
 // withErrorBoundary — validation
 // ============================================================================
 
-// Mock import.meta.env.DEV pour éviter les console.warn dans les tests
+// Mock import.meta.env.DEV to avoid console.warn in tests
 vi.stubGlobal('import', { meta: { env: { DEV: false } } });
 
 import { withErrorBoundary } from '../../../src/lib/shell/messaging/error-boundary';
@@ -168,7 +168,7 @@ describe('withErrorBoundary — error boundary async', () => {
 
     wrapped({ type: 'GET_PROFILE' }, noopSender, sendResponse);
 
-    // Laisser les microtâches se terminer
+    // Let microtasks finish
     await new Promise((r) => setTimeout(r, 10));
 
     expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: false }));

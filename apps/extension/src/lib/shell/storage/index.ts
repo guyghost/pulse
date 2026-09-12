@@ -1,6 +1,6 @@
 /**
- * Point d'entrée unique pour le stockage shell.
- * Ré-exporte toutes les fonctions de stockage.
+ * Single entry point for shell storage.
+ * Re-exports all storage functions.
  */
 
 // === Favorites & Hidden (chrome.storage.local) ===
@@ -15,7 +15,7 @@ export { getReviewJournal, journalFirstViews } from './review-journal';
 // === Chrome Storage (Settings) ===
 export { getSettings, setSettings, type AppSettings } from './chrome-storage';
 
-// === Session Storage (état temporaire) ===
+// === Session Storage (temporary state) ===
 export {
   getScanState,
   setScanState,

@@ -1,6 +1,6 @@
 /**
- * Types pour les métriques de performance
- * Core = pur, zéro I/O, zéro side effects
+ * Performance metric types
+ * Core = pure, zero I/O, zero side effects
  */
 
 export type MetricUnit = 'ms' | 'bytes' | 'count' | 'percent';
@@ -18,7 +18,7 @@ export interface ScanMetrics {
   totalMissions: number;
   missionsPerConnector: Record<string, number>;
   errors: Array<{ connectorId: string; errorType: string }>;
-  dedupRatio: number; // % de missions dédupliquées
+  dedupRatio: number; // % of deduplicated missions
 }
 
 export interface CacheMetrics {
@@ -36,20 +36,20 @@ export interface TimingMetric {
 }
 
 /**
- * Calcule le hit rate à partir des hits et misses
- * Fonction pure, testable sans mocks
+ * Computes the hit rate from hits and misses
+ * Pure function, testable without mocks
  */
 export function calculateHitRate(hits: number, misses: number): number {
   const total = hits + misses;
   if (total === 0) {
     return 0;
   }
-  return Math.round((hits / total) * 100 * 100) / 100; // Arrondi à 2 décimals
+  return Math.round((hits / total) * 100 * 100) / 100; // Rounded to 2 decimals
 }
 
 /**
- * Calcule le ratio de déduplication
- * Fonction pure
+ * Computes the deduplication ratio
+ * Pure function
  */
 export function calculateDedupRatio(beforeCount: number, afterCount: number): number {
   if (beforeCount === 0) {

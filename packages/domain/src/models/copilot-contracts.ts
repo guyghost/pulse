@@ -66,7 +66,7 @@ export interface CopilotDisplayedTjm {
 export interface CopilotTjmBounds {
   min: number;
   target: number;
-  /** DAO #174 : null = profil sans plafond (seul le minimum est collecté). */
+  /** DAO #174: null = profile without ceiling (only the minimum is collected). */
   max: number | null;
   currency: 'EUR';
 }
@@ -499,8 +499,8 @@ function isProfileData(value: unknown): value is CopilotProfileData {
           !hasOnlyKeys(fieldValue, new Set(['min', 'target', 'max', 'currency'])) ||
           !isTjmRate(fieldValue.min) ||
           !isTjmRate(fieldValue.target) ||
-          // DAO #174 : max null = profil sans plafond (le target retombe sur
-          // le plancher) ; une borne explicite reste pleinement validée.
+          // DAO #174: max null = profile without ceiling (target falls back to
+          // the floor); an explicit bound remains fully validated.
           (fieldValue.max !== null && !isTjmRate(fieldValue.max)) ||
           fieldValue.currency !== 'EUR' ||
           fieldValue.min > fieldValue.target ||

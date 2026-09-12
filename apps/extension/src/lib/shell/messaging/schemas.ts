@@ -1,13 +1,13 @@
 /**
- * Bridge Message Schemas — Validation Zod pour tous les variants de BridgeMessage.
+ * Bridge Message Schemas — Zod validation for all BridgeMessage variants.
  *
- * Shell only : schémas de validation à la frontière de confiance.
- * Les types inférés sont compatibles avec BridgeMessage (pas de duplication).
+ * Shell only: validation schemas at the trust boundary.
+ * Inferred types are compatible with BridgeMessage (no duplication).
  *
- * Limites de payload :
- *   - MISSIONS_UPDATED : ≤ 500 missions
- *   - SAVE_PROFILE     : payload ≤ 10 Ko sérialisé
- *   - URLs             : https:// uniquement, ≤ 2048 chars
+ * Payload limits:
+ *   - MISSIONS_UPDATED: ≤ 500 missions
+ *   - SAVE_PROFILE     : payload ≤ 10 KB serialized
+ *   - URLs             : https:// only, ≤ 2048 chars
  */
 
 import { z } from 'zod';
@@ -38,7 +38,7 @@ import {
 } from '@pulse/domain';
 
 // ============================================================================
-// Helpers de validation réutilisables
+// Reusable validation helpers
 // ============================================================================
 
 const SafeString = z.string().max(4096);
@@ -61,7 +61,7 @@ const CanonicalEnabledConnectorIdsSchema = z
     );
   }, 'Enabled connector IDs must be unique and follow the shipped catalogue order');
 
-/** Valide qu'un objet sérialisé ne dépasse pas N octets */
+/** Validates that a serialized object doesn't exceed N bytes */
 function maxBytes(maxB: number) {
   return (val: unknown): boolean => {
     try {
@@ -73,7 +73,7 @@ function maxBytes(maxB: number) {
 }
 
 // ============================================================================
-// Schémas par type de message
+// Schemas per message type
 // ============================================================================
 
 // ── Form Assistant (shared sub-schema) ───────────────────────────────────────
@@ -120,7 +120,7 @@ const MissionSchema = z
     title: z.string(),
     source: z.string(),
   })
-  .passthrough(); // Les autres champs de Mission sont acceptés
+  .passthrough(); // Other Mission fields are accepted
 
 const MissionsPayloadSchema = z.array(MissionSchema).max(500, {
   message: 'MISSIONS_UPDATED payload exceeds 500 items limit',
@@ -745,12 +745,12 @@ const PlatformAccountOperationResultSchema = z.union([
 ]);
 
 // ============================================================================
-// Registre des schémas par type de message
+// Registry of schemas per message type
 // ============================================================================
 
 /**
- * Schéma de validation pour chaque type de message entrant.
- * Les messages sans payload utilisent z.undefined() ou z.unknown().
+ * Validation schema for each incoming message type.
+ * Messages without payload use z.undefined() or z.unknown().
  */
 export const MessageSchemas = {
   // Feed local data
@@ -1683,7 +1683,7 @@ export const MessageSchemas = {
   NOTIFICATION_CLICKED: z.object({ type: z.literal('NOTIFICATION_CLICKED') }),
 
   // ── Form Assistant (content script ↔ service worker) ───────────────────────
-  // Source de vérité : src/models/form-assistant.model.md.
+  // Source of truth: src/models/form-assistant.model.md.
   FORM_ASSIST_STATUS: z.object({ type: z.literal('FORM_ASSIST_STATUS') }),
   FORM_ASSIST_STATUS_RESULT: z.object({
     type: z.literal('FORM_ASSIST_STATUS_RESULT'),
@@ -1710,7 +1710,7 @@ export const MessageSchemas = {
       field: FieldDescriptorSchema,
     }),
   }),
-  // Content → SW : annule une génération en cours (transition `requesting CANCEL`).
+  // Content → SW: cancels an in-flight generation (`requesting CANCEL` transition).
   FORM_ASSIST_CANCEL: z.object({
     type: z.literal('FORM_ASSIST_CANCEL'),
     payload: z.object({
@@ -1725,7 +1725,7 @@ export const MessageSchemas = {
       engine: z.enum(['local', 'remote']),
     }),
   }),
-  // SW → Content : accuse réception de l'annulation (transition `cancelling → idle`).
+  // SW → Content: acknowledges the cancellation (`cancelling → idle` transition).
   FORM_ASSIST_CANCEL_ACK: z.object({
     type: z.literal('FORM_ASSIST_CANCEL_ACK'),
     payload: z.object({
@@ -1745,8 +1745,8 @@ export const MessageSchemas = {
 export type MessageType = keyof typeof MessageSchemas;
 
 /**
- * Valide un message entrant contre son schéma.
- * Retourne le message typé si valide, ou une erreur structurée.
+ * Validates an incoming message against its schema.
+ * Returns the typed message if valid, or a structured error.
  */
 export function validateMessage(raw: unknown):
   | {
@@ -1758,7 +1758,7 @@ export function validateMessage(raw: unknown):
       messageType: string | undefined;
       errors: string[];
     } {
-  // 1. Le message doit être un objet avec un champ `type`
+  // 1. The message must be an object with a `type` field
   if (
     !raw ||
     typeof raw !== 'object' ||

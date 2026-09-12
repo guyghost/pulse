@@ -547,11 +547,11 @@ function devFormAssistProposal(kind: string, label: string, profile: UserProfile
       return name;
     case 'email':
     case 'phone':
-      // UserProfile ne persiste pas ces coordonnées (local-first,
-      // pas de credentials). Cohérent avec le prompt production.
+      // UserProfile does not persist these contact details (local-first,
+      // no credentials). Consistent with the production prompt.
       return '';
     case 'linkedin':
-      // Aucune URL LinkedIn dans le profil de ce modèle.
+      // No LinkedIn URL in this model's profile.
       return '';
     case 'cover-letter':
       return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM ${
@@ -734,9 +734,9 @@ function createChromeStubs() {
             };
           }
           case 'FORM_ASSIST_REQUEST': {
-            // Dev stub : Gemini Nano n'est pas disponible dans un onglet navigateur
-            // normal. On renvoie une proposition câblée pour valider le contrat
-            // bridge et l'UX du widget (lorsque le content script est injecté).
+            // Dev stub: Gemini Nano is not available in a regular browser tab.
+            // Return a wired proposal to validate the bridge contract and the
+            // widget UX (when the content script is injected).
             const payload = message.payload as {
               requestId: string;
               field: { kind: string; label: string };

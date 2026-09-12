@@ -21,7 +21,7 @@ vi.stubGlobal('chrome', {
 });
 
 // ============================================================================
-// Imports (après le stub global)
+// Imports (after the global stub)
 // ============================================================================
 
 import {
@@ -78,7 +78,7 @@ describe('getHealthSnapshot', () => {
   });
 
   it('retourne un snapshot initial si les données sont corrompues', async () => {
-    // Injecter des données corrompues directement dans le mock storage
+    // Inject corrupt data directly into the mock storage
     mockStorageData['connector_health_snapshots'] = { freework: { invalid: true } };
 
     const snap = await getHealthSnapshot('freework', T0);
@@ -265,7 +265,7 @@ describe('saveHealthSnapshot — quota exceeded', () => {
   });
 
   it('tente un fallback avec latences élaguées si QUOTA_BYTES dépassé', async () => {
-    // Premier appel set() lance une erreur QUOTA_BYTES, le second réussit
+    // First set() call throws a QUOTA_BYTES error, the second succeeds
     let callCount = 0;
     mockStorage.set.mockImplementation(async (items: Record<string, unknown>) => {
       callCount++;
@@ -281,7 +281,7 @@ describe('saveHealthSnapshot — quota exceeded', () => {
     // Ne devrait pas lancer d'exception
     await expect(saveHealthSnapshot(snap)).resolves.toBeUndefined();
 
-    // Le deuxième appel (fallback) doit avoir eu lieu
+    // The second (fallback) call must have happened
     expect(callCount).toBe(2);
   });
 

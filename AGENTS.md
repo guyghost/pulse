@@ -379,6 +379,13 @@ Le scoring sémantique utilise Gemini Nano (Chrome built-in AI) pour analyser la
 
 Le scoring sémantique est optionnel et non-bloquant : si Gemini Nano n'est pas disponible, le scoring de base (`relevance.ts`) est utilisé.
 
+## Langues — code & documentation
+
+- **Code en anglais** : identifiants, fonctions, variables, types, commentaires, logs, messages de commit. Tout ce qui vit dans le code est en anglais.
+- **Documentation `.md` en français** : README, ADRs, specs, models, guides. Les blocs de code, identifiants techniques et termes consacrés (feed, scan, core, shell…) restent en anglais.
+- **Copy UI en français** : le produit cible des freelances francophones — les chaînes affichées à l'utilisateur (labels, notifications, aria-labels) sont en français.
+- **Exception — archives** : les artefacts historiques (plans datés, rapports générés, snapshots d'audit) conservent leur langue d'origine ; on ne réécrit pas l'historique. Suivi du backlog de traduction : `docs/traduction-fr.md`.
+
 ## Conventions TypeScript
 
 - `strict: true` dans tsconfig
@@ -465,6 +472,8 @@ Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais
 11. **Importer du Shell depuis le Core** — `core/` ne doit JAMAIS importer depuis `shell/`
 12. **Utiliser `Date.now()` ou `new Date()` dans le Core** — Injecter via paramètre depuis le Shell
 13. **Mettre de l'I/O dans le Core** — Pas de `fetch`, `indexedDB`, `chrome.*` dans `core/`
+14. **Écrire du code en français** — Identifiants et commentaires en anglais uniquement (la copy UI reste en français)
+15. **Écrire une nouvelle doc `.md` en anglais** — La documentation en français, sauf artefacts historiques
 
 ## Cursor Cloud specific instructions
 

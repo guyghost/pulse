@@ -257,10 +257,10 @@ test.describe('Feed', () => {
 
     await setFeedState(page, 'empty');
 
-    // Sur un runner CI lent, le SCAN_COMPLETE du scan de montage (stub à
-    // ~2,5 s après SCAN_START) peut arriver APRÈS le passage à « empty » et
-    // repeupler le feed : ré-émettre l'événement dev du DevPanel (même
-    // mécanisme que son bouton) jusqu'à ce que l'état vide persiste.
+    // On a slow CI runner, the setup scan's SCAN_COMPLETE (stub ~2.5s after
+    // SCAN_START) may arrive AFTER the switch to "empty" and repopulate the
+    // feed: re-emit the DevPanel dev event (same mechanism as its button)
+    // until the empty state persists.
     await expect
       .poll(
         async () => {
@@ -581,7 +581,7 @@ test.describe('Feed', () => {
 
     const panelIsTopmost = await filterPanel.evaluate((panel) => {
       const rect = panel.getBoundingClientRect();
-      // Sonde au centre vertical : le bord supérieur du panneau passe sous la
+      // Probe at the vertical center: the panel's top edge moves below the
       // barre d'outils sticky du feed (z-20), ce qui fausse un probe top+24.
       const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
       return hit === panel || (hit !== null && panel.contains(hit));

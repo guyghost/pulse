@@ -9,15 +9,15 @@ export interface PlatformConnector {
   readonly icon: string;
 
   /**
-   * Détecte si l'utilisateur a une session active sur la plateforme
-   * @param now - Timestamp injecté (pas de Date.now() dans Core)
+   * Detects whether the user has an active session on the platform
+   * @param now - Injected timestamp (no Date.now() in Core)
    * @param signal - Optional AbortSignal for cancellation
    */
   detectSession(now: number, signal?: AbortSignal): Promise<Result<boolean, AppError>>;
 
   /**
-   * Récupère les missions depuis la plateforme
-   * @param now - Timestamp injecté (pas de Date.now() dans Core)
+   * Fetches missions from the platform
+   * @param now - Injected timestamp (no Date.now() in Core)
    * @param context - Optional search context for server-side filtering
    * @param signal - Optional AbortSignal for cancellation
    */
@@ -28,8 +28,8 @@ export interface PlatformConnector {
   ): Promise<Result<Mission[], AppError>>;
 
   /**
-   * Récupère la date de dernière synchronisation
-   * @param now - Timestamp injecté (pas de Date.now() dans Core)
+   * Retrieves the last synchronization date
+   * @param now - Injected timestamp (no Date.now() in Core)
    */
   getLastSync(now: number): Promise<Result<Date | null, AppError>>;
 }

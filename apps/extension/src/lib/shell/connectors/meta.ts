@@ -14,9 +14,9 @@ export interface ConnectorMeta {
   url: string;
   hostPermissions: readonly string[];
   /**
-   * Active le Form Assistant (remplissage de champs type Grammarly) sur ce
-   * connecteur. Le content script est injecté uniquement sur les connecteurs
-   * `formAssist: true`. Source de vérité : src/models/form-assistant.model.md.
+   * Enables the Form Assistant (Grammarly-style field filling) on this
+   * connector. The content script is injected only on `formAssist: true`
+   * connectors. Source of truth: src/models/form-assistant.model.md.
    */
   formAssist?: boolean;
 }

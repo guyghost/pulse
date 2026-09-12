@@ -1,5 +1,5 @@
 /**
- * Stratégie de retry avec backoff exponentiel pour les requêtes réseau
+ * Retry strategy with exponential backoff for network requests
  */
 
 import type { Result, AppError } from '../../core/errors';
@@ -9,9 +9,9 @@ export interface RetryConfig {
   maxAttempts: number;
   baseDelayMs: number;
   maxDelayMs: number;
-  /** Liste des codes d'erreur ou messages qui déclenchent un retry */
+  /** List of error codes or messages that trigger a retry */
   retryableErrors: string[];
-  /** Multiplicateur pour le backoff exponentiel (défaut: 2) */
+  /** Multiplier for the exponential backoff (default: 2) */
   backoffMultiplier?: number;
 }
 
@@ -29,7 +29,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 };
 
 /**
- * Erreur émise quand tous les retries ont échoué
+ * Error thrown when all retries have failed
  */
 export class RetryExhaustedError extends Error {
   constructor(
@@ -43,7 +43,7 @@ export class RetryExhaustedError extends Error {
 }
 
 /**
- * Calcule le délai avant le prochain retry avec jitter
+ * Computes the delay before the next retry with jitter
  */
 function calculateDelay(attempt: number, config: RetryConfig): number {
   const multiplier = config.backoffMultiplier ?? 2;
@@ -53,7 +53,7 @@ function calculateDelay(attempt: number, config: RetryConfig): number {
 }
 
 /**
- * Vérifie si une erreur est retryable
+ * Checks whether an error is retryable
  */
 function isRetryableError(error: Error, retryableErrors: string[]): boolean {
   const errorMessage = error.message.toUpperCase();
@@ -70,7 +70,7 @@ function throwIfAborted(signal?: AbortSignal): void {
   }
 }
 
-/** Attend un délai et libère toujours timer/listener à la résolution ou l'abort. */
+/** Waits a delay and always releases timer/listener on resolution or abort. */
 export function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
   if (signal?.aborted) {
     return Promise.reject(abortError());
@@ -91,12 +91,12 @@ export function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> 
 }
 
 /**
- * Exécute une fonction avec retry automatique
- * @param fn Fonction à exécuter
- * @param config Configuration du retry
- * @param isOnline Fonction optionnelle pour vérifier la connexion
- * @returns Le résultat de fn()
- * @throws RetryExhaustedError si tous les retries échouent
+ * Runs a function with automatic retry
+ * @param fn Function to execute
+ * @param config Retry configuration
+ * @param isOnline Optional function to check connectivity
+ * @returns The result of fn()
+ * @throws RetryExhaustedError when all retries fail
  */
 export async function withRetry<T>(
   fn: () => Promise<T>,
@@ -109,9 +109,9 @@ export async function withRetry<T>(
   for (let attempt = 1; attempt <= fullConfig.maxAttempts; attempt++) {
     throwIfAborted(signal);
     try {
-      // Vérifier la connexion avant chaque tentative
+      // Check connectivity before each attempt
       if (!isOnline() && attempt > 1) {
-        // Attendre la reconnexion avant de réessayer
+        // Wait for reconnection before retrying
         await waitForOnlineState(isOnline, fullConfig.maxDelayMs, signal);
       }
 
@@ -120,7 +120,7 @@ export async function withRetry<T>(
       const isLastAttempt = attempt === fullConfig.maxAttempts;
       const err = error instanceof Error ? error : new Error(String(error));
 
-      // Si l'erreur n'est pas retryable, échouer immédiatement
+      // If the error is not retryable, fail immediately
       if (!isRetryableError(err, fullConfig.retryableErrors)) {
         throw err;
       }
@@ -133,7 +133,7 @@ export async function withRetry<T>(
         );
       }
 
-      // Calculer et attendre le délai avant retry
+      // Compute and wait for the retry delay
       const delay = calculateDelay(attempt, fullConfig);
 
       await abortableDelay(delay, signal);
@@ -189,7 +189,7 @@ function waitForOnlineState(
 }
 
 /**
- * Wrapper pour les requêtes fetch avec retry
+ * Wrapper for fetch requests with retry
  */
 export async function fetchWithRetry(
   url: string,

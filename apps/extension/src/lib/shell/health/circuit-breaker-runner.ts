@@ -1,11 +1,11 @@
 /**
- * CircuitBreakerRunner — Wrapper Shell qui :
- *  1. Mesure la latence de chaque appel connecteur
- *  2. Délègue le calcul de la transition au Core (computeNextHealth)
- *  3. Persiste le snapshot mis à jour
- *  4. Détermine si le circuit doit être sondé (half-open probe)
+ * CircuitBreakerRunner — Shell wrapper that:
+ *  1. Measures the latency of each connector call
+ *  2. Delegates the transition computation to the Core (computeNextHealth)
+ *  3. Persists the updated snapshot
+ *  4. Determines whether the circuit should be probed (half-open probe)
  *
- * Shell only : I/O, async, chrome.storage. Core n'importe jamais ce module.
+ * Shell only: I/O, async, chrome.storage. Core never imports this module.
  */
 
 import type { Mission } from '../../core/types/mission';
@@ -40,17 +40,17 @@ export interface CircuitRunLifecycleObserver {
 // ============================================================================
 
 /**
- * Exécute fetchMissions d'un connecteur en passant par le circuit breaker.
+ * Runs a connector's fetchMissions through the circuit breaker.
  *
- * - Si le circuit est `open` et que le probe interval n'est pas écoulé → retourne `skipped`
- * - Si le circuit est `open` et que le probe interval est écoulé → tente une sonde (half-open)
- * - Si le circuit est `closed` ou `half-open` → exécute normalement
+ * - If the circuit is `open` and the probe interval hasn't elapsed → returns `skipped`
+ * - If the circuit is `open` and the probe interval has elapsed → attempts a probe (half-open)
+ * - If the circuit is `closed` or `half-open` → executes normally
  *
- * @param connector   Le connecteur à appeler
- * @param now         Timestamp courant en ms
- * @param context     Contexte de recherche optionnel
- * @param signal      AbortSignal optionnel
- * @param thresholds  Seuils configurables (défaut: DEFAULT_HEALTH_THRESHOLDS)
+ * @param connector   The connector to call
+ * @param now         Current timestamp in ms
+ * @param context     Optional search context
+ * @param signal      Optional AbortSignal
+ * @param thresholds  Configurable thresholds (default: DEFAULT_HEALTH_THRESHOLDS)
  */
 export async function runWithCircuitBreaker(
   connector: PlatformConnector,
@@ -67,18 +67,18 @@ export async function runWithCircuitBreaker(
   };
 
   throwIfAborted();
-  // Charger le snapshot courant (ou créer un snapshot initial si premier run)
+  // Load the current snapshot (or create an initial snapshot on first run)
   let snapshot = await getHealthSnapshot(connector.id, now);
   throwIfAborted();
 
-  // Vérifier si le circuit est ouvert
+  // Check whether the circuit is open
   if (snapshot.circuitState === 'open') {
     if (!shouldAttemptProbe(snapshot, now, thresholds)) {
-      // Circuit ouvert, probe interval pas encore écoulé → skip
+      // Circuit open, probe interval not yet elapsed → skip
       return { status: 'skipped', snapshot, reason: 'circuit-open' };
     }
 
-    // Probe interval écoulé → passer en half-open pour tenter la sonde
+    // Probe interval elapsed → move to half-open to attempt the probe
     snapshot = transitionToHalfOpen(snapshot, now);
     throwIfAborted();
     await saveHealthSnapshot(snapshot);
@@ -89,8 +89,8 @@ export async function runWithCircuitBreaker(
     }
   }
 
-  // Exécuter l'appel avec retry pour les erreurs transientes,
-  // puis mesurer la latence totale pour le circuit breaker
+  // Execute the call with retry for transient errors,
+  // then measure the total latency for the circuit breaker
   const startTime = performance.now();
   const result = await withResultRetry(
     () => connector.fetchMissions(now, context, signal),
@@ -105,14 +105,14 @@ export async function runWithCircuitBreaker(
   throwIfAborted();
   const latencyMs = Math.round(performance.now() - startTime);
 
-  // Calculer le prochain état de santé (pure function)
+  // Compute the next health state (pure function)
   const callResult = result.ok
     ? { success: true as const, latencyMs }
     : { success: false as const, latencyMs };
 
   const nextSnapshot = computeNextHealth(snapshot, callResult, now, thresholds);
 
-  // Loguer les transitions d'état en dev
+  // Log state transitions in dev
   if (import.meta.env.DEV && nextSnapshot.circuitState !== snapshot.circuitState) {
     console.debug(
       `[CircuitBreaker] ${connector.id}: ${snapshot.circuitState} → ${nextSnapshot.circuitState}` +
@@ -120,7 +120,7 @@ export async function runWithCircuitBreaker(
     );
   }
 
-  // Persister le snapshot mis à jour
+  // Persist the updated snapshot
   throwIfAborted();
   await saveHealthSnapshot(nextSnapshot);
   throwIfAborted();
@@ -129,8 +129,8 @@ export async function runWithCircuitBreaker(
 }
 
 /**
- * Lit le snapshot courant d'un connecteur sans l'exécuter.
- * Utile pour l'affichage UI sans déclencher de scan.
+ * Reads a connector's current snapshot without executing it.
+ * Useful for UI display without triggering a scan.
  */
 export async function getConnectorHealth(
   connectorId: string,

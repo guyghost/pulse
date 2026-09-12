@@ -1,5 +1,5 @@
 /**
- * Types for extraction-confidence review queue (« À vérifier »).
+ * Types for extraction-confidence review queue ("À vérifier").
  *
  * Model: src/models/parsing-confidence.model.md
  * Pure data — no I/O, no dates, no randomness.

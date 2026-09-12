@@ -10,7 +10,7 @@ import {
 } from '../../../src/lib/core/types/health';
 import type { ConnectorHealthSnapshot, HealthThresholds } from '../../../src/lib/core/types/health';
 
-const T0 = 1_000_000; // timestamp de référence
+const T0 = 1_000_000; // reference timestamp
 const THRESHOLDS: HealthThresholds = { ...DEFAULT_HEALTH_THRESHOLDS, failureThreshold: 3 };
 const PROBE_INTERVAL = DEFAULT_HEALTH_THRESHOLDS.probeIntervalMs;
 
@@ -81,8 +81,8 @@ describe('computeNextHealth', () => {
 
   describe('open state', () => {
     it('reste open si on appelle computeNextHealth avec un succès (ne devrait pas arriver sans probe)', () => {
-      // En état open, le scanner ne devrait pas appeler le connecteur
-      // Mais si c'est appelé quand même (ex: probe), un succès passe à closed
+      // In open state, the scanner shouldn't call the connector
+      // But if it's called anyway (e.g. probe), a success moves to closed
       const snap = makeSnapshot({ circuitState: 'half-open' });
       const next = computeNextHealth(snap, success(), T0 + 1000, THRESHOLDS);
       expect(next.circuitState).toBe('closed');

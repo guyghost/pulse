@@ -68,7 +68,7 @@ export function formatTJM(
 
 /**
  * Format a TJM range. Collapses to a single value when bounds are equal, and
- * renders an open-ended floor (« à partir de 500 €/jour ») when only the
+ * renders an open-ended floor (« à partir de 500 €/jour » — FR copy) when only the
  * minimum is known (DAO #174) — pass `minOnlyPrefix` to label it.
  *
  * `formatTJMRange(600, 900)` → "600–900 €/j"

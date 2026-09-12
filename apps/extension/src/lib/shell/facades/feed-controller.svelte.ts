@@ -286,9 +286,9 @@ export interface FeedController {
   get lastScanAt(): number | null;
   get lastScanMissionCount(): number;
   get scanProgress(): ScanProgress;
-  /** Santé des connecteurs (circuit breaker snapshots) */
+  /** Connector health (circuit breaker snapshots) */
   get healthSnapshots(): Map<string, ConnectorHealthSnapshot>;
-  /** Anomalies parser (zéros consécutifs, chute soudaine) */
+  /** Parser anomalies (consecutive zeros, sudden drop) */
   get parserHealthRecords(): Map<string, ConnectorHealthRecord>;
 
   // Source session state
@@ -418,7 +418,7 @@ export function createFeedController(
     feedStore.load();
 
     try {
-      // Envoyer SCAN_START au service worker — il gère toute l'orchestration
+      // Send SCAN_START to the service worker — it handles all orchestration
       const response = (await sendMessage({
         type: 'SCAN_START',
         payload: { operationId, trigger: 'manual' },
@@ -594,8 +594,8 @@ export function createFeedController(
   }
 
   /**
-   * Reçoit les missions finalisées du service worker (déjà scored, deduped, semantic).
-   * Plus de post-processing local — le SW fait tout.
+   * Receives finalized missions from the service worker (already scored, deduped, semantic).
+   * No more local post-processing — the SW does everything.
    */
   async function handleScanComplete(missions: Mission[]): Promise<void> {
     if (import.meta.env.DEV) {
@@ -622,7 +622,7 @@ export function createFeedController(
     lastScanAt = Date.now();
     lastScanMissionCount = missions.length;
 
-    // Recharger les statuts persistés pour le panneau SourceHealthPanel
+    // Reload persisted statuses for the SourceHealthPanel
     try {
       persistedStatuses = await getConnectorStatuses();
     } catch {
@@ -955,7 +955,7 @@ export function createFeedController(
   function setupBridgeListener(): void {
     try {
       bridgeListenerCleanup = subscribeMessages((message) => {
-        // Progression détaillée pendant le scan
+        // Detailed progress during the scan
         if (message?.type === 'SCAN_PROGRESS' && message.payload) {
           const payload = message.payload;
           if (payload.operationId !== activeScanOperationId) {
@@ -973,7 +973,7 @@ export function createFeedController(
                   ? 'retrying'
                   : 'scanning',
           };
-          // Mettre à jour les états de connecteurs pour l'UI
+          // Update connector states for the UI
           connectorStatuses.clear();
           for (const cp of payload.connectorProgress) {
             connectorStatuses.set(cp.connectorId, {
@@ -1006,7 +1006,7 @@ export function createFeedController(
           );
         }
 
-        // Résultat final du scan (auto-scan du background)
+        // Final scan result (background auto-scan)
         if (message?.type === 'SCAN_COMPLETE' && claimTerminal(message.payload.operationId)) {
           const operationId = message.payload.operationId;
           ownedScan = { operationId, state: 'persisting' };

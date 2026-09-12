@@ -140,8 +140,8 @@ export class SettingsPageController {
 
   /**
    * Form Assistant activation (Machine D — src/models/form-assistant.model.md).
-   * Miroir de l'état persisté dans le SW (chrome.storage.local). Le toggle ne
-   * écrit JAMAIS directement en storage : il émet FORM_ASSIST_ENABLE via bridge.
+   * Mirror of the state persisted in the SW (chrome.storage.local). The toggle
+   * NEVER writes directly to storage: it emits FORM_ASSIST_ENABLE via bridge.
    */
   formAssistEnabled = $state(false);
   formAssistStatus = $state<'loading' | 'ready' | 'error'>('loading');
@@ -201,8 +201,8 @@ export class SettingsPageController {
   }
 
   /**
-   * Racolement Machine D : le SW diffuse FORM_ASSIST_ENABLED après toute
-   * mutation persistée. Le panel est un miroir, jamais la source primaire.
+   * Machine D reconciliation: the SW broadcasts FORM_ASSIST_ENABLED after any
+   * persisted mutation. The panel is a mirror, never the primary source.
    */
   private subscribeFormAssistMessages(): () => void {
     try {
@@ -295,8 +295,8 @@ export class SettingsPageController {
   }
 
   /**
-   * Lit l'état persisté du Form Assistant auprès du SW (Machine D — INIT).
-   * Échec (SW injoignable) → état `error` mais la page reste utilisable.
+   * Reads the persisted Form Assistant state from the SW (Machine D — INIT).
+   * Failure (SW unreachable) → `error` state but the page stays usable.
    */
   async loadFormAssist(): Promise<void> {
     this.formAssistStatus = 'loading';
@@ -311,9 +311,9 @@ export class SettingsPageController {
   }
 
   /**
-   * Bascule l'activation du Form Assistant. Le SW persiste et diffuse
-   * FORM_ASSIST_ENABLED (racolement). L'UI reste optimiste : on met à jour
-   * immédiatement pour la réactivité, et le message SW confirme/rétablit.
+   * Toggles the Form Assistant activation. The SW persists and broadcasts
+   * FORM_ASSIST_ENABLED (reconciliation). The UI stays optimistic: update
+   * immediately for responsiveness, and the SW message confirms/restores.
    */
   async toggleFormAssist(): Promise<void> {
     if (this.formAssistStatus === 'loading') {
@@ -328,8 +328,8 @@ export class SettingsPageController {
         type: 'FORM_ASSIST_ENABLE',
         payload: { enabled: next },
       })) as { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean } } | undefined;
-      // La réponse du SW est la source de vérité (elle peut différer de
-      // l'optimisme en cas d'erreur persistée côté SW).
+      // The SW response is the source of truth (it may differ from the
+      // optimistic value if a persisted error occurred SW-side).
       this.formAssistEnabled = Boolean(result?.payload.enabled);
       this.formAssistStatus = 'ready';
     } catch {
@@ -548,8 +548,8 @@ export class SettingsPageController {
       const current = this.currentProfile ?? (await getProfile());
       const nextKeywords = appendUniqueNormalized(this.profileKeywords, this.keywordInput);
       const nextTjmMin = normalizeDailyRate(this.tjmMin);
-      // DAO #174 : plus de plafond collecté dans le formulaire — on persiste
-      // null (sans plafond). Toute borne legacy préexistante est écrasée.
+      // DAO #174: no more ceiling collected in the form — persist null
+      // (no ceiling). Any pre-existing legacy bound is overwritten.
 
       const normalized = normalizeProfileDraft({
         firstName: normalizeTextInput(this.firstName),

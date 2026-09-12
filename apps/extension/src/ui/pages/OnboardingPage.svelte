@@ -115,9 +115,9 @@
     void runEffect(effect);
   });
 
-  // ── P0-B — vérification de session par source ─────────────────────────
-  // La machine ne reçoit que l'issue (SOURCE_SESSION) ; les états
-  // intermédiaires restent locaux (plan : « erreurs affichées localement »).
+  // ── P0-B — per-source session verification ─────────────────────────
+  // The machine only receives the issue (SOURCE_SESSION); intermediate
+  // states stay local (plan: "errors displayed locally").
   const sourceVerifications = $state<Record<string, SourceVerificationStatus | 'checking'>>({});
 
   async function handleVerifySource(sourceId: string): Promise<void> {
@@ -132,13 +132,13 @@
     }
   }
 
-  /** Session prouvée → la machine l'ajoute aux sources connectées + persistance durable. */
+  /** Session verified → the machine adds it to connected sources + durable persistence. */
   function onSourceSessionReady(sourceId: string): void {
     controller.send({ type: 'SOURCE_SESSION', sourceId, hasSession: true });
     void persistEnabledSource(sourceId);
   }
 
-  /** Persistance immédiate dans settings.enabledConnectors (pas seulement au START_SCAN). */
+  /** Immediate persistence into settings.enabledConnectors (not only at START_SCAN). */
   async function persistEnabledSource(sourceId: string): Promise<void> {
     try {
       const settings = await getSettings();
@@ -162,8 +162,8 @@
     }
   }
 
-  // Retour de focus après ouverture de la plateforme : re-vérifier les
-  // sources sans session (plan P0-B, interaction 2).
+  // Focus return after opening the platform: re-verify the
+  // sources without a session (P0-B plan, interaction 2).
   $effect(() => {
     const recheckPending = (): void => {
       for (const [id, status] of Object.entries(sourceVerifications)) {
@@ -204,9 +204,9 @@
     }
     // START_SCAN
     try {
-      // P0-A1 : un profil durable doit exister avant tout scan — le chemin
-      // nominal passe par PERSIST_PROFILE, mais SKIP/partiel saute directement
-      // à START_SCAN. Non bloquant : un échec n'annule pas le scan.
+      // P0-A1: a durable profile must exist before any scan — the nominal
+      // path goes through PERSIST_PROFILE, but SKIP/partial jumps straight
+      // to START_SCAN. Non-blocking: a failure doesn't cancel the scan.
       await ensureDurableProfileBeforeScan({
         getProfile,
         saveProfile,

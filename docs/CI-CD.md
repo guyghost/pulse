@@ -1,245 +1,245 @@
-# MissionPulse CI/CD Pipeline
+# Pipeline CI/CD MissionPulse
 
-This document describes the CI/CD pipeline for the MissionPulse monorepo.
+Ce document décrit le pipeline CI/CD du monorepo MissionPulse.
 
-## Monorepo Structure
+## Structure du monorepo
 
 ```
 pulse/
-├── apps/extension/   # Chrome extension (tests, build)
-├── apps/landing/     # Static landing page (no CI needed)
-└── packages/tsconfig # Shared TypeScript config
+├── apps/extension/   # Extension Chrome (tests, build)
+├── apps/landing/     # Landing page statique (pas de CI nécessaire)
+└── packages/tsconfig # Config TypeScript partagée
 ```
 
-All CI jobs run in the `apps/extension/` workspace via Turborepo.
+Tous les jobs CI s'exécutent dans le workspace `apps/extension/` via Turborepo.
 
-## Overview
+## Vue d'ensemble
 
-MissionPulse uses GitHub Actions for continuous integration and deployment. The pipeline consists of two main workflows:
+MissionPulse utilise GitHub Actions pour l'intégration continue et le déploiement. Le pipeline se compose de deux workflows principaux :
 
-| Workflow      | Trigger           | Purpose                           |
-| ------------- | ----------------- | --------------------------------- |
-| `ci.yml`      | Push to main, PRs | Lint, test, build, coverage       |
-| `release.yml` | Git tags (`v*`)   | Build, package, publish extension |
+| Workflow      | Déclencheur        | Rôle                                       |
+| ------------- | ------------------ | ------------------------------------------ |
+| `ci.yml`      | Push sur main, PRs | Lint, test, build, couverture              |
+| `release.yml` | Tags Git (`v*`)    | Build, package, publication de l'extension |
 
 ## Workflows
 
-### 1. CI Workflow (`ci.yml`)
+### 1. Workflow CI (`ci.yml`)
 
-Runs on every push to `main` and on all pull requests.
+S'exécute à chaque push sur `main` et sur toutes les pull requests.
 
-**Jobs:**
+**Jobs :**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     CI Pipeline                              │
+│                     Pipeline CI                              │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
 │  setup ──► lint ──┐                                         │
 │           │        │                                         │
 │           └──► format ─┼──► test ──┬──► build                    │
-│           │              │         └──► test-e2e (PRs only)      │
+│           │              │         └──► test-e2e (PRs uniquement) │
 │           └──► typecheck ┘                                       │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-| Job         | Description                  |
-| ----------- | ---------------------------- |
-| `setup`     | Compute pnpm cache path      |
-| `lint`      | Run ESLint on all files      |
-| `format`    | Check Prettier formatting    |
-| `typecheck` | TypeScript strict mode check |
-| `test`      | Run unit tests with coverage |
-| `build`     | Build extension artifact     |
-| `test-e2e`  | Run E2E tests (PRs only)     |
+| Job         | Description                          |
+| ----------- | ------------------------------------ |
+| `setup`     | Calcule le chemin du cache pnpm      |
+| `lint`      | Exécute ESLint sur tous les fichiers |
+| `format`    | Vérifie le formatage Prettier        |
+| `typecheck` | Vérification TypeScript strict       |
+| `test`      | Tests unitaires avec couverture      |
+| `build`     | Build de l'artefact extension        |
+| `test-e2e`  | Tests E2E (PRs uniquement)           |
 
-**Features:**
+**Fonctionnalités :**
 
-- pnpm cache for faster installs
-- Coverage upload to Codecov
-- Concurrency groups to cancel old runs
-- E2E tests only on PRs (cost optimization)
-- E2E runs in parallel with `build` (no extension artifact required)
-- E2E bootstraps `@pulse/ui` via `pnpm --filter @pulse/extension test:e2e`
-- CI excludes `@slow` tests (performance, offline); run `pnpm test:e2e:full` locally for the full suite
+- Cache pnpm pour des installations plus rapides
+- Upload de couverture vers Codecov
+- Groupes de concurrence pour annuler les anciens runs
+- Tests E2E uniquement sur les PRs (optimisation de coût)
+- E2E s'exécute en parallèle de `build` (aucun artefact extension requis)
+- E2E bootstrappe `@pulse/ui` via `pnpm --filter @pulse/extension test:e2e`
+- La CI exclut les tests `@slow` (performance, offline) ; lancer `pnpm test:e2e:full` en local pour la suite complète
 
-### 2. Release Workflow (`release.yml`)
+### 2. Workflow Release (`release.yml`)
 
-Triggered by pushing a semantic version tag (e.g., `v1.0.0`).
+Déclenché par le push d'un tag de version sémantique (ex. `v1.0.0`).
 
-**Process:**
+**Processus :**
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                   Release Pipeline                           │
+│                   Pipeline de release                        │
 ├─────────────────────────────────────────────────────────────┤
 │                                                              │
-│  1. Extract version from tag                                 │
-│  2. Verify manifest.json validity                            │
-│  3. Bump version in package.json & manifest.json             │
-│  4. Build production extension                               │
-│  5. Create ZIP artifact                                      │
-│  6. Generate changelog from git history                      │
-│  7. Create GitHub Release with ZIP attached                  │
-│  8. Publish to Chrome Web Store (if credentials set)         │
+│  1. Extraction de la version depuis le tag                   │
+│  2. Vérification de la validité de manifest.json             │
+│  3. Bump de version dans package.json & manifest.json        │
+│  4. Build de l'extension en production                       │
+│  5. Création de l'artefact ZIP                               │
+│  6. Génération du changelog depuis l'historique git          │
+│  7. Création de la GitHub Release avec le ZIP attaché        │
+│  8. Publication au Chrome Web Store (si identifiants définis)│
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-**Version Format:**
+**Format de version :**
 
-- Stable: `v1.0.0` → Published to CWS
-- Pre-release: `v1.0.0-beta.1` → GitHub Release only (skips CWS)
+- Stable : `v1.0.0` → publiée sur le CWS
+- Pré-release : `v1.0.0-beta.1` → GitHub Release uniquement (CWS ignoré)
 
-## Credentials Setup
+## Configuration des identifiants
 
-### Required Secrets
+### Secrets requis
 
-Configure these secrets in your GitHub repository settings:
+Configurer ces secrets dans les réglages du dépôt GitHub :
 
-| Secret                 | Required For    | How to Obtain                    |
-| ---------------------- | --------------- | -------------------------------- |
-| `CODECOV_TOKEN`        | Coverage upload | [codecov.io](https://codecov.io) |
-| `CHROME_CLIENT_ID`     | CWS publish     | Chrome Web Store API             |
-| `CHROME_CLIENT_SECRET` | CWS publish     | Chrome Web Store API             |
-| `CHROME_REFRESH_TOKEN` | CWS publish     | Chrome Web Store API             |
-| `CHROME_EXTENSION_ID`  | CWS publish     | Your extension ID                |
+| Secret                 | Requis pour          | Comment l'obtenir                |
+| ---------------------- | -------------------- | -------------------------------- |
+| `CODECOV_TOKEN`        | Upload de couverture | [codecov.io](https://codecov.io) |
+| `CHROME_CLIENT_ID`     | Publication CWS      | API Chrome Web Store             |
+| `CHROME_CLIENT_SECRET` | Publication CWS      | API Chrome Web Store             |
+| `CHROME_REFRESH_TOKEN` | Publication CWS      | API Chrome Web Store             |
+| `CHROME_EXTENSION_ID`  | Publication CWS      | L'ID de votre extension          |
 
-### Setting Up Chrome Web Store Publishing
+### Configuration de la publication Chrome Web Store
 
-1. **Create OAuth Credentials:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com)
-   - Create OAuth 2.0 client ID
-   - Add authorized redirect URI: `https://oauth2.googleapis.com/token`
-   - Note the Client ID and Client Secret
+1. **Créer les identifiants OAuth :**
+   - Aller sur la [Google Cloud Console](https://console.cloud.google.com)
+   - Créer un client ID OAuth 2.0
+   - Ajouter l'URI de redirection autorisée : `https://oauth2.googleapis.com/token`
+   - Noter le Client ID et le Client Secret
 
-2. **Get Refresh Token:**
-   - Use the [Chrome Web Store API](https://developer.chrome.com/docs/webstore/using-the-api)
-   - Follow OAuth flow to obtain refresh token
+2. **Obtenir le refresh token :**
+   - Utiliser l'[API Chrome Web Store](https://developer.chrome.com/docs/webstore/using-the-api)
+   - Suivre le flux OAuth pour obtenir le refresh token
 
-3. **Get Extension ID:**
-   - Found in your Chrome Web Store developer dashboard
-   - Format: `abcdefghijklmnopqrstuvwxyzabcdef`
+3. **Obtenir l'extension ID :**
+   - Visible dans le tableau de bord développeur du Chrome Web Store
+   - Format : `abcdefghijklmnopqrstuvwxyzabcdef`
 
-4. **Add Secrets to GitHub:**
-   - Go to repo Settings → Secrets and variables → Actions
-   - Add each secret individually
+4. **Ajouter les secrets à GitHub :**
+   - Aller dans Settings du repo → Secrets and variables → Actions
+   - Ajouter chaque secret individuellement
 
-### Optional Configuration
+### Configuration optionnelle
 
-To skip Chrome Web Store publishing, simply don't configure the CWS secrets. The workflow will log a warning but continue successfully.
+Pour ignorer la publication Chrome Web Store, il suffit de ne pas configurer les secrets CWS. Le workflow loguera un avertissement mais continuera avec succès.
 
-## Local Development
+## Développement local
 
-### Build Scripts
+### Scripts de build
 
 ```bash
-# Build for production
+# Build production
 pnpm build
 
-# Build with version bump
+# Build avec bump de version
 ./scripts/build-extension.sh 1.0.0
 
-# Verify manifest.json
+# Vérifier manifest.json
 pnpm tsx scripts/verify-manifest.ts
 
-# Bump version only
+# Bump de version uniquement
 pnpm tsx scripts/bump-version.ts 1.0.0
 ```
 
-### Creating a Release
+### Créer une release
 
 ```bash
-# 1. Ensure you're on main
+# 1. S'assurer d'être sur main
 git checkout main
 git pull
 
-# 2. Create and push tag
+# 2. Créer et pousser le tag
 git tag v1.0.0
 git push origin v1.0.0
 
-# 3. Monitor workflow
+# 3. Surveiller le workflow
 gh run watch
 ```
 
-### Manual Workflow Triggers
+### Déclencheurs manuels de workflow
 
 ```bash
-# Trigger CI manually
+# Déclencher la CI manuellement
 gh workflow run ci.yml
 ```
 
-## Code Quality Tools
+## Outils de qualité de code
 
 ### ESLint
 
-Configuration: `.eslintrc.cjs`
+Configuration : `.eslintrc.cjs`
 
 ```bash
-# Run linting
+# Lancer le lint
 pnpm lint
 
-# Fix auto-fixable issues
+# Corriger les problèmes auto-corrigibles
 pnpm lint:fix
 ```
 
-**Key Rules:**
+**Règles clés :**
 
-- No `any` types
-- Functional Core isolation (no shell imports from core)
-- Svelte 5 runes enforcement
-- No Svelte stores (use $state runes)
+- Pas de types `any`
+- Isolement du Functional Core (pas d'imports shell depuis core)
+- Application des runes Svelte 5
+- Pas de stores Svelte (utiliser les runes $state)
 
 ### Prettier
 
-Configuration: `.prettierrc`
+Configuration : `.prettierrc`
 
 ```bash
-# Check formatting
+# Vérifier le formatage
 pnpm format:check
 
-# Fix formatting
+# Corriger le formatage
 pnpm format
 ```
 
 ### TypeScript
 
-Configuration: `tsconfig.json` (strict mode)
+Configuration : `tsconfig.json` (mode strict)
 
 ```bash
-# Type check
+# Vérification des types
 pnpm tsc --noEmit
 ```
 
-## Coverage Reports
+## Rapports de couverture
 
-Coverage is automatically uploaded to Codecov on every CI run.
+La couverture est automatiquement uploadée vers Codecov à chaque run CI.
 
-- **Badge:** Add to README: `![coverage](https://codecov.io/gh/your-org/pulse/branch/main/graph/badge.svg)`
-- **Reports:** View detailed reports at codecov.io
+- **Badge :** à ajouter au README : `![coverage](https://codecov.io/gh/your-org/pulse/branch/main/graph/badge.svg)`
+- **Rapports :** rapports détaillés sur codecov.io
 
-## Troubleshooting
+## Dépannage
 
-### CI Fails: "pnpm install failed"
+### Échec CI : « pnpm install failed »
 
-- Check `pnpm-lock.yaml` is committed
-- Run `pnpm install` locally and commit changes
+- Vérifier que `pnpm-lock.yaml` est commité
+- Lancer `pnpm install` en local et committer les changements
 
-### CI Fails: "TypeScript error"
+### Échec CI : « TypeScript error »
 
-- Run `pnpm tsc --noEmit` locally
-- Fix type errors before pushing
+- Lancer `pnpm tsc --noEmit` en local
+- Corriger les erreurs de types avant de pousser
 
-### Release Fails: "Chrome Web Store publish failed"
+### Échec Release : « Chrome Web Store publish failed »
 
-- Verify all CWS secrets are set correctly
-- Check refresh token hasn't expired
-- Ensure extension ID is correct
+- Vérifier que tous les secrets CWS sont correctement définis
+- Vérifier que le refresh token n'a pas expiré
+- S'assurer que l'extension ID est correct
 
-## Security
+## Sécurité
 
-- All secrets are masked in logs
-- No credentials in code or comments
-- Workflow permissions use least-privilege principle
-- Third-party actions are pinned to specific versions
+- Tous les secrets sont masqués dans les logs
+- Aucun identifiant dans le code ou les commentaires
+- Les permissions des workflows suivent le principe du moindre privilège
+- Les actions tierces sont épinglées à des versions spécifiques

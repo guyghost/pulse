@@ -1,13 +1,14 @@
 /**
- * P0-B — vérification de session par source (docs/plans/2026-09-07-
+ * P0-B — per-source session verification (docs/plans/2026-09-07-
  * activation-first-scan-p0.md).
  *
- * Réutilise le pipeline existant des connecteurs (`detectSession`) — le même
- * que `checkSourceSessions` côté feed. La machine onboarding ne reçoit que
- * l'issue (`SOURCE_SESSION`) ; les états intermédiaires restent locaux à l'UI.
+ * Reuses the existing connector pipeline (`detectSession`) — the same as
+ * `checkSourceSessions` on the feed side. The onboarding machine only
+ * receives the issue (`SOURCE_SESSION`); intermediate states stay local to
+ * the UI.
  *
- * Shell : I/O injectées pour la testabilité ; le défaut passe par le
- * registry de connecteurs (contexte extension / stubs dev).
+ * Shell: injected I/O for testability; the default goes through the
+ * connector registry (extension context / dev stubs).
  */
 
 import type { PlatformConnector } from '$lib/shell/connectors/platform-connector';
@@ -35,10 +36,10 @@ async function defaultGetConnector(
 }
 
 /**
- * Vérifie la session d'une source via son connecteur.
- * - `ready` : le connecteur rapporte une session active.
- * - `session-missing` : pas de session (→ CTA « Ouvrir {source} »).
- * - `unavailable` : connecteur absent ou échec de vérification (→ réessayer).
+ * Verifies a source's session via its connector.
+ * - `ready`: the connector reports an active session.
+ * - `session-missing`: no session (→ "Ouvrir {source}" CTA).
+ * - `unavailable`: missing connector or verification failure (→ retry).
  */
 export async function verifySourceSession(
   sourceId: string,
@@ -62,9 +63,9 @@ export async function verifySourceSession(
 }
 
 /**
- * Ouvre la plateforme dans un nouvel onglet (connexion utilisateur).
- * Le side panel regagne le focus à la retour → l'orchestration re-vérifie.
- * Fallback `window.open` pour le mode dev sans contexte extension.
+ * Opens the platform in a new tab (user login).
+ * The side panel regains focus on return → the orchestration re-verifies.
+ * `window.open` fallback for dev mode without extension context.
  */
 export async function openSourceInNewTab(url: string): Promise<void> {
   if (typeof chrome !== 'undefined' && chrome.tabs?.create) {

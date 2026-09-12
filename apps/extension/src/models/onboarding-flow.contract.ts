@@ -223,8 +223,8 @@ export function canAdvanceStep(ctx: OnboardingFlowContext): boolean {
     case 'identity':
       return ctx.profile.firstName.trim().length > 0 && ctx.profile.jobTitle.trim().length > 0;
     case 'preferences':
-      // DAO #174 : le plafond n'est plus collecté (null = sans plafond) —
-      // seul le minimum conditionne l'avance dans le wizard.
+      // DAO #174: the ceiling is no longer collected (null = no ceiling) —
+      // only the minimum gates wizard progression.
       return (
         ctx.profile.tjmMin > 0 &&
         (ctx.profile.tjmMax === null || ctx.profile.tjmMax >= ctx.profile.tjmMin)

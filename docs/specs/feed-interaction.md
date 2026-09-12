@@ -1,315 +1,323 @@
-# Spec: MVP Feed Interaction
+# Spec : Interaction du feed MVP
 
-## Objective
+## Objectif
 
-Formalize the five core feed interactions — see, favorite, filter, sort, and search —
-with testable acceptance criteria grounded in the actual implementation.
+Formaliser les cinq interactions cœur du feed — voir, favori, filtrer, trier et rechercher —
+avec des critères d'acceptance testables ancrés dans l'implémentation réelle.
 
-The feed is where users spend the majority of their time. This spec serves as the
-canonical reference for these interactions, ensuring future changes don't silently
-break expected behavior and providing new contributors a single source of truth.
+Le feed est l'écran où les utilisateurs passent la majorité de leur temps. Cette spec sert de
+référence canonique pour ces interactions, garantissant que les changements futurs ne cassent
+pas silencieusement le comportement attendu et fournissant aux nouveaux contributeurs une
+source de vérité unique.
 
-## Scope
+## Périmètre
 
-| #    | Interaction                      | Primary state module                                            |
-| ---- | -------------------------------- | --------------------------------------------------------------- |
-| US-1 | Mark missions as seen            | `feed-page.svelte.ts` → `seen-missions.ts`                      |
-| US-2 | Favorite / hide missions         | `feed-page.svelte.ts` → `favorites.ts`                          |
-| US-3 | Filter missions (multi-criteria) | `feed-page.svelte.ts`                                           |
-| US-4 | Sort missions                    | `feed-page.svelte.ts` → `sort-missions.ts` / `rank-missions.ts` |
-| US-5 | Search missions                  | `feed.svelte.ts`                                                |
+| #    | Interaction                           | Module d'état principal                                         |
+| ---- | ------------------------------------- | --------------------------------------------------------------- |
+| US-1 | Marquer les missions comme vues       | `feed-page.svelte.ts` → `seen-missions.ts`                      |
+| US-2 | Favori / masquer les missions         | `feed-page.svelte.ts` → `favorites.ts`                          |
+| US-3 | Filtrer les missions (multi-critères) | `feed-page.svelte.ts`                                           |
+| US-4 | Trier les missions                    | `feed-page.svelte.ts` → `sort-missions.ts` / `rank-missions.ts` |
+| US-5 | Rechercher les missions               | `feed.svelte.ts`                                                |
 
-**Out of scope:** mission detail panel, comparison, keyboard shortcuts, saved views,
-scan triggering, onboarding. These are documented elsewhere or are secondary to the
-core feed loop.
+**Hors périmètre :** panneau de détail mission, comparaison, raccourcis clavier, vues
+sauvegardées, déclenchement du scan, onboarding. Ces sujets sont documentés ailleurs ou
+sont secondaires par rapport à la boucle cœur du feed.
 
-## Architecture Context
+## Contexte architecture
 
-- **State:** Svelte 5 runes (`$state`, `$derived`) in `src/lib/state/`.
-- **Persistence:** `chrome.storage.local` for seen IDs, favorites, hidden, and sort
-  preference. IndexedDB for missions (loaded via `getMissions()`).
-- **Core/Shell split:** all filtering and scoring logic lives in pure Core functions
-  (`filterFavoritesOnly`, `filterHidden`, `sortMissions`, `rankMissions`,
-  `recomputeFilteredMissions`). The state modules orchestrate I/O and delegate
-  computation to Core.
-- **No direct storage access from UI:** the side panel reads/writes persistence
-  through facade functions, never touching `chrome.*` or IndexedDB directly.
-
----
-
-## US-1: Mark Missions as Seen
-
-**As a** consultant
-**I want** missions I've already looked at to be visually distinguished from new ones
-**So that** I don't re-read the same opportunities.
-
-### Acceptance Criteria
-
-1. **AC-1.1 — Mark on view:** When a mission card enters the viewport (or is clicked),
-   `handleMissionSeen(missionId)` queues it for seen-marking.
-
-2. **AC-1.2 — Debounced persistence:** Seen IDs are flushed to storage in batches with
-   a 120 ms debounce (`SEEN_FLUSH_MS`). Rapid scrolling does not produce one write per
-   card.
-
-3. **AC-1.3 — Persists across sessions:** Seen IDs are stored in `chrome.storage.local`
-   under the key `seenMissionIds` and reloaded on panel mount via `getSeenIds()`.
-
-4. **AC-1.4 — Idempotent:** Re-marking an already-seen mission is a no-op
-   (`pendingSeenIds` deduplicates).
-
-5. **AC-1.5 — Flush on unmount:** `dispose()` flushes any pending seen IDs before the
-   component unmounts, preventing data loss.
-
-6. **AC-1.6 — "New" count accurate:** `dashboardSummary.newCount` reflects missions not
-   in `seenSet`, scoped to the visible/filtered set.
-
-### Implementation Reference
-
-| Component        | Location                                                                         |
-| ---------------- | -------------------------------------------------------------------------------- |
-| Event handler    | `feed-page.svelte.ts` → `handleMissionSeen`, `scheduleSeenFlush`, `flushSeenIds` |
-| Pure computation | `core/seen/mark-seen.ts` → `markAsSeen(seenIds, newIds)`                         |
-| Persistence      | `shell/storage/seen-missions.ts` → `getSeenIds`, `saveSeenIds`                   |
-
-### Edge Cases
-
-- **Storage unavailable:** `saveSeenIds` failures are swallowed (non-critical). The
-  in-memory `seenIds` state is still updated for the current session.
-- **Empty flush:** `flushSeenIds` returns early if `pendingSeenIds` is empty.
+- **État :** runes Svelte 5 (`$state`, `$derived`) dans `src/lib/state/`.
+- **Persistance :** `chrome.storage.local` pour les IDs vus, favoris, masqués et la
+  préférence de tri. IndexedDB pour les missions (chargées via `getMissions()`).
+- **Séparation Core/Shell :** toute la logique de filtrage et de scoring vit dans des
+  fonctions Core pures (`filterFavoritesOnly`, `filterHidden`, `sortMissions`,
+  `rankMissions`, `recomputeFilteredMissions`). Les modules d'état orchestrent l'I/O et
+  délèguent les calculs au Core.
+- **Pas d'accès storage direct depuis l'UI :** le side panel lit/écrit la persistance via
+  des fonctions facade, sans jamais toucher `chrome.*` ni IndexedDB directement.
 
 ---
 
-## US-2: Favorite and Hide Missions
+## US-1 : Marquer les missions comme vues
 
-**As a** consultant
-**I want** to bookmark promising missions and hide irrelevant ones
-**So that** I can build a shortlist and reduce noise.
+**En tant que** consultant
+**Je veux** que les missions déjà consultées soient visuellement distinguées des nouvelles
+**Afin de** ne pas relire les mêmes opportunités.
 
-### Acceptance Criteria
+### Critères d'acceptance
 
-1. **AC-2.1 — Toggle favorite:** `handleToggleFavorite(id)` adds/removes the mission
-   from the favorites map with an ISO timestamp.
+1. **AC-1.1 — Marquage à la vue :** quand une carte mission entre dans le viewport (ou est
+   cliquée), `handleMissionSeen(missionId)` la met en file pour marquage.
 
-2. **AC-2.2 — Toggle hidden:** `handleHide(id)` adds/removes the mission from the
-   hidden map with a timestamp.
+2. **AC-1.2 — Persistance debouncée :** les IDs vus sont poussés vers le storage par lots
+   avec un debounce de 120 ms (`SEEN_FLUSH_MS`). Un scroll rapide ne produit pas une
+   écriture par carte.
 
-3. **AC-2.3 — Persists across sessions:** Favorites stored under `favorites` key,
-   hidden under `hidden` key in `chrome.storage.local`. Both reloaded on mount.
+3. **AC-1.3 — Persiste entre les sessions :** les IDs vus sont stockés dans
+   `chrome.storage.local` sous la clé `seenMissionIds` et rechargés au montage du panel
+   via `getSeenIds()`.
 
-4. **AC-2.4 — Undo toast:** Both actions show a toast with an "Annuler" (Undo) button
-   that reverts the state and re-persists the previous value.
+4. **AC-1.4 — Idempotent :** re-marquer une mission déjà vue est un no-op
+   (`pendingSeenIds` déduplique).
 
-5. **AC-2.5 — Favorites filter:** Toggling `showFavoritesOnly` filters the feed to
-   favorited missions only via `filterFavoritesOnly(result, favorites)`.
+5. **AC-1.5 — Flush au démontage :** `dispose()` pousse les IDs vus en attente avant le
+   démontage du composant, évitant toute perte de données.
 
-6. **AC-2.6 — Hidden filter:** By default, hidden missions are excluded via
-   `filterHidden(result, hidden)`. Toggling `showHidden` reveals them.
+6. **AC-1.6 — Comptage « nouvelles » exact :** `dashboardSummary.newCount` reflète les
+   missions absentes de `seenSet`, restreint à l'ensemble visible/filtré.
 
-7. **AC-2.7 — Counts:** `favoriteCount` and `hiddenCount` are derived from the maps
-   and reactive.
+### Références d'implémentation
 
-### Implementation Reference
+| Composant           | Emplacement                                                                      |
+| ------------------- | -------------------------------------------------------------------------------- |
+| Handler d'événement | `feed-page.svelte.ts` → `handleMissionSeen`, `scheduleSeenFlush`, `flushSeenIds` |
+| Calcul pur          | `core/seen/mark-seen.ts` → `markAsSeen(seenIds, newIds)`                         |
+| Persistance         | `shell/storage/seen-missions.ts` → `getSeenIds`, `saveSeenIds`                   |
 
-| Component        | Location                                                                                                |
-| ---------------- | ------------------------------------------------------------------------------------------------------- |
-| Event handlers   | `feed-page.svelte.ts` → `handleToggleFavorite`, `handleHide`                                            |
-| Pure computation | `core/favorites/favorites.ts` → `toggleFavorite`, `toggleHidden`, `filterFavoritesOnly`, `filterHidden` |
-| Persistence      | `shell/storage/favorites.ts` → `getFavorites`, `saveFavorites`, `getHidden`, `saveHidden`               |
-| Toast            | `shell/notifications/toast-service.ts` → `showToastAction`                                              |
+### Cas limites
 
-### Edge Cases
-
-- **Undo after storage failure:** The undo handler re-persists the previous state
-  best-effort; if storage is unavailable the in-memory state still reverts for the
-  current session.
+- **Storage indisponible :** les échecs de `saveSeenIds` sont avalés (non critique).
+  L'état en mémoire `seenIds` reste mis à jour pour la session courante.
+- **Flush vide :** `flushSeenIds` retourne tôt si `pendingSeenIds` est vide.
 
 ---
 
-## US-3: Filter Missions (Multi-Criteria)
+## US-2 : Favoris et missions masquées
 
-**As a** consultant
-**I want** to narrow the feed by source, remote type, seniority, tech stack, and score
-**So that** I can focus on missions matching my criteria.
+**En tant que** consultant
+**Je veux** mettre de côté les missions prometteuses et masquer les hors-sujet
+**Afin de** construire une shortlist et réduire le bruit.
 
-### Acceptance Criteria
+### Critères d'acceptance
 
-1. **AC-3.1 — Source filter:** `setSelectedSource(source)` filters to a single
-   connector source (`free-work`, `lehibou`, `hiway`, `collective`, `cherry-pick`,
-   `malt`). `null` clears it.
+1. **AC-2.1 — Toggle favori :** `handleToggleFavorite(id)` ajoute/retire la mission de la
+   map des favoris avec un timestamp ISO.
 
-2. **AC-3.2 — Remote filter:** `setSelectedRemote(remote)` filters by work mode
-   (`full`, `hybrid`, `onsite`). `null` clears it.
+2. **AC-2.2 — Toggle masqué :** `handleHide(id)` ajoute/retire la mission de la map des
+   masquées avec un timestamp.
 
-3. **AC-3.3 — Seniority filter:** `setSelectedSeniority(level)` filters by
-   `junior`, `confirmed`, or `senior`. `null` clears it.
+3. **AC-2.3 — Persiste entre les sessions :** favoris stockés sous la clé `favorites`,
+   masqués sous la clé `hidden` dans `chrome.storage.local`. Les deux sont rechargés au
+   montage.
 
-4. **AC-3.4 — Stack filter (multi-select):** `toggleStack(stack)` toggles individual
-   stacks. A mission passes if it contains **at least one** of the selected stacks.
-   Empty selection = no stack filtering.
+4. **AC-2.4 — Toast d'annulation :** les deux actions affichent un toast avec un bouton
+   « Annuler » qui rétablit l'état et re-persiste la valeur précédente.
 
-5. **AC-3.5 — Score bucket filter:** `setSelectedScoreBucket(bucket)` filters by
-   score band:
-   - `strong`: score ≥ 80
-   - `good`: 60 ≤ score < 80
-   - `weak`: score < 60
+5. **AC-2.5 — Filtre favoris :** activer `showFavoritesOnly` filtre le feed sur les
+   missions favorites uniquement via `filterFavoritesOnly(result, favorites)`.
 
-6. **AC-3.6 — Decision presets:** `applyDecisionPreset(preset)` applies a quick-filter:
-   - `priority`: score ≥ 80
-   - `remote-compatible`: `remote === 'full' \|\| 'hybrid'`
-   - `tjm-negotiation`: TJM below profile minimum
-   - `new`: not in seen set
-     Toggling the active preset clears it.
+6. **AC-2.6 — Filtre masqués :** par défaut, les missions masquées sont exclues via
+   `filterHidden(result, hidden)`. Activer `showHidden` les révèle.
 
-7. **AC-3.7 — New-only toggle:** `toggleNewOnly()` filters to unseen missions.
+7. **AC-2.7 — Compteurs :** `favoriteCount` et `hiddenCount` sont dérivés des maps et
+   réactifs.
 
-8. **AC-3.8 — Composable:** All filters combine with AND logic. A mission must pass
-   every active filter to appear.
+### Références d'implémentation
 
-9. **AC-3.9 — Clear all:** `clearAllFilters()` resets every filter to its default
-   (null/empty) state.
+| Composant             | Emplacement                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------- |
+| Handlers d'événements | `feed-page.svelte.ts` → `handleToggleFavorite`, `handleHide`                                            |
+| Calcul pur            | `core/favorites/favorites.ts` → `toggleFavorite`, `toggleHidden`, `filterFavoritesOnly`, `filterHidden` |
+| Persistance           | `shell/storage/favorites.ts` → `getFavorites`, `saveFavorites`, `getHidden`, `saveHidden`               |
+| Toast                 | `shell/notifications/toast-service.ts` → `showToastAction`                                              |
 
-10. **AC-3.10 — Filter indicator:** `filterActive` is `true` when any filter is
-    engaged, enabling a "clear" affordance in the UI.
+### Cas limites
 
-11. **AC-3.11 — Performance:** Combined filtering of ≤ 500 missions completes in
-    < 100 ms (in-memory `$derived` recomputation, no I/O in the hot path).
-
-### Implementation Reference
-
-| Component               | Location                                                                                                                           |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| Filter state + handlers | `feed-page.svelte.ts` → `sourceCountBaseMissions` derived, `setSelected*`, `toggleStack`, `applyDecisionPreset`, `clearAllFilters` |
-| Score bucket helper     | `feed-page.svelte.ts` → `getScoreBucket(score)`                                                                                    |
-| Facet counts            | `feed-page.svelte.ts` → `feedAggregates` derived (score distribution, preset counts)                                               |
-
-### Edge Cases
-
-- **Null mission fields:** Missions with `remote === null` or `seniority === null` are
-  excluded when the corresponding filter is active (they don't match any specific
-  value).
-- **Preset vs explicit filter:** Applying `priority` preset clears an active
-  `selectedScoreBucket`, and vice versa, to avoid conflicting states.
+- **Annulation après échec storage :** le handler d'annulation re-persiste l'état
+  précédent en best-effort ; si le storage est indisponible, l'état en mémoire est quand
+  même rétabli pour la session courante.
 
 ---
 
-## US-4: Sort Missions
+## US-3 : Filtrer les missions (multi-critères)
 
-**As a** consultant
-**I want** to order the feed by relevance, recency, or daily rate
-**So that** the most actionable missions are at the top.
+**En tant que** consultant
+**Je veux** restreindre le feed par source, mode remote, séniorité, stack technique et score
+**Afin de** me concentrer sur les missions correspondant à mes critères.
 
-### Acceptance Criteria
+### Critères d'acceptance
 
-1. **AC-4.1 — Sort modes:** `sortBy` accepts three values: `score` (default), `date`,
+1. **AC-3.1 — Filtre source :** `setSelectedSource(source)` filtre sur une source de
+   connecteur unique (`free-work`, `lehibou`, `hiway`, `collective`, `cherry-pick`,
+   `malt`). `null` le réinitialise.
+
+2. **AC-3.2 — Filtre remote :** `setSelectedRemote(remote)` filtre par mode de travail
+   (`full`, `hybrid`, `onsite`). `null` le réinitialise.
+
+3. **AC-3.3 — Filtre séniorité :** `setSelectedSeniority(level)` filtre par
+   `junior`, `confirmed` ou `senior`. `null` le réinitialise.
+
+4. **AC-3.4 — Filtre stack (multi-sélection) :** `toggleStack(stack)` bascule chaque
+   stack. Une mission passe si elle contient **au moins une** des stacks sélectionnées.
+   Sélection vide = pas de filtrage par stack.
+
+5. **AC-3.5 — Filtre par tranche de score :** `setSelectedScoreBucket(bucket)` filtre par
+   bande de score :
+   - `strong` : score ≥ 80
+   - `good` : 60 ≤ score < 80
+   - `weak` : score < 60
+
+6. **AC-3.6 — Presets de décision :** `applyDecisionPreset(preset)` applique un
+   quick-filtre :
+   - `priority` : score ≥ 80
+   - `remote-compatible` : `remote === 'full' \|\| 'hybrid'`
+   - `tjm-negotiation` : TJM sous le minimum du profil
+   - `new` : absente du set des vues
+     Rebaser le preset actif le réinitialise.
+
+7. **AC-3.7 — Toggle nouvelles uniquement :** `toggleNewOnly()` filtre sur les missions
+   non vues.
+
+8. **AC-3.8 — Composable :** tous les filtres se combinent en logique ET. Une mission doit
+   passer chaque filtre actif pour apparaître.
+
+9. **AC-3.9 — Tout effacer :** `clearAllFilters()` réinitialise chaque filtre à son état
+   par défaut (null/vide).
+
+10. **AC-3.10 — Indicateur de filtre :** `filterActive` vaut `true` dès qu'un filtre est
+    engagé, activant une affordance « effacer » dans l'UI.
+
+11. **AC-3.11 — Performance :** le filtrage combiné de ≤ 500 missions s'exécute en
+    < 100 ms (recalcul `$derived` en mémoire, pas d'I/O dans le chemin chaud).
+
+### Références d'implémentation
+
+| Composant                  | Emplacement                                                                                                                       |
+| -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| État de filtres + handlers | `feed-page.svelte.ts` → `sourceCountBaseMissions` dérivé, `setSelected*`, `toggleStack`, `applyDecisionPreset`, `clearAllFilters` |
+| Helper de tranche de score | `feed-page.svelte.ts` → `getScoreBucket(score)`                                                                                   |
+| Comptages de facettes      | `feed-page.svelte.ts` → `feedAggregates` dérivé (distribution des scores, comptages de presets)                                   |
+
+### Cas limites
+
+- **Champs mission null :** les missions avec `remote === null` ou `seniority === null`
+  sont exclues quand le filtre correspondant est actif (elles ne correspondent à aucune
+  valeur spécifique).
+- **Preset vs filtre explicite :** appliquer le preset `priority` efface un
+  `selectedScoreBucket` actif, et réciproquement, pour éviter les états conflictuels.
+
+---
+
+## US-4 : Trier les missions
+
+**En tant que** consultant
+**Je veux** ordonner le feed par pertinence, fraîcheur ou taux journalier
+**Afin de** retrouver les missions les plus actionnables en tête.
+
+### Critères d'acceptance
+
+1. **AC-4.1 — Modes de tri :** `sortBy` accepte trois valeurs : `score` (défaut), `date`,
    `tjm`.
 
-2. **AC-4.2 — Score (composite ranking):** When `sortBy === 'score'`, missions are
-   ordered by `rankMissions()` — a composite of relevance (existing score) and
-   freshness (publication recency), with source diversity interleaving. See
+2. **AC-4.2 — Score (ranking composite) :** quand `sortBy === 'score'`, les missions sont
+   ordonnées par `rankMissions()` — un composite de pertinence (score existant) et de
+   fraîcheur (récence de publication), avec entrelacement de diversité des sources. Voir
    `rank-missions.ts`.
 
-3. **AC-4.3 — Date:** When `sortBy === 'date'`, missions are sorted newest-first by
-   `scrapedAt` timestamp via `sortMissions(missions, 'date')`.
+3. **AC-4.3 — Date :** quand `sortBy === 'date'`, les missions sont triées de la plus
+   récente à la plus ancienne par timestamp `scrapedAt` via `sortMissions(missions, 'date')`.
 
-4. **AC-4.4 — TJM:** When `sortBy === 'tjm'`, missions are sorted highest-TJM-first.
-   Null TJM is treated as 0.
+4. **AC-4.4 — TJM :** quand `sortBy === 'tjm'`, les missions sont triées du TJM le plus
+   haut au plus bas. Un TJM null est traité comme 0.
 
-5. **AC-4.5 — Persists across sessions:** The selected sort mode is stored in
-   `chrome.storage.local` via `setFeedSortBy()` and restored on mount via
-   `getFeedSortBy()`.
+5. **AC-4.5 — Persiste entre les sessions :** le mode de tri sélectionné est stocké dans
+   `chrome.storage.local` via `setFeedSortBy()` et restauré au montage via `getFeedSortBy()`.
 
-6. **AC-4.6 — No mutation:** Sorting returns a new array; the input is not mutated.
+6. **AC-4.6 — Pas de mutation :** le tri retourne un nouveau tableau ; l'entrée n'est pas
+   mutée.
 
-7. **AC-4.7 — Sort applies post-filter:** Sorting is applied to the filtered set
-   (`displayMissions`), not the raw mission list.
+7. **AC-4.7 — Tri appliqué post-filtre :** le tri s'applique à l'ensemble filtré
+   (`displayMissions`), pas à la liste brute des missions.
 
-### Implementation Reference
+### Références d'implémentation
 
-| Component         | Location                                                             |
+| Composant         | Emplacement                                                          |
 | ----------------- | -------------------------------------------------------------------- |
-| Sort dispatch     | `feed-page.svelte.ts` → `displayMissions` derived                    |
-| Composite ranking | `core/scoring/rank-missions.ts` → `rankMissions`                     |
-| Single-key sort   | `core/scoring/sort-missions.ts` → `sortMissions`                     |
-| Persistence       | `shell/storage/chrome-storage.ts` → `getFeedSortBy`, `setFeedSortBy` |
+| Dispatch du tri   | `feed-page.svelte.ts` → `displayMissions` dérivé                     |
+| Ranking composite | `core/scoring/rank-missions.ts` → `rankMissions`                     |
+| Tri à clé unique  | `core/scoring/sort-missions.ts` → `sortMissions`                     |
+| Persistance       | `shell/storage/chrome-storage.ts` → `getFeedSortBy`, `setFeedSortBy` |
 
-### Edge Cases
+### Cas limites
 
-- **Null scores:** Treated as 0 for ranking purposes.
-- **Equal scores:** Stable within source group (round-robin preserves bucket order).
-- **Future-dated missions:** Freshness score caps at 100.
-
----
-
-## US-5: Search Missions
-
-**As a** consultant
-**I want** to free-text search across mission details
-**So that** I can quickly find missions mentioning a specific technology or client.
-
-### Acceptance Criteria
-
-1. **AC-5.1 — Searchable fields:** The query matches against a concatenated string of:
-   `title`, `client`, `description`, `location`, `source`, and all `stack` entries.
-
-2. **AC-5.2 — Case-insensitive:** Both the query and the searchable text are
-   lowercased before matching.
-
-3. **AC-5.3 — Substring match:** A mission matches if the lowercased query appears as
-   a substring anywhere in the searchable text.
-
-4. **AC-5.4 — Debounced:** Non-empty queries are debounced with a 300 ms delay
-   (`SEARCH_DEBOUNCE_MS`) to avoid recomputing on every keystroke.
-
-5. **AC-5.5 — Instant clear:** An empty query clears the search immediately (no debounce
-   wait).
-
-6. **AC-5.6 — Composable with filters:** Search is applied first (in the feed store),
-   then filters and sort are applied to the search-filtered set.
-
-7. **AC-5.7 — No match:** If no missions match, the feed shows an empty state (not an
-   error).
-
-8. **AC-5.8 — Performance:** Search over ≤ 500 missions completes in < 100 ms
-   (single-pass filter, no I/O).
-
-### Implementation Reference
-
-| Component            | Location                                                     |
-| -------------------- | ------------------------------------------------------------ |
-| Search input handler | `feed-page.svelte.ts` → `handleSearch` (debounce)            |
-| Search filter (pure) | `feed.svelte.ts` → `recomputeFilteredMissions`               |
-| Feed store state     | `feed.svelte.ts` → `searchQuery`, `filteredMissions` derived |
-
-### Edge Cases
-
-- **Whitespace-only query:** Treated as empty (`.trim()` guard) → clears search.
-- **Special characters:** No regex or wildcard support; plain substring match.
+- **Scores null :** traités comme 0 pour le ranking.
+- **Scores égaux :** stable au sein du groupe de source (le round-robin préserve l'ordre
+  des buckets).
+- **Missions datées du futur :** le score de fraîcheur est plafonné à 100.
 
 ---
 
-## Non-Functional Requirements
+## US-5 : Rechercher les missions
 
-| Requirement                            | Target                               | Rationale                                                       |
-| -------------------------------------- | ------------------------------------ | --------------------------------------------------------------- |
-| Filter + sort latency (≤ 500 missions) | < 100 ms                             | Feed must feel instant; all computation is in-memory `$derived` |
-| Search debounce                        | 300 ms                               | Balance responsiveness vs recomputation cost                    |
-| Seen-mark debounce                     | 120 ms                               | Batch writes without visible lag                                |
-| Persistence                            | `chrome.storage.local`               | Survives browser restarts; isolated per-extension               |
-| Immutability                           | All Core functions return new arrays | No mutation of input state                                      |
+**En tant que** consultant
+**Je veux** effectuer une recherche plein texte dans les détails des missions
+**Afin de** trouver rapidement les missions mentionnant une technologie ou un client précis.
 
-## Test References
+### Critères d'acceptance
 
-| Interaction               | Test file                                                                                          |
-| ------------------------- | -------------------------------------------------------------------------------------------------- |
-| Sort (single-key)         | `tests/unit/scoring/sort-missions.test.ts`                                                         |
-| Rank (composite)          | `tests/unit/scoring/rank-missions.test.ts`                                                         |
-| Mark as seen              | `tests/unit/scoring/dedup.test.ts` (mark-seen pattern), `tests/unit/storage/seen-missions.test.ts` |
-| Favorites                 | `tests/unit/storage/favorites.test.ts`                                                             |
-| Smart notification filter | `tests/unit/scoring/smart-notification.test.ts`                                                    |
+1. **AC-5.1 — Champs recherchables :** la requête porte sur une chaîne concaténée de :
+   `title`, `client`, `description`, `location`, `source` et toutes les entrées `stack`.
 
-## Change Log
+2. **AC-5.2 — Insensible à la casse :** la requête et le texte recherchable sont mis en
+   minuscules avant le matching.
 
-| Date       | Change                                                                        |
-| ---------- | ----------------------------------------------------------------------------- |
-| 2026-07-02 | Initial spec (#59). Documents existing implementation as canonical reference. |
+3. **AC-5.3 — Match par sous-chaîne :** une mission correspond si la requête en
+   minuscules apparaît comme sous-chaîne n'importe où dans le texte recherchable.
+
+4. **AC-5.4 — Debounce :** les requêtes non vides sont debouncées avec un délai de 300 ms
+   (`SEARCH_DEBOUNCE_MS`) pour éviter de recalculer à chaque frappe.
+
+5. **AC-5.5 — Effacement instantané :** une requête vide efface la recherche immédiatement
+   (sans attendre le debounce).
+
+6. **AC-5.6 — Composable avec les filtres :** la recherche s'applique d'abord (dans le
+   store du feed), puis les filtres et le tri s'appliquent à l'ensemble filtré par
+   recherche.
+
+7. **AC-5.7 — Aucun match :** si aucune mission ne correspond, le feed affiche un état
+   vide (pas une erreur).
+
+8. **AC-5.8 — Performance :** la recherche sur ≤ 500 missions s'exécute en < 100 ms
+   (filtre en une passe, pas d'I/O).
+
+### Références d'implémentation
+
+| Composant                  | Emplacement                                                 |
+| -------------------------- | ----------------------------------------------------------- |
+| Handler de champ recherche | `feed-page.svelte.ts` → `handleSearch` (debounce)           |
+| Filtre de recherche (pur)  | `feed.svelte.ts` → `recomputeFilteredMissions`              |
+| État du store du feed      | `feed.svelte.ts` → `searchQuery`, `filteredMissions` dérivé |
+
+### Cas limites
+
+- **Requête uniquement composée d'espaces :** traitée comme vide (garde `.trim()`) →
+  efface la recherche.
+- **Caractères spéciaux :** pas de support regex ni wildcard ; match par sous-chaîne simple.
+
+---
+
+## Exigences non fonctionnelles
+
+| Exigence                              | Cible                                                     | Justification                                                               |
+| ------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Latence filtre + tri (≤ 500 missions) | < 100 ms                                                  | Le feed doit paraître instantané ; tout le calcul est `$derived` en mémoire |
+| Debounce de recherche                 | 300 ms                                                    | Équilibre entre réactivité et coût de recalcul                              |
+| Debounce de marquage vu               | 120 ms                                                    | Loter les écritures sans lag visible                                        |
+| Persistance                           | `chrome.storage.local`                                    | Survit aux redémarrages du navigateur ; isolé par extension                 |
+| Immutabilité                          | Toutes les fonctions Core retournent de nouveaux tableaux | Aucune mutation de l'état d'entrée                                          |
+
+## Références de tests
+
+| Interaction                  | Fichier de test                                                                                    |
+| ---------------------------- | -------------------------------------------------------------------------------------------------- |
+| Tri (clé unique)             | `tests/unit/scoring/sort-missions.test.ts`                                                         |
+| Ranking (composite)          | `tests/unit/scoring/rank-missions.test.ts`                                                         |
+| Marquer comme vu             | `tests/unit/scoring/dedup.test.ts` (pattern mark-seen), `tests/unit/storage/seen-missions.test.ts` |
+| Favoris                      | `tests/unit/storage/favorites.test.ts`                                                             |
+| Filtre de notification smart | `tests/unit/scoring/smart-notification.test.ts`                                                    |
+
+## Journal des changements
+
+| Date       | Changement                                                                           |
+| ---------- | ------------------------------------------------------------------------------------ |
+| 2026-07-02 | Spec initiale (#59). Documente l'implémentation existante comme référence canonique. |

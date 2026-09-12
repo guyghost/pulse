@@ -86,7 +86,7 @@ export interface ScanPartialResultPayload {
  */
 export interface ConnectorHealthPayload {
   snapshot: ConnectorHealthSnapshot;
-  /** true si le circuit vient de changer d'état dans ce cycle */
+  /** true when the circuit changed state in this cycle */
   stateChanged: boolean;
 }
 
@@ -387,29 +387,29 @@ export type BridgeMessage =
   // would not re-fire and the intent would stay pending.
   | { type: 'NOTIFICATION_CLICKED' }
   // Form Assistant (Grammarly-like field fill, content script ↔ service worker).
-  // Source de vérité : src/models/form-assistant.model.md.
-  // Content → SW : la feature est-elle active pour cette origine ?
+  // Source of truth: src/models/form-assistant.model.md.
+  // Content → SW: is the feature enabled for this origin?
   | { type: 'FORM_ASSIST_STATUS' }
   | {
       type: 'FORM_ASSIST_STATUS_RESULT';
       payload: { enabled: boolean; engine: 'local' | 'remote' };
     }
-  // Side panel → SW : activer/désactiver la feature (persisté).
+  // Side panel → SW: enable/disable the feature (persisted).
   | { type: 'FORM_ASSIST_ENABLE'; payload: { enabled: boolean } }
   | { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean; engine: 'local' | 'remote' } }
-  // Content → SW : demander une proposition pour un champ (Machine B).
-  // Le field est un FieldDescriptor canonical (sanit-isé, sans PII DOM).
+  // Content → SW: request a proposal for a field (Machine B).
+  // The field is a canonical FieldDescriptor (sanitized, no DOM PII).
   | { type: 'FORM_ASSIST_REQUEST'; payload: { requestId: string; field: FieldDescriptor } }
-  // Content → SW : annuler une requête en vol (changement de champ, fermeture widget).
+  // Content → SW: cancel an in-flight request (field change, widget close).
   | { type: 'FORM_ASSIST_CANCEL'; payload: { requestId: string } }
-  // SW → Content : proposition prête (ACCEPT explicite requis pour appliquer).
+  // SW → Content: proposal ready (explicit ACCEPT required to apply).
   | {
       type: 'FORM_ASSIST_PROPOSAL';
       payload: { requestId: string; text: string; engine: 'local' | 'remote' };
     }
-  // SW → Content : annulation prise en compte.
+  // SW → Content: cancellation acknowledged.
   | { type: 'FORM_ASSIST_CANCEL_ACK'; payload: { requestId: string } }
-  // SW → Content : échec (moteur indisponible, génération en erreur, ou annulée).
+  // SW → Content: failure (engine unavailable, generation error, or cancelled).
   | {
       type: 'FORM_ASSIST_ERROR';
       payload: { requestId: string; code: 'unavailable' | 'failed' | 'cancelled'; message: string };

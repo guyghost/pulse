@@ -1,8 +1,8 @@
 import type { FieldDescriptor, FieldKind, RawFieldInput } from './types';
 
 /**
- * Normalise un texte pour la classification : minuscules, sans diacritiques,
- * espaces collées. Déterministe (pur).
+ * Normalizes text for classification: lowercase, no diacritics,
+ * collapsed whitespace. Deterministic (pure).
  */
 function normalize(text: string): string {
   return text
@@ -19,9 +19,9 @@ interface KindRule {
 }
 
 /**
- * Marqueurs indiquant un champ d'organisation ou de compte, pour lesquels une
- * classification "nom de personne" serait une fausse positive. Évalués sur le
- * texte normalisé (label + placeholder).
+ * Markers indicating an organization/account field, for which a "person name"
+ * classification would be a false positive. Evaluated on the normalized text
+ * (label + placeholder).
  */
 const ORG_USER_MARKERS: readonly string[] = [
   'company',
@@ -45,8 +45,8 @@ function isNameKind(kind: FieldKind): boolean {
 }
 
 /**
- * Règles ordonnées (du plus spécifique au plus générique).
- * L'ordre compte : "nom de famille" doit battre "nom".
+ * Ordered rules (most specific to most generic).
+ * Order matters: "nom de famille" must beat "nom".
  */
 const KIND_RULES: readonly KindRule[] = [
   { kind: 'first-name', keywords: ['firstname', 'prenom', 'given name', 'givenname'] },
@@ -133,8 +133,8 @@ const KIND_RULES: readonly KindRule[] = [
 ];
 
 /**
- * Détecte la catégorie d'un champ à partir de ses métadonnées.
- * L'`inputType` est prioritaire pour email/tel (signal fort).
+ * Detects a field's category from its metadata.
+ * `inputType` takes priority for email/tel (strong signal).
  */
 function detectKind(raw: RawFieldInput): FieldKind {
   // Signal fort : type d'input DOM.
@@ -161,8 +161,8 @@ function detectKind(raw: RawFieldInput): FieldKind {
   for (const rule of KIND_RULES) {
     for (const keyword of rule.keywords) {
       if (text.includes(keyword)) {
-        // Évite de classer un champ d'organisation/compte comme un nom de personne.
-        // Ex : "Nom de l'entreprise", "Username", "Raison sociale".
+        // Avoid classifying an organization/account field as a person name.
+        // E.g. "Nom de l'entreprise", "Username", "Raison sociale".
         if (isOrgOrUserContext && isNameKind(rule.kind)) {
           continue;
         }
@@ -174,8 +174,8 @@ function detectKind(raw: RawFieldInput): FieldKind {
 }
 
 /**
- * Classifie un champ brut en FieldDescriptor canonical.
- * Pur, déterministe, sans I/O.
+ * Classifies a raw field into a canonical FieldDescriptor.
+ * Pure, deterministic, no I/O.
  */
 export function classifyField(raw: RawFieldInput): FieldDescriptor {
   return {

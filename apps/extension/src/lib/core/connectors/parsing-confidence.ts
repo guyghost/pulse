@@ -1,5 +1,5 @@
 /**
- * Extraction-confidence scoring for the « À vérifier » review queue.
+ * Extraction-confidence scoring for the "À vérifier" review queue.
  *
  * Pure (FC&IS): no I/O, no async, no Date/Math randomness. Everything is a
  * deterministic function of its arguments. Model:

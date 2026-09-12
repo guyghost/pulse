@@ -3,10 +3,10 @@
  *
  * Ce module contient la logique I/O pour la gestion d'erreurs:
  * - Logging console
- * - Envoi à un service de monitoring (si configuré)
- * - Affichage de toasts
+ * - Sending to a monitoring service (if configured)
+ * - Displaying toasts
  *
- * Règle: Core = pure, Shell = I/O autorisé
+ * Rule: Core = pure, Shell = I/O allowed
  */
 
 import {
@@ -44,7 +44,7 @@ export function configureErrorHandler(newConfig: Partial<ErrorHandlerConfig>): v
   config = { ...config, ...newConfig };
 }
 
-/** Récupère la configuration actuelle */
+/** Returns the current configuration */
 export function getErrorHandlerConfig(): ErrorHandlerConfig {
   return { ...config };
 }
@@ -54,24 +54,24 @@ export function getErrorHandlerConfig(): ErrorHandlerConfig {
 // ============================================================================
 
 /**
- * Gère une erreur applicative
- * - Log en console avec contexte
- * - Envoi au service de monitoring si configuré
- * - Affiche toast si nécessaire
+ * Handles an application error
+ * - Logs to console with context
+ * - Sends to the monitoring service if configured
+ * - Shows a toast when necessary
  */
 export function handleError(error: AppError): void {
-  // 1. Log en console avec le niveau approprié
+  // 1. Log to console with the appropriate level
   logToConsole(error);
 
-  // 1b. Enregistrement dans l'analytics locale
+  // 1b. Record in local analytics
   recordError(error);
 
-  // 2. Envoi au service de monitoring si configuré
+  // 2. Send to the monitoring service if configured
   if (config.monitoringUrl) {
     sendToMonitoring(error);
   }
 
-  // 3. Affichage toast si activé et erreur visible par l'utilisateur
+  // 3. Show toast if enabled and error is user-visible
   if (config.enableToasts && shouldShowToast(error)) {
     showToast(error);
   }
@@ -341,7 +341,7 @@ export function shouldIgnoreError(error: AppError): boolean {
   return false;
 }
 
-/** Wrapper pour capturer et gérer automatiquement les erreurs */
+/** Wrapper to capture and automatically handle errors */
 export function withErrorHandling<T>(
   fn: () => T,
   onError?: (error: AppError) => void
@@ -349,7 +349,7 @@ export function withErrorHandling<T>(
   try {
     return fn();
   } catch (e) {
-    // Si c'est déjà une AppError, la gérer directement
+    // If it's already an AppError, handle it directly
     if (e && typeof e === 'object' && 'type' in e) {
       const error = e as AppError;
       if (!shouldIgnoreError(error)) {
@@ -358,14 +358,14 @@ export function withErrorHandling<T>(
       onError?.(error);
       return undefined;
     }
-    // Sinon, convertir en erreur générique
+    // Otherwise, convert to a generic error
     const message = e instanceof Error ? e.message : String(e);
     console.error('[UNHANDLED]', message, e);
     return undefined;
   }
 }
 
-/** Wrapper async pour capturer et gérer automatiquement les erreurs */
+/** Async wrapper to capture and automatically handle errors */
 export async function withErrorHandlingAsync<T>(
   fn: () => Promise<T>,
   onError?: (error: AppError) => void
@@ -373,7 +373,7 @@ export async function withErrorHandlingAsync<T>(
   try {
     return await fn();
   } catch (e) {
-    // Si c'est déjà une AppError, la gérer directement
+    // If it's already an AppError, handle it directly
     if (e && typeof e === 'object' && 'type' in e) {
       const error = e as AppError;
       if (!shouldIgnoreError(error)) {
@@ -382,7 +382,7 @@ export async function withErrorHandlingAsync<T>(
       onError?.(error);
       return undefined;
     }
-    // Sinon, convertir en erreur générique
+    // Otherwise, convert to a generic error
     const message = e instanceof Error ? e.message : String(e);
     console.error('[UNHANDLED]', message, e);
     return undefined;
