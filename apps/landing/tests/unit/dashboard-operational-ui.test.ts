@@ -39,10 +39,11 @@ describe('landing account dashboard operational UI', () => {
     expect(homeSource).not.toContain('Développeurs 3+ ans');
     expect(homeSource).toContain('Shortlist quotidienne');
     expect(homeSource).toContain('missions Java, Spring Boot et frontend senior');
-    expect(homeSource).toContain('Créer mon compte Premium');
-    expect(homeSource).toContain('10€<small> TTC/an</small>');
-    expect(homeSource).toContain('Plusieurs comptes par plateforme');
-    expect(homeSource).toContain('Aucune soumission automatique');
+    expect(homeSource).toContain('Une offre locale, sans compte');
+    expect(homeSource).toContain('Installer gratuitement');
+    expect(homeSource).not.toContain('Créer mon compte Premium');
+    expect(homeSource).not.toContain('10€<small> TTC/an</small>');
+    expect(homeSource).not.toContain('Plusieurs comptes par plateforme');
     expect(homeSource).not.toContain('/mois');
   });
 });

@@ -30,7 +30,7 @@ describe('P0 launch copy (Comex / Tor)', () => {
   it('exposes the three frozen public angles', () => {
     expect(homePage).toContain('Un radar, pas quatre onglets.');
     expect(homePage).toContain('Le score propose. Tu tranches.');
-    expect(homePage).toContain('Gratuit pour chasser. 10 €/an pour aller plus vite.');
+    expect(homePage).toContain('Gratuit pour chasser. Sans compte, sans paiement.');
   });
 
   it('labels the scanner 42/31/8 counters as an illustrative Exemple', () => {
@@ -57,6 +57,28 @@ describe('P0 launch copy (Comex / Tor)', () => {
     expect(storeListing).not.toContain(
       'Radar freelance tech : 4 plateformes, 1 feed scoré, dashboard connecté optionnel. Exécution navigateur.'
     );
+  });
+
+  it('keeps the launch surfaces free of connected, Premium, or paid promises', () => {
+    const forbidden = [
+      'Premium',
+      '10 €',
+      '10€',
+      'Dashboard connecté',
+      'dashboard connecté',
+      'Crédits IA',
+      'générer le pitch',
+      'Créer mon compte',
+      'Gérer mon compte',
+      '/register',
+      '/dashboard',
+      'checkout',
+    ];
+
+    for (const claim of forbidden) {
+      expect(homePage).not.toContain(claim);
+      expect(storeListing).not.toContain(claim);
+    }
   });
 
   it('aligns the live privacy page date with docs/privacy-policy.md', () => {
