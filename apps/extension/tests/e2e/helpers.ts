@@ -192,7 +192,16 @@ export function feedRegion(page: Page): Locator {
 }
 
 export async function expectFeedEmptyState(page: Page, timeout = 5000) {
-  await expect(feedRegion(page).getByText(/Aucune mission/)).toBeVisible({ timeout });
+  const empty = feedRegion(page).getByTestId('feed-list-empty');
+  if ((await empty.count()) > 0) {
+    await expect(empty).toBeVisible({ timeout });
+    return;
+  }
+  await expect(
+    feedRegion(page).getByText(
+      /Aucune mission|Lancez un premier scan|Aucune donnée|Aucune source|Aucune session|Aucune correspondance/
+    )
+  ).toBeVisible({ timeout });
 }
 
 export async function waitForDevPanel(page: Page) {

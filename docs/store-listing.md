@@ -14,7 +14,7 @@
 
 ## Résumé court (132 caractères max)
 
-> Radar freelance tech : 4 plateformes, 1 feed scoré, dashboard connecté optionnel. Exécution navigateur.
+> Radar freelance tech : 4 plateformes, 1 feed scoré, exécution navigateur. Local-first.
 
 ---
 

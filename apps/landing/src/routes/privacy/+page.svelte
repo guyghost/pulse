@@ -66,85 +66,130 @@
     <article class="privacy-content glass-card">
       <h1>Politique de confidentialité</h1>
 
-      <p class="last-updated">Dernière mise à jour : Mai 2026</p>
-
-      <p>
-        <strong>MissionPulse</strong> est une extension de navigateur conçue avec la confidentialité comme
-        principe fondateur. Cette politique de confidentialité explique comment nous gérons vos données.
+      <p class="last-updated">
+        Dernière mise à jour : <time datetime="2026-07-30">30 juillet 2026</time>
+        (<span>2026-07-30</span>)
       </p>
 
-      <h2>Principe fondamental</h2>
+      <p>
+        MissionPulse collecte et traite les données suivantes pour faire fonctionner l'extension
+        locale et, si vous connectez un compte MissionPulse, le dashboard connecté optionnel.
+      </p>
+
+      <h2>1. Données collectées</h2>
+
+      <ul>
+        <li>
+          <strong>Profil utilisateur</strong> — prénom, intitulé de poste, compétences, TJM cible, préférences
+          de remote et séniorité, renseignés lors de l'onboarding et dans les paramètres.
+        </li>
+        <li>
+          <strong>Missions</strong> — titre, description, TJM, localisation, source, date de publication
+          et métadonnées de scoring, extraites depuis les plateformes connectées.
+        </li>
+        <li>
+          <strong>Préférences</strong> — intervalle de scan, connecteurs activés, seuils de notification,
+          paramètres d'analyse locale.
+        </li>
+        <li>
+          <strong>Données locales de fonctionnement</strong> — favoris, missions masquées, missions déjà
+          vues, cache sémantique local, historique TJM et état des connecteurs.
+        </li>
+        <li>
+          <strong>Données synchronisées du dashboard</strong> — snapshots normalisés de missions, scores,
+          pipeline de candidature, assets générés, profil CV canonique, historique d'import et état de
+          synchronisation.
+        </li>
+        <li>
+          <strong>Liaisons multi-compte</strong> — plateforme, libellé choisi, compte actif et hash pseudonymisé
+          de la session détectée. Aucun cookie brut n'est synchronisé.
+        </li>
+        <li>
+          <strong>Assistance de formulaire</strong> — après consentement explicite, les champs autorisés
+          et suggestions restent dans une session éphémère locale le temps de la revue. Ils ne sont pas
+          envoyés au dashboard.
+        </li>
+      </ul>
 
       <p>
         <strong>L'exécution plateforme reste locale dans votre navigateur.</strong>
-        MissionPulse utilise vos sessions existantes pour lire les plateformes depuis l'extension, sans
-        jamais stocker vos identifiants. Si vous connectez un compte MissionPulse, le dashboard peut synchroniser
-        des snapshots normalisés via Supabase afin de retrouver vos missions, candidatures et profils
-        CV entre appareils.
+        La synchronisation cloud est optionnelle et limitée aux données produit normalisées nécessaires
+        au dashboard connecté.
       </p>
 
-      <h2>Données stockées localement</h2>
-
-      <p>
-        Les données suivantes restent stockées sur votre ordinateur pour le fonctionnement local de
-        l'extension :
-      </p>
+      <h2>2. Stockage</h2>
 
       <ul>
         <li>
-          <strong>Profil utilisateur</strong> — Vos compétences, TJM cible, localisation, préférences
-          de télétravail et niveau de seniorité que vous configurez lors de l'onboarding.
+          <strong>chrome.storage.local</strong> — paramètres, favoris, missions masquées, cache sémantique
+          local et autres données légères.
         </li>
         <li>
-          <strong>Missions scrapées</strong> — Les missions récupérées depuis Free-Work, LeHibou, Hiway
-          et Cherry Pick sont stockées dans IndexedDB sur votre machine.
+          <strong>IndexedDB</strong> — profil, missions scrapées, historique TJM, états de connecteurs
+          et données plus volumineuses.
         </li>
         <li>
-          <strong>États des connecteurs</strong> — Le statut de vos connexions aux différentes plateformes.
+          <strong>Stockage de session</strong> — certains états temporaires de scan ou d'interface peuvent
+          être gardés localement pendant l'exécution.
         </li>
         <li>
-          <strong>Assistance de formulaire</strong> — Après votre consentement explicite, les champs autorisés
-          et les suggestions restent dans une session éphémère de l'extension, le temps de votre revue.
-          Ils ne sont ni envoyés au dashboard, ni conservés comme historique.
-        </li>
-        <li>
-          <strong>Cache de scoring sémantique</strong> — Les scores de pertinence calculés par Gemini
-          Nano sont mis en cache localement pour optimiser les performances.
-        </li>
-        <li>
-          <strong>Préférences de l'extension</strong> — Vos paramètres de notification et de scan automatique.
+          <strong>Supabase</strong> — si vous connectez un compte MissionPulse, le dashboard peut synchroniser
+          des snapshots normalisés via Supabase pour vos missions, candidatures, assets générés, CV canonique,
+          conflits et statuts de synchronisation.
         </li>
       </ul>
 
-      <h2>Données synchronisées avec le dashboard</h2>
+      <p>
+        La suppression de l'extension entraîne la suppression des données associées à son stockage
+        local. Le dashboard fournit aussi des contrôles d'export et de suppression des données
+        connectées.
+      </p>
+
+      <h2>3. IA locale</h2>
 
       <p>
-        La synchronisation cloud est liée à votre compte MissionPulse. Elle sert uniquement à
-        alimenter le dashboard connecté et peut inclure :
+        MissionPulse peut utiliser les capacités d'IA locales au navigateur, notamment
+        <strong>Gemini Nano</strong> via la Prompt API de Chrome, pour enrichir le scoring sémantique
+        des missions et proposer des valeurs pour les champs autorisés d'un formulaire de candidature.
       </p>
 
       <ul>
+        <li>Aucune clé API externe n'est requise dans l'expérience actuelle de l'application.</li>
+        <li>Les scores sémantiques sont mis en cache localement pour limiter les recalculs.</li>
         <li>
-          <strong>Missions détectées</strong> — titre, client, source, TJM, localisation, score, lien
-          public et métadonnées normalisées.
+          Si l'IA locale n'est pas disponible, l'application continue de fonctionner avec son
+          scoring de base.
         </li>
         <li>
-          <strong>Suivi de candidature</strong> — étape du pipeline, notes, dates de relance, historique
-          d'événements et assets générés.
+          L'assistance de formulaire s'exécute dans un Worker local dédié, exige un consentement
+          explicite et une validation champ par champ.
         </li>
         <li>
-          <strong>Profil CV canonique</strong> — résumé, expériences, compétences, formation, liens et
-          historique d'import LinkedIn.
-        </li>
-        <li>
-          <strong>État de synchronisation</strong> — statut des connecteurs, erreurs typées et dernière
-          synchronisation par appareil.
-        </li>
-        <li>
-          <strong>Liaisons multi-compte</strong> — libellé choisi, plateforme, compte actif et hash pseudonymisé
-          de la session détectée. Aucun cookie ou jeton de session n'est synchronisé.
+          MissionPulse ne soumet jamais le formulaire et n'utilise aucun fallback cloud sans un
+          nouveau consentement explicite.
         </li>
       </ul>
+
+      <h2>4. Cookies et sessions navigateur</h2>
+
+      <p>
+        MissionPulse peut accéder en lecture seule aux cookies ou aux sessions navigateur
+        nécessaires pour détecter l'état de connexion sur les plateformes supportées et récupérer
+        les missions accessibles à l'utilisateur.
+      </p>
+
+      <p>Plateformes actuellement supportées :</p>
+      <ul>
+        <li><strong>Free-Work</strong> (<code>www.free-work.com</code>)</li>
+        <li><strong>LeHibou</strong> (<code>*.lehibou.com</code>)</li>
+        <li><strong>Hiway</strong> (<code>hiway-missions.fr</code>)</li>
+        <li><strong>Cherry Pick</strong> (<code>app.cherry-pick.io</code>)</li>
+      </ul>
+
+      <p>
+        MissionPulse ne modifie, ne crée et ne supprime aucun cookie utilisateur. Ces accès servent
+        uniquement au fonctionnement local de l'extension.
+      </p>
 
       <p>
         Nous ne synchronisons pas les mots de passe, cookies, jetons de session des plateformes, ni
@@ -152,98 +197,53 @@
         nécessaires au CV, un hash et des compteurs de champs.
       </p>
 
-      <h2>Utilisation de Gemini Nano</h2>
+      <h2>5. Permissions</h2>
+
+      <dl>
+        <dt>sidePanel</dt>
+        <dd>Affiche le panneau latéral contenant le feed, le dashboard TJM et les paramètres.</dd>
+        <dt>storage</dt>
+        <dd>Sauvegarde locale des préférences, caches et données de fonctionnement.</dd>
+        <dt>cookies</dt>
+        <dd>Détection de session sur les plateformes supportées lorsque c'est nécessaire.</dd>
+        <dt>scripting / activeTab</dt>
+        <dd>
+          Import LinkedIn et assistance de formulaire déclenchés explicitement par l'utilisateur.
+        </dd>
+        <dt>alarms</dt>
+        <dd>Planification des cycles de scan automatiques à intervalles réguliers.</dd>
+        <dt>notifications</dt>
+        <dd>Alertes lors de la détection de nouvelles missions pertinentes.</dd>
+        <dt>declarativeNetRequest</dt>
+        <dd>Application de règles réseau temporaires nécessaires à certains connecteurs.</dd>
+      </dl>
+
+      <h2>6. Services externes contactés</h2>
 
       <p>
-        MissionPulse utilise <strong>Gemini Nano</strong>, l'IA intégrée de Chrome, pour le scoring
-        sémantique des missions et, avec Premium, pour proposer des réponses aux champs autorisés
-        d'un formulaire de candidature. Cette IA fonctionne entièrement sur votre ordinateur (<em
-          >on-device</em
-        >). L'assistance requiert votre consentement explicite, chaque suggestion reste modifiable
-        ou refusable, et MissionPulse ne soumet jamais le formulaire. Aucun fallback cloud n'est
-        utilisé sans un nouveau consentement explicite.
+        MissionPulse peut communiquer directement depuis votre navigateur avec les domaines des
+        plateformes supportées pour récupérer les missions, ainsi qu'avec les services strictement
+        nécessaires à leur fonctionnement selon les permissions déclarées.
       </p>
 
-      <h2>Accès aux plateformes tierces</h2>
-
       <p>
-        MissionPulse accède aux sites Free-Work, LeHibou, Hiway et Cherry Pick pour scrapper les
-        missions disponibles. Ces accès sont effectués via <strong
-          >votre session navigateur existante</strong
-        > — vous devez être connecté à ces plateformes. Le package publié peut désactiver certains connecteurs
-        : le multi-compte et l'assistance ne sont proposés que pour les plateformes effectivement incluses.
-        Nous ne stockons jamais vos identifiants de connexion.
+        Aucun backend MissionPulse ne scrape les plateformes à votre place. Le dashboard connecté
+        utilise Supabase uniquement pour stocker et synchroniser les données produit de votre
+        compte.
       </p>
 
-      <p>
-        Les conditions d'utilisation de ces plateformes tierces s'appliquent à votre utilisation de
-        leurs services. MissionPulse n'est pas affilié à ces plateformes.
-      </p>
-
-      <h2>Aucun tracking ni analytique</h2>
+      <h2>7. Contact</h2>
 
       <p>
-        MissionPulse ne collecte pas de données publicitaires et n'intègre pas d'analytics
-        comportementales. Nous n'utilisons pas :
-      </p>
-
-      <ul>
-        <li>Google Analytics ou tout autre service d'analytique</li>
-        <li>Cookies de tracking</li>
-        <li>Fingerprinting</li>
-        <li>Télémétrie</li>
-        <li>Rapports d'erreur automatisés</li>
-      </ul>
-
-      <h2>Communications</h2>
-
-      <p>
-        Nous ne vous enverrons jamais d'emails marketing ou de notifications push commerciales. Les
-        seules notifications que vous recevrez sont celles que vous avez explicitement configurées
-        pour être alerté des nouvelles missions.
-      </p>
-
-      <h2>Code source ouvert</h2>
-
-      <p>
-        MissionPulse est un projet open source. Vous pouvez vérifier par vous-même comment
-        l'extension fonctionne en consultant notre code source sur
-        <a href="https://github.com/guyghost/pulse" target="_blank" rel="noopener noreferrer"
-          >GitHub</a
-        >. La transparence est notre meilleure garantie de respect de votre vie privée.
-      </p>
-
-      <h2>Suppression de vos données</h2>
-
-      <p>Pour supprimer vos données locales :</p>
-
-      <ul>
-        <li>
-          Désinstallez l'extension depuis Chrome (<code>chrome://extensions</code>)
-        </li>
-        <li>Les données IndexedDB et chrome.storage associées seront automatiquement supprimées</li>
-      </ul>
-
-      <p>
-        Pour les données synchronisées avec le dashboard connecté, vous pouvez demander la
-        suppression du compte et des données associées via
+        Pour toute question relative à la confidentialité de vos données :
         <a href="mailto:privacy@missionpulse.app">privacy@missionpulse.app</a>.
       </p>
 
-      <h2>Mises à jour de cette politique</h2>
-
       <p>
-        Si nous modifions cette politique de confidentialité, nous en informerons les utilisateurs
-        via une notification dans l'extension. Les changements significatifs nécessiteront votre
-        consentement explicite.
-      </p>
-
-      <h2>Contact</h2>
-
-      <p>
-        Pour toute question concernant cette politique de confidentialité ou vos données, vous
-        pouvez nous contacter à :
-        <a href="mailto:privacy@missionpulse.app">privacy@missionpulse.app</a>
+        MissionPulse est un projet open-source. Le code est disponible pour audit sur
+        <a href="https://github.com/guyghost/pulse" target="_blank" rel="noopener noreferrer"
+          >GitHub</a
+        >.
       </p>
 
       <p class="privacy-return">
