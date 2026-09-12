@@ -62,12 +62,12 @@ cassée ne doit **jamais** produire zéro avertissement visible.
 hero + empty générique `VirtualMissionFeed`). `resolveFeedEmptySurface()`
 désigne un seul owner :
 
-| Surface        | Condition                                                                 | Rendu                                                                 |
-| -------------- | ------------------------------------------------------------------------- | --------------------------------------------------------------------- |
-| `none`         | liste en cours de chargement, ou au moins une mission visible             | pas d'empty                                                           |
-| `hero`         | story empty **déjà** rendue dans le hero (missions dashboard = 0 + strip) | la liste reste silencieuse (`suppressEmptyState`)                     |
-| `list-story`   | feed vide, hero silencieux                                                | `VirtualMissionFeed` rend la story (`emptyStory`) — copy et CTA uniques |
-| `list-local`   | la liste est vide mais le dashboard a encore des missions (filtre overlay) | empty local filtres, sans reprendre le never-scanned générique        |
+| Surface      | Condition                                                                  | Rendu                                                                   |
+| ------------ | -------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| `none`       | liste en cours de chargement, ou au moins une mission visible              | pas d'empty                                                             |
+| `hero`       | story empty **déjà** rendue dans le hero (missions dashboard = 0 + strip)  | la liste reste silencieuse (`suppressEmptyState`)                       |
+| `list-story` | feed vide, hero silencieux                                                 | `VirtualMissionFeed` rend la story (`emptyStory`) — copy et CTA uniques |
+| `list-local` | la liste est vide mais le dashboard a encore des missions (filtre overlay) | empty local filtres, sans reprendre le never-scanned générique          |
 
 `VirtualMissionFeed` **n'a plus** de copy hardcodée « Lancez un premier scan… ».
 Cette phrase vit uniquement dans `buildFeedStory` (`never-scanned-empty`).
