@@ -143,6 +143,8 @@ describe('MissionCard', () => {
     });
     await tick();
     expect(target.textContent).toContain('sous plancher');
+    // AA text token (#c21f14, 6.0:1 on white) — decorative bar keeps status-red.
+    expect(target.querySelector('.text-status-red-text')).not.toBeNull();
     expect(target.querySelector('[aria-hidden="true"] [class*="bg-status-red"]')).not.toBeNull();
   });
 

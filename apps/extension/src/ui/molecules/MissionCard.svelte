@@ -455,7 +455,7 @@
         ></div>
       </div>
       {#if ratePos.underFloor}
-        <span class="text-micro font-medium text-status-red">sous plancher</span>
+        <span class="text-micro font-medium text-status-red-text">sous plancher</span>
       {/if}
     </div>
   {/if}
