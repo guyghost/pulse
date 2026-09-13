@@ -231,6 +231,13 @@
     onCopyLink?.();
   }
 
+  // Touch targets (DAO #180): icon buttons stay 32px visually (compact
+  // density, DAO #176) but their clickable area extends to 44×44 via an
+  // invisible pseudo-element. Adjacent gaps are 6px, matching the 6px
+  // extension on each side — zones touch but never overlap (no ghost taps).
+  const HIT_TARGET_EXTENSION =
+    "relative after:absolute after:-inset-1.5 after:rounded-lg after:content-['']";
+
   function handleToggleFavorite(e: MouseEvent) {
     e.stopPropagation();
     onToggleFavorite?.();
@@ -350,7 +357,7 @@
         {#if mission.description}
           <button
             type="button"
-            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+            class="{HIT_TARGET_EXTENSION} flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
             'expand'
               ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
               : ''}"
@@ -621,7 +628,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
           onclick={handleHide}
           onkeydown={tooltip.onKeydown}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
@@ -642,7 +649,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -667,7 +674,7 @@
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
           type="button"
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
@@ -699,7 +706,7 @@
       >
         {#snippet children(tooltip: TooltipTriggerState)}
           <button
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleCopyLink}
             onkeydown={tooltip.onKeydown}
             aria-label={copied
@@ -727,7 +734,7 @@
       >
         {#snippet children(tooltip: TooltipTriggerState)}
           <button
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleOpenLink}
             onkeydown={tooltip.onKeydown}
             aria-label="Ouvrir la mission sur la plateforme source"

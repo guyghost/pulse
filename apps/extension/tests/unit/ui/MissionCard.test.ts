@@ -220,6 +220,36 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
+  it('étend la zone tactile des boutons icône à 44×44 sans densifier (DAO #180)', async () => {
+    const target = mountCard();
+    await tick();
+
+    // Expand: copy and open join the bar unfolded (DAO #176).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    // 32px visual + 6px extension per side = 44×44 effective hit area.
+    const hitLabels = [
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer les détails de la mission Developpeur fullstack TypeScript',
+    ];
+    for (const label of hitLabels) {
+      const button = target.querySelector(`button[aria-label="${label}"]`);
+      expect(button, label).not.toBeNull();
+      expect(button?.className, label).toContain('after:absolute');
+      expect(button?.className, label).toContain('after:-inset-1.5');
+      // Visual density unchanged: the button itself stays 32px (size-8 / h-8).
+      expect(button?.className, label).toMatch(/size-8|h-8 w-8/);
+    }
+  });
+
   it('affiche un état d’erreur perceptible quand la copie échoue (DAO #178)', async () => {
     const target = mountCard({ copyStatus: 'error' });
     await tick();
