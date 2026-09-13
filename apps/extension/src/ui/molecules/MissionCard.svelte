@@ -44,6 +44,7 @@
     isStatusTransitionPending = false,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
     profileTjmMin = null as number | null,
+    copyStatus = 'idle' as 'idle' | 'copied',
   }: {
     mission: Mission;
     isSeen?: boolean;
@@ -69,6 +70,11 @@
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
     /** Profile floor (DAO #175) — null = profile without floor, gauge hidden. */
     profileTjmMin?: number | null;
+    /** Copy-link feedback owned by the parent (DAO #179): the molecule never
+     * touches the clipboard itself — it renders this status and emits the
+     * copy request through onCopyLink. The error state is perceptible:
+     * tooltip, icon and a polite live announcement (DAO #178). */
+    copyStatus?: 'idle' | 'copied' | 'error';
   } = $props();
 
   // Collapsed by default: the feed's quick scan comes first. Compact density:
@@ -215,23 +221,22 @@
     scoreDetailsOpen = !scoreDetailsOpen;
   }
 
-  let copied = $state(false);
+  // Copy-link presentation (DAO #179): the parent owns the clipboard and the
+  // transient "copied" feedback (link-copy controller); the molecule only
+  // renders copyStatus and emits the copy request via onCopyLink.
+  const copied = $derived(copyStatus === 'copied');
 
   function handleCopyLink(e: MouseEvent) {
     e.stopPropagation();
-    navigator.clipboard
-      .writeText(mission.url)
-      .then(() => {
-        copied = true;
-        onCopyLink?.();
-        setTimeout(() => {
-          copied = false;
-        }, 1500);
-      })
-      .catch(() => {
-        // Clipboard write rejected (permissions/focus): stay silent, no false "copied".
-      });
+    onCopyLink?.();
   }
+
+  // Touch targets (DAO #180): icon buttons stay 32px visually (compact
+  // density, DAO #176) but their clickable area extends to 44×44 via an
+  // invisible pseudo-element. Adjacent gaps are 6px, matching the 6px
+  // extension on each side — zones touch but never overlap (no ghost taps).
+  const HIT_TARGET_EXTENSION =
+    "relative after:absolute after:-inset-1.5 after:rounded-lg after:content-['']";
 
   function handleToggleFavorite(e: MouseEvent) {
     e.stopPropagation();
@@ -273,7 +278,7 @@
       }
     },
   }}
-  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
+  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-[border-color,opacity] duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
@@ -352,7 +357,7 @@
         {#if mission.description}
           <button
             type="button"
-            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+            class="{HIT_TARGET_EXTENSION} flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
             'expand'
               ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
               : ''}"
@@ -455,7 +460,7 @@
         ></div>
       </div>
       {#if ratePos.underFloor}
-        <span class="text-micro font-medium text-status-red">sous plancher</span>
+        <span class="text-micro font-medium text-status-red-text">sous plancher</span>
       {/if}
     </div>
   {/if}
@@ -623,7 +628,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
           onclick={handleHide}
           onkeydown={tooltip.onKeydown}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
@@ -644,7 +649,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -669,7 +674,7 @@
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
           type="button"
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
@@ -686,22 +691,39 @@
       {/snippet}
     </Tooltip>
     {#if expanded}
+      <!-- Copy feedback announcements (DAO #178): the region stays mounted so
+           screen readers catch the message; empty while idle. -->
+      <span class="sr-only" role="status" aria-live="polite">
+        {copied ? 'Lien copié' : copyStatus === 'error' ? 'Échec de la copie du lien' : ''}
+      </span>
       <Tooltip
-        label={copied ? 'Lien copié' : 'Copier le lien'}
+        label={copied
+          ? 'Lien copié'
+          : copyStatus === 'error'
+            ? 'Échec de la copie'
+            : 'Copier le lien'}
         description="Partagez ou archivez la mission sans ouvrir la plateforme."
       >
         {#snippet children(tooltip: TooltipTriggerState)}
           <button
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleCopyLink}
             onkeydown={tooltip.onKeydown}
-            aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+            aria-label={copied
+              ? 'Lien copié'
+              : copyStatus === 'error'
+                ? 'Échec de la copie du lien'
+                : 'Copier le lien de la mission'}
             aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
           >
             <Icon
-              name={copied ? 'check' : 'link'}
+              name={copied ? 'check' : copyStatus === 'error' ? 'x-circle' : 'link'}
               size={13}
-              class={copied ? 'text-blueprint-blue' : ''}
+              class={copied
+                ? 'text-blueprint-blue'
+                : copyStatus === 'error'
+                  ? 'text-status-red-text'
+                  : ''}
             />
           </button>
         {/snippet}
@@ -712,7 +734,7 @@
       >
         {#snippet children(tooltip: TooltipTriggerState)}
           <button
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleOpenLink}
             onkeydown={tooltip.onKeydown}
             aria-label="Ouvrir la mission sur la plateforme source"

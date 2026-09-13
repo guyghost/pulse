@@ -8,25 +8,26 @@ Mission Pulse dégage une clarté focalisée et data-driven, présentant une aut
 
 ## Tokens — Couleurs
 
-| Nom            | Valeur    | Token                    | Rôle                                                                                                                                                                |
-| -------------- | --------- | ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Page Canvas    | `#f5f5f4` | `--color-page-canvas`    | Fond principal des pages et sections majeures, fournissant une base claire et lumineuse.                                                                            |
-| Surface White  | `#ffffff` | `--color-surface-white`  | Utilisé pour cartes, panneaux et éléments devant se détacher légèrement du fond principal, souvent comme conteneurs de contenu.                                     |
-| Blueprint Blue | `#0b64e9` | `--color-blueprint-blue` | Accent de marque principal, utilisé pour tous les calls-to-action, états interactifs et éléments de navigation clés, attirant l'œil sans saturer.                   |
-| Text Primary   | `#0c0a09` | `--color-text-primary`   | Texte courant, titres et informations critiques pour une lisibilité maximale sur fonds clairs.                                                                      |
-| Text Secondary | `#1c1917` | `--color-text-secondary` | Sous-titres, textes de support et informations moins mises en avant, un cran plus léger que le texte principal tout en restant très contrasté.                      |
-| Text Muted     | `#6b6561` | `--color-text-muted`     | Texte placeholder, labels mineurs et détails complémentaires, présence visuelle plus douce.                                                                         |
-| Text Subtle    | `#57534d` | `--color-text-subtle`    | Texte moins proéminent comme les captions ou descriptions, visuellement en retrait tout en restant lisible.                                                         |
-| Text On Bright | `#0c0a09` | `--color-text-on-bright` | Texte sur remplissages saturés de statut/accent (badges de note, tags). Ne bascule jamais en thème sombre car ses remplissages gardent leurs valeurs du mode clair. |
-| Subtle Gray    | `#ececea` | `--color-subtle-gray`    | Fonds pour conteneurs discrets comme les badges ou petits éléments de carte, offrant une légère différenciation.                                                    |
-| Border Light   | `#f0efef` | `--color-border-light`   | Distingue les éléments UI avec une bordure subtile, en particulier pour les champs de formulaire et éléments interactifs.                                           |
-| Disabled Gray  | `#d4d2d1` | `--color-disabled-gray`  | Utilisé pour les états désactivés des composants interactifs, indiquant la non-interactivité.                                                                       |
-| Status Red     | `#f24149` | `--color-status-red`     | Indicateur d'erreurs ou d'alertes importantes, attirant rapidement l'attention.                                                                                     |
-| Status Orange  | `#f97006` | `--color-status-orange`  | Mise en avant des avertissements ou informations de priorité modérée.                                                                                               |
-| Status Yellow  | `#f9b703` | `--color-status-yellow`  | Pour les highlights informatifs ou indicateurs de statut moins critiques.                                                                                           |
-| Status Violet  | `#6b4aff` | `--color-status-violet`  | Probablement pour des tags ou catégories de statut spécifiques, fournissant une distinction visuelle.                                                               |
-| Accent Green   | `#0d9488` | `--color-accent-green`   | Signal de support positif ou de succès, utilisé avec parcimonie pour les états de statut secondaires.                                                               |
-| Accent Amber   | `#d97706` | `--color-accent-amber`   | Signal de support de prudence, utilisé avec parcimonie pour les états de statut de priorité moyenne.                                                                |
+| Nom             | Valeur    | Token                     | Rôle                                                                                                                                                                                                   |
+| --------------- | --------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Page Canvas     | `#f5f5f4` | `--color-page-canvas`     | Fond principal des pages et sections majeures, fournissant une base claire et lumineuse.                                                                                                               |
+| Surface White   | `#ffffff` | `--color-surface-white`   | Utilisé pour cartes, panneaux et éléments devant se détacher légèrement du fond principal, souvent comme conteneurs de contenu.                                                                        |
+| Blueprint Blue  | `#0b64e9` | `--color-blueprint-blue`  | Accent de marque principal, utilisé pour tous les calls-to-action, états interactifs et éléments de navigation clés, attirant l'œil sans saturer.                                                      |
+| Text Primary    | `#0c0a09` | `--color-text-primary`    | Texte courant, titres et informations critiques pour une lisibilité maximale sur fonds clairs.                                                                                                         |
+| Text Secondary  | `#1c1917` | `--color-text-secondary`  | Sous-titres, textes de support et informations moins mises en avant, un cran plus léger que le texte principal tout en restant très contrasté.                                                         |
+| Text Muted      | `#6b6561` | `--color-text-muted`      | Texte placeholder, labels mineurs et détails complémentaires, présence visuelle plus douce.                                                                                                            |
+| Text Subtle     | `#57534d` | `--color-text-subtle`     | Texte moins proéminent comme les captions ou descriptions, visuellement en retrait tout en restant lisible.                                                                                            |
+| Text On Bright  | `#0c0a09` | `--color-text-on-bright`  | Texte sur remplissages saturés de statut/accent (badges de note, tags). Ne bascule jamais en thème sombre car ses remplissages gardent leurs valeurs du mode clair.                                    |
+| Subtle Gray     | `#ececea` | `--color-subtle-gray`     | Fonds pour conteneurs discrets comme les badges ou petits éléments de carte, offrant une légère différenciation.                                                                                       |
+| Border Light    | `#f0efef` | `--color-border-light`    | Distingue les éléments UI avec une bordure subtile, en particulier pour les champs de formulaire et éléments interactifs.                                                                              |
+| Disabled Gray   | `#d4d2d1` | `--color-disabled-gray`   | Utilisé pour les états désactivés des composants interactifs, indiquant la non-interactivité.                                                                                                          |
+| Status Red      | `#f24149` | `--color-status-red`      | Indicateur d'erreurs ou d'alertes importantes, attirant rapidement l'attention.                                                                                                                        |
+| Status Red Text | `#c21f14` | `--color-status-red-text` | Rouge conforme AA pour les petits libellés de statut sur fond clair (6.0:1 sur blanc) ; passe sur `#f24149` en thème sombre (4.69:1 sur `#1c1917`). Les remplissages décoratifs conservent Status Red. |
+| Status Orange   | `#f97006` | `--color-status-orange`   | Mise en avant des avertissements ou informations de priorité modérée.                                                                                                                                  |
+| Status Yellow   | `#f9b703` | `--color-status-yellow`   | Pour les highlights informatifs ou indicateurs de statut moins critiques.                                                                                                                              |
+| Status Violet   | `#6b4aff` | `--color-status-violet`   | Probablement pour des tags ou catégories de statut spécifiques, fournissant une distinction visuelle.                                                                                                  |
+| Accent Green    | `#0d9488` | `--color-accent-green`    | Signal de support positif ou de succès, utilisé avec parcimonie pour les états de statut secondaires.                                                                                                  |
+| Accent Amber    | `#d97706` | `--color-accent-amber`    | Signal de support de prudence, utilisé avec parcimonie pour les états de statut de priorité moyenne.                                                                                                   |
 
 ## Tokens — Typographie
 
@@ -253,6 +254,7 @@ La page utilise principalement une mise en page à largeur maximale contenue, pr
   --color-border-light: #f0efef;
   --color-disabled-gray: #d4d2d1;
   --color-status-red: #f24149;
+  --color-status-red-text: #c21f14;
   --color-status-orange: #f97006;
   --color-status-yellow: #f9b703;
   --color-status-violet: #6b4aff;
@@ -367,6 +369,7 @@ La page utilise principalement une mise en page à largeur maximale contenue, pr
   --color-border-light: #f0efef;
   --color-disabled-gray: #d4d2d1;
   --color-status-red: #f24149;
+  --color-status-red-text: #c21f14;
   --color-status-orange: #f97006;
   --color-status-yellow: #f9b703;
   --color-status-violet: #6b4aff;

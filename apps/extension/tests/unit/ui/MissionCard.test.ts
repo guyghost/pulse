@@ -143,6 +143,8 @@ describe('MissionCard', () => {
     });
     await tick();
     expect(target.textContent).toContain('sous plancher');
+    // AA text token (#c21f14, 6.0:1 on white) — decorative bar keeps status-red.
+    expect(target.querySelector('.text-status-red-text')).not.toBeNull();
     expect(target.querySelector('[aria-hidden="true"] [class*="bg-status-red"]')).not.toBeNull();
   });
 
@@ -216,6 +218,60 @@ describe('MissionCard', () => {
     expect(
       target.querySelectorAll('button[aria-label="Ajouter la mission aux favoris"]')
     ).toHaveLength(1);
+  });
+
+  it('étend la zone tactile des boutons icône à 44×44 sans densifier (DAO #180)', async () => {
+    const target = mountCard();
+    await tick();
+
+    // Expand: copy and open join the bar unfolded (DAO #176).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    // 32px visual + 6px extension per side = 44×44 effective hit area.
+    const hitLabels = [
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer les détails de la mission Developpeur fullstack TypeScript',
+    ];
+    for (const label of hitLabels) {
+      const button = target.querySelector(`button[aria-label="${label}"]`);
+      expect(button, label).not.toBeNull();
+      expect(button?.className, label).toContain('after:absolute');
+      expect(button?.className, label).toContain('after:-inset-1.5');
+      // Visual density unchanged: the button itself stays 32px (size-8 / h-8).
+      expect(button?.className, label).toMatch(/size-8|h-8 w-8/);
+    }
+  });
+
+  it('affiche un état d’erreur perceptible quand la copie échoue (DAO #178)', async () => {
+    const target = mountCard({ copyStatus: 'error' });
+    await tick();
+
+    // Expand: the copy action only renders unfolded (DAO #176).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    // Perceptible failure state — distinct from rest AND from copied.
+    const failed = target.querySelector('button[aria-label="Échec de la copie du lien"]');
+    expect(failed).not.toBeNull();
+    // Icon uses the AA-compliant red text token (#177), never the copied blue.
+    expect(failed?.querySelector('.text-status-red-text')).not.toBeNull();
+    expect(target.querySelector('.text-blueprint-blue')).toBeNull();
+
+    // Polite live announcement (fr) for screen readers, and no false "copied".
+    const live = target.querySelector('[role="status"][aria-live="polite"]');
+    expect(live?.textContent?.trim()).toBe('Échec de la copie du lien');
+    expect(target.textContent).not.toContain('Lien copié');
   });
 
   it('réserve copier, ouvrir et Analyser à l’état déplié (revue design DAO #176)', async () => {
