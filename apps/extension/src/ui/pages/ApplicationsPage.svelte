@@ -591,8 +591,14 @@
   }
 
   async function copyAsset(content: string): Promise<void> {
-    await navigator.clipboard.writeText(content);
-    await showToast('Copié', 'success');
+    try {
+      await navigator.clipboard.writeText(content);
+      await showToast('Copié', 'success');
+    } catch {
+      // Clipboard rejected (permission/focus): surface the failure — the page
+      // notifies its errors, copy must not stay silent (DAO #184).
+      await showToast('Échec de la copie', 'error');
+    }
   }
 
   async function loadApplications(): Promise<void> {

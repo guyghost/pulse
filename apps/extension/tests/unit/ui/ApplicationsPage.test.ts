@@ -524,4 +524,46 @@ describe('ApplicationsPage next-action toast', () => {
       'error'
     );
   });
+
+  it('shows an ERROR toast (never “Copié”) when clipboard copy is rejected (DAO #184)', async () => {
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [tracking] });
+      }
+      if (message.type === 'GET_GENERATED_ASSETS') {
+        return Promise.resolve({
+          type: 'GENERATED_ASSETS_RESULT',
+          payload: [
+            {
+              id: 'a1',
+              missionId: 'm1',
+              type: 'pitch',
+              content: 'Pitch de test',
+              createdAt: 1_000,
+              modelUsed: 'unknown',
+            },
+          ],
+        });
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const writeText = vi.fn(() => Promise.reject(new Error('clipboard denied')));
+    vi.stubGlobal('navigator', { ...navigator, clipboard: { writeText } });
+
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    const copyButton = target.querySelector('button[title="Copier"]') as HTMLButtonElement;
+    expect(copyButton, 'asset copy button should exist').toBeTruthy();
+    copyButton.click();
+    await flush();
+    await tick();
+
+    expect(showToast).toHaveBeenCalledWith('Échec de la copie', 'error');
+    expect(showToast.mock.calls.some(([message]) => message === 'Copié')).toBe(false);
+    vi.unstubAllGlobals();
+  });
 });
