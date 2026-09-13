@@ -278,7 +278,7 @@
       }
     },
   }}
-  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
+  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-[border-color,opacity] duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
