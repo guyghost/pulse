@@ -44,6 +44,7 @@
     isStatusTransitionPending = false,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
     profileTjmMin = null as number | null,
+    copyStatus = 'idle' as 'idle' | 'copied',
   }: {
     mission: Mission;
     isSeen?: boolean;
@@ -69,6 +70,10 @@
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
     /** Profile floor (DAO #175) — null = profile without floor, gauge hidden. */
     profileTjmMin?: number | null;
+    /** Copy-link feedback owned by the parent (DAO #179): the molecule never
+     * touches the clipboard itself — it renders this status and emits the
+     * copy request through onCopyLink. */
+    copyStatus?: 'idle' | 'copied';
   } = $props();
 
   // Collapsed by default: the feed's quick scan comes first. Compact density:
@@ -215,22 +220,14 @@
     scoreDetailsOpen = !scoreDetailsOpen;
   }
 
-  let copied = $state(false);
+  // Copy-link presentation (DAO #179): the parent owns the clipboard and the
+  // transient "copied" feedback (link-copy controller); the molecule only
+  // renders copyStatus and emits the copy request via onCopyLink.
+  const copied = $derived(copyStatus === 'copied');
 
   function handleCopyLink(e: MouseEvent) {
     e.stopPropagation();
-    navigator.clipboard
-      .writeText(mission.url)
-      .then(() => {
-        copied = true;
-        onCopyLink?.();
-        setTimeout(() => {
-          copied = false;
-        }, 1500);
-      })
-      .catch(() => {
-        // Clipboard write rejected (permissions/focus): stay silent, no false "copied".
-      });
+    onCopyLink?.();
   }
 
   function handleToggleFavorite(e: MouseEvent) {
