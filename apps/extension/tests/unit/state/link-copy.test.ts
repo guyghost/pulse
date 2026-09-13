@@ -28,12 +28,15 @@ function createManualClock() {
   };
 }
 
+/** Fake clipboard whose behavior can flip between copies (retry scenarios). */
 function createClipboard(mode: 'resolve' | 'reject' = 'resolve') {
+  const state = { mode };
   const writes: string[] = [];
   return {
+    state,
     writes,
     writeText: (text: string) => {
-      if (mode === 'reject') {
+      if (state.mode === 'reject') {
         return Promise.reject(new Error('clipboard denied'));
       }
       writes.push(text);
@@ -57,12 +60,37 @@ describe('createLinkCopyController', () => {
     expect(COPY_FEEDBACK_MS).toBe(1500);
   });
 
-  it('reste « idle » et résout false quand le clipboard refuse (aucun faux « copié »)', async () => {
+  it('passe à « error » quand le clipboard refuse, sans faux « copié », puis se réinitialise (DAO #178)', async () => {
     const clock = createManualClock();
     const controller = createLinkCopyController(createClipboard('reject'), clock.delay);
 
     const succeeded = await controller.copy('https://example.com/mission-1');
     expect(succeeded).toBe(false);
+    expect(controller.status).toBe('error');
+    expect(clock.pendingCount()).toBe(1);
+
+    // Auto-reset after the feedback window.
+    clock.advance();
+    expect(controller.status).toBe('idle');
+  });
+
+  it('annule le timer d’erreur lors d’une nouvelle tentative qui réussit', async () => {
+    const clock = createManualClock();
+    const clipboard = createClipboard('reject');
+    const controller = createLinkCopyController(clipboard, clock.delay);
+
+    await controller.copy('https://example.com/mission-1');
+    expect(controller.status).toBe('error');
+    expect(clock.pendingCount()).toBe(1);
+
+    // The clipboard recovers (permission granted, focus restored): the retry
+    // must cancel the pending error reset, not stack a second timer.
+    clipboard.state.mode = 'resolve';
+    await controller.copy('https://example.com/mission-1');
+    expect(controller.status).toBe('copied');
+    expect(clock.pendingCount()).toBe(1);
+
+    clock.advance();
     expect(controller.status).toBe('idle');
     expect(clock.pendingCount()).toBe(0);
   });

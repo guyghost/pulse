@@ -9,7 +9,7 @@
  * `clipboard` and `delay` are injectable so tests run without global mocks.
  */
 
-export type LinkCopyStatus = 'idle' | 'copied';
+export type LinkCopyStatus = 'idle' | 'copied' | 'error';
 
 export interface LinkCopyController {
   readonly status: LinkCopyStatus;
@@ -19,7 +19,7 @@ export interface LinkCopyController {
   dispose(): void;
 }
 
-/** How long the "copied" feedback stays visible. */
+/** How long the "copied"/error feedback stays visible. */
 export const COPY_FEEDBACK_MS = 1500;
 
 export function createLinkCopyController(
@@ -37,25 +37,36 @@ export function createLinkCopyController(
     cancelFeedback = null;
   }
 
+  function scheduleFeedbackReset(): void {
+    cancelFeedback = delay(() => {
+      cancelFeedback = null;
+      status = 'idle';
+    }, COPY_FEEDBACK_MS);
+  }
+
   return {
     get status() {
       return status;
     },
     copy(url: string): Promise<boolean> {
-      // A rapid re-copy must not stack timers: the previous feedback is
-      // cancelled first, the new one fully owns the state from here on.
+      // A rapid re-copy must not stack timers: the previous feedback (copied
+      // OR error) is cancelled first, the new attempt fully owns the state.
       clearFeedbackTimer();
       return clipboard
         .writeText(url)
         .then(() => {
           status = 'copied';
-          cancelFeedback = delay(() => {
-            cancelFeedback = null;
-            status = 'idle';
-          }, COPY_FEEDBACK_MS);
+          scheduleFeedbackReset();
           return true;
         })
-        .catch(() => false);
+        .catch(() => {
+          // Rejected (permissions/focus): never show a false "copied" —
+          // surface a perceptible error state instead, auto-reset after the
+          // feedback window (DAO #178).
+          status = 'error';
+          scheduleFeedbackReset();
+          return false;
+        });
     },
     dispose() {
       clearFeedbackTimer();

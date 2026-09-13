@@ -72,8 +72,9 @@
     profileTjmMin?: number | null;
     /** Copy-link feedback owned by the parent (DAO #179): the molecule never
      * touches the clipboard itself — it renders this status and emits the
-     * copy request through onCopyLink. */
-    copyStatus?: 'idle' | 'copied';
+     * copy request through onCopyLink. The error state is perceptible:
+     * tooltip, icon and a polite live announcement (DAO #178). */
+    copyStatus?: 'idle' | 'copied' | 'error';
   } = $props();
 
   // Collapsed by default: the feed's quick scan comes first. Compact density:
@@ -683,8 +684,17 @@
       {/snippet}
     </Tooltip>
     {#if expanded}
+      <!-- Copy feedback announcements (DAO #178): the region stays mounted so
+           screen readers catch the message; empty while idle. -->
+      <span class="sr-only" role="status" aria-live="polite">
+        {copied ? 'Lien copié' : copyStatus === 'error' ? 'Échec de la copie du lien' : ''}
+      </span>
       <Tooltip
-        label={copied ? 'Lien copié' : 'Copier le lien'}
+        label={copied
+          ? 'Lien copié'
+          : copyStatus === 'error'
+            ? 'Échec de la copie'
+            : 'Copier le lien'}
         description="Partagez ou archivez la mission sans ouvrir la plateforme."
       >
         {#snippet children(tooltip: TooltipTriggerState)}
@@ -692,13 +702,21 @@
             class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleCopyLink}
             onkeydown={tooltip.onKeydown}
-            aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+            aria-label={copied
+              ? 'Lien copié'
+              : copyStatus === 'error'
+                ? 'Échec de la copie du lien'
+                : 'Copier le lien de la mission'}
             aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
           >
             <Icon
-              name={copied ? 'check' : 'link'}
+              name={copied ? 'check' : copyStatus === 'error' ? 'x-circle' : 'link'}
               size={13}
-              class={copied ? 'text-blueprint-blue' : ''}
+              class={copied
+                ? 'text-blueprint-blue'
+                : copyStatus === 'error'
+                  ? 'text-status-red-text'
+                  : ''}
             />
           </button>
         {/snippet}

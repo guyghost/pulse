@@ -220,6 +220,30 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
+  it('affiche un état d’erreur perceptible quand la copie échoue (DAO #178)', async () => {
+    const target = mountCard({ copyStatus: 'error' });
+    await tick();
+
+    // Expand: the copy action only renders unfolded (DAO #176).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    // Perceptible failure state — distinct from rest AND from copied.
+    const failed = target.querySelector('button[aria-label="Échec de la copie du lien"]');
+    expect(failed).not.toBeNull();
+    // Icon uses the AA-compliant red text token (#177), never the copied blue.
+    expect(failed?.querySelector('.text-status-red-text')).not.toBeNull();
+    expect(target.querySelector('.text-blueprint-blue')).toBeNull();
+
+    // Polite live announcement (fr) for screen readers, and no false "copied".
+    const live = target.querySelector('[role="status"][aria-live="polite"]');
+    expect(live?.textContent?.trim()).toBe('Échec de la copie du lien');
+    expect(target.textContent).not.toContain('Lien copié');
+  });
+
   it('réserve copier, ouvrir et Analyser à l’état déplié (revue design DAO #176)', async () => {
     const target = mountCard();
     await tick();
