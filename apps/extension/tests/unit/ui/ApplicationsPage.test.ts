@@ -558,6 +558,11 @@ describe('ApplicationsPage next-action toast', () => {
 
     const copyButton = target.querySelector('button[title="Copier"]') as HTMLButtonElement;
     expect(copyButton, 'asset copy button should exist').toBeTruthy();
+    // Touch target (DAO #185): 32px visual + 6px pseudo-element extension per
+    // side = 44×44 effective, no visual densification.
+    expect(copyButton.className).toContain('after:absolute');
+    expect(copyButton.className).toContain('after:-inset-1.5');
+    expect(copyButton.className).toMatch(/h-8 w-8/);
     copyButton.click();
     await flush();
     await tick();

@@ -1212,7 +1212,7 @@
                   </h4>
                 </div>
                 <button
-                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted hover:bg-subtle-gray hover:text-text-primary"
+                  class="relative after:absolute after:-inset-1.5 after:rounded-lg after:content-[''] inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted hover:bg-subtle-gray hover:text-text-primary"
                   onclick={() => copyAsset(asset.content)}
                   title="Copier"
                 >
