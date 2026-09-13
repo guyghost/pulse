@@ -306,7 +306,7 @@
             <p class="eyebrow eyebrow--strong">Votre cible</p>
             <p
               class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
-                ? 'text-status-red'
+                ? 'text-status-red-text'
                 : 'text-text-primary'}"
             >
               {hasTjmTarget ? `${userTjmMin}–${userTjmMax}€` : '—'}
