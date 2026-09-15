@@ -104,7 +104,7 @@ export async function recoverInterruptedScan(): Promise<string | null> {
   actor.start();
   actor.send({ type: 'SERVICE_WORKER_RESTARTED', checkpoint });
 
-  try {
+  await (async () => {
     const snapshot = actor.getSnapshot();
     const recoveredState = snapshot.value as ScanCheckpoint['state'];
     const terminal = recoveredTerminalDecision(checkpoint, recoveredState, snapshot.context.error);
@@ -122,14 +122,15 @@ export async function recoverInterruptedScan(): Promise<string | null> {
       // terminal has still been attempted and Feed consumption is idempotent
       // by operationId when a listener is present.
     });
-    const cleared = await clearScanCheckpoint(checkpoint.operationId);
-    if (!cleared) {
-      throw new Error(
-        `Recovered terminal checkpoint ${checkpoint.operationId} was not cleared conditionally.`
-      );
-    }
-  } finally {
+    return true;
+  })().finally(() => {
     actor.stop();
+  });
+  const cleared = await clearScanCheckpoint(checkpoint.operationId);
+  if (!cleared) {
+    throw new Error(
+      `Recovered terminal checkpoint ${checkpoint.operationId} was not cleared conditionally.`
+    );
   }
   return checkpoint.operationId;
 }
