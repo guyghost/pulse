@@ -52,7 +52,9 @@ function readGolden(path: string): NormalizedMissionRegression[] {
   try {
     return JSON.parse(readFileSync(path, 'utf8')) as NormalizedMissionRegression[];
   } catch (error) {
-    throw new Error(`Malformed or missing golden file: ${path}\n${String(error)}`);
+    throw new Error(`Malformed or missing golden file: ${path}\n${String(error)}`, {
+      cause: error,
+    });
   }
 }
 

@@ -169,13 +169,13 @@ describe('BackupRestoreModal — modal focus contract', () => {
     expect(document.activeElement).toBe(confirmation);
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
 
-    confirmation!.focus();
+    cancel!.focus();
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     );
-    expect(document.activeElement).toBe(cancel);
+    expect(document.activeElement).toBe(confirmation);
 
-    cancel!.focus();
+    confirmation!.focus();
     document.dispatchEvent(
       new KeyboardEvent('keydown', {
         key: 'Tab',
@@ -184,7 +184,7 @@ describe('BackupRestoreModal — modal focus contract', () => {
         cancelable: true,
       })
     );
-    expect(document.activeElement).toBe(confirmation);
+    expect(document.activeElement).toBe(cancel);
 
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })

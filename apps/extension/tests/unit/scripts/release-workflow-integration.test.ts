@@ -15,8 +15,8 @@ const REVIEWED_ACTION_PINS = new Map([
   ['actions/checkout', '3d3c42e5aac5ba805825da76410c181273ba90b1'],
   ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
   ['actions/setup-python', '5fda3b95a4ea91299a34e894583c3862153e4b97'],
-  // v6.0.10 — bump reviewed from dependabot PR #288.
-  ['pnpm/action-setup', '0977fd99725f1db4007ccb2928dbb4e90d06cc86'],
+  // v6.1.0 — bump reviewed from dependabot PR #385.
+  ['pnpm/action-setup', 'ea17c68df8912ef543352723c149a84f56e3d413'],
   // v4.2.2 — bump reviewed from dependabot PR #307.
   ['actions/attest', '1e69f48acb82d1966a394da916b4c1698aa569d6'],
   ['actions/upload-artifact', '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'],

@@ -1,6 +1,11 @@
 <script module lang="ts">
   let tooltipIdCounter = 0;
 
+  function nextTooltipId(): string {
+    tooltipIdCounter += 1;
+    return `tooltip-${tooltipIdCounter}`;
+  }
+
   export type TooltipTriggerState = {
     id: string;
     isOpen: boolean;
@@ -28,7 +33,7 @@
     children: Snippet<[TooltipTriggerState]>;
   } = $props();
 
-  const tooltipId = `tooltip-${++tooltipIdCounter}`;
+  const tooltipId = nextTooltipId();
   let isOpen = $state(false);
 
   const placementClass = $derived.by(() => {

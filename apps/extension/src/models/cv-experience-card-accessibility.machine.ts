@@ -1455,7 +1455,6 @@ function destroyContext(
 ): Partial<ExperienceCardMachineContext> {
   let diagnostics = context.diagnostics;
   let identityLease = context.identityLease;
-  let destroyCompleted = false;
 
   try {
     if (ownsFocus) {
@@ -1525,39 +1524,35 @@ function destroyContext(
       }
     }
   } finally {
-    try {
-      if (identityLease === 'reserved') {
-        try {
-          const release = context.registry.release(
-            context.scope,
-            context.detailsId,
-            context.ownerLeaseToken
-          );
-          if (release === 'released') {
-            identityLease = 'released';
-          } else {
-            diagnostics = appendReportedDiagnostic(
-              context,
-              diagnostics,
-              Object.freeze({ code: 'DETAILS_ID_RELEASE_MISMATCH' })
-            );
-          }
-        } catch {
+    if (identityLease === 'reserved') {
+      try {
+        const release = context.registry.release(
+          context.scope,
+          context.detailsId,
+          context.ownerLeaseToken
+        );
+        if (release === 'released') {
+          identityLease = 'released';
+        } else {
           diagnostics = appendReportedDiagnostic(
             context,
             diagnostics,
-            Object.freeze({ code: 'DETAILS_ID_RELEASE_FAILED' })
+            Object.freeze({ code: 'DETAILS_ID_RELEASE_MISMATCH' })
           );
         }
+      } catch {
+        diagnostics = appendReportedDiagnostic(
+          context,
+          diagnostics,
+          Object.freeze({ code: 'DETAILS_ID_RELEASE_FAILED' })
+        );
       }
-    } finally {
-      destroyCompleted = true;
     }
   }
   return {
     diagnostics,
     identityLease,
-    destroyCompleted,
+    destroyCompleted: true,
     focusRequest: null,
   };
 }
@@ -1586,7 +1581,7 @@ function createCvExperienceCardAccessibilityMachine(
   const detailsIdValid =
     detailsId.length >= 23 && detailsId.length <= 86 && DETAILS_ID_PATTERN.test(detailsId);
 
-  let identityLease: ExperienceCardMachineContext['identityLease'] = 'unvalidated';
+  let identityLease: ExperienceCardMachineContext['identityLease'];
   let identityDiagnostic: ExperienceCardIdentityDiagnostic | null = null;
   let unavailableReason: ExperienceCardUnavailableReason | null = null;
   const initialDiagnostics: ExperienceCardDiagnostic[] = [];

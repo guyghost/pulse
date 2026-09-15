@@ -3048,31 +3048,39 @@ export class FileReleaseReadinessTransactionPort implements ReleaseReadinessTran
     if (!lockStat.isDirectory() || lockStat.isSymbolicLink()) {
       throw new ReleaseReadinessDurableStoreError('Durable release lock path is unsafe.');
     }
-    let ownerBytes: Buffer | null = null;
-    try {
-      const read = this.#readLockOwner();
-      ownerBytes = read.bytes;
-      if (
-        Date.parse(read.owner.leaseExpiresAt) > Date.now() ||
-        this.#processOwnsLockIdentity(read.owner)
-      ) {
-        throw new ReleaseReadinessDurableStoreError(
-          'Durable release state is locked by a live controller.'
-        );
-      }
-    } catch (error) {
-      if (error instanceof ReleaseReadinessDurableStoreError) {
-        if (/live controller/.test(error.message)) {
+    const ownerBytes = (() => {
+      try {
+        const read = this.#readLockOwner();
+        if (
+          Date.parse(read.owner.leaseExpiresAt) > Date.now() ||
+          this.#processOwnsLockIdentity(read.owner)
+        ) {
+          throw new ReleaseReadinessDurableStoreError(
+            'Durable release state is locked by a live controller.'
+          );
+        }
+        return read.bytes;
+      } catch (error) {
+        if (
+          error instanceof ReleaseReadinessDurableStoreError &&
+          /live controller/.test(error.message)
+        ) {
           throw error;
         }
+        const entries = readdirSync(this.#lockPath);
+        const oldEnough = Date.now() - lockStat.mtimeMs >= LOCK_LEASE_MS;
+        if (
+          !oldEnough ||
+          entries.some((entry) => entry !== LOCK_OWNER_FILE) ||
+          entries.length > 1
+        ) {
+          throw new ReleaseReadinessDurableStoreError(
+            'Durable release lock ownership is ambiguous.'
+          );
+        }
+        return null;
       }
-      const entries = readdirSync(this.#lockPath);
-      const oldEnough = Date.now() - lockStat.mtimeMs >= LOCK_LEASE_MS;
-      if (!oldEnough || entries.some((entry) => entry !== LOCK_OWNER_FILE) || entries.length > 1) {
-        throw new ReleaseReadinessDurableStoreError('Durable release lock ownership is ambiguous.');
-      }
-      ownerBytes = null;
-    }
+    })();
     const quarantinePath = join(
       this.#directory,
       `${LOCK_DIRECTORY}.expired-${process.pid}-${randomBytes(8).toString('hex')}`

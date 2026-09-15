@@ -740,13 +740,13 @@ function beginClose(registry: RegistryInternal, entry: ModalEntry, reason: Modal
   entry.pendingClose = { cycle, reason };
   entry.state = 'closing';
   project(registry);
-  let disposition: 'accepted' | 'rejected' | 'threw' = 'rejected';
-  try {
-    const result = entry.callbacks.onBeforeClose(reason);
-    disposition = result === 'accepted' ? 'accepted' : 'rejected';
-  } catch {
-    disposition = 'threw';
-  }
+  const disposition: 'accepted' | 'rejected' | 'threw' = (() => {
+    try {
+      return entry.callbacks.onBeforeClose(reason) === 'accepted' ? 'accepted' : 'rejected';
+    } catch {
+      return 'threw';
+    }
+  })();
   if (entry.pendingClose?.cycle === cycle) {
     entry.pendingClose = null;
     if (disposition === 'accepted') {

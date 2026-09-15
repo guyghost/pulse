@@ -104,7 +104,6 @@ export async function recoverInterruptedScan(): Promise<string | null> {
   actor.start();
   actor.send({ type: 'SERVICE_WORKER_RESTARTED', checkpoint });
 
-  let terminalAttempted = false;
   try {
     const snapshot = actor.getSnapshot();
     const recoveredState = snapshot.value as ScanCheckpoint['state'];
@@ -118,22 +117,19 @@ export async function recoverInterruptedScan(): Promise<string | null> {
 
     await saveScanCheckpoint(terminalCheckpoint);
     const message = await terminalMessageFromDecision(checkpoint.operationId, terminal);
-    terminalAttempted = true;
     await chrome.runtime.sendMessage(message).catch(() => {
       // No side panel is expected during many worker wake-ups. The persisted
       // terminal has still been attempted and Feed consumption is idempotent
       // by operationId when a listener is present.
     });
-  } finally {
-    actor.stop();
-  }
-  if (terminalAttempted) {
     const cleared = await clearScanCheckpoint(checkpoint.operationId);
     if (!cleared) {
       throw new Error(
         `Recovered terminal checkpoint ${checkpoint.operationId} was not cleared conditionally.`
       );
     }
+  } finally {
+    actor.stop();
   }
   return checkpoint.operationId;
 }

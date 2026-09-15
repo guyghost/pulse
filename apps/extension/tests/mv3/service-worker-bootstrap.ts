@@ -782,9 +782,11 @@ export class ServiceWorkerBootstrapObserver {
       );
     } catch (error) {
       if (!this.#isCurrentPublishedContext(correlated)) {
-        throw new Error('Correlated worker evaluation became stale before its reply.');
+        throw new Error('Correlated worker evaluation became stale before its reply.', {
+          cause: error,
+        });
       }
-      throw error;
+      throw new Error('Correlated worker evaluation failed.', { cause: error });
     }
     if (!this.#isCurrentPublishedContext(correlated)) {
       throw new Error('Correlated worker evaluation became stale before its reply.');

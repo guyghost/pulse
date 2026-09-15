@@ -384,34 +384,42 @@ export function createMissionArrivalActor(
   }
 
   function process(command: ActorCommand): void {
-    let effects: readonly MissionArrivalQueueEffect[] = [];
-    let publication = new Map<string, Mission>();
-    let preparedMissions: readonly Mission[] | null = null;
-    if (command.type === 'alarm') {
-      publication = new Map(command.missions.map((mission) => [mission.id, mission]));
-      effects = reduce({
-        type: 'ALARM_MISSIONS_RECEIVED',
-        scopeRevision: command.scopeRevision,
-        candidates: command.missions.map(({ id, source }) => ({ id, source })),
-      });
-    } else if (command.type === 'prepared') {
-      preparedMissions = command.missions;
-      effects = reduce({ type: 'PROJECTION_PREPARED', candidate: command.candidate });
-    } else {
-      if (
-        !command.private &&
-        (command.event.type === 'PROJECTION_PREPARED' ||
-          command.event.type === 'PROJECTION_LOAD_FAILED' ||
-          command.event.type === 'PROJECTION_WRITE_SUCCEEDED' ||
-          command.event.type === 'PROJECTION_WRITE_FAILED' ||
-          command.event.type === 'SEEN_PERSISTED' ||
-          command.event.type === 'SEEN_PERSIST_FAILED')
-      ) {
-        return;
-      }
-      effects = reduce(command.event);
+    if (
+      command.type !== 'alarm' &&
+      command.type !== 'prepared' &&
+      !command.private &&
+      (command.event.type === 'PROJECTION_PREPARED' ||
+        command.event.type === 'PROJECTION_LOAD_FAILED' ||
+        command.event.type === 'PROJECTION_WRITE_SUCCEEDED' ||
+        command.event.type === 'PROJECTION_WRITE_FAILED' ||
+        command.event.type === 'SEEN_PERSISTED' ||
+        command.event.type === 'SEEN_PERSIST_FAILED')
+    ) {
+      return;
     }
-    runEffects(effects, publication, preparedMissions);
+    const execution =
+      command.type === 'alarm'
+        ? {
+            effects: reduce({
+              type: 'ALARM_MISSIONS_RECEIVED',
+              scopeRevision: command.scopeRevision,
+              candidates: command.missions.map(({ id, source }) => ({ id, source })),
+            }),
+            publication: new Map(command.missions.map((mission) => [mission.id, mission])),
+            preparedMissions: null,
+          }
+        : command.type === 'prepared'
+          ? {
+              effects: reduce({ type: 'PROJECTION_PREPARED', candidate: command.candidate }),
+              publication: new Map<string, Mission>(),
+              preparedMissions: command.missions,
+            }
+          : {
+              effects: reduce(command.event),
+              publication: new Map<string, Mission>(),
+              preparedMissions: null,
+            };
+    runEffects(execution.effects, execution.publication, execution.preparedMissions);
     dependencies.onStateChanged?.(state);
   }
 
