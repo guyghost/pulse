@@ -808,7 +808,7 @@ export function createSettingsReleaseCoordinator(
     if (!record) {
       return false;
     }
-    let parsed: ScanAdmissionQueryResult;
+    let parsed: ScanAdmissionQueryResult | null;
     try {
       parsed = parseScanResult(
         await withScanPortDeadline(
@@ -823,6 +823,9 @@ export function createSettingsReleaseCoordinator(
         record.identity
       );
     } catch {
+      return false;
+    }
+    if (!parsed) {
       return false;
     }
     const valid =
@@ -860,7 +863,7 @@ export function createSettingsReleaseCoordinator(
     if (previous.generation > MAX - 2) {
       return false;
     }
-    let parsed: ScanAdmissionQueryResult;
+    let parsed: ScanAdmissionQueryResult | null;
     try {
       const raw = await withScanPortDeadline(
         record.phase === 'reserved'
@@ -880,6 +883,9 @@ export function createSettingsReleaseCoordinator(
       );
       parsed = parseScanResult(raw, previous.installId, record.identity);
     } catch {
+      return false;
+    }
+    if (!parsed) {
       return false;
     }
     if (parsed.status === 'not_found' || parsed.status === 'retired') {
