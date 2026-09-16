@@ -32,7 +32,7 @@ interface FieldCompatibility {
  * compared against many candidates, so this is the hot path.
  *
  * Invariant: each field equals what the on-the-fly computation produced
- * before (tokenize/normalizeClientName/isProxyClientName/buildMissionSignature/
+ * before (tokenize/normalizeClientName/isProxyClientName/buildSignatureFromParts/
  * normalizeUrl/hasSpecificMissionPath are all pure and idempotent), so cached
  * comparisons are byte-identical to uncached ones.
  */
@@ -237,9 +237,16 @@ const hasSpecificMissionPath = (url: string | null | undefined): boolean => {
  * Builds the text signature used for duplicate detection.
  * Structured fields beyond the title prevent generic job titles from collapsing
  * unrelated missions, while client/location compatibility is checked separately.
+ *
+ * Takes the already-normalized client name and stack text so callers that
+ * computed them for other cache fields do not pay for them twice.
  */
-const buildMissionSignature = (mission: Mission): string =>
-  [mission.title, normalizeClientName(mission.client), getStackItems(mission).join(' ')]
+const buildSignatureFromParts = (
+  title: string,
+  normalizedClient: string,
+  stackText: string
+): string =>
+  [title, normalizedClient, stackText]
     .map((part) => normalizeText(part))
     .filter(Boolean)
     .join(' ');
@@ -255,19 +262,23 @@ const buildCandidateKey = (mission: Mission): string =>
  * comparison helpers used to recompute inline on each pair; centralizing it
  * preserves exact outputs while removing redundant tokenization.
  */
-const buildComparisonCache = (mission: Mission): MissionComparisonCache => ({
-  title: tokenize(mission.title),
-  clientTokens: tokenize(normalizeClientName(mission.client)),
-  locationTokens: tokenize(mission.location),
-  stackTokens: tokenize(getStackItems(mission).join(' ')),
-  clientProxy: isProxyClientName(mission.client),
-  normalizedClient: normalizeClientName(mission.client),
-  signature: buildMissionSignature(mission),
-  remote: mission.remote,
-  tjm: mission.tjm,
-  normalizedUrl: normalizeUrl(mission.url),
-  hasSpecificPath: hasSpecificMissionPath(mission.url),
-});
+const buildComparisonCache = (mission: Mission): MissionComparisonCache => {
+  const normalizedClient = normalizeClientName(mission.client);
+  const stackText = getStackItems(mission).join(' ');
+  return {
+    title: tokenize(mission.title),
+    clientTokens: tokenize(normalizedClient),
+    locationTokens: tokenize(mission.location),
+    stackTokens: tokenize(stackText),
+    clientProxy: isProxyClientName(mission.client),
+    normalizedClient,
+    signature: buildSignatureFromParts(mission.title, normalizedClient, stackText),
+    remote: mission.remote,
+    tjm: mission.tjm,
+    normalizedUrl: normalizeUrl(mission.url),
+    hasSpecificPath: hasSpecificMissionPath(mission.url),
+  };
+};
 
 const compareClients = (
   a: MissionComparisonCache,
