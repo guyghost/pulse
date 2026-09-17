@@ -1,8 +1,8 @@
 /**
- * Persistance du journal de première consultation (chrome.storage.local).
- * Événement shell au moment du mark-seen côté feed — voir
- * src/models/time-to-review.model.md. Les marquages automatiques
- * (notification, digest) ne doivent PAS appeler journalFirstViews.
+ * Persistence of the first-viewed journal (chrome.storage.local).
+ * Shell event at mark-seen time on the feed side — see
+ * src/models/time-to-review.model.md. Automatic markings (notification,
+ * digest) must NOT call journalFirstViews.
  */
 import {
   mergeFirstViewed,
@@ -24,9 +24,9 @@ export async function getReviewJournal(): Promise<ReviewJournal> {
 }
 
 /**
- * Journalise la première consultation des missions données (first-write-wins).
- * `capturedAt` est un snapshot de Mission.scrapedAt ; null si la mission n'est
- * pas dans `missions` (ou horodatage illisible).
+ * Journals the first review of the given missions (first-write-wins).
+ * `capturedAt` is a snapshot of Mission.scrapedAt; null if the mission is not
+ * in `missions` (or its timestamp is unreadable).
  */
 export async function journalFirstViews(missionIds: string[], missions: Mission[]): Promise<void> {
   if (missionIds.length === 0) {

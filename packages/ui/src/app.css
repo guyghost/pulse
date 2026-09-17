@@ -35,6 +35,10 @@
   --color-subtle-gray-dark: #292524;
   --color-border-light-dark: #292524;
   --color-disabled-gray-dark: #57534d;
+  /* Dark keeps the vivid red for small status labels: #f24149 = 4.69:1 on
+     #1c1917 (AA). The light-mode text token is darker (#c21f14) only because
+     white surfaces need the extra contrast. */
+  --color-status-red-text-dark: #f24149;
 
   /* Typography aliases used by apps and components */
   --font-display: var(--font-fh-total-display-regular);
@@ -75,6 +79,7 @@
   --color-subtle-gray: var(--color-subtle-gray-dark);
   --color-border-light: var(--color-border-light-dark);
   --color-disabled-gray: var(--color-disabled-gray-dark);
+  --color-status-red-text: var(--color-status-red-text-dark);
 
   --shadow-sm: var(--shadow-sm-dark);
   --shadow-subtle: var(--shadow-subtle-dark);

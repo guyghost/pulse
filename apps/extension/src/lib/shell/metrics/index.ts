@@ -1,6 +1,6 @@
 /**
- * Module de métriques de performance
- * Exporte tout ce qui est nécessaire pour instrumenter le code
+ * Performance metrics module
+ * Exports everything needed to instrument code
  */
 
 // Types (depuis Core)

@@ -1,25 +1,25 @@
 /**
- * Position de la fourchette TJM d'une mission sur une échelle fixe ancrée au
- * plancher du profil (DAO #175).
+ * Position of a mission's TJM range on a fixed scale anchored to the
+ * profile floor (DAO #175).
  *
- * Pure — zéro I/O, zéro side effect. Consomme les données déjà persistées
- * (mission.tjmMin/tjmMax/tjm, profile.tjmMin) : aucun recalcul de score, la
- * jauge de la MissionCard n'est qu'une lecture visuelle de ce que
- * `rawTjmScore` (relevance.ts) calcule déjà.
+ * Pure — zero I/O, zero side effects. Consumes already-persisted data
+ * (mission.tjmMin/tjmMax/tjm, profile.tjmMin): no score recomputation, the
+ * MissionCard gauge is only a visual readout of what `rawTjmScore`
+ * (relevance.ts) already computes.
  *
- * Échelle fixe : 0 → `max(plancher × 2, borne haute mission)`. Le tick du
- * plancher occupe ainsi au plus la moitié de la piste — l'œil compare les
- * missions sans recalibrer.
+ * Fixed scale: 0 → `max(floor × 2, mission upper bound)`. The floor tick thus
+ * takes at most half of the track — the eye compares missions without
+ * recalibrating.
  */
 
 export interface MissionRatePositionInput {
-  /** Borne basse annoncée par la plateforme. */
+  /** Lower bound advertised by the platform. */
   tjmMin: number | null | undefined;
-  /** Borne haute annoncée par la plateforme. */
+  /** Upper bound advertised by the platform. */
   tjmMax: number | null | undefined;
-  /** Valeur représentative de la mission (fallback quand pas de bornes). */
+  /** Representative value for the mission (fallback when no bounds). */
   tjm: number | null | undefined;
-  /** Plancher du profil (null = profil sans plancher, DAO #174). */
+  /** Profile floor (null = profile without floor, DAO #174). */
   profileTjmMin: number | null | undefined;
 }
 

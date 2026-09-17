@@ -1,16 +1,16 @@
 /**
  * Rate Limiter - Token Bucket implementation
  *
- * Gère le rate limiting par domaine pour éviter de surcharger les serveurs.
- * Utilise un algorithme token bucket pour permettre des bursts contrôlés.
+ * Handles per-domain rate limiting to avoid overloading servers.
+ * Uses a token bucket algorithm to allow controlled bursts.
  */
 
 import { abortableDelay } from './retry-strategy';
 
 export interface RateLimitConfig {
-  /** Nombre maximum de requêtes par seconde */
+  /** Maximum number of requests per second */
   requestsPerSecond: number;
-  /** Taille du bucket (burst autorisé). Par défaut égal à requestsPerSecond */
+  /** Bucket size (allowed burst). Defaults to requestsPerSecond */
   burstSize?: number;
 }
 
@@ -20,11 +20,11 @@ interface DomainState {
   queue: (() => void)[];
 }
 
-/** Configuration par défaut pour les domaines connus */
+/** Default configuration for known domains */
 const DEFAULT_DOMAIN_CONFIGS: Record<string, RateLimitConfig> = {
   // General fallback
   default: { requestsPerSecond: 2, burstSize: 3 },
-  // Free-work - API publique, plus tolérant
+  // Free-work - public API, more tolerant
   'free-work.com': { requestsPerSecond: 3, burstSize: 5 },
   // Lehibou
   'lehibou.com': { requestsPerSecond: 2, burstSize: 3 },
@@ -39,21 +39,21 @@ const DEFAULT_DOMAIN_CONFIGS: Record<string, RateLimitConfig> = {
 };
 
 /**
- * Extrait le domaine d'une URL complète
+ * Extracts the domain from a full URL
  */
 function extractDomain(url: string): string {
   try {
     const urlObj = new URL(url);
-    // Enlève le www. si présent
+    // Strip the www. prefix when present
     return urlObj.hostname.replace(/^www\./, '');
   } catch {
-    // Si ce n'est pas une URL valide, on considère que c'est déjà un domaine
+    // If not a valid URL, assume it's already a domain
     return url.replace(/^www\./, '');
   }
 }
 
 /**
- * Trouve la config la plus spécifique pour un domaine
+ * Finds the most specific config for a domain
  */
 function findConfig(domain: string, configs: Record<string, RateLimitConfig>): RateLimitConfig {
   // Recherche exacte d'abord
@@ -84,22 +84,22 @@ export class RateLimiter {
   }
 
   /**
-   * Active ou désactive le rate limiting
+   * Enables or disables rate limiting
    */
   setEnabled(enabled: boolean): void {
     this.enabled = enabled;
   }
 
   /**
-   * Met à jour la configuration pour un domaine
+   * Updates the configuration for a domain
    */
   setConfig(domain: string, config: RateLimitConfig): void {
     this.configs[domain] = config;
   }
 
   /**
-   * Acquiert un token pour le domaine donné.
-   * Attend si nécessaire selon la politique de rate limiting.
+   * Acquires a token for the given domain.
+   * Waits if necessary according to the rate limiting policy.
    */
   async acquire(urlOrDomain: string, signal?: AbortSignal): Promise<void> {
     if (signal?.aborted) {
@@ -112,7 +112,7 @@ export class RateLimiter {
     const domain = extractDomain(urlOrDomain);
     const config = findConfig(domain, this.configs);
 
-    // Calcul du délai minimum entre requêtes
+    // Compute the minimum delay between requests
     const minDelayMs = 1000 / config.requestsPerSecond;
 
     const now = Date.now();
@@ -127,7 +127,7 @@ export class RateLimiter {
       this.domains.set(domain, state);
     }
 
-    // Replénish tokens based on elapsed time
+    // Replenish tokens based on elapsed time
     const elapsedMs = now - state.lastUpdate;
     const tokensToAdd = (elapsedMs / 1000) * config.requestsPerSecond;
     const burstSize = config.burstSize ?? config.requestsPerSecond;
@@ -158,7 +158,7 @@ export class RateLimiter {
     // Attendre le prochain token
     await abortableDelay(waitTimeMs, signal);
 
-    // Après l'attente, réessayer récursivement (pour gérer la queue)
+    // After waiting, retry recursively (to handle the queue)
     return this.acquire(urlOrDomain, signal);
   }
 
@@ -191,7 +191,7 @@ export class RateLimiter {
   }
 
   /**
-   * Réinitialise l'état d'un domaine
+   * Resets a domain's state
    */
   reset(urlOrDomain?: string): void {
     if (urlOrDomain) {
@@ -211,13 +211,13 @@ export class RateLimiter {
 export const globalRateLimiter = new RateLimiter(DEFAULT_DOMAIN_CONFIGS);
 
 /**
- * Délai constant entre les pages d'un même connecteur
- * Utilisé pour espacer les requêtes de pagination
+ * Constant delay between pages of the same connector
+ * Used to space out pagination requests
  */
 export const DEFAULT_PAGE_DELAY_MS = 500;
 
 /**
- * Crée un délai entre les pages avec logging en mode dev
+ * Creates an inter-page delay with logging in dev mode
  */
 export async function delayBetweenPages(
   connectorId: string,
@@ -226,7 +226,7 @@ export async function delayBetweenPages(
 ): Promise<void> {
   if (pageNumber <= 1) {
     return;
-  } // Pas de délai pour la première page
+  } // No delay for the first page
 
   if (import.meta.env.DEV) {
     console.debug(

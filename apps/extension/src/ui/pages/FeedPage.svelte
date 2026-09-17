@@ -308,8 +308,8 @@
     });
   });
 
-  // Signaux de santé : stats de dédup persistées par le service worker,
-  // rechargées après chaque scan (dépendance sur l'horodatage du dernier scan).
+  // Health signals: dedup stats persisted by the service worker,
+  // reloaded after each scan (dependency on the last scan timestamp).
   let scanSignalStats = $state<DedupStats | null>(null);
   $effect(() => {
     const _lastScanAt = controller.lastScanAt;
@@ -963,8 +963,8 @@
     await setFeedTourSeen();
   }
 
-  /** Point d'entrée visible du tour (revue design DAO #176) : la modal
-      d'aide propose de le rejouer — ferme l'aide puis réouvre le tour. */
+  /** Visible tour entry point (DAO #176 design review): the help modal
+      offers to replay it — closes help then reopens the tour. */
   function replayTourFromHelp(): void {
     page.showShortcutsHelp = false;
     window.dispatchEvent(new Event('feed-tour:open'));

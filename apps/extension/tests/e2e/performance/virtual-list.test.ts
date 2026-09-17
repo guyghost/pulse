@@ -231,10 +231,10 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     const renderTime = Date.now() - startTime;
 
-    // Le rendu initial doit être rapide (< 3s pour 500 missions avec virtual list)
+    // Initial render must be fast (< 3s for 500 missions with virtual list)
     expect(renderTime).toBeLessThan(3000);
 
-    // Vérifier que le texte affiche le bon nombre
+    // Check that the text displays the right count
     await expectMissionCount(page, 500, 2000);
   });
 
@@ -244,7 +244,7 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     await expectMissionCount(page, 500, 5000);
 
-    // Attendre que le rendu soit stabilisé
+    // Wait for the render to stabilize
     await page.waitForTimeout(500);
 
     // The feed uses incremental batch rendering (not JS virtual scroll): it renders the first
@@ -284,17 +284,17 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     await page.waitForTimeout(300);
 
-    // L'application doit rester réactive
+    // The application must stay responsive
     await expectMissionCount(page, 300);
 
-    // Vérifier qu'aucune erreur n'est survenue
+    // Check that no error occurred
     const errorElements = page.locator('.error, [role="alert"], .crash');
     const errorCount = await errorElements.count();
     expect(errorCount).toBe(0);
   });
 
   test('no memory leaks with large dataset', async ({ page }) => {
-    // Mesurer mémoire de départ
+    // Measure starting memory
     const initialMemory = await captureMemoryMetrics(page);
 
     // Injecter 400 missions
@@ -302,7 +302,7 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     await expectMissionCount(page, 400, 5000);
 
-    // Scroller beaucoup pour forcer le recyclage des éléments
+    // Scroll a lot to force element recycling
     const container = page
       .locator('[role="region"], .missions-container, [data-testid="mission-feed"]')
       .first();
@@ -327,10 +327,10 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     await page.waitForTimeout(500);
 
-    // Mesurer mémoire après test
+    // Measure memory after the test
     const finalMemory = await captureMemoryMetrics(page);
 
-    // La mémoire ne devrait pas avoir augmenté de plus de 50MB
+    // Memory should not have grown by more than 50MB
     // (c'est une marge large pour les environnements de test)
     const memoryIncrease = finalMemory.usedJSHeapSize - initialMemory.usedJSHeapSize;
     const memoryIncreaseMB = memoryIncrease / (1024 * 1024);
@@ -371,7 +371,7 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     expect(scrollPerformance).not.toBeNull();
     if (scrollPerformance) {
-      // Le scroll devrait être fluide (< 500ms pour 100 étapes)
+      // Scroll should be smooth (< 500ms for 100 steps)
       expect(scrollPerformance.totalTime).toBeLessThan(500);
     }
   });
@@ -387,21 +387,21 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
     const searchInput = feedSearchInput(page);
     await searchInput.fill('React');
 
-    // Attendre que les résultats se mettent à jour
+    // Wait for results to update
     await page.waitForTimeout(300);
 
     const searchTime = Date.now() - searchStart;
 
-    // La recherche doit être rapide (< 1000ms)
+    // Search must be fast (< 1000ms)
     expect(searchTime).toBeLessThan(1000);
 
-    // Vérifier que l'input contient bien le terme de recherche
+    // Check that the input contains the search term
     await expect(searchInput).toHaveValue('React');
 
-    // Vérifier qu'on a des résultats filtrés
+    // Check that filtered results exist
     const resultsCount = await getDisplayedMissionCount(page);
 
-    // Le nombre de résultats devrait être <= 300 (filtré)
+    // The result count should be <= 300 (filtered)
     expect(resultsCount).toBeLessThanOrEqual(300);
   });
 
@@ -413,7 +413,7 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     // D'abord, favoriser quelques missions pour que le filtre ait du sens
     const cards = missionCards(page);
-    // Favoriser les 3 premières missions
+    // Favorite the first 3 missions
     for (let i = 0; i < 3; i++) {
       await favoriteMission(cards.nth(i));
     }
@@ -425,10 +425,10 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     const toggleTime = Date.now() - toggleStart;
 
-    // Le filtre doit répondre rapidement dans l'environnement Playwright.
+    // The filter must respond quickly in the Playwright environment.
     expect(toggleTime).toBeLessThan(2500);
 
-    // Vérifier qu'on a des favoris affichés
+    // Check that favorites are displayed
     expect(await getDisplayedMissionCount(page)).toBeGreaterThan(0);
   });
 
@@ -466,25 +466,25 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
     const scrollPositionBefore = await container.evaluate((el) => el.scrollTop);
 
-    // Vérifier qu'on a bien scrollé (pas à 0)
+    // Check that we actually scrolled (not at 0)
     expect(scrollPositionBefore).toBeGreaterThan(0);
 
     // Activer le filtre favoris (aucun favori → liste vide), puis le couper
     await toggleFavoritesFilter(page, true);
     await page.waitForTimeout(200);
 
-    // Remettre à toutes — le dashboard est ouvert, même bouton
+    // Reset to all — the dashboard is open, same button
     await favoritesToggle(page).click();
     await page.waitForTimeout(200);
 
-    // Vérifier que la position de scroll est revenue à une valeur valide
-    // (peut ne pas être exacte à cause de la virtual list)
+    // Check that the scroll position returned to a valid value
+    // (may not be exact because of the virtual list)
     const scrollPositionAfter = await container.evaluate((el) => el.scrollTop);
 
-    // La position devrait être un nombre valide
+    // The position should be a valid number
     expect(scrollPositionAfter).toBeGreaterThanOrEqual(0);
 
-    // Les missions doivent toujours être affichées
+    // Missions must still be displayed
     await expectMissionCount(page, 200, 2000);
   });
 });

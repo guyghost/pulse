@@ -154,11 +154,11 @@ import { createCopilotBridgeHandler } from '../lib/shell/copilot/background-hand
 import { generateAsset } from '../lib/shell/ai/mission-generator';
 import { generateFieldProposal } from '../lib/shell/form-assistant/local-generator';
 import { getFormAssistSettings, setFormAssistEnabled } from '../lib/shell/form-assistant/settings';
-// NOTE: pas d'import dynamique *runtime* (`await import()`) ici — interdit
-// dans un service worker MV3 (spec HTML, w3c/ServiceWorker#1356) et l'échec
-// est masqué en build packagé. Les références de types `import('...').T` sont
-// effacées à la compilation et donc sans effet. Tout module du worker doit
-// être importé statiquement.
+// NOTE: no runtime dynamic imports (`await import()`) here — forbidden in an
+// MV3 service worker (HTML spec, w3c/ServiceWorker#1356) and the failure is
+// silently swallowed in packaged builds. `import('...').T` type references
+// are erased at compile time and have no effect. Every worker module must be
+// imported statically.
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -281,8 +281,8 @@ function toConnectorProgress(states: ConnectorScanState[]): ConnectorProgress[] 
 }
 
 /**
- * Envoie un message SCAN_PROGRESS au side panel (si ouvert).
- * Les erreurs de messaging sont ignorées (panel peut être fermé).
+ * Sends a SCAN_PROGRESS message to the side panel (if open).
+ * Messaging errors are ignored (panel may be closed).
  */
 function sendScanProgress(payload: ScanProgressPayload): void {
   chrome.runtime.sendMessage({ type: 'SCAN_PROGRESS', payload }).catch(() => {
@@ -1078,11 +1078,11 @@ async function executeScanOperation(
 }
 
 /**
- * Projette les effets secondaires dérivés d'un scan déjà commité.
+ * Projects the side effects derived from an already-committed scan.
  *
- * La transaction missions est l'unique commit canonique. Tout ce qui suit est
- * best-effort : une projection défaillante ne peut ni annuler le commit, ni
- * transformer son terminal en erreur.
+ * The missions transaction is the single canonical commit. Everything after is
+ * best-effort: a failing projection can neither undo the commit nor turn its
+ * terminal state into an error.
  */
 async function clearNewMissionBadge(): Promise<void> {
   await setNewMissionCount(0);
@@ -1354,10 +1354,10 @@ void settingsReleaseCoordinator.boot().catch((error) => {
 // Message handler — profile management + scan orchestration
 
 /**
- * AbortControllers actifs pour les générations Form Assistant en cours, indexés
- * par requestId. Permet au content script d'annuler une génération (transition
- * `requesting CANCEL → armed` du modèle) via FORM_ASSIST_CANCEL. Un Map par
- * requestId évite qu'un onglet n'annule la génération d'un autre.
+ * Active AbortControllers for in-flight Form Assistant generations, indexed by
+ * requestId. Lets the content script cancel a generation (`requesting CANCEL →
+ * armed` model transition) via FORM_ASSIST_CANCEL. One Map per requestId
+ * prevents a tab from cancelling another tab's generation.
  */
 const formAssistRequestControllers = new Map<string, AbortController>();
 
@@ -1385,8 +1385,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
   const message = validation.message as BridgeMessage;
 
   // ── Error boundary global ─────────────────────────────────────────────────
-  // Chaque branche a son propre try/catch mais cette enveloppe protège contre
-  // toute exception imprévue qui sinon crasherait le service worker.
+  // Each branch has its own try/catch but this wrapper guards against any
+  // unexpected exception that would otherwise crash the service worker.
   try {
     if (handleCopilotBridgeMessage(message, sendResponse)) {
       return true;
@@ -2332,8 +2332,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     // ── Form Assistant (content script ↔ SW) ──
-    // Source de vérité : src/models/form-assistant.model.md (Machine B).
-    // Phase 1 : chemin local uniquement. Le moteur remote (Eve/Vercel) est Phase 2.
+    // Source of truth: src/models/form-assistant.model.md (Machine B).
+    // Phase 1: local path only. The remote engine (Eve/Vercel) is Phase 2.
     if (message.type === 'FORM_ASSIST_STATUS') {
       getFormAssistSettings()
         .then((settings) => {
@@ -2360,11 +2360,11 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             type: 'FORM_ASSIST_ENABLED',
             payload: { enabled: settings.enabled, engine: settings.engine },
           };
-          // Broadcast au side panel (runtime) et aux content scripts (tabs).
-          // `runtime.sendMessage` depuis le SW ne touche que les pages de
-          // l'extension ; les content scripts écoutent sur `tabs`.
+          // Broadcast to the side panel (runtime) and content scripts (tabs).
+          // `runtime.sendMessage` from the SW only reaches extension pages;
+          // content scripts listen on `tabs`.
           chrome.runtime.sendMessage(enabledMessage).catch(() => {
-            /* Panel fermé — ignore */
+            /* Panel closed — ignore */
           });
           chrome.tabs
             .query({})
@@ -2429,9 +2429,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          // Phase 1 : selectFormAssistEngine() est la source de vérité Core pour
-          // le choix du moteur. Ici seul le chemin local est câblé ; le chemin
-          // remote (Eve) est Phase 2 et renverra 'unavailable' tant que non impl.
+          // Phase 1: selectFormAssistEngine() is the Core source of truth for
+          // engine selection. Only the local path is wired here; the remote
+          // path (Eve) is Phase 2 and will return 'unavailable' until implemented.
           const proposal = await generateFieldProposal(field, profile, controller.signal);
           if (!proposal || proposal.text.length === 0) {
             sendResponse({
@@ -2672,7 +2672,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
   } catch (err: unknown) {
-    // Error boundary — protège le service worker contre les crashes inattendus
+    // Error boundary — protects the service worker against unexpected crashes
     const category = classifyError(err);
     const errMessage = err instanceof Error ? err.message : String(err);
 
@@ -2687,7 +2687,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     try {
       sendResponse({ success: false, error: { code: category, message: errMessage } });
     } catch {
-      // sendResponse peut échouer si le canal est déjà fermé
+      // sendResponse can fail if the channel is already closed
     }
     return false;
   }

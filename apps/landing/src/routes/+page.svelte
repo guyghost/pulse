@@ -4,7 +4,7 @@
   import { EXTENSION_SURFACE_FLAGS } from '@pulse/domain';
   import { theme } from '$lib/theme.svelte';
 
-  type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'postuler';
+  type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'prepare';
 
   let mobileMenuOpen = $state(false);
   let scrolled = $state(false);
@@ -20,19 +20,16 @@
     { id: 'scanner', label: 'Scanner' },
     { id: 'qualifier', label: 'Qualifier' },
     { id: 'comparer', label: 'Décider' },
-    { id: 'postuler', label: 'Convertir' },
+    { id: 'prepare', label: 'Préparer' },
   ];
 
   // Source de vérité partagée avec l'extension (`@pulse/domain/feature-flags`).
   // Quand un flag passe à `true` côté extension, la landing suit automatiquement.
   const trackingLive = EXTENSION_SURFACE_FLAGS.applications;
-  const connectedLive = EXTENSION_SURFACE_FLAGS.connected;
 
-  type FeatureTier = 'free' | 'premium' | 'soon';
+  type FeatureTier = 'free';
   const tierLabels: Record<FeatureTier, string> = {
     free: 'Gratuit',
-    premium: 'Premium',
-    soon: 'À venir',
   };
   const featureMatrix: { label: string; tier: FeatureTier; note?: string }[] = [
     { label: 'Feed unique, 4 plateformes dédupliquées', tier: 'free' },
@@ -44,34 +41,20 @@
     },
     { label: 'Comparateur et shortlist quotidienne', tier: 'free' },
     { label: 'Assistant profil et CV', tier: 'free' },
-    {
-      label: 'Suivi de candidatures (pipeline, notes, relances)',
-      tier: trackingLive ? 'free' : 'soon',
-      note: trackingLive ? undefined : 'En cours d’activation',
-    },
+    ...(trackingLive
+      ? [
+          {
+            label: 'Suivi de candidatures (pipeline, notes, relances)',
+            tier: 'free' as const,
+          },
+        ]
+      : []),
     { label: 'Radar TJM par stack', tier: 'free' },
-    {
-      label: 'Génération pitch, message et résumé (IA distante)',
-      tier: connectedLive ? 'premium' : 'soon',
-      note: 'Suggestions locales, validation champ par champ, jamais de soumission automatique',
-    },
-    {
-      label: 'Dashboard connecté (crédits, gestion de compte)',
-      tier: connectedLive ? 'premium' : 'soon',
-      note: connectedLive ? undefined : 'En cours d’activation',
-    },
   ];
-
-  // Capacités non encore activées côté extension : listées comme « à venir » sur la page.
-  const upcomingFeatures: string[] = [
-    ...(trackingLive ? [] : ['suivi de candidatures']),
-    ...(connectedLive ? [] : ['générations IA distantes', 'dashboard connecté']),
-  ];
-  const upcomingSentence =
-    upcomingFeatures.length > 0 ? ` À venir : ${upcomingFeatures.join(', ')}.` : '';
 
   const metaTitle = 'MissionPulse — Centralisez votre veille missions freelance';
-  const socialDescription = `4 plateformes. 1 feed. Tu décides. Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote. Dans le navigateur. Sans compte.${upcomingSentence}`;
+  const socialDescription =
+    '4 plateformes. 1 feed. Tu décides. Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote. Dans le navigateur. Sans compte.';
 
   const platforms: { name: string; logo: string }[] = [
     { name: 'Free-Work', logo: '/logos/free-work.png' },
@@ -315,7 +298,7 @@
       <li><a href="#workflow" class="nav__link">Workflow</a></li>
       <li><a href="#shortlist" class="nav__link">Shortlist</a></li>
       <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
-      <li><a href="#plans" class="nav__link">Offres</a></li>
+      <li><a href="#plans" class="nav__link">Offre</a></li>
     </ul>
 
     <div class="nav__actions">
@@ -389,7 +372,7 @@
         <a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a>
       </li>
       <li>
-        <a href="#plans" onclick={closeMobileMenu}>Offres</a>
+        <a href="#plans" onclick={closeMobileMenu}>Offre</a>
       </li>
       <li>
         <a href={chromeStoreUrl} class="btn btn--primary" onclick={closeMobileMenu}>Installer</a>
@@ -455,12 +438,7 @@
 
         <p class="showcase-caption">
           L'extension livre le scan, le scoring{trackingLive ? ', le suivi de candidatures' : ''},
-          le radar TJM et le profil/CV — gratuitement, en local{connectedLive
-            ? '. Le compte connecté ouvre les générations IA distantes via crédits'
-            : ''}; la synchronisation multi-appareils est à venir via Supabase.
-          {#if upcomingFeatures.length > 0}
-            <strong>Activation en cours : {upcomingFeatures.join(', ')}.</strong>
-          {/if}
+          le radar TJM et le profil/CV — gratuitement, en local, sans compte.
         </p>
 
         <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -496,9 +474,9 @@
                 {:else if activeShowcaseStep === 'qualifier'}
                   Pourquoi cette mission ?
                 {:else if activeShowcaseStep === 'comparer'}
-                  Dashboard de décision
+                  Comparateur local
                 {:else}
-                  Assistant candidature Premium
+                  Profil &amp; CV locaux
                 {/if}
               </h2>
             </div>
@@ -723,39 +701,36 @@
                 </div>
               </div>
             </div>
-          {:else}
+          {:else if activeShowcaseStep === 'prepare'}
             <div class="app-preview__body app-preview__body--detail">
-              <div class="score-flow" aria-label="Checklist candidature">
+              <div class="score-flow" aria-label="Profil de décision local">
                 <article class="score-card score-card--highlight">
-                  <span class="score-card__label">Contact</span>
-                  <strong>Prêt</strong>
-                  <span>suggestion approuvée avant remplissage</span>
+                  <span class="score-card__label">Profil</span>
+                  <strong>Local</strong>
+                  <span>stack, TJM, remote et séniorité</span>
                 </article>
                 <article class="score-card">
                   <span class="score-card__label">CV</span>
-                  <strong>Aligné</strong>
-                  <span>mots-clés recommandés extraits</span>
+                  <strong>Structuré</strong>
+                  <span>expériences et compétences</span>
                 </article>
                 <article class="score-card">
                   <span class="score-card__label">Shortlist</span>
                   <strong>Top 3</strong>
-                  <span>missions gardées pour arbitrage</span>
+                  <span>missions gardées pour décision</span>
                 </article>
               </div>
 
-              <div class="message-panel" aria-label="Message de candidature">
-                <h3>Message de candidature</h3>
+              <div class="message-panel" aria-label="Décision manuelle">
+                <h3>Tu gardes la main</h3>
                 <p>
-                  Bonjour, votre mission Lead Svelte / TypeScript correspond fortement à mon
-                  expérience design system et plateformes front complexes.
+                  Le score explique l’adéquation ; le profil et le CV restent disponibles dans
+                  l’extension. Tu choisis la mission à ouvrir sur la plateforme source.
                 </p>
-                <p>
-                  Disponible sous 2 semaines, TJM cible 720€, remote hybride possible. Je peux vous
-                  partager deux références proches.
-                </p>
+                <p>Aucun message n’est généré ni envoyé automatiquement.</p>
                 <div class="message-actions">
-                  <span>Copier le message</span>
-                  <span>Ouvrir l’annonce</span>
+                  <span>Profil local</span>
+                  <span>CV local</span>
                 </div>
               </div>
             </div>
@@ -772,14 +747,11 @@
         <div class="daily-radar__content fade-in">
           <p class="daily-radar__eyebrow">Shortlist quotidienne</p>
           <h2 id="daily-radar-title" class="daily-radar__title">
-            Commencez par les missions Java, Spring Boot et frontend senior qui valent un message
-            aujourd'hui.
+            Commencez par les missions Java, Spring Boot et frontend senior à ouvrir aujourd'hui.
           </h2>
           <p class="daily-radar__desc">
             Chaque matin, MissionPulse sert le même réflexe produit: scanner les plateformes, isoler
-            les annonces au bon TJM, puis décider quoi ouvrir, sauvegarder{trackingLive
-              ? ' ou relancer'
-              : ''}.
+            les annonces au bon TJM, puis décider quoi ouvrir ou sauvegarder.
           </p>
           <div class="daily-radar__actions">
             <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Scanner mes plateformes</a>
@@ -821,7 +793,7 @@
           </article>
           <div class="radar-board__footer">
             <span>Action suivante</span>
-            <strong>Ouvrir #1 et générer le pitch</strong>
+            <strong>Ouvrir #1 sur la plateforme source</strong>
           </div>
         </div>
       </div>
@@ -834,12 +806,8 @@
       <div class="section-header">
         <h2 class="section-title fade-in">Ce que vous obtenez</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Le score propose. Tu tranches. L'extension offre le scan, le scoring{trackingLive
-            ? ', le suivi'
-            : ''}, le radar TJM et le profil/CV{connectedLive
-            ? '. Le compte connecté ouvre les générations IA distantes'
-            : '. Les générations IA distantes arrivent au moment du compte connecté'}; la
-          synchronisation multi-appareils est à venir.
+          Le score propose. Tu tranches. L'extension offre le scan, le scoring, le radar TJM et le
+          profil/CV, sans compte.
         </p>
       </div>
 
@@ -904,8 +872,8 @@
           <div class="step__content">
             <h3 class="step__title">Ouvrez le side panel</h3>
             <p class="step__desc">
-              Les missions arrivent classées par score. Filtrez, comparez, préparez vos
-              candidatures.
+              Les missions arrivent classées par score. Filtrez, comparez et ouvrez celles qui
+              comptent.
             </p>
           </div>
         </li>
@@ -917,17 +885,14 @@
   <section class="plans section" id="plans">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
+        <h2 class="section-title fade-in">Une offre locale, sans compte</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Gratuit pour chasser. 10 €/an pour aller plus vite. Commencez par scanner localement dans
-          l'extension, sans compte{connectedLive
-            ? ', puis connectez-vous quand vous voulez piloter la conversion. Le dashboard connecté optionnel synchronise votre shortlist'
-            : '. Le compte connecté et le dashboard associé arrivent prochainement'}; les sessions
-          plateforme restent dans le navigateur.
+          Gratuit pour chasser. Sans compte, sans paiement. Le radar, le profil et le CV restent
+          dans l’extension ; les sessions plateforme restent dans votre navigateur.
         </p>
       </div>
 
-      <div class="plans__grid" aria-label="Comparaison gratuit et Premium">
+      <div class="plans__grid plans__grid--single" aria-label="Offre MissionPulse">
         <article class="plan-card fade-in fade-in-delay-1">
           <div class="plan-card__header">
             <span class="plan-card__name">Gratuit</span>
@@ -946,64 +911,11 @@
                 ? ' et suivi de candidatures (pipeline, notes, relances)'
                 : ''}.
             </li>
-            {#if !trackingLive}
-              <li>Suivi de candidatures (pipeline, notes, relances) — à venir.</li>
-            {/if}
             <li>Radar TJM par stack et scoring sémantique local via Gemini Nano.</li>
+            <li>Exports JSON, CSV et Markdown avec les filtres appliqués.</li>
           </ul>
           <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer gratuitement</a>
         </article>
-
-        <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
-          <div class="plan-card__header">
-            <span class="plan-card__name">Premium</span>
-            <strong class="plan-card__price">10€<small> TTC/an</small></strong>
-            <p>Pour travailler avec plusieurs comptes et accélérer les formulaires répétitifs.</p>
-            <p class="plan-card__anchor">Une seule facturation annuelle, sans formule mensuelle.</p>
-          </div>
-          <ul class="plan-card__list">
-            <li>Plusieurs comptes par plateforme sous la même identité MissionPulse.</li>
-            <li>
-              Suggestions IA local-first pour renseigner les champs autorisés des formulaires.
-            </li>
-            <li>Approbation ou refus explicite de chaque champ avant écriture.</li>
-            <li>Aucune soumission automatique et aucun envoi cloud sans consentement explicite.</li>
-            <li>
-              Le feed, le scoring, le profil/CV{trackingLive ? ', le suivi' : ''} et le radar TJM restent
-              gratuits.
-            </li>
-          </ul>
-          {#if connectedLive}
-            <a
-              href="/register?redirectTo=%2Fdashboard%3Fupgrade%3Dpremium"
-              class="btn btn--primary btn--lg"
-            >
-              Créer mon compte Premium
-            </a>
-          {:else}
-            <span class="btn btn--primary btn--lg" aria-disabled="true">
-              Compte Premium — bientôt disponible
-            </span>
-          {/if}
-        </article>
-      </div>
-
-      <div class="credits-strip fade-in fade-in-delay-3">
-        <div>
-          <span class="credits-strip__label">Crédits IA à la demande</span>
-          <p>
-            Besoin de générer plus de contenus ? Packs disponibles depuis votre compte: 5 crédits à
-            4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€. Ces crédits restent séparés de
-            Premium et n'accordent aucun droit d'abonnement.
-          </p>
-        </div>
-        {#if connectedLive}
-          <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
-        {:else}
-          <span class="btn btn--secondary" aria-disabled="true">
-            Gestion des crédits — bientôt disponible
-          </span>
-        {/if}
       </div>
     </div>
   </section>
@@ -1012,14 +924,14 @@
   <section class="platforms section" id="platforms">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title fade-in">4 plateformes connectées</h2>
+        <h2 class="section-title fade-in">4 plateformes sources</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
           Un radar, pas quatre onglets. Les principales sources de missions freelance tech en
           France, dans un seul feed.
         </p>
       </div>
 
-      <ul class="platform-strip fade-in fade-in-delay-1" aria-label="Plateformes connectées">
+      <ul class="platform-strip fade-in fade-in-delay-1" aria-label="Plateformes sources">
         {#each platforms as p (p.name)}
           <li class="platform-strip__item">
             <img
@@ -1044,12 +956,8 @@
         <div class="cta__content">
           <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
           <p class="cta__desc">
-            Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le radar TJM,
-            {trackingLive ? 'le suivi de candidatures, ' : ''}le profil/CV et la shortlist restent
-            dans l'extension{connectedLive
-              ? '. Le compte connecté (optionnel) ouvre les crédits de génération IA distante'
-              : '. Les générations IA distantes et le dashboard connecté arrivent prochainement'};
-            la synchronisation multi-appareils est à venir.
+            Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le radar TJM, le
+            profil/CV et la shortlist restent dans l'extension.
           </p>
           <p class="cta__proof">
             <span class="cta__proof-dot" aria-hidden="true"></span>

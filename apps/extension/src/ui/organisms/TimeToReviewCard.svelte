@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
-   * Carte « Time to review » — organisme (voir src/models/time-to-review.model.md).
-   * En-tête pastille + légende, KPIs p50/p95/non vues avec deltas, graphe SVG
-   * inline sans dépendance (aire p50, ligne p95, point final cerclé),
-   * état vide tant qu'aucune consultation n'est journalisée.
+   * "Time to review" card — organism (see src/models/time-to-review.model.md).
+   * Badge header + legend, p50/p95/unviewed KPIs with deltas, inline
+   * dependency-free SVG chart (p50 area, p95 line, circled end point),
+   * empty state until any review is journaled.
    */
   import { Icon } from '@pulse/ui';
   import TimeToReviewKpi from '../molecules/TimeToReviewKpi.svelte';
@@ -19,7 +19,7 @@
   const Y_MAX_HOURS = 48;
   const Y_TICKS = [0, 12, 24, 48] as const;
 
-  /** Bornes les valeurs à l'échelle 0–48 h du graphe. */
+  /** Clamps values to the chart's 0–48 h scale. */
   function clampToScale(hours: number): number {
     return Math.min(Math.max(hours, 0), Y_MAX_HOURS);
   }
@@ -32,7 +32,7 @@
     return (1 - clampToScale(hours) / Y_MAX_HOURS) * 100;
   }
 
-  /** Découpe la série en segments de valeurs consécutives non nulles. */
+  /** Splits the series into segments of consecutive non-null values. */
   function nonNullSegments(values: TimeToReviewSeriesPoint[]): number[][] {
     const segments: number[][] = [];
     let current: number[] = [];

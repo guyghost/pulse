@@ -1,14 +1,15 @@
 /**
- * Projection de présentation pure pour la carte « Scans de la semaine ».
+ * Pure presentation projection for the "Scans of the week" card.
  *
- * Règles Core : pure — pas d'I/O, pas d'async, pas de Date.now()/Math.random()/console.
- * `now` et `weekStart` sont toujours injectés en paramètre par le Shell.
+ * Core rules: pure — no I/O, no async, no Date.now()/Math.random()/console.
+ * `now` and `weekStart` are always injected as parameters by the Shell.
  *
- * Modèle : src/models/scan-runs-week.model.md
- * - Aucune transition d'état : lecture seule des statuts persistés/live.
- * - Fusion : le statut live gagne sur le persisté ; `lastSyncAt` retombe sur le
- *   persisté si le live n'en fournit pas (connecteur `pending` en file).
- * - Un item = un connecteur avec un `runAt` datable dans [weekStart, now].
+ * Model: src/models/scan-runs-week.model.md
+ * - No state transition: read-only view of persisted/live statuses.
+ * - Merge: the live status wins over the persisted one; `lastSyncAt` falls
+ *   back to the persisted one if the live doesn't provide it (queued `pending`
+ *   connector).
+ * - One item = one connector with a datable `runAt` within [weekStart, now].
  */
 
 import type {
@@ -23,7 +24,7 @@ import type {
 
 export type ScanRunTone = 'done' | 'active' | 'attention' | 'waiting';
 
-/** Enregistrement unifié : fusion live/persisté, un par connecteur. */
+/** Unified record: live/persisted merge, one per connector. */
 export interface ScanRunRecord {
   readonly connectorId: string;
   readonly connectorName: string;
@@ -33,21 +34,21 @@ export interface ScanRunRecord {
   readonly lastSyncAt: number | null;
 }
 
-/** Item de présentation consommé par l'UI (molecule/organism). */
+/** Presentation item consumed by the UI (molecule/organism). */
 export interface ScanRunItem {
   readonly connectorId: string;
   readonly name: string;
   readonly state: ConnectorState;
   readonly missionsCount: number;
   readonly tone: ScanRunTone;
-  /** Progression indicative 0..1, bornée ; le rendu segmenté est un choix UI. */
+  /** Indicative progress 0..1, bounded; the segmented rendering is a UI choice. */
   readonly progress: number;
-  /** Horodatage brut du run (toujours résolu : les items non datables sont exclus) ; l'UI formate. */
+  /** Raw run timestamp (always resolved: non-datable items are excluded); the UI formats it. */
   readonly runAt: number;
 }
 
 // ============================================================================
-// Constantes de projection (mapping pur état → présentation)
+// Projection constants (pure state → presentation mapping)
 // ============================================================================
 
 const TONE_BY_STATE: Readonly<Record<ConnectorState, ScanRunTone>> = {
@@ -68,7 +69,7 @@ const PROGRESS_BY_STATE: Readonly<Record<ConnectorState, number>> = {
   pending: 0,
 };
 
-/** Priorité de tri : actifs → erreur → done → en attente. */
+/** Sort priority: active → error → done → waiting. */
 const SORT_RANK_BY_TONE: Readonly<Record<ScanRunTone, number>> = {
   active: 0,
   attention: 1,
@@ -81,8 +82,8 @@ const SORT_RANK_BY_TONE: Readonly<Record<ScanRunTone, number>> = {
 // ============================================================================
 
 /**
- * Début de semaine (00:00:00.000 local) contenant `now`.
- * `weekStartsOn` : 1 = lundi (défaut), 0 = dimanche.
+ * Start of the week (00:00:00.000 local time) containing `now`.
+ * `weekStartsOn`: 1 = Monday (default), 0 = Sunday.
  */
 export function getWeekStart(now: number, weekStartsOn: 0 | 1 = 1): number {
   const date = new Date(now);
@@ -93,10 +94,10 @@ export function getWeekStart(now: number, weekStartsOn: 0 | 1 = 1): number {
 }
 
 // ============================================================================
-// Fusion live / persisté
+// Live / persisted merge
 // ============================================================================
 
-/** Statut persisté → enregistrement unifié (état terminal borné done/error). */
+/** Persisted status → unified record (terminal state bounded to done/error). */
 function fromPersisted(status: PersistedConnectorStatus): ScanRunRecord {
   return {
     connectorId: status.connectorId,
@@ -108,7 +109,7 @@ function fromPersisted(status: PersistedConnectorStatus): ScanRunRecord {
   };
 }
 
-/** Statut live → enregistrement unifié (lastSyncAt retombe sur le persisté si absent). */
+/** Live status → unified record (lastSyncAt falls back to persisted when absent). */
 function mergeLive(
   live: ConnectorStatus,
   persisted: PersistedConnectorStatus | undefined
@@ -131,8 +132,8 @@ function mergeLive(
 }
 
 /**
- * Fusionne statuts live (en cours de scan) et persistés. Le live gagne par
- * `connectorId` ; les connecteurs uniquement persistés complètent la liste.
+ * Merges live (in-scan) and persisted statuses. Live wins per `connectorId`;
+ * persisted-only connectors complete the list.
  */
 export function mergeScanRunRecords(
   liveStatuses: readonly ConnectorStatus[],
@@ -159,7 +160,7 @@ function clamp01(value: number): number {
   return Math.min(1, Math.max(0, value));
 }
 
-/** Résout l'horodatage du run selon l'état (modèle : « Définition d'un run de la semaine »). */
+/** Resolves the run timestamp per state (model: "Définition d'un run de la semaine"). */
 function resolveRunAt(record: ScanRunRecord): number | null {
   if (record.state === 'done' || record.state === 'error') {
     return record.lastSyncAt;
@@ -168,8 +169,8 @@ function resolveRunAt(record: ScanRunRecord): number | null {
 }
 
 /**
- * Projette les enregistrements en items de la carte, filtrés sur la semaine
- * courante `[weekStart, now]` et triés : actifs → erreur → done récents → en attente.
+ * Projects records into card items, filtered to the current week
+ * `[weekStart, now]` and sorted: active → error → recent done → waiting.
  */
 export function buildScanRunSummaries(
   records: readonly ScanRunRecord[],

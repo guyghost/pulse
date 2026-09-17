@@ -6,7 +6,7 @@
 
   const SEGMENT_COUNT = 6;
 
-  // Projection de présentation uniquement (modèle : scan-runs-week.model.md).
+  // Presentation projection only (model: scan-runs-week.model.md).
   const filledSegments = $derived(Math.round(item.progress * SEGMENT_COUNT));
 
   const stateLabel = $derived.by(() => {

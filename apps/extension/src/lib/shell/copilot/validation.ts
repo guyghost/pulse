@@ -184,7 +184,7 @@ export const CopilotTjmCoachFactsSchema = z
       .object({
         min: z.number().finite(),
         target: z.number().finite(),
-        // DAO #174 : null = profil sans plafond (seul le minimum est collecté).
+        // DAO #174: null = profile without ceiling (only the minimum is collected).
         max: z.number().finite().nullable(),
         currency: z.literal('EUR'),
       })

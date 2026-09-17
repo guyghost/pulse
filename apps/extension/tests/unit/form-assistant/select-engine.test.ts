@@ -59,7 +59,7 @@ describe('selectFormAssistEngine — table de vérité', () => {
       );
       for (const [pref, avail, ent, cons] of matrix) {
         const out = selectFormAssistEngine(pref, avail, ent, cons);
-        // La décision est une union finie, jamais une promesse ou un appel.
+        // The decision is a finite union, never a promise or a call.
         expect(['local', 'remote', 'none']).toContain(out.engine);
       }
     });

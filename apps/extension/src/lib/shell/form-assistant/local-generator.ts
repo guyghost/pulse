@@ -1,12 +1,12 @@
 /**
  * Local field-proposal generator — Gemini Nano (Chrome built-in AI).
  *
- * Shell module : I/O (AI API), async. Délègue la construction du prompt et le
- * parsing au Core. Aucune décision d'état : produit une proposition ou null.
+ * Shell module: I/O (AI API), async. Delegates prompt building and parsing to
+ * the Core. No state decision: produces a proposal or null.
  *
- * Pattern identique à semantic-scorer.ts (timeout + retry + AbortSignal +
- * destroy). Un cache mémoire borné évite de ré-invoquer le modèle pour le même
- * champ/profil lors d'un re-focus ou d'une nouvelle proposition.
+ * Same pattern as semantic-scorer.ts (timeout + retry + AbortSignal +
+ * destroy). A bounded in-memory cache avoids re-invoking the model for the
+ * same field/profile on re-focus or a new proposal.
  */
 import type { FieldDescriptor, FieldProposal } from '../../core/form-assistant/types';
 import { buildFieldPrompt, parseFieldProposal } from '../../core/form-assistant';
@@ -19,7 +19,7 @@ const TIMEOUT_MS = 8000;
 const RETRY_DELAYS_MS = [500, 1000] as const;
 const MAX_RETRIES = RETRY_DELAYS_MS.length;
 
-/** Nombre maximal d'entrées du cache mémoire (garde-fou). */
+/** Maximum number of in-memory cache entries (guardrail). */
 const MAX_CACHE_ENTRIES = 64;
 
 interface CacheKey {
@@ -63,7 +63,7 @@ function getCache(key: CacheKey): FieldProposal | null | undefined {
 
 function setCache(key: CacheKey, value: FieldProposal | null): void {
   cache.set(key.fingerprint, { value });
-  // Éviction FIFO quand la borne est dépassée.
+  // FIFO eviction when the bound is exceeded.
   if (cache.size > MAX_CACHE_ENTRIES) {
     const oldest = cache.keys().next();
     if (!oldest.done && oldest.value !== key.fingerprint) {
@@ -73,7 +73,7 @@ function setCache(key: CacheKey, value: FieldProposal | null): void {
 }
 
 /**
- * Invalide tout le cache de propositions. À appeler quand le profil change.
+ * Invalidates the whole proposal cache. Call when the profile changes.
  */
 export function clearFieldProposalCache(): void {
   cache.clear();
@@ -112,10 +112,10 @@ function promptWithCancellation(
 }
 
 /**
- * Génère une proposition de valeur pour un champ via Gemini Nano.
- * Retourne `null` si l'API est indisponible/non téléchargée, ou si la sortie
- * n'est pas exploitable. Honore un `AbortSignal` (annulation cohérente avec la
- * Machine A du modèle `form-assistant`).
+ * Generates a field value proposal via Gemini Nano.
+ * Returns `null` if the API is unavailable/not downloaded, or if the output
+ * is unusable. Honors an `AbortSignal` (cancellation consistent with the
+ * Machine A of the `form-assistant` model).
  */
 export async function generateFieldProposal(
   field: FieldDescriptor,

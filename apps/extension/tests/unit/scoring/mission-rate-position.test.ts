@@ -30,7 +30,7 @@ describe('missionRatePosition', () => {
   });
 
   it('positionne une fourchette au-dessus du plancher sur l’échelle plancher×2', () => {
-    // Plancher 500 → échelle max(1000, 900) = 1000 : tick à 0.5.
+    // Floor 500 → scale max(1000, 900) = 1000: tick at 0.5.
     const result = missionRatePosition({
       tjmMin: 600,
       tjmMax: 900,
@@ -91,7 +91,7 @@ describe('missionRatePosition', () => {
       tjm: 500,
       profileTjmMin: 500,
     });
-    // scaleMax = max(1000, 2000) = 2000 → plancher à 0.25, segment 0.25 → 1.
+    // scaleMax = max(1000, 2000) = 2000 → floor at 0.25, segment 0.25 → 1.
     expect(result).toEqual({
       visible: true,
       ratioMin: 0.25,

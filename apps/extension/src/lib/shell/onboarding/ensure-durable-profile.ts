@@ -1,13 +1,13 @@
 /**
- * P0-A1 (docs/plans/2026-09-07-activation-first-scan-p0.md) — filet de
- * sécurité « never block first value » : un profil durable doit exister
- * avant tout premier scan, y compris sur le chemin SKIP/partiel où la
- * machine n'émet pas d'effet PERSIST_PROFILE.
+ * P0-A1 (docs/plans/2026-09-07-activation-first-scan-p0.md) — "never block
+ * first value" safety net: a durable profile must exist before any first
+ * scan, including on the SKIP/partial path where the machine doesn't emit a
+ * PERSIST_PROFILE effect.
  *
- * Shell (I/O injectées, testable sans mocks de chrome.*) : le core décide
- * (isDefaultProfile / mergeDraftOntoDefault), cette fonction orchestre.
- * Un échec de persistance n'annule jamais le scan — il est signalé et la
- * bannière « profil à compléter » (A2) prend le relais côté feed.
+ * Shell (injected I/O, testable without chrome.* mocks): the core decides
+ * (isDefaultProfile / mergeDraftOntoDefault), this function orchestrates.
+ * A persistence failure never cancels the scan — it is reported and the
+ * "profile to complete" banner (A2) takes over on the feed side.
  */
 
 import {
@@ -26,7 +26,7 @@ export interface EnsureDurableProfileDeps {
   warn?: (message: string, err: unknown) => void;
 }
 
-/** Persiste un profil durable avant scan si nécessaire. true = écrit effectué. */
+/** Persists a durable profile before scan if needed. true = write performed. */
 export async function ensureDurableProfileBeforeScan(
   deps: EnsureDurableProfileDeps
 ): Promise<boolean> {
@@ -34,7 +34,7 @@ export async function ensureDurableProfileBeforeScan(
   try {
     const existing = await getProfile();
     if (existing && !isDefaultProfile(existing)) {
-      // Profil durable déjà en place (wizard complété, retour utilisateur…).
+      // Durable profile already in place (completed wizard, returning user…).
       return false;
     }
     const base = existing ?? createDefaultProfile();

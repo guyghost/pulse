@@ -1,11 +1,11 @@
 /**
- * Scan Signal Stats — Persistance des statistiques de déduplication du dernier scan.
+ * Scan Signal Stats — Persistence of the last scan's deduplication statistics.
  *
- * Shell only : I/O, async, chrome.storage. Core n'importe jamais ce module.
- * Écrit par le service worker à la fin d'un scan (`persistPostCommitEffects`),
- * lu par le side panel pour le signal « Doublons » de la carte Santé des sources.
- * Le calcul (mois courant, fusion des compteurs) est délégué au core pur
- * `buildDedupStatsUpdate`. Voir `src/models/source-health-signals.model.md`.
+ * Shell only: I/O, async, chrome.storage. Core never imports this module.
+ * Written by the service worker at the end of a scan (`persistPostCommitEffects`),
+ * read by the side panel for the "Doublons" signal of the Source Health card.
+ * The computation (current month, counter merge) is delegated to the pure core
+ * `buildDedupStatsUpdate`. See `src/models/source-health-signals.model.md`.
  */
 
 import { z } from 'zod';
@@ -21,7 +21,7 @@ import {
 const STORAGE_KEY = 'scan_signal_stats';
 
 // ============================================================================
-// Zod schema (validation des données lues depuis le storage)
+// Zod schema (validation of data read from storage)
 // ============================================================================
 
 const DedupStatsSchema = z.object({
@@ -37,8 +37,8 @@ const DedupStatsSchema = z.object({
 // ============================================================================
 
 /**
- * Charge les stats du dernier scan. Retourne null si absentes ou corrompues
- * (le signal « Doublons » vaut alors 0 — dégradation silencieuse prévue par le modèle).
+ * Loads the last scan's stats. Returns null when absent or corrupt
+ * (the "Doublons" signal then reads 0 — silent degradation planned by the model).
  */
 export async function getScanSignalStats(): Promise<DedupStats | null> {
   try {
@@ -59,9 +59,9 @@ export async function getScanSignalStats(): Promise<DedupStats | null> {
 // ============================================================================
 
 /**
- * Enregistre les stats de déduplication d'un scan fraîchement terminé.
- * `prev` est l'état persisté courant (getScanSignalStats), `now` la date du scan.
- * Tolérant aux pannes : une erreur de quota/IO est avalée (statistique non critique).
+ * Saves the dedup stats of a freshly completed scan.
+ * `prev` is the current persisted state (getScanSignalStats), `now` the scan date.
+ * Fault-tolerant: a quota/IO error is swallowed (non-critical statistic).
  */
 export async function saveScanSignalStats(
   prev: DedupStats | null,

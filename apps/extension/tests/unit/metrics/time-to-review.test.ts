@@ -65,7 +65,7 @@ describe('percentile', () => {
   });
 
   it('interpolates p95 near the top of the distribution', () => {
-    // idx = 0.95 * 19 = 18.05 → 18e + 0.05 de l'écart vers le 19e
+    // idx = 0.95 * 19 = 18.05 → 18th + 0.05 of the gap towards the 19th
     const values = Array.from({ length: 20 }, (_, i) => i + 1);
     expect(percentile(values, 95)).toBeCloseTo(19.05, 10);
   });
@@ -144,7 +144,7 @@ describe('computeTimeToReview', () => {
 
   it('excludes invalid events: future capture, negative delay, orphan journal', () => {
     const events = [
-      event('future', '2026-09-15T08:00:00Z', '2026-09-15T09:00:00Z'), // capturé après now
+      event('future', '2026-09-15T08:00:00Z', '2026-09-15T09:00:00Z'), // captured after now
       event('negative', '2026-09-10T12:00:00Z', '2026-09-10T08:00:00Z'), // vue < capture
       event('orphan', null, '2026-09-10T09:00:00Z'), // capture inconnue
       event('valid', '2026-09-10T08:00:00Z', '2026-09-10T09:00:00Z'), // 1 h
@@ -152,7 +152,7 @@ describe('computeTimeToReview', () => {
 
     const result = computeTimeToReview(events, NOW);
 
-    // « negative » est compté comme vu (hors percentiles) → non vues = 0/2 comparables.
+    // "negative" is counted as viewed (outside percentiles) → unviewed = 0/2 comparable.
     expect(result.p50.value).toBe(1);
     expect(result.unviewed.value).toBe(0);
   });
@@ -167,7 +167,7 @@ describe('computeTimeToReview', () => {
     expect(new Set(days).size).toBe(30);
     expect(days[days.length - 1]).toBe('2026-09-11');
     expect(days[0]).toBe('2026-08-13');
-    // La mission hors fenêtre n'injecte aucune donnée.
+    // The out-of-window mission injects no data.
     expect(result.series.every((point) => point.p50 === null)).toBe(true);
     expect(result.hasData).toBe(false);
   });
@@ -209,7 +209,7 @@ describe('computeTimeToReview', () => {
     const events = [
       event('a', '2026-09-01T08:00:00Z', '2026-09-01T10:00:00Z'), // vue
       event('b', '2026-09-02T08:00:00Z', null), // non vue → 50 %
-      event('c', '2026-07-20T08:00:00Z', '2026-07-20T09:00:00Z'), // période N-1 : 0 % non vues
+      event('c', '2026-07-20T08:00:00Z', '2026-07-20T09:00:00Z'), // period N-1: 0% unviewed
     ];
 
     const result = computeTimeToReview(events, NOW);

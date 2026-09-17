@@ -12,7 +12,7 @@ function mountToast(store: ToastStore) {
 }
 
 /**
- * Ajoute un toast au store et attend la mise à jour du DOM.
+ * Adds a toast to the store and waits for the DOM update.
  */
 function addAndFlush(
   store: ToastStore,

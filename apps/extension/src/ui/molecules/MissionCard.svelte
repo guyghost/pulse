@@ -44,6 +44,7 @@
     isStatusTransitionPending = false,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
     profileTjmMin = null as number | null,
+    copyStatus = 'idle' as 'idle' | 'copied',
   }: {
     mission: Mission;
     isSeen?: boolean;
@@ -67,17 +68,22 @@
     trackingUpdatedAt?: number | null;
     isStatusTransitionPending?: boolean;
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
-    /** Plancher du profil (DAO #175) — null = profil sans plancher, jauge masquée. */
+    /** Profile floor (DAO #175) — null = profile without floor, gauge hidden. */
     profileTjmMin?: number | null;
+    /** Copy-link feedback owned by the parent (DAO #179): the molecule never
+     * touches the clipboard itself — it renders this status and emits the
+     * copy request through onCopyLink. The error state is perceptible:
+     * tooltip, icon and a polite live announcement (DAO #178). */
+    copyStatus?: 'idle' | 'copied' | 'error';
   } = $props();
 
-  // Replié par défaut : le scan rapide du feed prime. Densité compacte :
-  // paddings et marges verticales réduits, cible d'action 32px. La barre
-  // repliée expose la triade de tri uniquement (masquer, comparer, favori)
-  // — ≤ 4 affordances (revue design DAO #176) ; copier, ouvrir, Analyser
-  // et les transitions de suivi vivent dans l'état déplié. Localisation,
-  // séniorité et date de publication restent dans la ligne de scan rapide,
-  // la source en badge d'en-tête.
+  // Collapsed by default: the feed's quick scan comes first. Compact density:
+  // reduced paddings and vertical margins, 32px action target. The collapsed
+  // bar exposes the triage triad only (hide, compare, favorite)
+  // — ≤ 4 affordances (DAO #176 design review); copy, open, Analyze,
+  // and tracking transitions live in the expanded state. Location,
+  // seniority and publication date stay in the quick-scan line,
+  // source in the header badge.
   let expanded = $state(false);
   let scoreDetailsOpen = $state(false);
 
@@ -101,9 +107,9 @@
 
   const tjmValue = $derived(formatTJMValue(mission.tjm));
 
-  // Bloc tarif (DAO #175) : montant pour la colonne droite + jauge de
-  // plancher. Suffixe vide : l'unité "/j" reste portée par le span muted du
-  // template. Borne unique => « à partir de X » (ouverture à droite).
+  // Rate block (DAO #175): amount for the right column + floor gauge.
+  // Empty suffix: the "/d" unit stays carried by the template's muted span.
+  // Single bound => "starting at X" (open-ended on the right).
   const tjmRange = $derived(
     typeof mission.tjmMin === 'number' &&
       typeof mission.tjmMax === 'number' &&
@@ -215,23 +221,22 @@
     scoreDetailsOpen = !scoreDetailsOpen;
   }
 
-  let copied = $state(false);
+  // Copy-link presentation (DAO #179): the parent owns the clipboard and the
+  // transient "copied" feedback (link-copy controller); the molecule only
+  // renders copyStatus and emits the copy request via onCopyLink.
+  const copied = $derived(copyStatus === 'copied');
 
   function handleCopyLink(e: MouseEvent) {
     e.stopPropagation();
-    navigator.clipboard
-      .writeText(mission.url)
-      .then(() => {
-        copied = true;
-        onCopyLink?.();
-        setTimeout(() => {
-          copied = false;
-        }, 1500);
-      })
-      .catch(() => {
-        // Clipboard write rejected (permissions/focus): stay silent, no false "copied".
-      });
+    onCopyLink?.();
   }
+
+  // Touch targets (DAO #180): icon buttons stay 32px visually (compact
+  // density, DAO #176) but their clickable area extends to 44×44 via an
+  // invisible pseudo-element. Adjacent gaps are 6px, matching the 6px
+  // extension on each side — zones touch but never overlap (no ghost taps).
+  const HIT_TARGET_EXTENSION =
+    "relative after:absolute after:-inset-1.5 after:rounded-lg after:content-['']";
 
   function handleToggleFavorite(e: MouseEvent) {
     e.stopPropagation();
@@ -273,7 +278,7 @@
       }
     },
   }}
-  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
+  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-[border-color,opacity] duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
@@ -352,7 +357,7 @@
         {#if mission.description}
           <button
             type="button"
-            class="flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+            class="{HIT_TARGET_EXTENSION} flex h-8 w-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
             'expand'
               ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
               : ''}"
@@ -370,9 +375,9 @@
         {/if}
       </div>
 
-      <!-- Bloc tarif (DAO #175) : ancre économique de la carte, sous le grade.
-           aria-label portant la valeur numérique (jamais masquée — leçon
-           review #371) ; le title porte le tooltip natif. -->
+      <!-- Rate block (DAO #175): the card's economic anchor, under the grade.
+           aria-label carrying the numeric value (never hidden — lesson from
+           review #371); the title carries the native tooltip. -->
       {#if tjmBlockAmount}
         <div
           class="text-right"
@@ -407,9 +412,9 @@
     {/if}
   </div>
 
-  <!-- Quick-scan line: location + seniority + publication date (le TJM vit
-       dans le bloc tarif de la colonne droite — DAO #175). Les séparateurs
-       ne sont rendus qu'entre items — jamais avant le premier. -->
+  <!-- Quick-scan line: location + seniority + publication date (the TJM lives
+       in the right column's rate block — DAO #175). Separators are rendered
+       only between items — never before the first. -->
   <div class="mt-1.5 flex flex-wrap items-baseline gap-x-1.5 text-body">
     {#if mission.location}
       <span class="text-text-secondary">{mission.location}</span>
@@ -430,10 +435,10 @@
     {/if}
   </div>
 
-  <!-- Jauge de plancher (DAO #175) : lecture visuelle du rapport
-       fourchette annoncée / plancher du profil. Seule la piste est
-       décorative (aria-hidden) — le chip « sous plancher » reste dans
-       l'arbre d'accessibilité (la couleur ne porte jamais seule le sens). -->
+  <!-- Floor gauge (DAO #175): visual readout of the ratio between the
+       advertised range and the profile floor. Only the track is decorative
+       (aria-hidden) — the "below floor" chip stays in the accessibility
+       tree (color never carries meaning alone). -->
   {#if ratePos.visible}
     <div class="mt-1 flex items-center gap-2">
       <div class="relative h-1 w-12 rounded-full bg-subtle-gray" aria-hidden="true">
@@ -455,7 +460,7 @@
         ></div>
       </div>
       {#if ratePos.underFloor}
-        <span class="text-micro font-medium text-status-red">sous plancher</span>
+        <span class="text-micro font-medium text-status-red-text">sous plancher</span>
       {/if}
     </div>
   {/if}
@@ -579,8 +584,8 @@
     </div>
   {/if}
 
-  <!-- Transitions de suivi : état déplié uniquement (revue design DAO
-       #176) — le badge de statut d'en-tête reste l'annonce repliée. -->
+  <!-- Tracking transitions: expanded state only (DAO #176 design
+       review) — the header status badge remains the collapsed announcement. -->
   {#if trackingStatus && expanded}
     <div
       class="mt-2 flex flex-wrap gap-1.5"
@@ -611,8 +616,8 @@
     </div>
   {/if}
 
-  <!-- Action bar — repliée : triade de tri (revue design DAO #176).
-       Dépliée : copier, ouvrir et Analyser rejoignent la barre. Wraps only
+  <!-- Action bar — collapsed: triage triad (DAO #176 design review).
+       Expanded: copy, open and Analyze join the bar. Wraps only
        on very narrow side panels rather than overflowing. -->
   <div class="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border-light pt-2">
     <Tooltip
@@ -623,7 +628,7 @@
     >
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red active:bg-page-canvas"
           onclick={handleHide}
           onkeydown={tooltip.onKeydown}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
@@ -644,7 +649,7 @@
              que l'explication du blocage soit atteignable au clavier ; le
              handler garde l'action inactive. -->
         <button
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas aria-disabled:cursor-not-allowed aria-disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -669,7 +674,7 @@
       {#snippet children(tooltip: TooltipTriggerState)}
         <button
           type="button"
-          class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
+          class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas disabled:cursor-wait {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
@@ -686,22 +691,39 @@
       {/snippet}
     </Tooltip>
     {#if expanded}
+      <!-- Copy feedback announcements (DAO #178): the region stays mounted so
+           screen readers catch the message; empty while idle. -->
+      <span class="sr-only" role="status" aria-live="polite">
+        {copied ? 'Lien copié' : copyStatus === 'error' ? 'Échec de la copie du lien' : ''}
+      </span>
       <Tooltip
-        label={copied ? 'Lien copié' : 'Copier le lien'}
+        label={copied
+          ? 'Lien copié'
+          : copyStatus === 'error'
+            ? 'Échec de la copie'
+            : 'Copier le lien'}
         description="Partagez ou archivez la mission sans ouvrir la plateforme."
       >
         {#snippet children(tooltip: TooltipTriggerState)}
           <button
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleCopyLink}
             onkeydown={tooltip.onKeydown}
-            aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
+            aria-label={copied
+              ? 'Lien copié'
+              : copyStatus === 'error'
+                ? 'Échec de la copie du lien'
+                : 'Copier le lien de la mission'}
             aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
           >
             <Icon
-              name={copied ? 'check' : 'link'}
+              name={copied ? 'check' : copyStatus === 'error' ? 'x-circle' : 'link'}
               size={13}
-              class={copied ? 'text-blueprint-blue' : ''}
+              class={copied
+                ? 'text-blueprint-blue'
+                : copyStatus === 'error'
+                  ? 'text-status-red-text'
+                  : ''}
             />
           </button>
         {/snippet}
@@ -712,7 +734,7 @@
       >
         {#snippet children(tooltip: TooltipTriggerState)}
           <button
-            class="inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary active:bg-page-canvas"
             onclick={handleOpenLink}
             onkeydown={tooltip.onKeydown}
             aria-label="Ouvrir la mission sur la plateforme source"

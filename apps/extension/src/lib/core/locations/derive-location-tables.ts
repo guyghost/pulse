@@ -27,7 +27,7 @@ export interface MetroAreaData {
   readonly departments: readonly string[];
 }
 
-/** Matches a standalone department code (2 digits métropole, 3 digits DOM). */
+/** Matches a standalone department code (2 digits mainland, 3 digits overseas). */
 const DEPARTMENT_CODE = /^\d{2,3}$/;
 
 /**

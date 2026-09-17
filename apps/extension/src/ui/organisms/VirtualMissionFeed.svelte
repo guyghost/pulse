@@ -5,11 +5,40 @@
   import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
+  import { createLinkCopyController, type LinkCopyController } from '$lib/state/link-copy.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
   const BATCH_SIZE = 20;
+
+  // Copy-link ownership (DAO #179): the organism owns one link-copy
+  // controller per mission — molecules stay clipboard-free and receive the
+  // transient "copied" feedback via the copyStatus prop. Analytics
+  // (onCopyLink) still fires on success only. All feedback timers are
+  // disposed when the organism unmounts. The registry is intentionally a
+  // plain record: reactivity comes from each controller's internal state,
+  // not from the lookup itself.
+  const copyControllers: Record<string, LinkCopyController> = {};
+
+  function copyControllerFor(missionId: string): LinkCopyController {
+    return (copyControllers[missionId] ??= createLinkCopyController());
+  }
+
+  async function requestCopyLink(mission: Mission): Promise<void> {
+    const succeeded = await copyControllerFor(mission.id).copy(mission.url);
+    if (succeeded) {
+      onCopyLink?.(mission.id);
+    }
+  }
+
+  $effect(() => {
+    return () => {
+      for (const controller of Object.values(copyControllers)) {
+        controller.dispose();
+      }
+    };
+  });
 
   const {
     missions = [],
@@ -264,7 +293,8 @@
           onHide={() => onHide?.(mission.id)}
           onToggleCompare={() => onToggleCompare?.(mission.id)}
           onStatusTransition={(status) => onStatusTransition?.(mission.id, status)}
-          onCopyLink={() => onCopyLink?.(mission.id)}
+          onCopyLink={() => void requestCopyLink(mission)}
+          copyStatus={copyControllerFor(mission.id).status}
           onInvestigate={() => onInvestigateMission?.(mission)}
           {onOpenLink}
         />

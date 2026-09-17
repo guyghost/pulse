@@ -236,8 +236,8 @@ export function createAppNavigation() {
           await saveProfile(seededProfile);
         }
       } catch {
-        // best-effort : la navigation continue, le profil défaut sera
-        // re-persisté au prochain scan.
+        // best-effort: navigation continues, the default profile will be
+        // re-persisted on the next scan.
       }
     }
 

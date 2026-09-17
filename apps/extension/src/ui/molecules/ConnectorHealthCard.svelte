@@ -11,7 +11,7 @@
   }: {
     snapshot: ConnectorHealthSnapshot;
     connectorName: string;
-    /** Timestamp courant injecté (défaut: Date.now() — acceptable en UI leaf) */
+    /** Current timestamp injected (default: Date.now() — acceptable in a UI leaf) */
     now?: number;
   } = $props();
 

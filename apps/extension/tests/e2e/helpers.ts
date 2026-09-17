@@ -6,9 +6,9 @@ import type { Mission } from '../../src/lib/core/types/mission';
 export const SIDE_PANEL = '/src/sidepanel/index.html';
 
 /**
- * Active toutes les surfaces (onglets + couche connectée) pour un test e2e.
+ * Enables all surfaces (tabs + connected layer) for an e2e test.
  *
- * Au lancement, `applications` et `connected` sont désactivés
+ * At launch, `applications` and `connected` are disabled
  * (`EXTENSION_SURFACE_FLAGS`). Les tests qui couvrent ces surfaces seedent
  * l'override dev via localStorage avant le chargement du side panel — voir
  * `apps/extension/src/models/surface-feature-flags.model.md` §5bis.
@@ -46,15 +46,15 @@ export function navButton(page: Page, name: string): Locator {
 type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data';
 
 /**
- * Les réglages sont organisés en accordéon (`SettingsSectionId`, défini dans
- * SettingsPage.svelte) et seule la section 'sources' est ouverte par défaut.
- * Ce helper déplie la section demandée via les ids stables
+ * Settings are organized in accordions (`SettingsSectionId`, defined in
+ * SettingsPage.svelte) and only the 'sources' section is open by default.
+ * This helper expands the requested section via stable ids
  * `settings-trigger-{id}` / `settings-panel-{id}`.
  */
 export async function openSettingsSection(page: Page, sectionId: SettingsSectionId): Promise<void> {
   const trigger = page.locator(`#settings-trigger-${sectionId}`);
   const panel = page.locator(`#settings-panel-${sectionId}`);
-  // Échec rapide et diagnostic si l'id ne correspond plus au DOM (typo, refonte).
+  // Fail fast with diagnostics if the id no longer matches the DOM (typo, redesign).
   await expect(trigger).toBeVisible({ timeout: 2000 });
   if (await panel.isVisible().catch(() => false)) {
     return;
@@ -123,9 +123,9 @@ export function missionDetailsToggle(card: Locator): Locator {
 }
 
 /**
- * Ouvre le disclosure de la carte pour exposer les actions détaillées
+ * Opens the card disclosure to expose detailed actions
  * (copier, ouvrir, investiguer). Les actions de triage (masquer,
- * comparer, favori) sont visibles dès l'état réduit via le bandeau bas.
+ * compare, favorite) are visible in the collapsed state via the bottom bar.
  */
 export async function expandMission(card: Locator) {
   const toggle = missionDetailsToggle(card);
@@ -276,7 +276,7 @@ export async function injectMissions(page: Page, count: number) {
 
 /**
  * Vide le feed puis injecte exactement `count` missions.
- * Utilise le DevPanel pour garantir un état propre sans missions résiduelles.
+ * Uses the DevPanel to guarantee a clean state without residual missions.
  */
 export async function clearAndInjectMissions(page: Page, count: number) {
   await setFeedState(page, 'empty');
@@ -292,7 +292,7 @@ export async function clearAndInjectMissions(page: Page, count: number) {
 // ============================================================================
 
 /**
- * Mock le profil utilisateur pour simuler une première visite (pas de profil)
+ * Mocks the user profile to simulate a first visit (no profile)
  */
 export async function mockNoProfile(page: Page) {
   await page.addInitScript(() => {
@@ -344,7 +344,7 @@ export async function mockNoProfile(page: Page) {
  * Onboarding wizard — machine-driven 5-step flow (OnboardingFlow.svelte):
  * welcome → connecting (sources) → identity → preferences → skills →
  * notifying → persisting/scanning → completed. Guards live in the flow
- * machine: ≥1 source, firstName+jobTitle, tjmMin>0 (tjmMax supprimé, DAO #174), ≥1 keyword.
+ * machine: ≥1 source, firstName+jobTitle, tjmMin>0 (tjmMax removed, DAO #174), ≥1 keyword.
  */
 
 /** Welcome heading of the outcome-led onboarding screen. */
@@ -354,8 +354,8 @@ export function onboardingWelcomeHeading(page: Page): Locator {
 
 /**
  * Attend exactement un bouton « Continuer » puis le clique. Les transitions
- * fade (120ms) de Svelte peuvent garder le bouton de l'étape précédente
- * attaché au DOM — toHaveCount(1) attend la fin de la transition.
+ * fade (120ms) may keep the previous step's button attached to the DOM —
+ * toHaveCount(1) waits for the transition to finish.
  */
 export async function clickContinue(page: Page) {
   const button = page.getByRole('button', { name: 'Continuer', exact: true });
@@ -364,15 +364,15 @@ export async function clickContinue(page: Page) {
 }
 
 /**
- * Passe l'écran d'accueil (outcome-led welcome) et attend l'étape « Connectez
- * vos sources » (phase `connecting` de la machine d'états).
+ * Passes the welcome screen (outcome-led welcome) and waits for the
+ * "Connectez vos sources" step (`connecting` phase of the state machine).
  */
 export async function startOnboardingWizard(page: Page) {
   const connectingHeading = page.getByRole('heading', { name: 'Connectez vos sources' });
   if (!(await connectingHeading.isVisible().catch(() => false))) {
     const welcomeStart = page.getByRole('button', { name: 'Commencer', exact: true });
-    // Attendre que l'écran d'accueil soit monté avant de décider de cliquer
-    // (isVisible() immédiat peut courir avant l'hydratation de l'app).
+    // Wait for the welcome screen to mount before deciding to click
+    // (an immediate isVisible() may run before app hydration).
     await expect(welcomeStart.or(connectingHeading)).toBeVisible({ timeout: 10000 });
     if (await welcomeStart.isVisible().catch(() => false)) {
       await welcomeStart.click();
@@ -381,11 +381,11 @@ export async function startOnboardingWizard(page: Page) {
   await expect(connectingHeading).toBeVisible({ timeout: 10000 });
 }
 
-/** Connecte la première source proposée puis passe à l'étape identité. */
+/** Connects the first proposed source then moves to the identity step. */
 export async function connectFirstSource(page: Page, sourceName = 'Free-Work') {
   // Flux P0-B (#379) : les sources ne sont plus des toggles directs — un clic
-  // sur « Connecter » déclenche la vérification de session du connecteur et la
-  // source devient prête (« Session détectée ») quand detectSession() réussit.
+  // on "Connecter" triggers the connector's session verification and the
+  // source becomes ready ("Session détectée") when detectSession() succeeds.
   const row = page.getByRole('listitem').filter({ hasText: sourceName });
   await expect(row).toBeVisible();
   const connectButton = row.getByRole('button', { name: 'Connecter', exact: true });
@@ -396,7 +396,7 @@ export async function connectFirstSource(page: Page, sourceName = 'Free-Work') {
   await expect(page.getByRole('heading', { name: 'Qui êtes-vous ?' })).toBeVisible();
 }
 
-/** Remplit l'étape identité (Prénom/Métier obligatoires) puis continue. */
+/** Fills the identity step (Prénom/Métier required) then continues. */
 export async function fillIdentityStep(
   page: Page,
   profile: { firstName?: string; jobTitle?: string; location?: string }
@@ -405,10 +405,10 @@ export async function fillIdentityStep(
     await page.getByLabel('Prénom').fill(profile.firstName);
   }
   if (profile.jobTitle !== undefined) {
-    // Rôle + textbox : avec VITE_COPILOT_ROLLOUT_ENABLED=true (CI), la page
-    // Suivi montée en arrière-plan expose une case à cocher « Métier »
-    // (CopilotPanel) — getByLabel brut violerait le strict mode. La requête
-    // par rôle ignore aussi le sous-arbre aria-hidden.
+    // Role + textbox: with VITE_COPILOT_ROLLOUT_ENABLED=true (CI), the
+    // Applications page mounted in the background exposes a "Métier" checkbox
+    // (CopilotPanel) — raw getByLabel would violate strict mode. The role
+    // query also ignores the aria-hidden subtree.
     await page.getByRole('textbox', { name: 'Métier', exact: true }).fill(profile.jobTitle);
   }
   if (profile.location !== undefined) {
@@ -418,14 +418,14 @@ export async function fillIdentityStep(
   await expect(page.getByRole('heading', { name: 'Quels sont vos critères ?' })).toBeVisible();
 }
 
-/** Remplit l'étape critères (TJM) puis continue vers les compétences. */
+/** Fills the criteria step (TJM) then continues to skills. */
 export async function fillPreferencesStep(page: Page, tjmMin = 500) {
   await page.getByLabel('TJM minimum (€)').fill(String(tjmMin));
   await clickContinue(page);
   await expect(page.getByRole('heading', { name: 'Vos compétences clés' })).toBeVisible();
 }
 
-/** Ajoute un mot-clé (champ + Entrée) puis continue vers les alertes. */
+/** Adds a keyword (field + Enter) then continues to alerts. */
 export async function fillSkillsStep(page: Page, keyword = 'React') {
   const input = page.locator('#onboarding-skill-input');
   await expect(input).toBeVisible();
@@ -437,7 +437,7 @@ export async function fillSkillsStep(page: Page, keyword = 'React') {
 }
 
 /**
- * Lance le premier scan depuis l'étape notifications et attend la
+ * Starts the first scan from the notifications step and waits for the
  * redirection vers le feed (persist → scan → completed → onComplete).
  */
 export async function submitOnboardingScan(page: Page) {
@@ -450,7 +450,7 @@ export async function submitOnboardingScan(page: Page) {
 }
 
 /**
- * Complète l'onboarding avec un profil complet (toutes les étapes).
+ * Completes onboarding with a full profile (all steps).
  */
 export async function completeOnboarding(page: Page, profile: Partial<UserProfile> = {}) {
   const {
@@ -470,7 +470,7 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
 }
 
 /**
- * Ouvre l'application et complète l'onboarding si nécessaire pour arriver sur le feed.
+ * Opens the application and completes onboarding if needed to reach the feed.
  */
 export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile> = {}) {
   await page.goto(SIDE_PANEL);
@@ -502,7 +502,7 @@ export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile
 // ============================================================================
 
 /**
- * Mock les résultats de scan avec des missions personnalisées
+ * Mocks scan results with custom missions
  */
 export async function mockScanResults(page: Page, missions: Mission[]) {
   await page.addInitScript((missionsData: Mission[]) => {
@@ -601,7 +601,7 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
 }
 
 /**
- * Attend que le nombre spécifié de missions soit visible
+ * Waits until the specified number of missions is visible
  */
 export async function waitForMissions(page: Page, count: number, timeout = 5000) {
   await expect
@@ -610,7 +610,7 @@ export async function waitForMissions(page: Page, count: number, timeout = 5000)
 }
 
 /**
- * Attend que le feed soit chargé (scan terminé)
+ * Waits until the feed is loaded (scan complete)
  */
 export async function waitForScanComplete(page: Page, timeout = 10000) {
   await expect(page.getByText(/mission|Aucune mission/)).toBeVisible({ timeout });
@@ -654,7 +654,7 @@ export async function triggerScan(page: Page) {
 // ============================================================================
 
 /**
- * Récupère la première carte mission visible
+ * Gets the first visible mission card
  */
 export async function getFirstMissionCard(page: Page): Promise<Locator> {
   return missionCards(page).first();
@@ -706,7 +706,7 @@ export async function hideMission(card: Locator) {
 }
 
 /**
- * Active/désactive le filtre favoris. The dashboard exposes a single toggle
+ * Toggles the favorites filter. The dashboard exposes a single toggle
  * control (no aria-pressed), so both directions click the same button after
  * making sure the operational-details dashboard is open.
  */
@@ -717,7 +717,7 @@ export async function toggleFavoritesFilter(page: Page, _showOnlyFavorites: bool
 }
 
 /**
- * Affiche les missions masquées
+ * Shows hidden missions
  */
 export async function showHiddenMissions(page: Page) {
   const showHiddenBtn = hiddenMissionsToggle(page);
@@ -731,14 +731,14 @@ export async function showHiddenMissions(page: Page) {
 // ============================================================================
 
 /**
- * Active/désactive le mode offline
+ * Toggles offline mode
  */
 export async function toggleOffline(page: Page, offline: boolean) {
   await page.context().setOffline(offline);
 }
 
 /**
- * Simule une erreur réseau pour un connecteur spécifique
+ * Simulates a network error for a specific connector
  */
 export async function mockConnectorFailure(
   page: Page,
@@ -848,7 +848,7 @@ export async function mockConnectorFailure(
 // ============================================================================
 
 /**
- * Vérifie que le texte est visible (helper avec retry)
+ * Checks that text is visible (helper with retry)
  */
 export async function expectTextVisible(page: Page, text: string | RegExp, timeout = 2000) {
   await expect(page.getByText(text)).toBeVisible({ timeout });
@@ -863,7 +863,7 @@ export async function waitForLoadingComplete(page: Page, timeout = 5000) {
 }
 
 /**
- * Récupère le nombre de missions affiché dans le header
+ * Gets the mission count displayed in the header
  */
 export async function getDisplayedMissionCount(page: Page): Promise<number> {
   const labels = await page.locator('[aria-label]').evaluateAll((elements) =>
@@ -894,21 +894,21 @@ export async function getMissionTotalCount(page: Page): Promise<number> {
   if (match) {
     return parseInt(match[1], 10);
   }
-  // Certains états du feed (ex. après un cycle offline/restore) n'affichent
-  // pas la ligne « N/N missions triées » — retomber sur l'aria-label compact
-  // « N missions visibles » du hero.
+  // Some feed states (e.g. after an offline/restore cycle) don't display
+  // the "N/N missions triées" line — fall back to the compact hero
+  // aria-label "N missions visibles".
   return getDisplayedMissionCount(page);
 }
 
 /**
- * Assert que le total filtré de missions affiche exactement `count`.
+ * Asserts the filtered mission total displays exactly `count`.
  */
 export async function expectMissionCount(page: Page, count: number, timeout = 5000) {
   await expect.poll(async () => getMissionTotalCount(page), { timeout }).toBe(count);
 }
 
 /**
- * Vérifie si l'indicateur offline est visible
+ * Checks whether the offline indicator is visible
  */
 export async function isOfflineIndicatorVisible(page: Page): Promise<boolean> {
   const indicator = page.locator('[data-testid="offline-indicator"], text=Hors ligne').first();
@@ -921,7 +921,7 @@ export async function isOfflineIndicatorVisible(page: Page): Promise<boolean> {
 }
 
 /**
- * Prendre un snapshot de performance (mémoire)
+ * Takes a performance snapshot (memory)
  */
 export async function captureMemoryMetrics(page: Page): Promise<{
   usedJSHeapSize: number;
@@ -946,7 +946,7 @@ export async function captureMemoryMetrics(page: Page): Promise<{
 }
 
 /**
- * Compter les éléments dans le DOM
+ * Counts elements in the DOM
  */
 export async function countDomElements(page: Page, selector: string): Promise<number> {
   return page.locator(selector).count();

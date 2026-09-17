@@ -4,11 +4,11 @@
 
 ## Documents
 
-- [Pulse Apple design audit](./pulse-apple-design-audit.md)
+- [Audit design Pulse « Apple »](./pulse-apple-design-audit.md)
 
-## Source of Truth
+## Source de vérité
 
-- Design reference: `packages/design/DESIGN.md`
-- Tailwind theme: `packages/design/theme.css`
-- CSS variables: `packages/design/variables.css`
-- Tokens: `packages/design/tokens.json`
+- Référence design : `packages/design/DESIGN.md`
+- Thème Tailwind : `packages/design/theme.css`
+- Variables CSS : `packages/design/variables.css`
+- Tokens : `packages/design/tokens.json`

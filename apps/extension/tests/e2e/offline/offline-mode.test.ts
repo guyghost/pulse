@@ -63,11 +63,11 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    // Contrôle de scan de l'en-tête compact : désactivé hors ligne, son
-    // libellé accessible bascule en mode indisponible. Le CTA « Lancer le
-    // scan » de l'état vide reste activable : le refus hors ligne est géré
-    // dans le handler (FeedPage.handleFeedStoryPrimaryAction), pas sur le
-    // bouton.
+    // Scan control of the compact header: disabled offline, its accessible
+    // label switches to unavailable mode. The "Lancer le scan" CTA of the
+    // empty state stays clickable: the offline refusal is handled
+    // in the handler (FeedPage.handleFeedStoryPrimaryAction), not on the
+    // button.
     const overviewScan = page.getByRole('button', {
       name: 'Scan indisponible hors ligne',
       exact: true,
@@ -156,10 +156,10 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    // Les badges flottants DEV (right-2 top-14) et QA (left-2 top-14)
-    // recouvrent les boutons de navigation aux deux extrémités. Un click
-    // « force » dispatche quand même aux coordonnées du badge —
-    // dispatchEvent('click') cible l'élément lui-même, sans hit-test.
+    // DEV (right-2 top-14) and QA (left-2 top-14) floating badges
+    // overlap the navigation buttons at both ends. A "force" click
+    // still dispatches at the badge coordinates —
+    // dispatchEvent('click') targets the element itself, without hit-testing.
     await page
       .getByRole('navigation', { name: 'Main navigation' })
       .getByRole('button', { name: 'TJM' })

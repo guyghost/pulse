@@ -1,6 +1,6 @@
 /**
- * État de la carte « Time to review » (voir src/models/time-to-review.model.md).
- * Factory runes : charge missions (via bridge) + journal, calcule via core pur.
+ * State of the "Time to review" card (see src/models/time-to-review.model.md).
+ * Runes factory: loads missions (via bridge) + journal, computes via pure core.
  */
 import { SvelteDate } from 'svelte/reactivity';
 import {

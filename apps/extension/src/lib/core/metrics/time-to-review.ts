@@ -1,9 +1,9 @@
 /**
- * Métrique « Time to review » : délai (heures) entre la capture d'une mission
- * (scrapedAt) et sa première consultation (journal firstViewedAt), p50/p95 sur
- * 30 jours glissants. Voir src/models/time-to-review.model.md.
+ * "Time to review" metric: delay (hours) between mission capture
+ * (scrapedAt) and its first review (journal firstViewedAt), p50/p95 over
+ * a rolling 30-day window. See src/models/time-to-review.model.md.
  *
- * Pur : now injecté, aucune I/O, aucune horloge.
+ * Pure: now injected, no I/O, no clock.
  */
 import type { Mission } from '../types/mission';
 import { coerceIso, type ReviewJournal } from '../seen/first-viewed';
@@ -29,7 +29,7 @@ export interface TimeToReviewResult {
   hasData: boolean;
   p50: TimeToReviewPoint;
   p95: TimeToReviewPoint;
-  /** Part de missions non vues dans la fenêtre courante (0..1). */
+  /** Share of unviewed missions in the current window (0..1). */
   unviewed: TimeToReviewPoint;
   series: TimeToReviewSeriesPoint[];
 }
@@ -38,7 +38,7 @@ const HOUR_MS = 3_600_000;
 const DAY_MS = 24 * HOUR_MS;
 export const REVIEW_WINDOW_DAYS = 30;
 
-/** Union des missions connues (DB) et du journal (entrées orphelines incluses). */
+/** Union of known missions (DB) and journal entries (orphans included). */
 export function buildReviewEvents(missions: Mission[], journal: ReviewJournal): ReviewEventInput[] {
   const events = new Map<string, ReviewEventInput>();
   for (const mission of missions) {
@@ -67,7 +67,7 @@ export function buildReviewEvents(missions: Mission[], journal: ReviewJournal): 
   return [...events.values()];
 }
 
-/** Percentile par interpolation linéaire ; null sur entrée vide. */
+/** Percentile with linear interpolation; null on empty input. */
 export function percentile(values: number[], p: 50 | 95): number | null {
   if (values.length === 0) {
     return null;
@@ -99,12 +99,12 @@ function utcDayKey(timeMs: number): string {
 }
 
 /**
- * Calcule p50/p95 (heures), part de non-vues, deltas vs période précédente et
- * séries quotidiennes sur 30 jours glissants (jours UTC).
+ * Computes p50/p95 (hours), unviewed share, deltas vs the previous period and
+ * daily series over a rolling 30-day window (UTC days).
  *
- * Exclusions (voir modèle) : capturedAt irrésoluble ou futur ; délai négatif
- * (horloge incohérente → compté comme vu, hors percentiles) ; non-vues comptées
- * dans `unviewed` et exclues des percentiles.
+ * Exclusions (see model): unresolvable or future capturedAt; negative delay
+ * (inconsistent clock → counted as viewed, outside percentiles); unviewed
+ * counted in `unviewed` and excluded from percentiles.
  */
 export function computeTimeToReview(events: ReviewEventInput[], now: Date): TimeToReviewResult {
   const nowMs = now.getTime();
@@ -131,7 +131,7 @@ export function computeTimeToReview(events: ReviewEventInput[], now: Date): Time
 
     const viewedMs = event.firstViewedAt === null ? null : Date.parse(event.firstViewedAt);
     const hasValidView = viewedMs !== null && Number.isFinite(viewedMs);
-    // Délai négatif (horloge incohérente) : compté comme vu, mais hors percentiles.
+    // Negative delay (inconsistent clock): counted as viewed, outside percentiles.
     const delayHours =
       hasValidView && viewedMs !== null && viewedMs >= capturedMs
         ? (viewedMs - capturedMs) / HOUR_MS

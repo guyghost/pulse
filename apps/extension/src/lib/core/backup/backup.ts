@@ -1,6 +1,6 @@
 /**
- * Backup et restore des données utilisateur
- * Core = pur : validation, transformation, migration
+ * Backup and restore of user data
+ * Core = pure: validation, transformation, migration
  */
 
 import { z } from 'zod';
@@ -9,7 +9,7 @@ import { UserProfileSchema } from '../types/schemas';
 import type { AppSettings } from '../types/app-settings';
 
 // ============================================
-// Schémas Zod pour validation
+// Zod schemas for validation
 // ============================================
 
 export const BackupDataSchema = z.object({
@@ -34,7 +34,7 @@ export const BackupDataSchema = z.object({
 export type BackupData = z.infer<typeof BackupDataSchema>;
 
 // ============================================
-// Types de résultat
+// Result types
 // ============================================
 
 export type ValidationError =
@@ -56,7 +56,7 @@ const MAX_SUPPORTED_VERSION = 1;
 // ============================================
 
 /**
- * Crée un objet de backup à partir des données utilisateur
+ * Builds a backup object from user data
  * Pure function
  */
 export function createBackup(
@@ -85,18 +85,18 @@ export function createBackup(
  * Pure function - utilise Zod pour la validation
  */
 export function validateBackup(data: unknown): Result<BackupData, ValidationError> {
-  // Vérifier si c'est un objet valide
+  // Check whether this is a valid object
   if (data === null || typeof data !== 'object') {
     return {
       ok: false,
       error: {
         type: 'INVALID_JSON',
-        message: 'Les données ne sont pas un objet JSON valide',
+        message: 'Data is not a valid JSON object',
       },
     };
   }
 
-  // Vérifier la version avant la validation complète
+  // Check the version before full validation
   const versionCheck = data as { version?: unknown };
   if (typeof versionCheck.version !== 'number') {
     return {
@@ -119,7 +119,7 @@ export function validateBackup(data: unknown): Result<BackupData, ValidationErro
     };
   }
 
-  // Validation Zod complète
+  // Full Zod validation
   const result = BackupDataSchema.safeParse(data);
 
   if (!result.success) {
@@ -163,7 +163,7 @@ export function migrateBackup(data: BackupData): BackupData {
 }
 
 /**
- * Sérialise un backup en JSON
+ * Serializes a backup to JSON
  * Pure function
  */
 export function serializeBackup(backup: BackupData): string {
@@ -171,7 +171,7 @@ export function serializeBackup(backup: BackupData): string {
 }
 
 /**
- * Parse une chaîne JSON en objet
+ * Parses a JSON string into an object
  * Pure function
  */
 export function parseBackupJson(json: string): Result<unknown, ValidationError> {
@@ -212,7 +212,7 @@ export function getBackupStats(backup: BackupData): {
 }
 
 /**
- * Génère un nom de fichier pour le backup
+ * Generates a filename for the backup
  * Pure function
  */
 export function generateBackupFilename(
