@@ -1079,7 +1079,7 @@
               description="Interrompt le scan en cours et conserve les données déjà chargées."
             >
               <button
-                class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
+                class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red-text transition-all duration-200 hover:bg-status-red/15"
                 onclick={handleMissionFeedScanAction}
                 disabled={!page.feedPresentation.actionEnabled}
                 aria-label="Stopper le scan en cours"

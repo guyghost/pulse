@@ -614,7 +614,7 @@
 
     {#if settings.settingsError}
       <p
-        class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red"
+        class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red-text"
         role="alert"
       >
         {settings.settingsError}. La dernière configuration confirmée reste active.

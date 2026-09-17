@@ -31,7 +31,7 @@
       case 'open':
         return {
           dotClass: 'bg-status-red shadow-[0_0_6px_theme(colors.status-red/60%)]',
-          labelClass: 'text-status-red',
+          labelClass: 'text-status-red-text',
           label: 'Suspendu',
           title: "Connecteur suspendu — trop d'erreurs",
         };

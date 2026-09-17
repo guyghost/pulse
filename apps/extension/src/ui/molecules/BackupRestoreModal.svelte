@@ -108,7 +108,7 @@
     <div class="mb-5 flex items-center gap-3">
       {#if error}
         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-status-red/10">
-          <Icon name="alert-circle" size={20} class="text-status-red" />
+          <Icon name="alert-circle" size={20} class="text-status-red-text" />
         </div>
         <div>
           <h3 id="backup-restore-title" class="text-heading font-semibold text-text-primary">
@@ -144,7 +144,7 @@
     <!-- Content -->
     {#if error}
       <div class="mb-5 rounded-lg border border-status-red/20 bg-status-red/8 p-4">
-        <p class="eyebrow eyebrow--strong text-status-red">Restauration bloquée</p>
+        <p class="eyebrow eyebrow--strong text-status-red-text">Restauration bloquée</p>
         <p class="mt-2 text-body-lg leading-5 text-text-primary">{getErrorMessage(error)}</p>
         <p class="mt-2 text-meta leading-5 text-text-subtle">
           Choisissez un autre fichier ou recréez une sauvegarde depuis cet appareil.
@@ -201,7 +201,7 @@
       </div>
 
       <div class="mb-4 rounded-lg border border-status-orange/25 bg-status-orange/8 p-4">
-        <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-orange">
+        <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-orange-text">
           <Icon name="alert-triangle" size={13} class="shrink-0" />
           Décision requise
         </p>
@@ -235,7 +235,7 @@
           role="alert"
           aria-live="assertive"
         >
-          <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-red">
+          <p class="flex items-center gap-2 eyebrow eyebrow--strong text-status-red-text">
             <Icon name="alert-circle" size={13} class="shrink-0" />
             Restauration échouée
           </p>

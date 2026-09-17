@@ -136,7 +136,7 @@
       : preview.grade === 'B'
         ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
         : preview.grade === 'C'
-          ? 'bg-status-yellow/15 text-status-orange'
+          ? 'bg-status-yellow/15 text-status-orange-text'
           : 'bg-subtle-gray text-text-subtle'
   );
 </script>
@@ -178,7 +178,7 @@
                     : verification === 'checking'
                       ? 'text-text-subtle'
                       : verification === 'session-missing'
-                        ? 'text-status-orange'
+                        ? 'text-status-orange-text'
                         : verification === 'unavailable'
                           ? 'text-text-muted'
                           : 'text-text-subtle'}"
@@ -567,7 +567,7 @@
   >
     <div
       class="flex h-16 w-16 items-center justify-center rounded-full {navFailed
-        ? 'bg-status-orange/15 text-status-orange'
+        ? 'bg-status-orange/15 text-status-orange-text'
         : 'bg-accent-green/15 text-accent-green'}"
     >
       <Icon name={navFailed ? 'alert-triangle' : 'check'} class="h-8 w-8" />
