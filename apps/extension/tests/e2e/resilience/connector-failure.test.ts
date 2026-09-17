@@ -372,7 +372,7 @@ test.describe('Connector Resilience', () => {
 
     await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
     // `.first()` — the title may appear both in the overview
-    // et dans la carte du feed (strict mode).
+    // and in the feed card (strict mode).
     await expect(page.getByText(missionTitle, { exact: true }).first()).toBeVisible({
       timeout: 10000,
     });
