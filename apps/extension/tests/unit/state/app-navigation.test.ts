@@ -268,7 +268,7 @@ describe('createAppNavigation bootstrap recovery', () => {
     });
 
     const completion = navigation.completeOnboarding();
-    // L'import dynamique de la seed prend plusieurs microtasks : on attend
+    // The dynamic seed import takes several microtasks: wait until
     // the write starts.
     await vi.waitFor(() => {
       expect(saveProfile).toHaveBeenCalledTimes(1);
