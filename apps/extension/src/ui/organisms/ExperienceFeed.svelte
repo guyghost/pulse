@@ -199,7 +199,7 @@
       <div
         role="alert"
         aria-live="assertive"
-        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-meta text-status-red"
+        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-meta text-status-red-text"
       >
         <Icon name="triangle-alert" size={14} />
         <span class="flex-1">{store.editError}</span>

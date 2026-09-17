@@ -53,10 +53,10 @@
       return 'border-accent-green/20 bg-accent-green/10 text-accent-green';
     }
     if (state === 'error') {
-      return 'border-status-red/20 bg-status-red/10 text-status-red';
+      return 'border-status-red/20 bg-status-red/10 text-status-red-text';
     }
     if (state === 'retrying') {
-      return 'border-status-orange/20 bg-status-orange/10 text-status-orange';
+      return 'border-status-orange/20 bg-status-orange/10 text-status-orange-text';
     }
     if (state === 'fetching' || state === 'detecting') {
       return 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue';
@@ -108,7 +108,7 @@
           <p class="eyebrow">Erreurs</p>
           <p
             class="mt-0.5 text-meta font-semibold tabular-nums {errorCount > 0
-              ? 'text-status-red'
+              ? 'text-status-red-text'
               : 'text-text-primary'}"
           >
             {errorCount}

@@ -37,7 +37,7 @@
       return 'text-accent-green';
     }
     if (tone === 'critical') {
-      return 'text-status-red';
+      return 'text-status-red-text';
     }
     return 'text-blueprint-blue';
   }

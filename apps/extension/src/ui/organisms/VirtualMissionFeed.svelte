@@ -258,7 +258,7 @@
     {#if error}
       <div class="section-card rounded-xl flex items-center gap-3 px-4 py-3">
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/10">
-          <Icon name="x" size={14} class="text-status-red" />
+          <Icon name="x" size={14} class="text-status-red-text" />
         </div>
         <p class="text-meta leading-relaxed text-text-secondary">{error}</p>
       </div>
