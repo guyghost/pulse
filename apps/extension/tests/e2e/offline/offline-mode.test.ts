@@ -156,7 +156,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    // Les badges flottants DEV (right-2 top-14) et QA (left-2 top-14)
+    // DEV (right-2 top-14) and QA (left-2 top-14) floating badges
     // overlap the navigation buttons at both ends. A "force" click
     // still dispatches at the badge coordinates —
     // dispatchEvent('click') targets the element itself, without hit-testing.
