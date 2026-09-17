@@ -80,7 +80,7 @@
   >
     <button
       type="button"
-      class="absolute inset-0 bg-black/45 backdrop-blur-sm"
+      class="absolute inset-0 bg-black/45"
       data-testid="shortcuts-help-scrim"
       onclick={handleExplicitClose}
       aria-label="Fermer l'aide des raccourcis"

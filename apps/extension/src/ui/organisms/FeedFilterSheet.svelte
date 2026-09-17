@@ -138,7 +138,7 @@
 <div class="pointer-events-none absolute inset-0 z-50" data-testid="feed-filter-sheet-layer">
   <button
     type="button"
-    class="pointer-events-auto absolute inset-0 cursor-default bg-text-primary/24 backdrop-blur-[1px]"
+    class="pointer-events-auto absolute inset-0 cursor-default bg-text-primary/24"
     aria-label="Fermer les filtres"
     onclick={() => onDismiss('scrim')}
     transition:fade={{ duration: scrimDuration }}
@@ -147,7 +147,7 @@
   <div
     bind:this={panel}
     id="filter-panel"
-    class="bottom-sheet pointer-events-auto absolute inset-x-0 bottom-0 flex h-[70%] max-h-[calc(100%-5rem)] flex-col overflow-visible rounded-t-[1.75rem] border-x border-t border-border-light bg-surface-white/98 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1.5 outline-none shadow-[0_-24px_64px_rgba(28,25,23,0.20)] dark:shadow-[0_-24px_64px_rgba(0,0,0,0.5)] backdrop-blur-2xl"
+    class="bottom-sheet pointer-events-auto absolute inset-x-0 bottom-0 flex h-[70%] max-h-[calc(100%-5rem)] flex-col overflow-visible rounded-t-[1.75rem] border-x border-t border-border-light bg-surface-white pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-1.5 outline-none shadow-xl"
     role="dialog"
     aria-modal="true"
     aria-labelledby="filter-sheet-title"
@@ -156,7 +156,7 @@
   >
     <button
       type="button"
-      class="soft-ring absolute -top-[3.75rem] left-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/75 dark:border-white/15 bg-surface-white/96 text-text-secondary shadow-[0_10px_28px_rgba(28,25,23,0.18)] dark:shadow-[0_10px_28px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-[background-color,color,transform] duration-200 hover:bg-subtle-gray hover:text-text-primary active:scale-95"
+      class="soft-ring absolute -top-[3.75rem] left-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-secondary shadow-sm transition-[background-color,color,transform] duration-200 hover:bg-subtle-gray hover:text-text-primary active:scale-95"
       aria-label="Fermer les filtres et revenir au feed"
       onclick={() => onDismiss('button')}
     >

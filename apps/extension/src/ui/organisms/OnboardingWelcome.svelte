@@ -65,7 +65,7 @@
   </div>
 
   <div
-    class="sticky bottom-0 -mx-4 mt-6 border-t border-border-light bg-page-canvas/95 px-4 pb-4 pt-3 backdrop-blur"
+    class="sticky bottom-0 -mx-4 mt-6 border-t border-border-light bg-page-canvas px-4 pb-4 pt-3"
   >
     <button
       type="button"
