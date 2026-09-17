@@ -582,7 +582,7 @@ test.describe('Feed', () => {
     const panelIsTopmost = await filterPanel.evaluate((panel) => {
       const rect = panel.getBoundingClientRect();
       // Probe at the vertical center: the panel's top edge moves below the
-      // barre d'outils sticky du feed (z-20), ce qui fausse un probe top+24.
+      // sticky feed toolbar (z-20), which would skew a top+24 probe.
       const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
       return hit === panel || (hit !== null && panel.contains(hit));
     });

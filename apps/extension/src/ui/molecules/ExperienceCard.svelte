@@ -309,7 +309,7 @@
         disabled={snapshot.context.input.isBusy}
         aria-label="Supprimer"
         data-experience-control="delete"
-        class="hover:text-status-red"
+        class="hover:text-status-red-text"
       >
         <Icon name="trash-2" size={14} />
       </Button>

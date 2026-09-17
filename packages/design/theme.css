@@ -27,6 +27,11 @@
      #1c1917) via @pulse/ui/app.css. */
   --color-status-red-text: #c21f14;
   --color-status-orange: #f97006;
+  /* Text-safe orange for small status labels on light surfaces (#c2410c = 5.2:1
+     on white, 4.8:1 on page-canvas — WCAG AA). The vivid fill (#f97006 = 2.9:1
+     on white) stays reserved for decorative fills, borders and dots. Dark
+     theme remaps to #fb923c via @pulse/ui/app.css. */
+  --color-status-orange-text: #c2410c;
   --color-status-yellow: #f9b703;
   --color-status-violet: #6b4aff;
   --color-accent-green: #0d9488;

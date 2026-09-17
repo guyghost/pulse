@@ -18,12 +18,12 @@
   aria-live="polite"
 >
   <div class="flex items-start gap-2">
-    <Icon name="wifi-off" size={14} class="mt-0.5 shrink-0 text-status-orange" />
+    <Icon name="wifi-off" size={14} class="mt-0.5 shrink-0 text-status-orange-text" />
     <div class="min-w-0">
       <p class="text-meta font-semibold text-text-primary">{title}</p>
       <p class="mt-0.5 text-caption leading-4 text-text-subtle">{description}</p>
       {#if action}
-        <p class="mt-1 text-caption font-medium text-status-orange">{action}</p>
+        <p class="mt-1 text-caption font-medium text-status-orange-text">{action}</p>
       {/if}
     </div>
   </div>

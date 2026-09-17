@@ -350,7 +350,7 @@
   <div class="relative z-10 flex h-full flex-col">
     {#if showOfflineBanner}
       <div
-        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-meta text-status-red"
+        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-meta text-status-red-text"
         transition:fade={{ duration: 200 }}
       >
         <Icon name="wifi-off" size={12} />
