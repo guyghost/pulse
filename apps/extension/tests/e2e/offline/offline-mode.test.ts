@@ -66,8 +66,8 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     // Scan control of the compact header: disabled offline, its accessible
     // label switches to unavailable mode. The "Lancer le scan" CTA of the
     // empty state stays clickable: the offline refusal is handled
-    // dans le handler (FeedPage.handleFeedStoryPrimaryAction), pas sur le
-    // bouton.
+    // in the handler (FeedPage.handleFeedStoryPrimaryAction), not on the
+    // button.
     const overviewScan = page.getByRole('button', {
       name: 'Scan indisponible hors ligne',
       exact: true,
