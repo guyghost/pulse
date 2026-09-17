@@ -1399,7 +1399,7 @@
         {#if feedToolbarVisible}
           <div
             class="border-t border-border-light px-5 {page.heroCompact
-              ? 'sticky top-0 z-20 rounded-b-2xl bg-surface-white/90 py-2 backdrop-blur-md'
+              ? 'sticky top-0 z-20 rounded-b-2xl bg-surface-white py-2'
               : 'rounded-b-2xl py-3'}"
           >
             {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion && ProfileRefinementBanner}
@@ -1655,7 +1655,7 @@
       aria-label="Actions du feed"
     >
       <div
-        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-white/70 dark:border-white/15 bg-surface-white/60 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-1px_0_rgba(255,255,255,0.03),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)] backdrop-blur-xl backdrop-saturate-150 transition-[background-color,border-color,box-shadow] duration-200 hover:bg-surface-white/70 focus-within:border-blueprint-blue/50 focus-within:bg-surface-white/70 focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)] dark:focus-within:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(255,255,255,0.03),0_16px_36px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.32)]"
+        class="flex h-12 min-w-0 flex-1 items-center rounded-full border border-border-light bg-surface-white shadow-sm transition-colors duration-200 focus-within:border-blueprint-blue/50"
       >
         <SearchInput
           variant="dock"
@@ -1673,10 +1673,10 @@
         <button
           bind:this={filterTrigger}
           type="button"
-          class="soft-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
+          class="soft-ring relative inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-[background-color,color,transform] duration-200 active:scale-95 {page.showFilters ||
           page.filterActive
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue-on-tint shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(255,255,255,0.02),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)]'
-            : 'border-white/70 dark:border-white/15 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-1px_0_rgba(255,255,255,0.03),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)] dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(255,255,255,0.03),0_16px_36px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.32)]'}"
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue-on-tint'
+            : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
           onclick={() => page.setShowFilters(!page.showFilters)}
           aria-expanded={page.showFilters}
           aria-controls="filter-panel"
@@ -1698,9 +1698,9 @@
       >
         <button
           type="button"
-          class="soft-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border backdrop-blur-xl backdrop-saturate-150 transition-[background-color,color,transform,box-shadow] duration-200 active:scale-95 {showAdvancedControls
-            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue-on-tint shadow-[inset_0_1px_0_rgba(255,255,255,0.45),inset_0_-1px_0_rgba(255,255,255,0.1),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),inset_0_-1px_0_rgba(255,255,255,0.02),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)]'
-            : 'border-white/70 dark:border-white/15 bg-surface-white/60 text-text-secondary shadow-[inset_0_1px_0_rgba(255,255,255,0.65),inset_0_-1px_0_rgba(255,255,255,0.12),0_12px_32px_rgba(28,25,23,0.16),0_2px_6px_rgba(28,25,23,0.07)] dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.07),inset_0_-1px_0_rgba(255,255,255,0.03),0_12px_32px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.28)] hover:bg-surface-white/75 hover:text-text-primary hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),inset_0_-1px_0_rgba(255,255,255,0.12),0_16px_36px_rgba(28,25,23,0.19),0_2px_8px_rgba(28,25,23,0.08)] dark:hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.09),inset_0_-1px_0_rgba(255,255,255,0.03),0_16px_36px_rgba(0,0,0,0.5),0_2px_8px_rgba(0,0,0,0.32)]'}"
+          class="soft-ring inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full border transition-[background-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/15 text-blueprint-blue-on-tint'
+            : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
           onclick={toggleOperationalDetails}
           aria-expanded={showAdvancedControls}
           aria-label={showAdvancedControls
@@ -1775,7 +1775,7 @@
 
 {#if page.comparisonMissionIds.length > 0 && !arrivalDrawerExpanded}
   <div
-    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
+    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
       ? 'bottom-40'
       : 'bottom-24'}"
   >
