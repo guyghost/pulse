@@ -453,8 +453,8 @@ Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais
 
 - Conventional commits : `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
 - Scope par domaine : `feat(connector): add LeHibou scraper`, `fix(tjm): cache invalidation`
-- Branche principale : `main`
-- Feature branches : `feat/nom-feature`
+- **Trunk-based development** : `main` est la seule branche de longue durée (la branche `develop` a été supprimée)
+- Branches de courte durée depuis `main` : `feat/nom-feature` — merge fréquent, cycle de vie court
 - PR obligatoire pour merge dans `main`
 
 ## Ce qu'il ne faut JAMAIS faire
