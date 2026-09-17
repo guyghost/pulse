@@ -44,7 +44,7 @@ function stripSurroundingQuotes(text: string): string {
 }
 
 /**
- * Transforme la sortie brute d'un LLM en FieldProposal canonical, ou `null`
+ * Transforms raw LLM output into a canonical FieldProposal, or `null`
  * when empty/invalid.
  *
  * Pure, deterministic, no I/O.

@@ -77,7 +77,7 @@ test.describe('Scan Lifecycle', () => {
     const filterPanel = page.getByRole('dialog', { name: 'Filtrer les missions' });
     await expect(filterPanel).toBeVisible();
 
-    // Le sheet ouvert couvre le toggle (scrim) — la fermeture passe par son
+    // The open sheet covers the toggle (scrim) — closing goes through its
     // dedicated button introduced by the bottom-sheet redesign.
     await page.getByRole('button', { name: 'Fermer les filtres et revenir au feed' }).click();
     await expect(filterPanel).not.toBeVisible();

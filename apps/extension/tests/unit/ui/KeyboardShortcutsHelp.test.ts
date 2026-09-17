@@ -227,7 +227,7 @@ describe('KeyboardShortcutsHelp — SET-05 idiomatic reactive grouping', () => {
     await tick();
 
     // modalFocus teleports the dialog into the overlay root (document.body):
-    // interroger le document, pas la cible de montage.
+    // query the document, not the mount target.
     const replayButton = Array.from(document.querySelectorAll('button')).find(
       (button) => button.textContent?.trim() === 'Revoir la visite guidée'
     ) as HTMLButtonElement;

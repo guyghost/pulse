@@ -5,7 +5,7 @@
  * via a closed shadow root. No business logic: only displays states and emits
  * callbacks (trigger / accept / dismiss).
  *
- * Les états reflètent la Machine A (src/models/form-assistant.model.md).
+ * States mirror Machine A (src/models/form-assistant.model.md).
  */
 export type WidgetViewState =
   | { kind: 'armed' }
