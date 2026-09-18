@@ -38,13 +38,27 @@ textarea:focus-visible,
   box-shadow: 0 0 0 4px rgba(11, 100, 233, 0.16);
 }
 
+/*
+ * Reduced motion (DAO #200, audit 2026-09-18): preserve perceptible feedback
+ * while suppressing movement. Opacity/color fades keep a short but visible
+ * duration so state changes stay readable; transform and layout properties
+ * are excluded from transition-property so movement snaps instead of
+ * animating. The former blanket instant-duration (near-zero) kill destroyed
+ * state-change feedback for prefers-reduced-motion users.
+ */
+:root {
+  --motion-duration-reduced: 80ms;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
+    transition-property:
+      opacity, color, background-color, border-color, fill, stroke, box-shadow !important;
+    transition-duration: var(--motion-duration-reduced) !important;
+    animation-duration: var(--motion-duration-reduced) !important;
     animation-iteration-count: 1 !important;
   }
 }
