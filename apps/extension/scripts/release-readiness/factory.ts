@@ -23,6 +23,7 @@ import {
   type ReleaseReadinessReducerPorts,
   type ReleaseReadinessReduction,
 } from './reducer';
+import { ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS } from '../verify-manifest';
 import { inspectPrivilegedWorkflow } from './workflow-policy';
 import {
   deriveCandidateReplacementClosureProof,
@@ -1436,14 +1437,27 @@ export function deriveCandidateIdentity(input: {
     const connectorHostPermissions = [
       ...new Set(includedConnectors.flatMap((connector) => [...connector.hostPermissions])),
     ].sort();
-    if (!sameArray(hostPermissions, connectorHostPermissions)) {
+    // Infrastructure hosts (AI Gateway, Copilot) ride alongside connector
+    // authority: the build retains unowned patterns, so the expected set is
+    // connector authority plus the reviewed infrastructure allowlist — but
+    // only patterns the source manifest actually declares, so candidates
+    // without a given infra host don't gain it implicitly.
+    const allowedHostPermissions = [
+      ...new Set([
+        ...connectorHostPermissions,
+        ...ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS.filter((pattern) =>
+          sourceHosts.includes(pattern)
+        ),
+      ]),
+    ].sort();
+    if (!sameArray(hostPermissions, allowedHostPermissions)) {
       throw new ReleaseCandidateFactoryError(
         'Built manifest host permissions differ from included connector authority.'
       );
     }
     const expectedBuiltManifest = deriveExpectedBuiltManifest(
       sourceManifest,
-      connectorHostPermissions
+      allowedHostPermissions
     );
     if (jcsCanonicalize(builtManifest) !== jcsCanonicalize(expectedBuiltManifest)) {
       throw new ReleaseCandidateFactoryError(
