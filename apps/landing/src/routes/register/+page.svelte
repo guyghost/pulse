@@ -56,7 +56,7 @@
 
 <main class="auth-page">
   <div class="container">
-    <div class="auth-card glass-card">
+    <div class="auth-card">
       {#if linkSent}
         <div class="auth-card__header">
           <h1>Vérifiez votre email</h1>

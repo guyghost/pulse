@@ -23,7 +23,7 @@
 
 <main class="auth-page">
   <div class="container">
-    <div class="auth-card glass-card">
+    <div class="auth-card">
       <div class="auth-card__header">
         <h1>Connecter cette extension</h1>
         <p>
