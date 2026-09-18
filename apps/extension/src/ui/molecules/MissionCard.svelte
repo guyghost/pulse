@@ -531,7 +531,7 @@
                 : grade === 'B'
                   ? 'bg-accent-amber text-text-on-bright'
                   : grade === 'C'
-                    ? 'bg-status-orange-graphic text-text-on-bright'
+                    ? 'bg-status-orange-graphic text-surface-white'
                     : 'bg-disabled-gray text-text-secondary'}
             <div class="flex items-center gap-2.5 py-0.5">
               <span class="text-caption text-text-subtle flex-1">{line.label}</span>
