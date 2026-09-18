@@ -106,7 +106,7 @@ authentifié reste hors périmètre, comme à l'audit précédent).
 
 ## Findings vérifiés non-actionables (faux positifs ou intentionnels)
 
-- **`overused-font` (Geist)** : choice documenté dans `DESIGN.md` (`--font-geist`),
+- **`overused-font` (Geist)** : choix documenté dans `DESIGN.md` (`--font-geist`),
   épinglé par le design system. Ajouter une ignore-rule projet si le bruit gêne.
 - **`codex-grid-background` (dashboard)** : signature de marque « Analytical
   Blueprint » assumée. À rescoper uniquement si elle est perçue comme bruit sur
