@@ -22,7 +22,7 @@
     "svelte": "^5.57.0"
   },
   "devDependencies": {
-    "@playwright/test": "1.62.1",
+    "@playwright/test": "1.61.1",
     "@pulse/tsconfig": "workspace:*",
     "@sveltejs/adapter-vercel": "^6.3.4",
     "@sveltejs/kit": "^2.70.3",
