@@ -39,6 +39,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   respectRateLimits: true,
   customDelayMs: 0,
   theme: 'system',
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
 };
 const immediateGate: SettingsAtomicCommitGatePort = {
   async runExclusive(scope, effect) {

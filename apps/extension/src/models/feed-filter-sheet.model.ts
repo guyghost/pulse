@@ -1,4 +1,5 @@
 import type { MissionSource, RemoteType } from '$lib/core/types/mission';
+import type { MissionCategory } from '$lib/core/types/mission-classification';
 import type { SeniorityLevel } from '$lib/core/types/profile';
 import type { FeedDecisionPresetId, FeedScoreBucket } from '$lib/core/types/feed-view';
 
@@ -8,6 +9,7 @@ export interface FeedFilterDraft {
   selectedTjmMin: number | null;
   selectedSource: MissionSource | null;
   selectedRemote: RemoteType | null;
+  selectedCategory: MissionCategory | null;
   selectedSeniority: SeniorityLevel | null;
   selectedStacks: string[];
 }
@@ -24,6 +26,7 @@ export type FeedFilterSheetEvent =
   | { type: 'SET_TJM_MIN'; tjmMin: number | null }
   | { type: 'SET_SOURCE'; source: MissionSource | null }
   | { type: 'SET_REMOTE'; remote: RemoteType | null }
+  | { type: 'SET_CATEGORY'; category: MissionCategory | null }
   | { type: 'SET_SENIORITY'; seniority: SeniorityLevel | null }
   | { type: 'TOGGLE_STACK'; stack: string }
   | { type: 'RESET_FILTERS' }
@@ -47,6 +50,7 @@ export function emptyFeedFilterDraft(): FeedFilterDraft {
     selectedTjmMin: null,
     selectedSource: null,
     selectedRemote: null,
+    selectedCategory: null,
     selectedSeniority: null,
     selectedStacks: [],
   };
@@ -149,6 +153,8 @@ export function transitionFeedFilterSheet(
             ? null
             : state.filters.decisionPreset,
       });
+    case 'SET_CATEGORY':
+      return updateDraft(state, { ...state.filters, selectedCategory: event.category });
     case 'SET_SENIORITY':
       return updateDraft(state, { ...state.filters, selectedSeniority: event.seniority });
     case 'TOGGLE_STACK': {

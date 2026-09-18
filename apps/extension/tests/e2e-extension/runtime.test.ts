@@ -16,8 +16,11 @@ test(
     const page = await extension.openSidePanel();
     const expectedSettings = {
       autoScan: true,
+      classificationConfidenceThreshold: 0.7,
+      classificationEnabled: true,
       customDelayMs: 0,
       enabledConnectors: [],
+      maxClassificationPerScan: 25,
       maxSemanticPerScan: 4,
       notificationScoreThreshold: 75,
       notifications: false,

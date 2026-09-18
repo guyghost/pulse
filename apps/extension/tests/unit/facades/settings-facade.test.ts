@@ -40,6 +40,9 @@ const settings: AppSettings = {
   respectRateLimits: true,
   customDelayMs: 0,
   theme: 'system',
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
 };
 
 describe('settings facade profile bridge', () => {

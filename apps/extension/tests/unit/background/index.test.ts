@@ -128,6 +128,9 @@ const RELEASE_SETTINGS = {
   respectRateLimits: true,
   customDelayMs: 0,
   theme: 'system' as const,
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
 };
 
 function cloneStorageValue<T>(value: T): T {
@@ -435,6 +438,9 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
     respectRateLimits: true,
     customDelayMs: 0,
     theme: 'system',
+    classificationEnabled: true,
+    maxClassificationPerScan: 25,
+    classificationConfidenceThreshold: 0.7,
   },
   getSettings,
   setSettings,
@@ -2462,6 +2468,9 @@ describe('background auto-scan notifications', () => {
       notificationScoreThreshold: 80,
       customDelayMs: 1000,
       theme: 'dark' as const,
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
     const getResponse = vi.fn();
     const onboardingResponse = vi.fn();
@@ -2625,6 +2634,7 @@ describe('background auto-scan notifications', () => {
           selectedStacks: [],
           selectedSource: null,
           selectedRemote: null,
+          selectedCategory: null,
           selectedSeniority: null,
           selectedScoreBucket: 'strong',
           decisionPreset: null,
@@ -3038,6 +3048,7 @@ describe('background auto-scan notifications', () => {
           selectedStacks: [],
           selectedSource: null,
           selectedRemote: 'full' as const,
+          selectedCategory: null,
           selectedSeniority: null,
           selectedScoreBucket: null,
           decisionPreset: null,

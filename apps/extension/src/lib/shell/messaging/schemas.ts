@@ -151,6 +151,20 @@ const FeedSavedViewSchema = z
           .enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'])
           .nullable(),
         selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
+        selectedCategory: z
+          .enum([
+            'frontend',
+            'backend',
+            'fullstack',
+            'mobile',
+            'data',
+            'devops',
+            'product',
+            'design',
+            'other',
+          ])
+          .nullable()
+          .default(null),
         selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),
         selectedScoreBucket: z.enum(['strong', 'good', 'weak']).nullable(),
         decisionPreset: z
@@ -304,6 +318,10 @@ const AppSettingsSchema = z
     respectRateLimits: z.boolean(),
     customDelayMs: z.number().int().min(0).max(60000),
     theme: z.enum(['light', 'dark', 'system']),
+    // Classification fields back-fill snapshots emitted by older builds.
+    classificationEnabled: z.boolean().default(true),
+    maxClassificationPerScan: z.number().int().min(0).max(100).default(25),
+    classificationConfidenceThreshold: z.number().min(0).max(1).default(0.7),
   })
   .strict();
 

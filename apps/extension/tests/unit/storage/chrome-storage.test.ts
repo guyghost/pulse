@@ -57,6 +57,9 @@ describe('getSettings', () => {
       respectRateLimits: true,
       customDelayMs: 0,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     });
   });
 
@@ -75,6 +78,9 @@ describe('getSettings', () => {
       respectRateLimits: false,
       customDelayMs: 2000,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -96,6 +102,9 @@ describe('getSettings', () => {
       scanIntervalMinutes: 60,
       notifications: false,
       theme: 'dark',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -120,6 +129,9 @@ describe('getSettings', () => {
       respectRateLimits: true,
       customDelayMs: 0,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -140,6 +152,9 @@ describe('getSettings', () => {
       respectRateLimits: true,
       customDelayMs: 0,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -159,6 +174,9 @@ describe('getSettings', () => {
       respectRateLimits: true,
       customDelayMs: 0,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -177,6 +195,9 @@ describe('getSettings', () => {
       respectRateLimits: true,
       customDelayMs: 0,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -195,6 +216,9 @@ describe('getSettings', () => {
       respectRateLimits: true,
       customDelayMs: 0,
       theme: 'system',
+      classificationEnabled: true,
+      maxClassificationPerScan: 25,
+      classificationConfidenceThreshold: 0.7,
     };
 
     const settings = await getSettings();
@@ -269,6 +293,7 @@ describe('feed saved views storage', () => {
           selectedStacks: ['Svelte'],
           selectedSource: null,
           selectedRemote: 'full' as const,
+          selectedCategory: null,
           selectedSeniority: 'senior' as const,
           selectedScoreBucket: 'strong' as const,
           decisionPreset: null,

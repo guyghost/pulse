@@ -15,4 +15,10 @@ export interface AppSettings {
   respectRateLimits: boolean;
   customDelayMs: number;
   theme: ThemePreference;
+  /** Master switch for the Jev classification service (AI Gateway). */
+  classificationEnabled: boolean;
+  /** Maximum missions classified per scan (cost budget). */
+  maxClassificationPerScan: number;
+  /** Minimum model confidence in [0, 1] for a classification to be kept. */
+  classificationConfidenceThreshold: number;
 }

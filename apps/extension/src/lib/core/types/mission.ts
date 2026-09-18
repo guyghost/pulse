@@ -1,5 +1,6 @@
 import type { SeniorityLevel } from './profile';
 import type { ScoreBreakdown } from './score';
+import type { MissionClassification } from './mission-classification';
 
 export type MissionSource =
   'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick' | 'malt';
@@ -53,4 +54,10 @@ export interface Mission {
    * @deprecated Use scoreBreakdown.semanticReason instead.
    */
   semanticReason: string | null;
+  /**
+   * Jev classification (category + remote compatibility), when available.
+   * Profile-independent: absent until classified, and never revised by
+   * profile changes.
+   */
+  classification?: MissionClassification | null;
 }

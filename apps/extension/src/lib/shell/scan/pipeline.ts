@@ -5,7 +5,7 @@
  * transformed missions. The pipeline is designed for testability and extensibility.
  *
  * Pipeline stages:
- *   extract → normalize → dedup → filter → score → enrich(semantic) → persist
+ *   extract → normalize → dedup → filter → score → enrich(semantic) → classify(jev) → persist
  *
  * Shell module: orchestrates I/O but delegates pure logic to core.
  */
@@ -22,6 +22,8 @@ import {
 } from '../../core/scoring/relevance';
 import { buildScoreBreakdown, computeFinalBreakdown } from '../../core/scoring/final-score';
 import { createTracking } from '../../core/tracking/transitions';
+import { enrichMissionsWithClassification } from '../ai/mission-classifier';
+import type { ClassificationSettings } from '../ai/mission-classifier';
 
 import type { PlatformConnector } from '../connectors/platform-connector';
 import { saveMissions } from '../storage/db';
@@ -37,6 +39,8 @@ export interface PipelineContext {
   now: Date;
   signal?: AbortSignal;
   maxSemanticPerScan: number;
+  /** Jev classification settings — classification stage is skipped when absent. */
+  classification?: ClassificationSettings;
   /** Connector search context built from profile */
   searchContext: ConnectorSearchContext | null;
 }
@@ -174,7 +178,32 @@ export const enrichStage: PipelineStage = {
 };
 
 /**
- * Stage 6: Track — create tracking records for new missions.
+ * Stage 6: Classify — Jev classification (category + remote compatibility).
+ * Profile-independent and non-blocking: any failure leaves missions
+ * unclassified without affecting the rest of the pipeline.
+ */
+export const classifyStage: PipelineStage = {
+  name: 'classify',
+  execute: async (missions: Mission[], ctx: PipelineContext) => {
+    if (!ctx.classification?.enabled || missions.length === 0 || ctx.signal?.aborted) {
+      return missions;
+    }
+
+    try {
+      const { missions: classified } = await enrichMissionsWithClassification(
+        missions,
+        ctx.classification,
+        ctx.signal
+      );
+      return classified;
+    } catch {
+      return missions;
+    }
+  },
+};
+
+/**
+ * Stage 7: Track — create tracking records for new missions.
  */
 export const trackStage: PipelineStage = {
   name: 'track',
@@ -265,5 +294,13 @@ export async function runPipeline(
  * Create the default scan pipeline stages (excluding extract, which is connector-specific).
  */
 export function createDefaultPipelineStages(): PipelineStage[] {
-  return [filterStage, dedupStage, scoreStage, enrichStage, trackStage, persistStage];
+  return [
+    filterStage,
+    dedupStage,
+    scoreStage,
+    enrichStage,
+    classifyStage,
+    trackStage,
+    persistStage,
+  ];
 }

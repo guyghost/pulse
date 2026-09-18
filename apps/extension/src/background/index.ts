@@ -34,6 +34,10 @@ import {
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
 import { enrichMissionsWithSemanticScores } from '../lib/shell/ai/semantic-scorer';
+import {
+  enrichMissionsWithClassification,
+  type ClassificationSettings,
+} from '../lib/shell/ai/mission-classifier';
 import { createActor, type ActorRefFrom } from 'xstate';
 import {
   scanLifecycleMachine,
@@ -70,6 +74,7 @@ import {
   DIGEST_ALARM_NAME,
 } from '../lib/shell/notifications/daily-digest';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
+import { clearExpiredClassificationCache } from '../lib/shell/storage/classification-cache';
 import {
   getAllHealthSnapshots,
   readHealthSnapshotsForProbeReconciliation,
@@ -247,6 +252,11 @@ async function previewLinkedInProfile(
 // Trigger expired semantic cache cleanup on startup
 clearExpiredSemanticCache().catch((err) => {
   console.warn('[MissionPulse] Failed to cleanup expired semantic cache:', err);
+});
+
+// Trigger expired classification cache cleanup on startup
+clearExpiredClassificationCache().catch((err) => {
+  console.warn('[MissionPulse] Failed to cleanup expired classification cache:', err);
 });
 
 // Health snapshots are persisted across service worker wake-ups so the side panel
@@ -928,6 +938,54 @@ async function executeAcceptedScanOperation(
             return;
           }
           console.warn('[MissionPulse] Semantic enrichment failed:', error);
+        }
+      }
+
+      // Jev classification is profile-INDEPENDENT: it runs regardless of the
+      // profile state and needs no profile fence of its own. To stay safe
+      // against a SAVE_PROFILE rescore that commits while classification is
+      // in flight, the classification is applied onto missions re-read from
+      // the store (never onto the stale result.missions objects), so no
+      // profile-dependent score is ever rewritten here. Unclassified stored
+      // missions are the only candidates; already-classified ones are left
+      // untouched (their cache entry stays valid via the content
+      // fingerprint). Failures are swallowed — missions simply stay
+      // unclassified and the feed is unaffected.
+      const classificationSettings: ClassificationSettings = {
+        enabled: settings.classificationEnabled,
+        maxPerScan: settings.maxClassificationPerScan,
+        confidenceThreshold: settings.classificationConfidenceThreshold,
+      };
+      if (
+        classificationSettings.enabled &&
+        result.missions.length > 0 &&
+        !operation.controller.signal.aborted
+      ) {
+        try {
+          const stored = await getMissions();
+          const pending = stored.filter((mission) => !mission.classification);
+          if (pending.length > 0 && !operation.controller.signal.aborted) {
+            const { changed } = await enrichMissionsWithClassification(
+              pending,
+              classificationSettings,
+              operation.controller.signal
+            );
+            if (changed && !operation.controller.signal.aborted) {
+              await saveMissions(stored, operation.controller.signal);
+              if (trigger !== 'alarm') {
+                await chrome.runtime
+                  .sendMessage({ type: 'MISSIONS_UPDATED', payload: stored })
+                  .catch(() => {
+                    // Side panel not open; classified missions remain durable.
+                  });
+              }
+            }
+          }
+        } catch (error) {
+          if (operation.controller.signal.aborted) {
+            return;
+          }
+          console.warn('[MissionPulse] Mission classification failed:', error);
         }
       }
 

@@ -123,6 +123,40 @@ describe('feed filter grid model', () => {
     });
   });
 
+  it('toggles the category filter and syncs the committed draft', () => {
+    const selected = transitionFeedFilterSheet(open(), {
+      type: 'SET_CATEGORY',
+      category: 'frontend',
+    });
+
+    expect(selected.state).toEqual({
+      value: 'open',
+      filters: { ...emptyFeedFilterDraft(), selectedCategory: 'frontend' },
+    });
+    expect(selected.command).toEqual({
+      type: 'SYNC_FILTERS',
+      filters: { ...emptyFeedFilterDraft(), selectedCategory: 'frontend' },
+    });
+
+    const cleared = transitionFeedFilterSheet(selected.state, {
+      type: 'SET_CATEGORY',
+      category: null,
+    });
+    expect(cleared.command).toEqual({
+      type: 'SYNC_FILTERS',
+      filters: emptyFeedFilterDraft(),
+    });
+
+    const switched = transitionFeedFilterSheet(cleared.state, {
+      type: 'SET_CATEGORY',
+      category: 'data',
+    });
+    expect(switched.command).toEqual({
+      type: 'SYNC_FILTERS',
+      filters: { ...emptyFeedFilterDraft(), selectedCategory: 'data' },
+    });
+  });
+
   it('keeps stacks unique, ignores blank values, and syncs reset', () => {
     let state = open({ ...emptyFeedFilterDraft(), selectedSource: 'free-work' });
     state = transitionFeedFilterSheet(state, { type: 'TOGGLE_STACK', stack: ' Java ' }).state;
