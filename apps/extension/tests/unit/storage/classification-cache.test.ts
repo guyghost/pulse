@@ -57,10 +57,11 @@ describe('classification cache', () => {
   });
 
   it('returns cached classifications while the content fingerprint matches', async () => {
-    await cacheClassifications([write('mission-1', 'fp-1', 'backend')]);
+    const stored = classification('backend');
+    await cacheClassifications([{ ...input('mission-1', 'fp-1'), classification: stored }]);
 
     await expect(getCachedClassifications([input('mission-1', 'fp-1')])).resolves.toEqual(
-      new Map([['mission-1', classification('backend')]])
+      new Map([['mission-1', stored]])
     );
   });
 

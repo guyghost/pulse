@@ -64,7 +64,11 @@ d'afficher une valeur douteuse. Les réponses mal formées sont rejetées par
 ## Cycle de vie
 
 1. **Scan** — après le broadcast terminal, `enrichMissionsWithClassification`
-   s'exécute de façon non bloquante (aucune erreur ne remonte au scan).
+   s'exécute de façon non bloquante (aucune erreur ne remonte au scan). La
+   classification est appliquée sur les missions **relues depuis le store**
+   (seules celles sans classification sont candidates) : une rescore liée à
+   un changement de profil qui commite pendant l'enrichissement ne peut jamais
+   être écrasée par des scores obsolètes.
 2. **Cache** — clé = id de mission, entrée = classification + empreinte de
    contenu + date. TTL 7 jours, 1 000 entrées maximum, purge des expirées au
    démarrage. La classification étant **indépendante du profil**, aucune
