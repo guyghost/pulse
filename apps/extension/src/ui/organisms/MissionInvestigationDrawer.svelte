@@ -432,7 +432,7 @@
                     </button>
                     <button
                       type="button"
-                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
+                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red-text"
                       onclick={() => {
                         actionsMenuOpen = false;
                         onHide?.();
@@ -448,7 +448,9 @@
               </div>
             </div>
             {#if trackingState === 'error' && trackingError}
-              <p class="mt-2 text-meta leading-5 text-status-red" role="status">{trackingError}</p>
+              <p class="mt-2 text-meta leading-5 text-status-red-text" role="status">
+                {trackingError}
+              </p>
             {/if}
           </section>
         </div>

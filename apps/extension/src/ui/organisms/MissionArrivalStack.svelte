@@ -161,7 +161,7 @@
 
         {#if stackState === 'refresh-error'}
           <p
-            class="mx-4 mb-3 rounded-lg bg-status-red/10 px-3 py-2 text-meta text-status-red"
+            class="mx-4 mb-3 rounded-lg bg-status-red/10 px-3 py-2 text-meta text-status-red-text"
             role="alert"
           >
             {errorMessage ?? 'Impossible d’actualiser la file. Réessayez.'}

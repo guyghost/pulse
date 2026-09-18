@@ -68,11 +68,11 @@
     severity === 'success'
       ? 'bg-accent-green/10 text-accent-green'
       : severity === 'attention'
-        ? 'bg-status-yellow/15 text-status-orange'
+        ? 'bg-status-yellow/15 text-status-orange-text'
         : severity === 'incident'
-          ? 'bg-status-orange/10 text-status-orange'
+          ? 'bg-status-orange/10 text-status-orange-text'
           : severity === 'critical'
-            ? 'bg-status-red/10 text-status-red'
+            ? 'bg-status-red/10 text-status-red-text'
             : 'bg-blueprint-blue/8 text-blueprint-blue-on-tint'
   );
 
@@ -93,9 +93,9 @@
     severity === 'success'
       ? 'text-accent-green'
       : severity === 'attention' || severity === 'incident'
-        ? 'text-status-orange'
+        ? 'text-status-orange-text'
         : severity === 'critical'
-          ? 'text-status-red'
+          ? 'text-status-red-text'
           : 'text-text-subtle'
   );
 

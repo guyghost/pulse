@@ -36,7 +36,7 @@ export class CherryPickConnector extends BaseConnector {
       const allMissions: Mission[] = [];
 
       for (let page = 1; ; page++) {
-        // Délai entre les pages (sauf première)
+        // Delay between pages (except the first)
         if (page > 1) {
           await delayBetweenPages(this.id, page, signal);
         }
@@ -61,8 +61,8 @@ export class CherryPickConnector extends BaseConnector {
           body.minimum_rate = context.tjmMin;
         }
 
-        // Paramètre de pagination : { page: N } est le pattern le plus courant
-        // pour les API REST paginées type Laravel/Symfony
+        // Pagination parameter: { page: N } is the most common pattern
+        // for Laravel/Symfony-style paginated REST APIs
         const result = await this.fetchJSON(
           SEARCH_URL,
           now,

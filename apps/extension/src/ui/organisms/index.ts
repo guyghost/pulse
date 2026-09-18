@@ -1,3 +1,5 @@
 // Organisms - Composants complexes qui combinent des molecules
 export { default as MetricsPanel } from './MetricsPanel.svelte';
 export { default as CopilotPanel } from './CopilotPanel.svelte';
+export { default as TimeToReviewCard } from './TimeToReviewCard.svelte';
+export { default as ScanRunsPanel } from './ScanRunsPanel.svelte';

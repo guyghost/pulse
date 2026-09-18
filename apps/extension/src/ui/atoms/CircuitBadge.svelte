@@ -16,22 +16,25 @@
     switch (state) {
       case 'closed':
         return {
-          dotClass: 'bg-blueprint-blue shadow-[0_0_6px_theme(colors.blueprint-blue/60%)]',
+          dotClass:
+            'bg-blueprint-blue shadow-[0_0_6px_color-mix(in_srgb,var(--color-blueprint-blue)_60%,transparent)]',
           labelClass: 'text-blueprint-blue',
           label: 'Opérationnel',
           title: 'Connecteur opérationnel',
         };
       case 'half-open':
         return {
-          dotClass: 'bg-blueprint-blue shadow-[0_0_6px_theme(colors.blueprint-blue/60%)]',
+          dotClass:
+            'bg-blueprint-blue shadow-[0_0_6px_color-mix(in_srgb,var(--color-blueprint-blue)_60%,transparent)]',
           labelClass: 'text-blueprint-blue',
           label: 'Sonde...',
           title: 'Connecteur en cours de récupération',
         };
       case 'open':
         return {
-          dotClass: 'bg-status-red shadow-[0_0_6px_theme(colors.status-red/60%)]',
-          labelClass: 'text-status-red',
+          dotClass:
+            'bg-status-red shadow-[0_0_6px_color-mix(in_srgb,var(--color-status-red)_60%,transparent)]',
+          labelClass: 'text-status-red-text',
           label: 'Suspendu',
           title: "Connecteur suspendu — trop d'erreurs",
         };

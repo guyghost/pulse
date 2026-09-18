@@ -1,17 +1,17 @@
 /**
- * Health Metrics — Calcul de métriques depuis un snapshot.
+ * Health Metrics — Metric computation from a snapshot.
  *
- * Règles Core : zéro I/O, zéro async, zéro side effect.
- * `now` est toujours injecté depuis le Shell.
+ * Core rules: zero I/O, zero async, zero side effects.
+ * `now` is always injected from the Shell.
  */
 
 import type { ConnectorHealthSnapshot, HealthMetrics } from '../types/health';
 
 /**
- * Calcule les métriques de santé depuis un snapshot.
+ * Computes health metrics from a snapshot.
  *
- * @param snapshot  Snapshot courant
- * @param now       Timestamp courant en ms (injecté depuis Shell)
+ * @param snapshot  Current snapshot
+ * @param now       Current timestamp in ms (injected from Shell)
  */
 export function computeHealthMetrics(
   snapshot: ConnectorHealthSnapshot,
@@ -51,7 +51,7 @@ export function percentile(values: readonly number[], p: number): number | null 
     return sorted[lower];
   }
 
-  // Interpolation linéaire
+  // Linear interpolation
   const fraction = index - lower;
   return sorted[lower] * (1 - fraction) + sorted[upper] * fraction;
 }

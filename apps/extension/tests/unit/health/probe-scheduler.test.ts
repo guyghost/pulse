@@ -46,7 +46,7 @@ vi.stubGlobal('chrome', {
 });
 
 // ============================================================================
-// Imports (après stub)
+// Imports (after stub)
 // ============================================================================
 
 import {
@@ -238,11 +238,11 @@ describe('cancelAllProbes', () => {
     // Remettre les alarmes dans le mock
     registeredAlarms.set('probe:freework', { delayInMinutes: 30 });
     registeredAlarms.set('probe:lehibou', { delayInMinutes: 30 });
-    registeredAlarms.set('auto-scan', { periodInMinutes: 30 }); // ne doit pas être supprimée
+    registeredAlarms.set('auto-scan', { periodInMinutes: 30 }); // must not be deleted
 
     await cancelAllProbes();
 
-    // auto-scan ne doit pas avoir été supprimée
+    // auto-scan must not have been deleted
     const clearCalls = mockAlarms.clear.mock.calls.map((c) => c[0]);
     expect(clearCalls).toContain('probe:freework');
     expect(clearCalls).toContain('probe:lehibou');

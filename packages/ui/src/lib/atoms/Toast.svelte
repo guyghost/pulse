@@ -30,9 +30,9 @@
 
   const colorClasses = {
     info: 'border-blueprint-blue/20 bg-surface-white text-blueprint-blue',
-    error: 'border-status-red/20 bg-surface-white text-status-red',
+    error: 'border-status-red/20 bg-surface-white text-status-red-text',
     success: 'border-accent-green/20 bg-surface-white text-accent-green',
-    warning: 'border-status-orange/20 bg-surface-white text-status-orange',
+    warning: 'border-status-orange/20 bg-surface-white text-status-orange-text',
   } as const;
 </script>
 

@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { buildFeedStory } from '../../../src/lib/core/feed/build-feed-story';
+import {
+  buildFeedStory,
+  resolveFeedEmptySurface,
+} from '../../../src/lib/core/feed/build-feed-story';
 
 const baseInput = {
   isOffline: false,
@@ -11,6 +14,9 @@ const baseInput = {
   filterActive: false,
   totalMissionCount: 0,
   searchQuery: '',
+  enabledConnectorCount: 1,
+  sessionReadyCount: 1,
+  reconnectPlatformName: 'Free-Work',
 };
 
 describe('buildFeedStory', () => {
@@ -42,5 +48,46 @@ describe('buildFeedStory', () => {
 
     expect(critical.severity).toBe('critical');
     expect(critical.title).toContain('Impossible');
+  });
+
+  it('does not let the list duplicate an empty story already shown in the hero', () => {
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 0,
+        storyRenderedInHero: true,
+      })
+    ).toBe('hero');
+  });
+
+  it('routes a silent-hero empty feed to the story, not a generic list empty', () => {
+    const neverScanned = buildFeedStory({
+      ...baseInput,
+      error: null,
+      newCount: 0,
+      highScoreCount: 0,
+      visibleCount: 0,
+    });
+    const scannedEmpty = buildFeedStory({
+      ...baseInput,
+      error: null,
+      newCount: 0,
+      highScoreCount: 0,
+      visibleCount: 0,
+      hasCompletedScan: true,
+    });
+
+    expect(
+      resolveFeedEmptySurface({
+        listCount: 0,
+        isLoading: false,
+        storyVisibleCount: 0,
+        storyRenderedInHero: false,
+      })
+    ).toBe('list-story');
+    expect(neverScanned.primaryActionId).toBe('start-scan');
+    expect(scannedEmpty.primaryActionId).toBe('adjust-profile');
+    expect(scannedEmpty.title).not.toBe(neverScanned.title);
   });
 });

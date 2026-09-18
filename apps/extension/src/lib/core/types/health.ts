@@ -1,7 +1,7 @@
 /**
- * Types pour le système de circuit breaker et health monitoring des connecteurs.
+ * Types for the connector circuit breaker and health monitoring system.
  *
- * Règles Core : pure, pas d'I/O, pas de Date.now(), pas d'import Shell.
+ * Core rules: pure, no I/O, no Date.now(), no Shell imports.
  */
 
 // ============================================================================
@@ -9,10 +9,10 @@
 // ============================================================================
 
 /**
- * États du circuit breaker :
- * - `closed`    : connecteur opérationnel, les appels passent normalement
- * - `open`      : connecteur en échec, les appels sont bloqués
- * - `half-open` : en phase de sonde pour tester la récupération
+ * Circuit breaker states:
+ * - `closed`    : connector operational, calls go through normally
+ * - `open`      : connector failing, calls are blocked
+ * - `half-open` : probing phase to test recovery
  */
 export type CircuitState = 'closed' | 'open' | 'half-open';
 
@@ -26,26 +26,26 @@ export type ConnectorHealthStatus = 'healthy' | 'degraded' | 'broken';
 // ============================================================================
 
 /**
- * Snapshot complet de l'état de santé d'un connecteur.
- * Toutes les timestamps sont en ms (Unix epoch), injectées depuis le Shell.
+ * Complete health snapshot of a connector.
+ * All timestamps are in ms (Unix epoch), injected from the Shell.
  */
 export interface ConnectorHealthSnapshot {
   readonly connectorId: string;
-  /** État courant du circuit */
+  /** Current circuit state */
   readonly circuitState: CircuitState;
-  /** Échecs consécutifs depuis le dernier succès */
+  /** Consecutive failures since the last success */
   readonly consecutiveFailures: number;
-  /** Total d'échecs depuis la création */
+  /** Total failures since creation */
   readonly totalFailures: number;
-  /** Total de succès depuis la création */
+  /** Total successes since creation */
   readonly totalSuccesses: number;
-  /** Timestamp du dernier succès (null si jamais réussi) */
+  /** Timestamp of the last success (null if never succeeded) */
   readonly lastSuccessAt: number | null;
-  /** Timestamp du dernier échec (null si jamais échoué) */
+  /** Timestamp of the last failure (null if never failed) */
   readonly lastFailureAt: number | null;
-  /** Timestamp du dernier changement d'état du circuit */
+  /** Timestamp of the last circuit state change */
   readonly lastStateChangeAt: number;
-  /** Latences récentes en ms (fenêtre glissante, max 100 entrées) */
+  /** Recent latencies in ms (rolling window, max 100 entries) */
   readonly recentLatenciesMs: readonly number[];
 }
 
@@ -54,7 +54,7 @@ export interface ConnectorHealthSnapshot {
 // ============================================================================
 
 /**
- * Résultat d'un appel connecteur, utilisé pour mettre à jour le health snapshot.
+ * Result of a connector call, used to update the health snapshot.
  */
 export type ConnectorCallResult =
   | { readonly success: true; readonly latencyMs: number }
@@ -65,21 +65,21 @@ export type ConnectorCallResult =
 // ============================================================================
 
 /**
- * Seuils configurables du circuit breaker.
- * Valeurs par défaut raisonnables définies dans le Shell.
+ * Configurable circuit breaker thresholds.
+ * Reasonable defaults defined in the Shell.
  */
 export interface HealthThresholds {
-  /** Nombre d'échecs consécutifs pour passer closed → open (défaut: 3) */
+  /** Number of consecutive failures to move closed → open (default: 3) */
   readonly failureThreshold: number;
-  /** Durée minimale en état open avant de tenter half-open, en ms (défaut: 30 min) */
+  /** Minimum time in open state before attempting half-open, in ms (default: 30 min) */
   readonly probeIntervalMs: number;
-  /** Fenêtre glissante pour les latences (défaut: 100) */
+  /** Rolling window for latencies (default: 100) */
   readonly latencyWindowSize: number;
 }
 
 export const DEFAULT_HEALTH_THRESHOLDS: HealthThresholds = {
-  failureThreshold: 5, // 5 échecs persistants (chacun après 3 retries) pour ouvrir
-  probeIntervalMs: 5 * 60 * 1000, // Sonde toutes les 5min (au lieu de 30min)
+  failureThreshold: 5, // 5 persistent failures (each after 3 retries) to open
+  probeIntervalMs: 5 * 60 * 1000, // Probe every 5min (instead of 30min)
   latencyWindowSize: 100,
 };
 
@@ -88,18 +88,18 @@ export const DEFAULT_HEALTH_THRESHOLDS: HealthThresholds = {
 // ============================================================================
 
 /**
- * Métriques calculées depuis un snapshot (latences, taux d'erreur).
+ * Metrics computed from a snapshot (latencies, error rate).
  */
 export interface HealthMetrics {
-  /** Latence médiane (p50) en ms, null si aucune donnée */
+  /** Median latency (p50) in ms, null if no data */
   readonly p50LatencyMs: number | null;
-  /** Latence p95 en ms, null si aucune donnée */
+  /** p95 latency in ms, null if no data */
   readonly p95LatencyMs: number | null;
-  /** Taux d'échec global 0-1 */
+  /** Overall failure rate 0-1 */
   readonly failureRate: number;
-  /** Nombre total d'appels */
+  /** Total number of calls */
   readonly totalCalls: number;
-  /** Temps écoulé depuis le dernier succès en ms, null si jamais réussi */
+  /** Time elapsed since the last success in ms, null if never succeeded */
   readonly msSinceLastSuccess: number | null;
 }
 
@@ -108,8 +108,8 @@ export interface HealthMetrics {
 // ============================================================================
 
 /**
- * Crée un health snapshot initial (circuit fermé, aucune donnée).
- * Le `now` est injecté depuis le Shell.
+ * Creates an initial health snapshot (closed circuit, no data).
+ * `now` is injected from the Shell.
  */
 export function createInitialHealthSnapshot(
   connectorId: string,

@@ -26,8 +26,8 @@ export type ExtensionSurfaceFlags = Record<ExtensionSurfaceFeature, boolean>;
 /**
  * Launch configuration.
  *
- * `applications` (suivi de candidatures) and `connected` (dashboard connecté
- * + synchronisation) are DISABLED at launch. Flip to `true` to ship them.
+ * `applications` (application tracking) and `connected` (connected dashboard
+ * + sync) are DISABLED at launch. Flip to `true` to ship them.
  */
 export const EXTENSION_SURFACE_FLAGS: ExtensionSurfaceFlags = {
   feed: true,

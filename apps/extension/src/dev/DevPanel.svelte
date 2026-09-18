@@ -115,10 +115,10 @@
 
   function severityClasses(severity: DevScenario['severity']): string {
     if (severity === 'incident') {
-      return 'border-status-red/25 bg-status-red/8 text-status-red';
+      return 'border-status-red/25 bg-status-red/8 text-status-red-text';
     }
     if (severity === 'attention') {
-      return 'border-status-orange/25 bg-status-orange/8 text-status-orange';
+      return 'border-status-orange/25 bg-status-orange/8 text-status-orange-text';
     }
     return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-blueprint-blue';
   }
@@ -381,7 +381,7 @@
           <button
             class="rounded-lg border px-2 py-1.5 text-left text-caption transition-colors {premiumScenario ===
             'active-free'
-              ? 'border-status-red/40 bg-status-red/12 text-status-red'
+              ? 'border-status-red/40 bg-status-red/12 text-status-red-text'
               : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray'}"
             onclick={() => applyPremiumScenario('active-free')}
             title="Feature active + utilisateur gratuit : locks + PREMIUM_REQUIRED"
@@ -511,7 +511,7 @@
                 Exporter contexte
               </button>
               <button
-                class="flex-1 rounded-lg border border-status-red/25 bg-status-red/8 px-2 py-1.5 text-caption font-medium text-status-red transition-colors hover:bg-status-red/12"
+                class="flex-1 rounded-lg border border-status-red/25 bg-status-red/8 px-2 py-1.5 text-caption font-medium text-status-red-text transition-colors hover:bg-status-red/12"
                 onclick={() => {
                   onResetMetrics?.();
                   metricsRefreshKey++;

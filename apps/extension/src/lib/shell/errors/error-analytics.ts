@@ -1,8 +1,8 @@
 /**
- * Module d'analytics d'erreurs - Shell
+ * Error analytics module - Shell
  *
- * Ring buffer en mémoire (max 50 entrées) + persistance dans chrome.storage.local.
- * Aucun service externe : toutes les données restent en local (privacy-first).
+ * In-memory ring buffer (max 50 entries) + persistence in chrome.storage.local.
+ * No external service: all data stays local (privacy-first).
  */
 
 import type { AppError } from '$lib/core/errors';
@@ -26,7 +26,7 @@ export interface ErrorSummary {
 }
 
 // ============================================================================
-// Ring buffer en mémoire
+// In-memory ring buffer
 // ============================================================================
 
 const MAX_BUFFER_SIZE = 50;
@@ -64,32 +64,32 @@ export function recordError(error: AppError): void {
 
   if (recordsSinceLastPersist >= PERSIST_EVERY) {
     recordsSinceLastPersist = 0;
-    // Fire-and-forget, on ne bloque pas l'appelant
+    // Fire-and-forget, the caller is never blocked
     persistErrors().catch(() => {
-      // Silencieux : éviter les erreurs infinies
+      // Silent: avoid infinite error loops
     });
   }
 }
 
-/** Persiste le buffer dans chrome.storage.local */
+/** Persists the buffer to chrome.storage.local */
 export async function persistErrors(): Promise<void> {
   await chrome.storage.local.set({ [STORAGE_KEY]: buffer });
 }
 
-/** Récupère le log d'erreurs persisté */
+/** Retrieves the persisted error log */
 export async function getErrorLog(): Promise<ErrorLogEntry[]> {
   const result = await chrome.storage.local.get(STORAGE_KEY);
   return (result[STORAGE_KEY] as ErrorLogEntry[] | undefined) ?? [];
 }
 
-/** Efface le log d'erreurs persisté et le buffer en mémoire */
+/** Clears the persisted error log and the in-memory buffer */
 export async function clearErrorLog(): Promise<void> {
   buffer = [];
   recordsSinceLastPersist = 0;
   await chrome.storage.local.remove(STORAGE_KEY);
 }
 
-/** Retourne un résumé des erreurs en mémoire */
+/** Returns a summary of in-memory errors */
 export function getErrorSummary(): ErrorSummary {
   const now = Date.now();
   const oneDayMs = 24 * 60 * 60 * 1000;
@@ -115,12 +115,12 @@ export function getErrorSummary(): ErrorSummary {
 // Helpers (tests)
 // ============================================================================
 
-/** Retourne une copie du buffer en mémoire (utile pour les tests) */
+/** Returns a copy of the in-memory buffer (useful for tests) */
 export function _getBuffer(): readonly ErrorLogEntry[] {
   return [...buffer];
 }
 
-/** Réinitialise le buffer (utile pour les tests) */
+/** Resets the buffer (useful for tests) */
 export function _resetBuffer(): void {
   buffer = [];
   recordsSinceLastPersist = 0;

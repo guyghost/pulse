@@ -1,7 +1,7 @@
 /**
- * Connector Health Storage — Persistence des snapshots de santé dans chrome.storage.local.
+ * Connector Health Storage — Persistence of health snapshots in chrome.storage.local.
  *
- * Shell only : I/O, async, chrome.storage. Core n'importe jamais ce module.
+ * Shell only: I/O, async, chrome.storage. Core never imports this module.
  */
 
 import { z } from 'zod';
@@ -15,7 +15,7 @@ import { createInitialHealthSnapshot, DEFAULT_HEALTH_THRESHOLDS } from '../../co
 const STORAGE_KEY = 'connector_health_snapshots';
 
 // ============================================================================
-// Zod schema (validation des données lues depuis le storage)
+// Zod schema (validation of data read from storage)
 // ============================================================================
 
 const CircuitStateSchema = z.enum(['closed', 'open', 'half-open']);
@@ -47,7 +47,7 @@ export type ProbeHealthSnapshotsRead =
       readonly reason: 'corrupt' | 'io_error';
     };
 
-/** Détecte les erreurs de quota chrome.storage */
+/** Detects chrome.storage quota errors */
 function isQuotaError(err: unknown): boolean {
   if (err instanceof Error) {
     return err.message.includes('QUOTA_BYTES') || err.message.includes('quota');
@@ -60,8 +60,8 @@ function isQuotaError(err: unknown): boolean {
 // ============================================================================
 
 /**
- * Charge tous les snapshots depuis chrome.storage.local.
- * Retourne un objet vide si aucune donnée ou données corrompues.
+ * Loads all snapshots from chrome.storage.local.
+ * Returns an empty object when there is no data or the data is corrupt.
  */
 async function loadAll(): Promise<StoredSnapshots> {
   try {
@@ -77,7 +77,7 @@ async function loadAll(): Promise<StoredSnapshots> {
       if (parsed.success) {
         snapshots[id] = parsed.data as ConnectorHealthSnapshot;
       }
-      // On ignore silencieusement les entrées corrompues
+      // Silently ignore corrupt entries
     }
     return snapshots;
   } catch {
@@ -120,11 +120,11 @@ function parseStoredSnapshotsStrict(raw: unknown): StoredSnapshots | null {
 // ============================================================================
 
 /**
- * Lit le health snapshot d'un connecteur.
- * Crée et retourne un snapshot initial si aucune donnée n'existe.
+ * Reads a connector's health snapshot.
+ * Creates and returns an initial snapshot when none exists.
  *
- * @param connectorId  ID du connecteur
- * @param now          Timestamp courant en ms (injecté depuis le caller)
+ * @param connectorId  Connector ID
+ * @param now          Current timestamp in ms (injected by the caller)
  */
 export async function getHealthSnapshot(
   connectorId: string,
@@ -135,10 +135,10 @@ export async function getHealthSnapshot(
 }
 
 /**
- * Persiste un health snapshot mis à jour.
- * En cas de quota dépassé, tente de réessayer après avoir élagué les latences.
+ * Persists an updated health snapshot.
+ * On quota exceeded, retries once after pruning latencies.
  *
- * @param snapshot  Snapshot à sauvegarder
+ * @param snapshot  Snapshot to save
  */
 export async function saveHealthSnapshot(snapshot: ConnectorHealthSnapshot): Promise<void> {
   try {
@@ -146,11 +146,11 @@ export async function saveHealthSnapshot(snapshot: ConnectorHealthSnapshot): Pro
     all[snapshot.connectorId] = snapshot;
     await chrome.storage.local.set({ [STORAGE_KEY]: all });
   } catch (err) {
-    // En cas de QUOTA_BYTES dépassé : élaguer les latences et réessayer une fois
+    // On QUOTA_BYTES exceeded: prune latencies and retry once
     if (isQuotaError(err)) {
       try {
         const all = await loadAll();
-        // Élaguer les latences de tous les snapshots à max 10 entrées
+        // Prune latencies of all snapshots to max 10 entries
         for (const [id, snap] of Object.entries(all)) {
           all[id] = { ...snap, recentLatenciesMs: snap.recentLatenciesMs.slice(-10) };
         }
@@ -171,11 +171,11 @@ export async function saveHealthSnapshot(snapshot: ConnectorHealthSnapshot): Pro
 }
 
 /**
- * Lit les snapshots de tous les connecteurs donnés.
- * Les connecteurs sans snapshot reçoivent un snapshot initial.
+ * Reads the snapshots of all given connectors.
+ * Connectors without a snapshot receive an initial one.
  *
- * @param connectorIds  Liste des IDs de connecteurs
- * @param now           Timestamp courant en ms
+ * @param connectorIds  List of connector IDs
+ * @param now           Current timestamp in ms
  */
 export async function getAllHealthSnapshots(
   connectorIds: string[],
@@ -239,7 +239,7 @@ export async function resetHealthSnapshot(connectorId: string): Promise<void> {
 }
 
 /**
- * Supprime tous les snapshots de santé (ex: lors d'un reset global).
+ * Deletes all health snapshots (e.g. during a global reset).
  */
 export async function clearAllHealthSnapshots(): Promise<void> {
   try {

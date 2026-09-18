@@ -57,7 +57,7 @@
   const selectedMarketRange = $derived(analysis ? analysis[userSeniority ?? 'confirmed'] : null);
   // An inverted target (min > max, both defined) is incoherent: do not derive a
   // median/delta from it, otherwise the dashboard would display a misleading
-  // positioning and écart. Surfaced as an explicit validation state instead.
+  // positioning and spread. Surfaced as an explicit validation state instead.
   const isTargetInverted = $derived(
     userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0)
   );
@@ -306,7 +306,7 @@
             <p class="eyebrow eyebrow--strong">Votre cible</p>
             <p
               class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
-                ? 'text-status-red'
+                ? 'text-status-red-text'
                 : 'text-text-primary'}"
             >
               {hasTjmTarget ? `${userTjmMin}–${userTjmMax}€` : '—'}
@@ -379,7 +379,7 @@
           </div>
           <div class="h-1.5 overflow-hidden rounded-full bg-subtle-gray">
             <div
-              class="h-full rounded-full bg-blueprint-blue transition-all duration-500"
+              class="h-full rounded-full bg-blueprint-blue transition-[width] duration-500"
               style:width="{confidencePct}%"
             ></div>
           </div>
@@ -412,12 +412,12 @@
               <span class="w-16 shrink-0 text-micro text-text-muted">Marché</span>
               <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
                 <div
-                  class="absolute inset-y-0 rounded-full bg-text-muted/35 transition-all duration-500"
+                  class="absolute inset-y-0 rounded-full bg-text-muted/35 transition-[left,width] duration-500"
                   style:left="{positioning.marketLeft}%"
                   style:width="{positioning.marketWidth}%"
                 ></div>
                 <div
-                  class="absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-text-primary transition-all duration-500"
+                  class="absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-text-primary transition-[left] duration-500"
                   style:left="{positioning.medianLeft}%"
                   title="Médiane marché"
                 ></div>
@@ -427,7 +427,7 @@
               <span class="w-16 shrink-0 text-micro text-text-muted">Votre cible</span>
               <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
                 <div
-                  class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-all duration-500"
+                  class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-[left,width] duration-500"
                   style:left="{positioning.userLeft}%"
                   style:width="{positioning.userWidth}%"
                 ></div>
@@ -524,7 +524,7 @@
                   </div>
                   <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
                     <div
-                      class="h-full rounded-full bg-blueprint-blue/45 transition-all duration-500"
+                      class="h-full rounded-full bg-blueprint-blue/45 transition-[width] duration-500"
                       style:width="{barWidth}%"
                     ></div>
                   </div>
@@ -558,7 +558,7 @@
                   </div>
                   <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
                     <div
-                      class="h-full rounded-full transition-all duration-500
+                      class="h-full rounded-full transition-[width,background-color] duration-500
                     {region.trend === 'up'
                         ? 'bg-blueprint-blue/40'
                         : region.trend === 'down'

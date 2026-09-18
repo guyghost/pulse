@@ -22,7 +22,7 @@
   ];
 
   function handleFormatSelect(format: ExportFormat) {
-    // Import dynamique du Core pour garder le composant léger
+    // Dynamic Core import to keep the component lightweight
     import('$lib/core/export/mission-export').then((module) => {
       const now = new Date();
       const content = module.exportMissions(

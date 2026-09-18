@@ -1,8 +1,8 @@
-# Contributing to MissionPulse
+# Contribuer à MissionPulse
 
-Thanks for helping improve MissionPulse. This project is local-first and privacy-sensitive, so contributions must preserve the functional core / imperative shell boundary and avoid collecting credentials.
+Merci d'aider à améliorer MissionPulse. Ce projet est local-first et sensible à la vie privée : les contributions doivent préserver la frontière functional core / imperative shell et éviter toute collecte d'identifiants.
 
-## Setup
+## Installation
 
 ```bash
 pnpm install
@@ -10,18 +10,18 @@ pnpm dev
 pnpm ci:check
 ```
 
-Use `pnpm dev:local` when you need the local Supabase stack for the landing/dashboard flows.
+Utilisez `pnpm dev:local` quand vous avez besoin de la stack Supabase locale pour les flux landing/dashboard.
 
-## Development Rules
+## Règles de développement
 
-- Use Svelte 5 runes only: `$props`, `$state`, `$derived`, `$effect`.
-- Keep `apps/extension/src/lib/core/` pure: no I/O, no async, no `chrome.*`, no `Date.now()`.
-- Keep side effects in `apps/extension/src/lib/shell/`.
-- Do not commit secrets, local `.env` files, cookies, session tokens, or generated release ZIPs.
-- Add or update tests for parser, scoring, storage, and messaging changes.
-- Use Conventional Commits: `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
+- Utiliser uniquement les runes Svelte 5 : `$props`, `$state`, `$derived`, `$effect`.
+- Garder `apps/extension/src/lib/core/` pur : pas d'I/O, pas d'async, pas de `chrome.*`, pas de `Date.now()`.
+- Garder les effets de bord dans `apps/extension/src/lib/shell/`.
+- Ne pas committer de secrets, fichiers `.env` locaux, cookies, tokens de session ou ZIP de release générés.
+- Ajouter ou mettre à jour les tests pour les changements de parser, scoring, storage et messaging.
+- Utiliser Conventional Commits : `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`.
 
-## Before Opening a Pull Request
+## Avant d'ouvrir une pull request
 
 ```bash
 pnpm format:check
@@ -31,12 +31,12 @@ pnpm test
 pnpm build
 ```
 
-For extension UI changes, run the relevant Playwright tests from `apps/extension`.
+Pour les changements d'UI de l'extension, lancer les tests Playwright pertinents depuis `apps/extension`.
 
-## Useful Documentation
+## Documentation utile
 
-- [Project README](../README.md)
-- [Documentation index](../docs/README.md)
-- [Architecture decisions](../docs/adr/README.md)
+- [README du projet](../README.md)
+- [Index de la documentation](../docs/README.md)
+- [Décisions d'architecture](../docs/adr/README.md)
 - [CI/CD](../docs/CI-CD.md)
-- [Open source readiness](../docs/open-source-readiness.md)
+- [Préparation open source](../docs/open-source-readiness.md)

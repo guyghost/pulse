@@ -1,12 +1,12 @@
 /**
- * Error Boundary — Wrapper générique pour les handlers de messages bridge.
+ * Error Boundary — Generic wrapper for bridge message handlers.
  *
- * Garantit :
- *  - Isolation : une erreur dans un handler n'affecte pas les autres
- *  - Classification : VALIDATION_ERROR | CONNECTOR_ERROR | STORAGE_ERROR | UNKNOWN
- *  - Logging structuré : type de message, contexte sender, chemin d'erreur Zod
+ * Guarantees:
+ *  - Isolation: an error in one handler doesn't affect the others
+ *  - Classification: VALIDATION_ERROR | CONNECTOR_ERROR | STORAGE_ERROR | UNKNOWN
+ *  - Structured logging: message type, sender context, Zod error path
  *
- * Shell only — pas d'import Core.
+ * Shell only — no Core imports.
  */
 
 import { validateMessage } from './schemas';

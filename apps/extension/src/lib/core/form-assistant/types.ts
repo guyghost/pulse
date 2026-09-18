@@ -1,17 +1,17 @@
 /**
- * Types purs du Form Assistant (remplissage de champs type Grammarly).
+ * Pure types for the Form Assistant (Grammarly-style field filling).
  *
- * Règles (Core) :
- * - Aucune I/O, aucun `Date`, aucun random. Tout ce qui est non-déterministe
- *   est injecté par le Shell.
- * - FieldDescriptor ne contient JAMAIS d'identifiants DOM (id/name), la valeur
- *   d'autres champs, l'URL courante ou du HTML brut. Seules des métadonnées
- *   décrivant le champ sont conservées.
+ * Rules (Core):
+ * - No I/O, no `Date`, no randomness. Everything non-deterministic is
+ *   injected by the Shell.
+ * - FieldDescriptor NEVER contains DOM identifiers (id/name), other fields'
+ *   values, the current URL, or raw HTML. Only metadata describing the field
+ *   is kept.
  *
- * Source de vérité : `src/models/form-assistant.model.md`.
+ * Source of truth: `src/models/form-assistant.model.md`.
  */
 
-/** Catégorie sémantique d'un champ de formulaire. */
+/** Semantic category of a form field. */
 export type FieldKind =
   | 'first-name'
   | 'last-name'
@@ -27,13 +27,13 @@ export type FieldKind =
   | 'job-title'
   | 'free-text';
 
-/** Type d'entrée DOM dont on a la maîtrise (pas de valeurs arbitraires). */
+/** DOM input type we fully control (no arbitrary values). */
 export type FieldInputType =
   'text' | 'textarea' | 'email' | 'tel' | 'url' | 'search' | 'contenteditable';
 
 /**
- * Métadonnées brutes extraites du DOM par le content script, avant
- * sanitisation. Le Shell (content script) produit ces valeurs ; le Core
+ * Raw metadata extracted from the DOM by the content script, before
+ * sanitization. The Shell (content script) produces these values; the Core
  * les valide/sanitise/classifie.
  */
 export interface RawFieldInput {
@@ -44,8 +44,8 @@ export interface RawFieldInput {
 }
 
 /**
- * Descripteur de champ canonical : métadonnées sanit-isées + catégorie.
- * C'est l'unique représentation d'un champ qui franchit le bridge.
+ * Canonical field descriptor: sanitized metadata + category.
+ * This is the only field representation that crosses the bridge.
  */
 export interface FieldDescriptor {
   readonly kind: FieldKind;
@@ -60,22 +60,22 @@ export interface FieldProposal {
   readonly text: string;
 }
 
-/** Préférence utilisateur pour le moteur de génération. */
+/** User preference for the generation engine. */
 export type EnginePreference = 'local' | 'remote';
 
-/** Disponibilité du moteur local (Gemini Nano). */
+/** Local engine availability (Gemini Nano). */
 export type AiAvailability = 'available' | 'after-download' | 'no';
 
-/** Droit d'accès au moteur distant (Eve). Piloté par le serveur. */
+/** Remote engine entitlement (Eve). Server-driven. */
 export type EntitlementState = 'active' | 'inactive';
 
-/** Consentement session pour l'appel à Eve (aucun consentement ⇒ pas d'appel). */
+/** Session consent for calling Eve (no consent ⇒ no call). */
 export type ConsentState = 'unknown' | 'granted' | 'denied';
 
 /**
- * Décision du sélecteur de moteur (Machine B). Soit un moteur effectif,
- * soit `none` quand aucun chemin n'est disponible (Gemini Nano absent/non
- * téléchargé ET Eve non autorisé).
+ * Engine selector decision (Machine B). Either an effective engine, or `none`
+ * when no path is available (Gemini Nano absent/not downloaded AND Eve not
+ * entitled).
  */
 export type EngineSelection =
   | { readonly engine: 'local' }
@@ -83,8 +83,8 @@ export type EngineSelection =
   | { readonly engine: 'none'; readonly reason: 'unavailable' };
 
 /**
- * Requête envoyée à Eve (Phase 2). Le profil est une projection allowlistée :
- * seuls les champs professionnels non-PII transitent (jamais d'email/téléphone).
+ * Request sent to Eve (Phase 2). The profile is an allowlisted projection:
+ * only non-PII professional fields transit (never email/phone).
  */
 export interface RemoteFieldRequest {
   readonly kind: FieldKind;

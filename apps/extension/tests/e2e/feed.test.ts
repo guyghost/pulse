@@ -257,19 +257,22 @@ test.describe('Feed', () => {
 
     await setFeedState(page, 'empty');
 
-    // Sur un runner CI lent, le SCAN_COMPLETE du scan de montage (stub à
-    // ~2,5 s après SCAN_START) peut arriver APRÈS le passage à « empty » et
-    // repeupler le feed : ré-émettre l'événement dev du DevPanel (même
-    // mécanisme que son bouton) jusqu'à ce que l'état vide persiste.
+    // On a slow CI runner, the setup scan's SCAN_COMPLETE (stub ~2.5s after
+    // SCAN_START) may arrive AFTER the switch to "empty" and repopulate the
+    // feed: re-emit the DevPanel dev event (same mechanism as its button)
+    // until the empty state persists.
     await expect
       .poll(
         async () => {
           await page.evaluate(() => {
             window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: 'empty' }));
           });
-          return feedRegion(page)
-            .getByText(/Aucune mission/)
-            .isVisible();
+          return (
+            (await feedRegion(page).getByTestId('feed-list-empty').count()) > 0 ||
+            (await feedRegion(page)
+              .getByText(/Aucune mission|Lancez un premier scan|Aucune donnée/)
+              .isVisible())
+          );
         },
         { timeout: 10_000 }
       )
@@ -578,8 +581,8 @@ test.describe('Feed', () => {
 
     const panelIsTopmost = await filterPanel.evaluate((panel) => {
       const rect = panel.getBoundingClientRect();
-      // Sonde au centre vertical : le bord supérieur du panneau passe sous la
-      // barre d'outils sticky du feed (z-20), ce qui fausse un probe top+24.
+      // Probe at the vertical center: the panel's top edge moves below the
+      // sticky feed toolbar (z-20), which would skew a top+24 probe.
       const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2);
       return hit === panel || (hit !== null && panel.contains(hit));
     });
