@@ -51,6 +51,7 @@ import {
   consumeDeepLinkIntent,
   subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
+import { journalFirstViews } from '$lib/shell/storage/review-journal';
 import { rankStacksByCount } from '$lib/core/filters/stack-ranking';
 import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
@@ -325,6 +326,8 @@ export function createFeedPageState(
       const nextSeenIds = markAsSeen(Array.from(seenIds), [missionId]);
       await saveSeenIds(nextSeenIds);
       seenIds = nextSeenIds;
+      // Time to review: the arrival stack counts as a user review.
+      journalFirstViews([missionId], feedStore.missions).catch(() => {});
     },
     onStateChanged: (nextState) => {
       arrivalQueueState = nextState;
@@ -525,9 +528,9 @@ export function createFeedPageState(
   );
 
   function sortCurrentMissions(input: Mission[]): Mission[] {
-    // if/else plutôt que ternaire : les appels en branche de ternaire sont
-    // annotés /* @__PURE__ */ par esbuild à une position que Rollup ne peut
-    // pas interpréter, ce qui émet un warning à chaque build.
+    // if/else instead of a ternary: calls in ternary branches are annotated
+    // /* @__PURE__ */ by esbuild at a position Rollup can't interpret, which
+    // emits a warning on every build.
     if (sortBy === 'score') {
       return rankMissions(input, new Date());
     }
@@ -720,8 +723,8 @@ export function createFeedPageState(
     if (focusMode === 'focused' && focusIntent) {
       const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
-        // Même motif que sortCurrentMissions : if/else pour éviter le warning
-        // Rollup sur l'annotation __PURE__ en branche de ternaire.
+        // Same pattern as sortCurrentMissions: if/else to avoid the Rollup
+        // warning on __PURE__ annotation in a ternary branch.
         if (sortBy === 'score') {
           return rankMissions(focused, new Date());
         }
@@ -884,10 +887,13 @@ export function createFeedPageState(
       return;
     }
 
-    const nextSeenIds = markAsSeen(Array.from(seenIds), [...pendingSeenIds]);
+    const viewedIds = [...pendingSeenIds];
+    const nextSeenIds = markAsSeen(Array.from(seenIds), viewedIds);
     pendingSeenIds = new Set();
     seenIds = nextSeenIds;
     saveSeenIds(nextSeenIds).catch(() => {});
+    // Time to review : consultation utilisateur au moment du mark-seen feed.
+    journalFirstViews(viewedIds, feedStore.missions).catch(() => {});
   }
 
   function scheduleSeenFlush(): void {

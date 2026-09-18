@@ -66,19 +66,18 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
-  it('affiche la fourchette de TJM annoncée quand min ≠ max (DAO #173)', async () => {
+  it('affiche la fourchette dans le bloc tarif quand min ≠ max (DAO #175)', async () => {
     const target = mountCard({
       mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: 900 }),
     });
     await tick();
-    expect(target.textContent).toMatch(/600–900.*\/j/);
-    const value = target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]');
+    const value = target.querySelector('[title="TJM annoncé par la plateforme"]');
     expect(value).not.toBeNull();
-    // Pas d'aria-label : il masquerait la valeur numérique aux lecteurs
-    // d'écran. Le libellé est porté par un texte sr-only, la valeur reste
-    // dans le contenu annoncé.
-    expect(value?.querySelector('.sr-only')?.textContent).toContain('Fourchette de TJM annoncée');
+    // The aria-label carries the numeric value (never hidden behind a
+    // generic label — lesson from review #371).
+    expect(value?.getAttribute('aria-label')).toContain('600');
     expect(value?.textContent).toContain('600–900');
+    expect(value?.textContent).toContain('annoncé');
   });
 
   it('replie sur la valeur simple quand les bornes sont égales', async () => {
@@ -99,6 +98,61 @@ describe('MissionCard', () => {
     expect(
       target.querySelector('[title="Fourchette de TJM annoncée par la plateforme"]')
     ).toBeNull();
+  });
+
+  it('ne rend pas de séparateur avant le premier item de la ligne quick-scan (review #374)', async () => {
+    const target = mountCard();
+    await tick();
+    const line = target.textContent ?? '';
+    // Location is the first item: no bullet at line start.
+    expect(line.trim().startsWith('•')).toBe(false);
+    expect(line).toContain('Paris • Senior');
+  });
+
+  it('affiche « à partir de » dans le bloc tarif pour une borne unique (DAO #175)', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 600, tjmMin: 600, tjmMax: null }),
+    });
+    await tick();
+    const value = target.querySelector('[title="TJM annoncé par la plateforme"]');
+    expect(value?.textContent).toContain('à partir de 600');
+    expect(value?.textContent).toContain('annoncé');
+  });
+
+  it('affiche « TJM à vérifier » dans la colonne droite quand le tarif est absent (DAO #175)', async () => {
+    const target = mountCard({ mission: makeMission({ tjm: null, tjmMin: null, tjmMax: null }) });
+    await tick();
+    expect(target.textContent).toContain('TJM à vérifier');
+    expect(target.textContent).not.toMatch(/650.*\/j/);
+  });
+
+  it('affiche la jauge de plancher quand le profil a un plancher (DAO #175)', async () => {
+    const target = mountCard({ profileTjmMin: 500 });
+    await tick();
+    // Gauge above the floor: no chip, track present.
+    expect(target.querySelector('.h-1.w-12')).not.toBeNull();
+    expect(target.textContent).not.toContain('sous plancher');
+    const min = makeMission();
+    expect(min.tjm).toBeGreaterThan(0);
+  });
+
+  it('signale « sous plancher » quand le min de la mission est sous le plancher (DAO #175)', async () => {
+    const target = mountCard({
+      mission: makeMission({ tjm: 400, tjmMin: 400, tjmMax: 600 }),
+      profileTjmMin: 500,
+    });
+    await tick();
+    expect(target.textContent).toContain('sous plancher');
+    // AA text token (#c21f14, 6.0:1 on white) — decorative bar keeps status-red.
+    expect(target.querySelector('.text-status-red-text')).not.toBeNull();
+    expect(target.querySelector('[aria-hidden="true"] [class*="bg-status-red"]')).not.toBeNull();
+  });
+
+  it('masque la jauge sans plancher profil (DAO #174, tjmMax null)', async () => {
+    const target = mountCard();
+    await tick();
+    expect(target.querySelector('.h-1.w-12')).toBeNull();
+    expect(target.textContent).not.toContain('sous plancher');
   });
 
   it('affiche le TJM, la localisation et la séniorité dès l’état réduit, sans déplier', async () => {
@@ -125,7 +179,7 @@ describe('MissionCard', () => {
     await tick();
 
     // formatAbsoluteDate rend la date dans le fuseau local du runtime :
-    // on dérive l'attendu du même instant pour rester indépendant du TZ.
+    // derive the expected value from the same instant to stay TZ-independent.
     const expectedDate = new Intl.DateTimeFormat('fr-FR', {
       day: '2-digit',
       month: 'short',
@@ -166,35 +220,83 @@ describe('MissionCard', () => {
     ).toHaveLength(1);
   });
 
-  it('regroupe les six actions sur une seule ligne, hors de la zone dépliée', async () => {
+  it('étend la zone tactile des boutons icône à 44×44 sans densifier (DAO #180)', async () => {
     const target = mountCard();
     await tick();
 
-    const actionLabels = [
-      'Copier le lien de la mission',
-      'Ouvrir la mission sur la plateforme source',
-      'Masquer la mission',
-      'Ajouter la mission à la comparaison',
-      'Ajouter la mission aux favoris',
-    ];
-
-    // État replié (défaut) : toutes les actions restent visibles sur la même ligne.
-    for (const label of actionLabels) {
-      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
-    }
-    expect(target.textContent).toContain('Analyser');
-
-    // État déplié : la région de détails n'introduit aucun bouton dupliqué.
+    // Expand: copy and open join the bar unfolded (DAO #176).
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
     disclosure.click();
     await tick();
 
-    const details = target.querySelector('[role="region"]');
-    expect(details).not.toBeNull();
-    expect(details!.querySelectorAll('button')).toHaveLength(0);
-    for (const label of actionLabels) {
+    // 32px visual + 6px extension per side = 44×44 effective hit area.
+    const hitLabels = [
+      'Masquer la mission',
+      'Ajouter la mission à la comparaison',
+      'Ajouter la mission aux favoris',
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Masquer les détails de la mission Developpeur fullstack TypeScript',
+    ];
+    for (const label of hitLabels) {
+      const button = target.querySelector(`button[aria-label="${label}"]`);
+      expect(button, label).not.toBeNull();
+      expect(button?.className, label).toContain('after:absolute');
+      expect(button?.className, label).toContain('after:-inset-1.5');
+      // Visual density unchanged: the button itself stays 32px (size-8 / h-8).
+      expect(button?.className, label).toMatch(/size-8|h-8 w-8/);
+    }
+  });
+
+  it('affiche un état d’erreur perceptible quand la copie échoue (DAO #178)', async () => {
+    const target = mountCard({ copyStatus: 'error' });
+    await tick();
+
+    // Expand: the copy action only renders unfolded (DAO #176).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    // Perceptible failure state — distinct from rest AND from copied.
+    const failed = target.querySelector('button[aria-label="Échec de la copie du lien"]');
+    expect(failed).not.toBeNull();
+    // Icon uses the AA-compliant red text token (#177), never the copied blue.
+    expect(failed?.querySelector('.text-status-red-text')).not.toBeNull();
+    expect(target.querySelector('.text-blueprint-blue')).toBeNull();
+
+    // Polite live announcement (fr) for screen readers, and no false "copied".
+    const live = target.querySelector('[role="status"][aria-live="polite"]');
+    expect(live?.textContent?.trim()).toBe('Échec de la copie du lien');
+    expect(target.textContent).not.toContain('Lien copié');
+  });
+
+  it('réserve copier, ouvrir et Analyser à l’état déplié (revue design DAO #176)', async () => {
+    const target = mountCard();
+    await tick();
+
+    const detailLabels = [
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+    ];
+
+    // Collapsed state: only the triage triad renders, not the "Analyser" CTA.
+    for (const label of detailLabels) {
+      expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(0);
+    }
+    expect(target.textContent).not.toContain('Analyser');
+
+    // Expanded state: actions join the bar, no duplicates.
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    for (const label of detailLabels) {
       expect(target.querySelectorAll(`button[aria-label="${label}"]`)).toHaveLength(1);
     }
     expect(target.textContent).toContain('Analyser');
@@ -210,8 +312,8 @@ describe('MissionCard', () => {
 
     const details = target.querySelector('[role="region"]') as HTMLElement;
     expect(details).not.toBeNull();
-    // Zone, séniorité et source vivent hors de la zone dépliée :
-    // localisation et séniorité dans la ligne de scan rapide, source en badge d'en-tête.
+    // Area, seniority and source live outside the expanded zone:
+    // location and seniority in the quick-scan line, source in the header badge.
     expect(details.textContent).not.toContain('Zone');
     expect(details.textContent).not.toContain('Séniorité');
     expect(details.textContent).not.toContain('Source');
@@ -261,7 +363,7 @@ describe('MissionCard', () => {
     const target = mountCard({ mission: makeMission({ id: '123/mission très longue' }) });
     await tick();
 
-    // Replié par défaut : la région n'est pas montée, l'identifiant reste borné.
+    // Collapsed by default: the region is not mounted, the identifier stays scoped.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -302,9 +404,22 @@ describe('MissionCard', () => {
     expect(firstId).not.toBe(secondId);
   });
 
-  it('expose le statut courant et les transitions dans un groupe nommé', async () => {
+  it('réserve les transitions de suivi à l’état déplié (revue design DAO #176)', async () => {
     const onStatusTransition = vi.fn();
     const target = mountCard({ trackingStatus: 'detected', onStatusTransition });
+    await tick();
+
+    // Collapsed: the header status badge is enough, no transition group.
+    expect(
+      target.querySelector(
+        '[role="group"][aria-label="Statut de la mission Developpeur fullstack TypeScript"]'
+      )
+    ).toBeNull();
+
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
     await tick();
 
     const group = target.querySelector(
@@ -328,6 +443,13 @@ describe('MissionCard', () => {
       isStatusTransitionPending: true,
       onStatusTransition: vi.fn(),
     });
+    await tick();
+
+    // Transitions live in the expanded state (DAO #176 design review).
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
     await tick();
 
     const group = target.querySelector(
@@ -576,7 +698,7 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
     compare.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await tick();
     expect(compare.getAttribute('aria-describedby')).toBeNull();
-    // Le focus reste sur le déclencheur.
+    // Focus stays on the trigger.
     expect(document.activeElement === compare || compare.isConnected).toBe(true);
   });
 
@@ -635,20 +757,17 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
         (button) => button.getAttribute('aria-label') ?? button.textContent?.trim() ?? ''
       );
 
-    // État réduit (défaut) : disclosure → note → les six actions sur une ligne.
+    // Collapsed state (default): disclosure → grade → triage triad.
     const collapsedLabels = [
       'Afficher les détails de la mission Developpeur fullstack TypeScript',
       'Pourquoi cette note ?',
-      'Copier le lien de la mission',
-      'Ouvrir la mission sur la plateforme source',
       'Masquer la mission',
       'Ajouter la mission à la comparaison',
       'Ajouter la mission aux favoris',
-      'Analyser',
     ];
     expect(labels()).toEqual(collapsedLabels);
 
-    // État déplié : la barre d'actions reste complète et inchangée.
+    // Expanded state: actions and CTA join the bar.
     const disclosure = target.querySelector(
       'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
     ) as HTMLButtonElement;
@@ -658,6 +777,9 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
     expect(labels()).toEqual([
       'Masquer les détails de la mission Developpeur fullstack TypeScript',
       ...collapsedLabels.slice(1),
+      'Copier le lien de la mission',
+      'Ouvrir la mission sur la plateforme source',
+      'Analyser',
     ]);
   });
 

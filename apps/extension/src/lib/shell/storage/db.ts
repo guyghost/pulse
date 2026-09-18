@@ -1018,7 +1018,7 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     store.put({ ...profile, id: 'current' })
   );
 
-  // Invalider le cache sémantique : les scores doivent être recalculés avec le nouveau profil
+  // Invalidate the semantic cache: scores must be recomputed with the new profile
   try {
     await clearSemanticCache();
   } catch {
@@ -1048,13 +1048,13 @@ export async function getProfile(): Promise<UserProfile | null> {
     return null;
   }
 
-  // Vérifier que c'est un objet avec un id
+  // Check that this is an object with an id
   if (typeof result !== 'object' || result === null) {
-    console.error('[DB] Profil corrompu: données non-objet', result);
+    console.error('[DB] Corrupt profile: non-object data', result);
     return null;
   }
 
-  // Extraire l'id et le reste des propriétés
+  // Extract the id and the remaining properties
   const { id: _, ...profileData } = result as Record<string, unknown>;
 
   // Valider avec Zod

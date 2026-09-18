@@ -411,14 +411,18 @@
                   >
                 {/if}
                 {#if snap?.lastFailureAt}
-                  <span class="text-status-red">Échec {getRelativeTime(snap.lastFailureAt)}</span>
+                  <span class="text-status-red-text"
+                    >Échec {getRelativeTime(snap.lastFailureAt)}</span
+                  >
                 {/if}
                 {#if parserRecord && deriveParserHealthAlert(parserRecord)}
-                  <span class="text-status-orange">Parser {parserRecord.consecutiveZeros}×0</span>
+                  <span class="text-status-orange-text"
+                    >Parser {parserRecord.consecutiveZeros}×0</span
+                  >
                 {/if}
               </div>
               {#if source.error}
-                <span class="mt-0.5 block truncate text-micro text-status-red">
+                <span class="mt-0.5 block truncate text-micro text-status-red-text">
                   {sourceErrorCopy.label}
                 </span>
               {/if}
@@ -434,9 +438,9 @@
                 <div class="flex items-center justify-between gap-2">
                   <span
                     class="text-micro font-medium {diagnosis.severity === 'incident'
-                      ? 'text-status-red'
+                      ? 'text-status-red-text'
                       : diagnosis.severity === 'attention'
-                        ? 'text-status-orange'
+                        ? 'text-status-orange-text'
                         : diagnosis.severity === 'success'
                           ? 'text-accent-green'
                           : 'text-text-subtle'}"
@@ -456,9 +460,9 @@
                 <span
                   class="rounded-md px-1.5 py-0.5 text-micro font-medium
                     {healthStatus === 'broken'
-                    ? 'bg-status-red/10 text-status-red'
+                    ? 'bg-status-red/10 text-status-red-text'
                     : healthStatus === 'degraded'
-                      ? 'bg-status-yellow/20 text-status-orange'
+                      ? 'bg-status-yellow/20 text-status-orange-text'
                       : 'bg-accent-green/10 text-accent-green'}"
                 >
                   {getHealthLabel(snap)}
@@ -485,7 +489,7 @@
                   Se connecter
                 </button>
               {:else if source.sessionStatus === 'error'}
-                <span class="flex items-center gap-1 text-micro text-status-red">
+                <span class="flex items-center gap-1 text-micro text-status-red-text">
                   <Icon name="x-circle" size={11} />
                   <span class="max-w-28 truncate">{sourceErrorCopy.label}</span>
                 </span>
@@ -494,7 +498,7 @@
               {#if snap}
                 {#if deriveHealthStatus(snap) === 'broken' && onRecheckConnector}
                   <button
-                    class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-micro font-medium text-status-red transition-colors hover:bg-status-red/10"
+                    class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-micro font-medium text-status-red-text transition-colors hover:bg-status-red/10"
                     onclick={() => onRecheckConnector(source.connectorId, !isEnabled)}
                   >
                     {isEnabled ? 'Relancer' : 'Activer'}

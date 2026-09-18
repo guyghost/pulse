@@ -50,16 +50,16 @@
     severity === 'success'
       ? 'bg-accent-green/10 text-accent-green'
       : severity === 'attention'
-        ? 'bg-status-yellow/15 text-status-orange'
+        ? 'bg-status-yellow/15 text-status-orange-text'
         : severity === 'incident'
-          ? 'bg-status-orange/10 text-status-orange'
+          ? 'bg-status-orange/10 text-status-orange-text'
           : severity === 'critical'
-            ? 'bg-status-red/10 text-status-red'
+            ? 'bg-status-red/10 text-status-red-text'
             : 'bg-blueprint-blue/8 text-blueprint-blue-on-tint'
   );
 </script>
 
-<section class="rounded-2xl border px-4 py-5 {toneClass}">
+<section class="rounded-xl border px-4 py-5 {toneClass}">
   <div class="flex items-start gap-3">
     <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl {iconClass}">
       <Icon name={icon} size={18} />

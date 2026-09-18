@@ -32,16 +32,18 @@ describe('landing account dashboard operational UI', () => {
 
   it('implements the freelance acquisition wedge on the public landing', () => {
     expect(homeSource).toContain('4 plateformes');
-    expect(homeSource).toContain('1 feed scoré');
-    expect(homeSource).toContain('Zéro doublon');
-    expect(homeSource).toContain('Développeurs 3+ ans');
-    expect(homeSource).toContain('TJM 450-900€');
+    expect(homeSource).toContain('1 feed.');
+    expect(homeSource).toContain('Tu décides.');
+    expect(homeSource).toContain('Freelance tech · France &amp; remote');
+    expect(homeSource).not.toContain('TJM 450-900€');
+    expect(homeSource).not.toContain('Développeurs 3+ ans');
     expect(homeSource).toContain('Shortlist quotidienne');
     expect(homeSource).toContain('missions Java, Spring Boot et frontend senior');
-    expect(homeSource).toContain('Créer mon compte Premium');
-    expect(homeSource).toContain('10€<small> TTC/an</small>');
-    expect(homeSource).toContain('Plusieurs comptes par plateforme');
-    expect(homeSource).toContain('Aucune soumission automatique');
+    expect(homeSource).toContain('Une offre locale, sans compte');
+    expect(homeSource).toContain('Installer gratuitement');
+    expect(homeSource).not.toContain('Créer mon compte Premium');
+    expect(homeSource).not.toContain('10€<small> TTC/an</small>');
+    expect(homeSource).not.toContain('Plusieurs comptes par plateforme');
     expect(homeSource).not.toContain('/mois');
   });
 });

@@ -29,7 +29,7 @@
 </script>
 
 <div
-  class="flex items-center gap-3 rounded-full border border-border-light bg-surface-white/95 px-3 py-2 shadow-sm backdrop-blur"
+  class="flex items-center gap-3 rounded-full border border-border-light bg-surface-white px-3 py-2 shadow-sm"
   transition:slide={{ duration: 150 }}
 >
   <button

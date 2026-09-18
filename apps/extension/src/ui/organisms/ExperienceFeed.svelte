@@ -199,7 +199,7 @@
       <div
         role="alert"
         aria-live="assertive"
-        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-meta text-status-red"
+        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-meta text-status-red-text"
       >
         <Icon name="triangle-alert" size={14} />
         <span class="flex-1">{store.editError}</span>
@@ -223,9 +223,7 @@
       <section
         aria-label={group.year === 0 ? 'Expériences sans date' : `Expériences ${group.year}`}
       >
-        <div
-          class="sticky top-0 z-10 -mt-1 flex items-baseline gap-2 bg-page-canvas/95 py-1.5 backdrop-blur-sm"
-        >
+        <div class="sticky top-0 z-10 -mt-1 flex items-baseline gap-2 bg-page-canvas py-1.5">
           <h3 class="eyebrow eyebrow--strong eyebrow--subtle">
             {group.year === 0 ? 'Sans date' : group.year}
           </h3>

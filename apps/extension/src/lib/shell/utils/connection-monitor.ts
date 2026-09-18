@@ -1,11 +1,11 @@
 /**
- * Surveillance de l'état de la connexion réseau
- * Utilise navigator.onLine et l'API Network Information si disponible
+ * Network connection state monitoring
+ * Uses navigator.onLine and the Network Information API when available
  *
  * Compatible Service Worker (pas de window/document).
  */
 
-/** Détecte si on est dans un contexte Service Worker (pas de window) */
+/** Detects whether we're in a Service Worker context (no window) */
 const isServiceWorker = typeof window === 'undefined';
 
 export type ConnectionStatus = 'online' | 'offline' | 'slow' | 'unknown';
@@ -34,8 +34,8 @@ const listeners = new Set<ConnectionCallback>();
 let currentInfo: ConnectionInfo = getConnectionInfo();
 
 /**
- * Récupère les informations de connexion actuelles
- * Combine navigator.onLine et Network Information API
+ * Retrieves the current connection information
+ * Combines navigator.onLine and the Network Information API
  */
 function getConnectionInfo(): ConnectionInfo {
   // Service worker: navigator.onLine est disponible mais pas window/document
@@ -45,7 +45,7 @@ function getConnectionInfo(): ConnectionInfo {
     return { status: 'offline' };
   }
 
-  // Network Information API (experimental mais bien supportée)
+  // Network Information API (experimental but well supported)
   const connection =
     typeof navigator !== 'undefined'
       ? (navigator as NavigatorWithConnection).connection
@@ -56,7 +56,7 @@ function getConnectionInfo(): ConnectionInfo {
     const downlink = typeof connection.downlink === 'number' ? connection.downlink : undefined;
     const rtt = typeof connection.rtt === 'number' ? connection.rtt : undefined;
 
-    // Considérer comme 'slow' si 2g, slow-2g, ou RTT élevé
+    // Consider 'slow' when 2g, slow-2g, or high RTT
     const isSlow = effectiveType === '2g' || effectiveType === 'slow-2g' || (rtt && rtt > 500);
 
     return {
@@ -80,8 +80,8 @@ function notifyListeners(): void {
 }
 
 /**
- * Initialise les écouteurs d'événements (appelé une seule fois)
- * No-op dans le Service Worker (pas de window).
+ * Initializes event listeners (called once)
+ * No-op in the Service Worker (no window).
  */
 let isInitialized = false;
 function initListeners(): void {
@@ -90,7 +90,7 @@ function initListeners(): void {
   }
   isInitialized = true;
 
-  // Service Worker n'a pas accès à window — skip les event listeners
+  // Service Worker has no access to window — skip event listeners
   if (isServiceWorker) {
     return;
   }
@@ -98,7 +98,7 @@ function initListeners(): void {
   window.addEventListener('online', notifyListeners);
   window.addEventListener('offline', notifyListeners);
 
-  // Écouter les changements de Network Information API
+  // Listen to Network Information API changes
   const connection = (
     navigator as unknown as {
       connection?: EventTarget & { effectiveType?: string };
@@ -110,15 +110,15 @@ function initListeners(): void {
 }
 
 /**
- * S'abonne aux changements d'état de connexion
- * @param callback Fonction appelée à chaque changement
- * @returns Fonction de désabonnement
+ * Subscribes to connection state changes
+ * @param callback Function invoked on each change
+ * @returns Unsubscribe function
  */
 export function subscribeToConnection(callback: ConnectionCallback): () => void {
   initListeners();
   listeners.add(callback);
 
-  // Notifier immédiatement avec l'état actuel
+  // Notify immediately with the current state
   callback(currentInfo);
 
   return () => {
@@ -127,7 +127,7 @@ export function subscribeToConnection(callback: ConnectionCallback): () => void 
 }
 
 /**
- * Récupère l'état actuel de la connexion sans s'abonner
+ * Retrieves the current connection state without subscribing
  */
 export function getCurrentConnection(): ConnectionInfo {
   currentInfo = getConnectionInfo();
@@ -135,15 +135,15 @@ export function getCurrentConnection(): ConnectionInfo {
 }
 
 /**
- * Vérifie si le navigateur est en ligne
- * Fonctionne dans le Service Worker (utilise navigator, pas window)
+ * Checks whether the browser is online
+ * Works in the Service Worker (uses navigator, not window)
  */
 export function isOnline(): boolean {
   return typeof navigator !== 'undefined' ? navigator.onLine : true;
 }
 
 /**
- * Vérifie si la connexion est lente
+ * Checks whether the connection is slow
  */
 export function isSlowConnection(): boolean {
   const info = getCurrentConnection();
@@ -151,9 +151,9 @@ export function isSlowConnection(): boolean {
 }
 
 /**
- * Attend que la connexion soit restaurée
- * @param timeoutMs Timeout en ms (défaut: 30s)
- * @returns Promise qui résout quand online, rejecte si timeout
+ * Waits for the connection to be restored
+ * @param timeoutMs Timeout in ms (default: 30s)
+ * @returns Promise resolving when online, rejecting on timeout
  */
 export function waitForOnline(timeoutMs = 30000): Promise<void> {
   return new Promise((resolve, reject) => {

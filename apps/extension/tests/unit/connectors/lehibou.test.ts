@@ -218,7 +218,7 @@ describe('parseLeHibouHTML (fallback strategies & malformed input)', () => {
   });
 
   it('extrait la localisation via le fallback BEM quand la section structurelle est absente', () => {
-    // Pas de <section>, mais classes BEM informations__item présentes.
+    // No <section>, but informations__item BEM classes present.
     const html = `
     <html><body>
     <a href="/annonce/bem-aaa-bbb">
@@ -249,7 +249,7 @@ describe('parseLeHibouHTML (fallback strategies & malformed input)', () => {
   });
 
   it('retourne location null mais duration present si seul le 2eme item existe (section structurelle)', () => {
-    // Section présente avec un seul div (duration en 2eme position logique).
+    // Section present with a single div (duration in 2nd logical position).
     const html = `
     <html><body>
     <a href="/annonce/onlydur-aaa-bbb">

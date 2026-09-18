@@ -4,31 +4,31 @@
 
 ## Navigation
 
-- [Architecture decisions](./adr/README.md)
+- [Décisions d'architecture](./adr/README.md)
 - [CI/CD](./CI-CD.md)
-- [Privacy policy](./privacy-policy.md)
-- [Open source readiness](./open-source-readiness.md)
-- [Store listing](./store-listing.md)
+- [Politique de confidentialité](./privacy-policy.md)
+- [Préparation open source](./open-source-readiness.md)
+- [Fiche store](./store-listing.md)
 - [Go-to-market](./go-to-market-missionpulse.md)
-- [Operational UX audit](./operational-ux-audit.md)
+- [Audit UX opérationnel](./operational-ux-audit.md)
 - [Design](./design/README.md)
 - [Plans](./plans/README.md)
 - [Specs](./specs/README.md)
-- [DAO documents](./dao/README.md)
-- [Historical bootstrap prompt](./history/README.md)
+- [Documents DAO](./dao/README.md)
+- [Prompt historique de bootstrap](./history/README.md)
 
-## Project Areas
+## Périmètres du projet
 
-| Area                | Path                               |
-| ------------------- | ---------------------------------- |
-| Chrome extension    | `apps/extension/`                  |
-| Landing page        | `apps/landing/`                    |
-| Connected dashboard | `apps/dashboard/`                  |
-| Design system       | `packages/design/`, `packages/ui/` |
-| Shared domain       | `packages/domain/`                 |
+| Périmètre          | Chemin                             |
+| ------------------ | ---------------------------------- |
+| Extension Chrome   | `apps/extension/`                  |
+| Landing page       | `apps/landing/`                    |
+| Dashboard connecté | `apps/dashboard/`                  |
+| Design system      | `packages/design/`, `packages/ui/` |
+| Domaine partagé    | `packages/domain/`                 |
 
-## Contributor Entry Points
+## Points d'entrée contributeurs
 
-- [Contributing guide](../.github/CONTRIBUTING.md)
-- [Security policy](../.github/SECURITY.md)
-- [Code of conduct](../.github/CODE_OF_CONDUCT.md)
+- [Guide de contribution](../.github/CONTRIBUTING.md)
+- [Politique de sécurité](../.github/SECURITY.md)
+- [Code de conduite](../.github/CODE_OF_CONDUCT.md)

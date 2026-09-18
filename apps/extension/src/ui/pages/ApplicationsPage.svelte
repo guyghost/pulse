@@ -591,8 +591,14 @@
   }
 
   async function copyAsset(content: string): Promise<void> {
-    await navigator.clipboard.writeText(content);
-    await showToast('Copié', 'success');
+    try {
+      await navigator.clipboard.writeText(content);
+      await showToast('Copié', 'success');
+    } catch {
+      // Clipboard rejected (permission/focus): surface the failure — the page
+      // notifies its errors, copy must not stay silent (DAO #184).
+      await showToast('Échec de la copie', 'error');
+    }
   }
 
   async function loadApplications(): Promise<void> {
@@ -1206,11 +1212,12 @@
                   </h4>
                 </div>
                 <button
-                  class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted hover:bg-subtle-gray hover:text-text-primary"
+                  class="relative after:absolute after:-inset-1.5 after:rounded-lg after:content-[''] inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted hover:bg-subtle-gray hover:text-text-primary"
                   onclick={() => copyAsset(asset.content)}
                   title="Copier"
+                  aria-label="Copier le contenu de l'asset"
                 >
-                  <Icon name="check" size={13} />
+                  <Icon name="copy" size={13} />
                 </button>
               </div>
               <p class="mt-3 whitespace-pre-wrap text-body-lg leading-6 text-text-secondary">

@@ -50,7 +50,7 @@
 <div class="section-card rounded-xl border border-status-red/15 p-5">
   <div class="flex items-center gap-3">
     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-red/8">
-      <Icon name="alert-triangle" size={14} class="text-status-red" />
+      <Icon name="alert-triangle" size={14} class="text-status-red-text" />
     </div>
     <div>
       <p class="text-body-lg font-medium text-text-primary">Zone dangereuse</p>
@@ -69,18 +69,18 @@
           aria-disabled={resetUnavailable}
           aria-describedby="danger-reset-unavailable"
         >
-          <Icon name="trash-2" size={12} class="mr-1 text-status-red" />
+          <Icon name="trash-2" size={12} class="mr-1 text-status-red-text" />
           Réinitialisation indisponible
         </button>
         <p
           id="danger-reset-unavailable"
-          class="mt-2 text-meta leading-4 text-status-red"
+          class="mt-2 text-meta leading-4 text-status-red-text"
           role="alert"
         >
           {resetAvailability.reason}
         </p>
         {#if resetError && resetError !== resetAvailability.reason}
-          <p class="mt-2 text-meta leading-4 text-status-red" role="alert">{resetError}</p>
+          <p class="mt-2 text-meta leading-4 text-status-red-text" role="alert">{resetError}</p>
         {/if}
       </div>
     {:else if showResetConfirm}
@@ -94,7 +94,7 @@
         </p>
 
         {#if resetError}
-          <p class="mt-2 text-meta leading-4 text-status-red" role="alert">{resetError}</p>
+          <p class="mt-2 text-meta leading-4 text-status-red-text" role="alert">{resetError}</p>
         {/if}
 
         <label
@@ -135,7 +135,7 @@
             disabled={!canConfirmReset}
             aria-disabled={!canConfirmReset}
           >
-            <Icon name="trash-2" size={12} class="mr-1 text-status-red" />
+            <Icon name="trash-2" size={12} class="mr-1 text-status-red-text" />
             Supprimer définitivement
           </button>
         </div>
@@ -145,7 +145,7 @@
         class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-status-red/10"
         onclick={onShowConfirm}
       >
-        <Icon name="trash-2" size={12} class="mr-1 text-status-red" />
+        <Icon name="trash-2" size={12} class="mr-1 text-status-red-text" />
         Réinitialiser tout
       </button>
     {/if}

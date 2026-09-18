@@ -52,7 +52,7 @@
       case 'copying':
         return { icon: 'loader-2', label: 'Ouverture…', class: 'text-blueprint-blue', spin: true };
       case 'error':
-        return { icon: 'x-circle', label: 'Échec', class: 'text-status-red' };
+        return { icon: 'x-circle', label: 'Échec', class: 'text-status-red-text' };
       case 'skipped':
         return { icon: 'circle-alert', label: 'Ignorée', class: 'text-text-muted' };
       default:
@@ -189,7 +189,9 @@
             class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
           />
           {#if dateMissing}
-            <span class="text-caption text-status-red">La date est requise pour ce statut.</span>
+            <span class="text-caption text-status-red-text"
+              >La date est requise pour ce statut.</span
+            >
           {/if}
         </label>
       {/if}

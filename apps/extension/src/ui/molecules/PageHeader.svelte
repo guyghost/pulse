@@ -23,7 +23,7 @@
   } = $props();
 </script>
 
-<section class="section-card-strong rounded-2xl px-5 py-4">
+<section class="section-card-strong rounded-xl px-5 py-4">
   <div class="flex flex-col items-stretch gap-3.5 sm:flex-row sm:items-start">
     <div class="flex min-w-0 flex-1 items-start gap-3.5">
       {#if icon}

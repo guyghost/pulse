@@ -1,87 +1,91 @@
-# Copilot Instructions — MissionPulse
+# Instructions Copilot — MissionPulse
 
-MissionPulse is a Chrome extension (Manifest V3) in a pnpm + Turborepo monorepo. It scrapes freelance-mission platforms via the user's existing browser sessions and surfaces them in a single scored feed. 100% local-first: no backend, no telemetry, no stored credentials.
+MissionPulse est une extension Chrome (Manifest V3) dans un monorepo pnpm + Turborepo. Elle scrappe les plateformes de missions freelance via les sessions navigateur existantes de l'utilisateur et les présente dans un feed unique avec scoring. 100 % local-first : pas de backend, pas de télémétrie, pas d'identifiants stockés.
 
-`AGENTS.md`, `README.md`, and `.github/CONTRIBUTING.md` are the long-form sources of truth. This file captures the project-specific rules an agent is most likely to get wrong.
+`AGENTS.md`, `README.md` et `.github/CONTRIBUTING.md` sont les sources de vérité longues. Ce fichier capture les règles spécifiques au projet qu'un agent a le plus de chances de se tromper.
 
-## Monorepo layout
+## Layout du monorepo
 
-- `apps/extension/` — Chrome extension (Svelte 5 + Vite + MV3). All paths below are relative to here.
-- `apps/landing/` — static marketing site (missionpulse.app).
-- `packages/design/`, `packages/domain/`, `packages/ui/`, `packages/tsconfig/` — shared.
+- `apps/extension/` — extension Chrome (Svelte 5 + Vite + MV3). Tous les chemins ci-dessous sont relatifs à ce dossier.
+- `apps/landing/` — site marketing statique (missionpulse.app).
+- `packages/design/`, `packages/domain/`, `packages/ui/`, `packages/tsconfig/` — partagés.
 
-Run commands from the repo root unless noted. Most tasks target the extension: `pnpm --filter @pulse/extension <script>`.
+Lancer les commandes depuis la racine du dépôt sauf mention contraire. La plupart des tâches ciblent l'extension : `pnpm --filter @pulse/extension <script>`.
 
-## Commands
+## Commandes
 
 ```bash
-pnpm dev:local        # local Supabase + .env.local + dev servers (Chrome APIs stubbed with mocks)
-pnpm dev              # dev servers only
-pnpm ci:check         # format:check && lint && typecheck && test && build  (also the pre-push gate)
-pnpm improvement:loop # format, lint, typecheck, tests, parser regression, connector health checks
+pnpm dev:local        # Supabase local + .env.local + dev servers (API Chrome stubées avec des mocks)
+pnpm dev              # dev servers uniquement
+pnpm ci:check         # format:check && lint && typecheck && test && build  (aussi la gate pre-push)
+pnpm improvement:loop # format, lint, typecheck, tests, régression parser, health checks connecteurs
 
-# Extension-scoped
+# Ciblé extension
 pnpm --filter @pulse/extension typecheck
 pnpm --filter @pulse/extension lint
 pnpm --filter @pulse/extension test
 pnpm --filter @pulse/extension test:watch
-pnpm --filter @pulse/extension test:coverage          # 70% gate on src/lib/core/**
-pnpm --filter @pulse/extension test:regression        # golden parser regression
-UPDATE_GOLDENS=1 pnpm --filter @pulse/extension test:regression   # regenerate goldens
-pnpm --filter @pulse/extension health-check           # fixture-based, no live platform calls
+pnpm --filter @pulse/extension test:coverage          # gate 70 % sur src/lib/core/**
+pnpm --filter @pulse/extension test:regression        # régression parser golden
+UPDATE_GOLDENS=1 pnpm --filter @pulse/extension test:regression   # régénérer les goldens
+pnpm --filter @pulse/extension health-check           # sur fixtures, sans appel plateforme réel
 pnpm --filter @pulse/extension health-check:json
-pnpm --filter @pulse/extension test:e2e               # Playwright (builds @pulse/ui first)
+pnpm --filter @pulse/extension test:e2e               # Playwright (build @pulse/ui d'abord)
 ```
 
-Run a **single** unit test:
+Lancer **un seul** test unitaire :
 
 ```bash
 pnpm --filter @pulse/extension exec vitest run tests/unit/scoring/relevance.test.ts
-# or by name pattern:
+# ou par pattern de nom :
 pnpm --filter @pulse/extension exec vitest run -t "deduplicates by URL"
 ```
 
-Dev Panel: `Ctrl+Shift+D` inside the side panel toggles mock injection, state switches, and bridge logs.
+Dev Panel : `Ctrl+Shift+D` dans le side panel bascule l'injection de mocks, les changements d'état et les logs bridge.
 
-The extension dev server runs on **http://localhost:5176** (see `apps/extension/vite.config.ts`); in dev mode Chrome APIs are stubbed with mocks, so the side panel UI is fully drivable in a normal browser tab. Use the Playwright MCP server (`.mcp.json`) for visual verification of UI changes — start `pnpm dev` first, then navigate the browser to the side panel URL.
+Le dev server de l'extension tourne sur **http://localhost:5176** (voir `apps/extension/vite.config.ts`) ; en dev les API Chrome sont stubées avec des mocks, l'UI du side panel est donc entièrement pilotable dans un onglet navigateur normal. Utiliser le serveur MCP Playwright (`.mcp.json`) pour la vérification visuelle des changements UI — lancer `pnpm dev` d'abord, puis naviguer vers l'URL du side panel.
 
 ## Architecture — Functional Core / Imperative Shell (strict)
 
-`apps/extension/src/lib/core/` is **pure**: no `fetch`, no `indexedDB`, no `chrome.*`, no `async/await`, no `Date.now()`, no `Math.random()`, no `console`. Anything non-deterministic (current time, generated IDs) is passed in as a parameter from the shell.
+`apps/extension/src/lib/core/` est **pur** : pas de `fetch`, pas d'`indexedDB`, pas de `chrome.*`, pas d'`async/await`, pas de `Date.now()`, pas de `Math.random()`, pas de `console`. Tout ce qui est non déterministe (heure courante, IDs générés) est passé en paramètre depuis le shell.
 
-`apps/extension/src/lib/shell/` owns all I/O, async, retries, and orchestration, and delegates computation to core.
+`apps/extension/src/lib/shell/` possède toutes les I/O, l'async, les retries et l'orchestration, et délègue les calculs au core.
 
-- **Shell may import core. Core MUST NEVER import shell.** Treat a `core/` file importing from `shell/` as a build error.
-- Connectors inject `new Date()` and ID prefixes into the pure parsers in `core/connectors/`.
-- `vitest.config.ts` enforces a 70/70/60/70 coverage gate on `src/lib/core/**` — keep new pure logic there so it is covered by mock-free unit tests.
+- **Le Shell peut importer le core. Le core ne doit JAMAIS importer le shell.** Traiter un fichier `core/` important depuis `shell/` comme une erreur de build.
+- Les connecteurs injectent `new Date()` et les préfixes d'ID dans les parsers purs de `core/connectors/`.
+- `vitest.config.ts` applique une gate de couverture 70/70/60/70 sur `src/lib/core/**` — garder la nouvelle logique pure là pour qu'elle soit couverte par des tests unitaires sans mocks.
 
-## Workflow rule: Model → Review → Implement → Verify
+## Règle de workflow : Model → Review → Implement → Verify
 
-Any change to a workflow, business feature, or state decision must go through this loop. **Never jump from prompt to code.**
+Tout changement de workflow, de fonctionnalité métier ou de décision d'état doit passer par cette boucle. **Ne jamais passer directement du prompt au code.**
 
-1. **Model** — Define states, events, transitions, side effects, and invariants explicitly. Authoritative models live in `apps/extension/src/models/*.model.md` and proposed changes in `openspec/changes/`. Use XState for important workflows. If the behavior cannot be modeled, it is not ready to implement.
-2. **Review** — Confirm the model covers nominal paths, errors, cancellations, retries, permissions, and terminal states. Disallow implicit or free-text-driven transitions.
-3. **Implement** — UI, messaging, and orchestration consume the model. LLMs live only inside dedicated AI workers (e.g. `lib/shell/ai/`); they may propose/extract/classify/enrich content but **never decide a state transition**.
-4. **Verify** — Test allowed and forbidden transitions and model invariants; confirm no business logic leaked outside the model.
+1. **Model** — Définir explicitement états, événements, transitions, effets de bord et invariants. Les modèles faisant foi vivent dans `apps/extension/src/models/*.model.md` et les changements proposés dans `openspec/changes/`. Utiliser XState pour les workflows importants. Si le comportement ne peut pas être modélisé, il n'est pas prêt à être implémenté.
+2. **Review** — Confirmer que le modèle couvre les chemins nominaux, erreurs, annulations, retries, permissions et états terminaux. Interdire les transitions implicites ou pilotées par texte libre.
+3. **Implement** — L'UI, le messaging et l'orchestration consomment le modèle. Les LLM vivent uniquement dans des workers IA dédiés (ex. `lib/shell/ai/`) ; ils peuvent proposer/extraire/classer/enrichir du contenu mais **ne décident jamais une transition d'état**.
+4. **Verify** — Tester les transitions autorisées et interdites et les invariants du modèle ; confirmer qu'aucune logique métier n'a fuité hors du modèle.
 
-Short form: **the LLM produces signals; the model decides.**
+Forme courte : **le LLM produit des signaux ; le modèle décide.**
 
-## Svelte 5 & styling conventions
+## Conventions Svelte 5 & styling
 
-- Svelte 5 runes only. Use `$props()`, `$state`, `$derived`, `$effect`.
-- Forbidden: `export let`, `$:` reactive declarations, `writable`/`readable`/`derived` stores, `on:click`/`on:input`, `createEventDispatcher`, `$$props`/`$$restProps`. Use native event attributes (`onclick`) and callback props.
-- Shared UI state lives in `src/lib/state/*.svelte.ts` as factory functions or classes using runes.
-- TailwindCSS 4, CSS-first. The design tokens live in `packages/design/` and are surfaced via `apps/extension/src/ui/design-tokens.css`. **Do not add `tailwind.config.js`/`.ts`** or JS/TS Tailwind config.
-- Atomic Design in `src/ui/`: atoms → molecules → organisms → templates → pages. Atoms/molecules receive data via props only; organisms and pages may touch state modules.
+- Runes Svelte 5 uniquement. Utiliser `$props()`, `$state`, `$derived`, `$effect`.
+- Interdit : `export let`, déclarations réactives `$:`, stores `writable`/`readable`/`derived`, `on:click`/`on:input`, `createEventDispatcher`, `$$props`/`$$restProps`. Utiliser les attributs d'événements natifs (`onclick`) et les callback props.
+- L'état UI partagé vit dans `src/lib/state/*.svelte.ts` sous forme de factory functions ou de classes utilisant les runes.
+- TailwindCSS 4, CSS-first. Les design tokens vivent dans `packages/design/` et sont exposés via `apps/extension/src/ui/design-tokens.css`. **Ne pas ajouter de `tailwind.config.js`/`.ts`** ni de config Tailwind JS/TS.
+- Atomic Design dans `src/ui/` : atoms → molecules → organisms → templates → pages. Atoms/molecules reçoivent les données via props uniquement ; organisms et pages peuvent toucher les modules d'état.
 
-## Connectors & messaging
+## Connecteurs & messaging
 
-- One platform = a **pure parser** in `core/connectors/{platform}-parser.ts` (`parse{Platform}HTML(html, now, idPrefix)`) + an **I/O connector** in `shell/connectors/{platform}.connector.ts`. Register new connectors in `shell/connectors/index.ts`, add `host_permissions` to `src/manifest.json`, and add a mock-free parser test in `tests/unit/connectors/`.
-- When a platform's DOM changes, the connector throws a typed `ConnectorError`; the runner marks it `error`, notifies the user, and other connectors continue. Do not swallow connector errors.
-- The side panel never calls IndexedDB, `chrome.cookies`, or other `chrome.*` APIs directly. Everything crosses contexts through `src/lib/shell/messaging/bridge.ts` with typed messages.
+- Une plateforme = un **parser pur** dans `core/connectors/{platform}-parser.ts` (`parse{Platform}HTML(html, now, idPrefix)`) + un **connecteur I/O** dans `shell/connectors/{platform}.connector.ts`. Enregistrer les nouveaux connecteurs dans `shell/connectors/index.ts`, ajouter les `host_permissions` dans `src/manifest.json`, et ajouter un test de parser sans mocks dans `tests/unit/connectors/`.
+- Quand le DOM d'une plateforme change, le connecteur throw une `ConnectorError` typée ; le runner le marque `error`, notifie l'utilisateur, et les autres connecteurs continuent. Ne pas avaler les erreurs de connecteur.
+- Le side panel n'appelle jamais IndexedDB, `chrome.cookies` ni les autres API `chrome.*` directement. Tout traverse les contextes via `src/lib/shell/messaging/bridge.ts` avec des messages typés.
 
-## Commit hygiene
+## Hygiène des commits
 
-- Conventional Commits with domain scope: `feat(connector): …`, `fix(tjm): …`, `refactor(scoring): …`.
-- No `any` (TypeScript strict). No stored credentials, cookies, session tokens, or generated release ZIPs in commits.
-- `pre-push` runs `ci:check`. Make it green locally before pushing.
+- Conventional Commits avec scope par domaine : `feat(connector): …`, `fix(tjm): …`, `refactor(scoring): …`.
+- Pas de `any` (TypeScript strict). Pas d'identifiants stockés, cookies, tokens de session ni ZIP de release générés dans les commits.
+- `pre-push` exécute `ci:check`. Le rendre vert en local avant de pousser.
+
+## Langues
+
+- Code et commentaires en anglais ; documentation `.md` en français ; copy UI en français. Voir `AGENTS.md`.
