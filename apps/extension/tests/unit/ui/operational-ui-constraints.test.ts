@@ -129,7 +129,13 @@ describe('operational UI constraints', () => {
     expect(source).toContain('button:focus-visible');
     expect(source).toContain('input:focus-visible');
     expect(source).toContain('@media (prefers-reduced-motion: reduce)');
-    expect(source).toContain('transition-duration: 0.01ms !important');
+    expect(source).toContain('--motion-duration-reduced');
+    // Whitespace-normalized: prettier may reflow the property list across lines.
+    const normalized = source.replace(/\s+/g, ' ');
+    expect(normalized).toContain(
+      'transition-property: opacity, color, background-color, border-color, fill, stroke, box-shadow !important'
+    );
+    expect(source).not.toContain('0.01ms');
     expect(source).toContain('animation-iteration-count: 1 !important');
   });
 
