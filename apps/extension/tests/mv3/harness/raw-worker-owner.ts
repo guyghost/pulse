@@ -2986,13 +2986,15 @@ export async function runRawWorkerEpoch(
           [operationError, releaseError],
           `Raw worker operation and mandatory failed release both failed: ${
             releaseError instanceof Error ? releaseError.message : 'unknown release error'
-          }`
+          }`,
+          { cause: operationError }
         );
       }
       if (failedReleaseReceipt === undefined) {
         throw new AggregateError(
           [operationError],
-          'Raw worker failed release returned no exact receipt.'
+          'Raw worker failed release returned no exact receipt.',
+          { cause: operationError }
         );
       }
       throw new RawWorkerEpochFailure(
@@ -3096,7 +3098,8 @@ export async function runRawWorkerEpoch(
           [acquisitionError, releaseError],
           `Raw worker acquisition and mandatory failed release both failed: ${
             releaseError instanceof Error ? releaseError.message : 'unknown release error'
-          }`
+          }`,
+          { cause: releaseError }
         );
       }
     }
@@ -3112,7 +3115,8 @@ export async function runRawWorkerEpoch(
         [acquisitionError, cleanupError],
         `Raw worker acquisition and direct cleanup both failed: ${
           cleanupError instanceof Error ? cleanupError.message : 'unknown cleanup error'
-        }`
+        }`,
+        { cause: cleanupError }
       );
     }
     throw acquisitionError;

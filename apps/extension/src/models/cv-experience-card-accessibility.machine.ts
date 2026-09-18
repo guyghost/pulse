@@ -1455,7 +1455,7 @@ function destroyContext(
 ): Partial<ExperienceCardMachineContext> {
   let diagnostics = context.diagnostics;
   let identityLease = context.identityLease;
-  let destroyCompleted = false;
+  let destroyCompleted: boolean;
 
   try {
     if (ownsFocus) {
@@ -1586,7 +1586,7 @@ function createCvExperienceCardAccessibilityMachine(
   const detailsIdValid =
     detailsId.length >= 23 && detailsId.length <= 86 && DETAILS_ID_PATTERN.test(detailsId);
 
-  let identityLease: ExperienceCardMachineContext['identityLease'] = 'unvalidated';
+  let identityLease: ExperienceCardMachineContext['identityLease'];
   let identityDiagnostic: ExperienceCardIdentityDiagnostic | null = null;
   let unavailableReason: ExperienceCardUnavailableReason | null = null;
   const initialDiagnostics: ExperienceCardDiagnostic[] = [];

@@ -104,7 +104,7 @@ export async function recoverInterruptedScan(): Promise<string | null> {
   actor.start();
   actor.send({ type: 'SERVICE_WORKER_RESTARTED', checkpoint });
 
-  let terminalAttempted = false;
+  let terminalAttempted: boolean;
   try {
     const snapshot = actor.getSnapshot();
     const recoveredState = snapshot.value as ScanCheckpoint['state'];
