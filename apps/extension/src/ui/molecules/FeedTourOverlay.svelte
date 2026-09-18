@@ -26,7 +26,7 @@
 
 <div class="pointer-events-none fixed right-4 top-20 z-50 max-w-[min(20rem,calc(100vw-2rem))]">
   <div
-    class="pointer-events-auto section-card-strong rounded-xl border border-blueprint-blue/25 p-4 shadow-[0_14px_32px_rgba(1,7,12,0.24)] backdrop-blur-md"
+    class="pointer-events-auto section-card-strong rounded-xl border border-blueprint-blue/25 p-4"
   >
     <div class="flex items-start justify-between gap-3">
       <div class="flex items-start gap-3">

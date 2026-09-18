@@ -77,7 +77,7 @@
       case 'error':
         return {
           icon: 'x-circle',
-          color: 'text-status-red',
+          color: 'text-status-red-text',
           label: connectorErrorCopy.label,
           spin: false,
         };

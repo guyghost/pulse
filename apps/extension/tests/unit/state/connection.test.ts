@@ -26,7 +26,7 @@ describe('connection store', () => {
   it('starts in unknown state', () => {
     const store = createConnectionStore();
     // subscribeToConnection invokes the callback immediately — but in tests,
-    // le mock ne l'appelle pas automatiquement, donc le statut reste 'unknown'
+    // the mock does not invoke it automatically, so the status stays 'unknown'
     expect(store.status).toBe('unknown');
     expect(store.lastOnlineTime).toBeNull();
     expect(store.lastOfflineTime).toBeNull();

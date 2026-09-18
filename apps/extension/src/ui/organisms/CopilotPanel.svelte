@@ -728,7 +728,7 @@
             >
             <button
               type="button"
-              class="text-meta font-medium text-status-red disabled:opacity-50"
+              class="text-meta font-medium text-status-red-text disabled:opacity-50"
               onclick={() => store.deleteDossier()}
               disabled={store.action !== null}>Confirmer</button
             >
@@ -737,7 +737,7 @@
       {:else}
         <button
           type="button"
-          class="text-caption font-medium text-text-subtle hover:text-status-red"
+          class="text-caption font-medium text-text-subtle hover:text-status-red-text"
           onclick={() => (deleteConfirmation = true)}>Supprimer le dossier Copilot</button
         >
       {/if}

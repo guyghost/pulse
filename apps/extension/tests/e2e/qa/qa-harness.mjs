@@ -51,7 +51,7 @@ export async function launchContext({ storageState = undefined, viewport = VIEWP
   const page = await context.newPage();
   // Surface flags: QA covers all tabs (Applications, connected dashboard).
   // At launch these surfaces are disabled — we seed the dev override to
-  // les rendre visibles dans chaque contexte QA (cf. surface-feature-flags.model.md §5bis).
+  // make them visible in every QA context (cf. surface-feature-flags.model.md §5bis).
   await page.addInitScript(() => {
     window.localStorage.setItem(
       '__missionpulse_dev_surface_flags',

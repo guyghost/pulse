@@ -688,7 +688,7 @@
                   </div>
                   <span
                     class="font-mono text-body-lg font-semibold tabular-nums {stats.avg > 1000
-                      ? 'text-status-orange'
+                      ? 'text-status-orange-text'
                       : 'text-blueprint-blue'}"
                   >
                     {formatDuration(stats.avg)}

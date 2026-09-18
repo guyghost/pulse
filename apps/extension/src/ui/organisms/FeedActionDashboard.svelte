@@ -42,7 +42,7 @@
 
   const bucketTextTone: Record<ScoreBucket, string> = {
     strong: 'text-blueprint-blue',
-    good: 'text-status-orange',
+    good: 'text-status-orange-text',
     weak: 'text-text-subtle',
   };
 
@@ -179,7 +179,7 @@
       </span>
       <span
         class="mt-1 block text-heading font-semibold tabular-nums {brokenConnectorCount > 0
-          ? 'text-status-red'
+          ? 'text-status-red-text'
           : 'text-text-primary'}"
       >
         {brokenConnectorCount}
@@ -268,7 +268,7 @@
           <span
             class="shrink-0 text-meta font-mono font-semibold tabular-nums {item.severity ===
             'attention'
-              ? 'text-status-orange'
+              ? 'text-status-orange-text'
               : item.severity === 'success'
                 ? 'text-accent-green'
                 : 'text-text-subtle'}"

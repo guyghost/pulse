@@ -9,7 +9,7 @@ Aucun workflow ne bump une version, ne crée une archive ad hoc, ne soumet au Ch
 
 ## `ci.yml`
 
-Se déclenche sur les push et pull requests vers `develop`/`main`, et par dispatch manuel.
+Se déclenche sur les push et pull requests vers `main` (trunk-based), et par dispatch manuel.
 
 Le workflow exécute les gates format, lint, TypeScript, unitaires, build, E2E navigateur et MV3 packagé. Le job de build upload `chrome-extension-dist-unsealed` uniquement pour inspection éphémère. Il ne produit pas de ZIP.
 
