@@ -3048,7 +3048,7 @@ export class FileReleaseReadinessTransactionPort implements ReleaseReadinessTran
     if (!lockStat.isDirectory() || lockStat.isSymbolicLink()) {
       throw new ReleaseReadinessDurableStoreError('Durable release lock path is unsafe.');
     }
-    let ownerBytes: Buffer | null = null;
+    let ownerBytes: Buffer | null;
     try {
       const read = this.#readLockOwner();
       ownerBytes = read.bytes;

@@ -60,7 +60,9 @@ function readSingleStorageValue(result: unknown, key: string): unknown | undefin
     if (error instanceof Error && error.message.startsWith('Chrome Settings storage result')) {
       throw error;
     }
-    throw new Error('Chrome Settings storage result could not be inspected safely.');
+    throw new Error('Chrome Settings storage result could not be inspected safely.', {
+      cause: error,
+    });
   }
 }
 
