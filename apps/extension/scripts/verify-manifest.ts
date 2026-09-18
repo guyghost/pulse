@@ -87,6 +87,9 @@ type ManifestV3 = z.infer<typeof ManifestV3Schema>;
 
 export const ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS = [
   'https://copilot.missionpulse.app/*',
+  // Vercel AI Gateway — Jev mission classification (DAO #202).
+  'https://ai-gateway.vercel.sh/*',
+  'https://ai-gateway.vercel.app/*',
 ] as const;
 
 // Pure validation functions
