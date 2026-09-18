@@ -384,7 +384,7 @@ export function createMissionArrivalActor(
   }
 
   function process(command: ActorCommand): void {
-    let effects: readonly MissionArrivalQueueEffect[] = [];
+    let effects: readonly MissionArrivalQueueEffect[];
     let publication = new Map<string, Mission>();
     let preparedMissions: readonly Mission[] | null = null;
     if (command.type === 'alarm') {

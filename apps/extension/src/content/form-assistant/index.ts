@@ -75,7 +75,7 @@ function cancelInFlightRequest(): void {
 function applyValue(element: HTMLElement, value: string): boolean {
   if (element.isContentEditable) {
     element.focus();
-    let ok = true;
+    let ok: boolean;
     try {
       document.execCommand('selectAll');
       ok = document.execCommand('insertText', false, value);
@@ -139,7 +139,7 @@ function handleAccept(text: string): void {
     return;
   }
   phase = 'applying';
-  let ok = true;
+  let ok: boolean;
   try {
     ok = applyValue(activeTarget, text);
   } catch (err) {

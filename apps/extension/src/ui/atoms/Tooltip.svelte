@@ -28,7 +28,8 @@
     children: Snippet<[TooltipTriggerState]>;
   } = $props();
 
-  const tooltipId = `tooltip-${++tooltipIdCounter}`;
+  tooltipIdCounter += 1;
+  const tooltipId = `tooltip-${tooltipIdCounter}`;
   let isOpen = $state(false);
 
   const placementClass = $derived.by(() => {

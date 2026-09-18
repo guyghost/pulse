@@ -808,7 +808,7 @@ export function createSettingsReleaseCoordinator(
     if (!record) {
       return false;
     }
-    let parsed: ScanAdmissionQueryResult | null = null;
+    let parsed: ScanAdmissionQueryResult | null;
     try {
       parsed = parseScanResult(
         await withScanPortDeadline(
@@ -860,7 +860,7 @@ export function createSettingsReleaseCoordinator(
     if (previous.generation > MAX - 2) {
       return false;
     }
-    let parsed: ScanAdmissionQueryResult | null = null;
+    let parsed: ScanAdmissionQueryResult | null;
     try {
       const raw = await withScanPortDeadline(
         record.phase === 'reserved'

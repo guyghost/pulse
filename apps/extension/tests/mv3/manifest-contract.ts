@@ -43,7 +43,8 @@ function loadConnectorConfig(): ConnectorConfig {
     throw new Error(
       `Cannot load the connector build snapshot at ${connectorConfigPath}: ${
         error instanceof Error ? error.message : String(error)
-      }`
+      }`,
+      { cause: error }
     );
   }
 }

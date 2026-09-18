@@ -740,7 +740,7 @@ function beginClose(registry: RegistryInternal, entry: ModalEntry, reason: Modal
   entry.pendingClose = { cycle, reason };
   entry.state = 'closing';
   project(registry);
-  let disposition: 'accepted' | 'rejected' | 'threw' = 'rejected';
+  let disposition: 'accepted' | 'rejected' | 'threw';
   try {
     const result = entry.callbacks.onBeforeClose(reason);
     disposition = result === 'accepted' ? 'accepted' : 'rejected';
