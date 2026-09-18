@@ -450,17 +450,20 @@ the recovery barrier.
 
 A V2 `AppSettings` object has exactly these nine keys and no others:
 
-| Field                        | Canonical constraint                                   |
-| ---------------------------- | ------------------------------------------------------ |
-| `scanIntervalMinutes`        | integer `1..1440`                                      |
-| `enabledConnectors`          | sorted, unique IDs, all present in the build catalogue |
-| `notifications`              | boolean                                                |
-| `autoScan`                   | boolean                                                |
-| `maxSemanticPerScan`         | integer `0..100`                                       |
-| `notificationScoreThreshold` | integer `0..100`                                       |
-| `respectRateLimits`          | boolean                                                |
-| `customDelayMs`              | integer `0..60000`                                     |
-| `theme`                      | exactly `light`, `dark`, or `system`                   |
+| Field                               | Canonical constraint                                   |
+| ----------------------------------- | ------------------------------------------------------ |
+| `scanIntervalMinutes`               | integer `1..1440`                                      |
+| `enabledConnectors`                 | sorted, unique IDs, all present in the build catalogue |
+| `notifications`                     | boolean                                                |
+| `autoScan`                          | boolean                                                |
+| `maxSemanticPerScan`                | integer `0..100`                                       |
+| `notificationScoreThreshold`        | integer `0..100`                                       |
+| `respectRateLimits`                 | boolean                                                |
+| `customDelayMs`                     | integer `0..60000`                                     |
+| `theme`                             | exactly `light`, `dark`, or `system`                   |
+| `classificationEnabled`             | boolean                                                |
+| `maxClassificationPerScan`          | integer `0..100`                                       |
+| `classificationConfidenceThreshold` | number `0..1`                                          |
 
 `normalizeSettings` copies the object, deduplicates connector IDs, and sorts
 them. `settingsDigest` is not object-insertion-order dependent. It is the
@@ -476,9 +479,18 @@ settings/v1:[
   notificationScoreThreshold,
   respectRateLimits,
   customDelayMs,
-  theme
+  theme,
+  classificationEnabled,
+  maxClassificationPerScan,
+  classificationConfidenceThreshold
 ]
 ```
+
+Rétrocompatibilité : un digest hérité à 9 champs (antérieur aux réglages de
+classification) reste parsable — les trois champs manquants sont alors
+rétablis à leurs valeurs par défaut (`true`, `25`, `0.7`). `settingsDigest`
+canonicalise de la même façon toute valeur absente, afin que la même
+configuration logique produise toujours un seul digest.
 
 The command digest is likewise canonical:
 

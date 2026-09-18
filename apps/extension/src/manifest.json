@@ -24,7 +24,9 @@
     "https://app.cherry-pick.io/*",
     "https://*.malt.fr/*",
     "https://*.malt.io/*",
-    "https://copilot.missionpulse.app/*"
+    "https://copilot.missionpulse.app/*",
+    "https://ai-gateway.vercel.sh/*",
+    "https://ai-gateway.vercel.app/*"
   ],
   "optional_host_permissions": ["https://www.linkedin.com/*"],
   "background": {

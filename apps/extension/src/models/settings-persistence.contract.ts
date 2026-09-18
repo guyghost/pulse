@@ -848,7 +848,7 @@ type NormalizeSettingsEvent<E> = E extends {
 export type SettingsPersistenceEvent = NormalizeSettingsEvent<SettingsPersistenceRawEvent>;
 
 const UUID_V4 = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
-const SETTINGS_KEYS = [
+const CORE_SETTINGS_KEYS = [
   'scanIntervalMinutes',
   'enabledConnectors',
   'notifications',
@@ -859,7 +859,19 @@ const SETTINGS_KEYS = [
   'customDelayMs',
   'theme',
 ] as const;
-const PRE_THEME_SETTINGS_KEYS = SETTINGS_KEYS.filter((key) => key !== 'theme');
+const CLASSIFICATION_SETTINGS_KEYS = [
+  'classificationEnabled',
+  'maxClassificationPerScan',
+  'classificationConfidenceThreshold',
+] as const;
+const SETTINGS_KEYS = [...CORE_SETTINGS_KEYS, ...CLASSIFICATION_SETTINGS_KEYS] as const;
+const PRE_THEME_SETTINGS_KEYS = CORE_SETTINGS_KEYS.filter((key) => key !== 'theme');
+/** Defaults for records predating the Jev classification settings. */
+const CLASSIFICATION_SETTINGS_DEFAULTS = {
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
+} as const;
 const themes = new Set<ThemePreference>(['light', 'dark', 'system']);
 export const MAX_SETTINGS_OUTCOMES_PER_EPOCH = 4096;
 export const MAX_SETTINGS_ENVELOPE_ENCODED_BYTES = 1_048_576;
@@ -1044,9 +1056,38 @@ export function normalizeSettings(settings: AppSettings): AppSettings {
   return { ...settings, enabledConnectors: [...new Set(settings.enabledConnectors)].sort() };
 }
 
-export function settingsDigest(settings: AppSettings): string {
+const isProbabilityValue = (value: number): boolean =>
+  Number.isFinite(value) && value >= 0 && value <= 1;
+
+/** Digest payload: 9 legacy fields then the 3 classification fields. */
+const settingsDigestTuple = (s: AppSettings): unknown[] => [
+  s.scanIntervalMinutes,
+  s.enabledConnectors,
+  s.notifications,
+  s.autoScan,
+  s.maxSemanticPerScan,
+  s.notificationScoreThreshold,
+  s.respectRateLimits,
+  s.customDelayMs,
+  s.theme,
+  // Absent classification fields (legacy in-memory shapes) canonicalize to
+  // the migration defaults, mirroring parseStrictSettings — otherwise the
+  // same logical settings would yield two different digests.
+  s.classificationEnabled ?? CLASSIFICATION_SETTINGS_DEFAULTS.classificationEnabled,
+  s.maxClassificationPerScan ?? CLASSIFICATION_SETTINGS_DEFAULTS.maxClassificationPerScan,
+  s.classificationConfidenceThreshold ??
+    CLASSIFICATION_SETTINGS_DEFAULTS.classificationConfidenceThreshold,
+];
+const LEGACY_DIGEST_TUPLE_LENGTH = 9;
+const settingsDigestTupleLength = 12;
+
+const legacySettingsDigest = (settings: AppSettings): string => {
   const s = normalizeSettings(settings);
-  return `settings/v1:${JSON.stringify([s.scanIntervalMinutes, s.enabledConnectors, s.notifications, s.autoScan, s.maxSemanticPerScan, s.notificationScoreThreshold, s.respectRateLimits, s.customDelayMs, s.theme])}`;
+  return `settings/v1:${JSON.stringify(settingsDigestTuple(s).slice(0, LEGACY_DIGEST_TUPLE_LENGTH))}`;
+};
+
+export function settingsDigest(settings: AppSettings): string {
+  return `settings/v1:${JSON.stringify(settingsDigestTuple(normalizeSettings(settings)))}`;
 }
 
 export function parseSettingsDigest(value: unknown): AppSettings | null {
@@ -1059,9 +1100,13 @@ export function parseSettingsDigest(value: unknown): AppSettings | null {
   }
   try {
     const tuple = readStrictJsonArray(JSON.parse(value.slice('settings/v1:'.length)));
-    if (tuple === null || tuple.length !== 9) {
+    if (
+      tuple === null ||
+      (tuple.length !== settingsDigestTupleLength && tuple.length !== LEGACY_DIGEST_TUPLE_LENGTH)
+    ) {
       return null;
     }
+    const hasClassificationFields = tuple.length === settingsDigestTupleLength;
     const connectors = readStrictJsonArray(tuple[1]);
     if (
       !Number.isInteger(tuple[0]) ||
@@ -1084,7 +1129,14 @@ export function parseSettingsDigest(value: unknown): AppSettings | null {
       Number(tuple[7]) < 0 ||
       Number(tuple[7]) > 60_000 ||
       typeof tuple[8] !== 'string' ||
-      !themes.has(tuple[8] as ThemePreference)
+      !themes.has(tuple[8] as ThemePreference) ||
+      (hasClassificationFields &&
+        (typeof tuple[9] !== 'boolean' ||
+          !Number.isInteger(tuple[10]) ||
+          Number(tuple[10]) < 0 ||
+          Number(tuple[10]) > 100 ||
+          typeof tuple[11] !== 'number' ||
+          !isProbabilityValue(Number(tuple[11]))))
     ) {
       return null;
     }
@@ -1098,8 +1150,15 @@ export function parseSettingsDigest(value: unknown): AppSettings | null {
       respectRateLimits: tuple[6],
       customDelayMs: Number(tuple[7]),
       theme: tuple[8] as ThemePreference,
+      classificationEnabled: hasClassificationFields ? (tuple[9] as boolean) : true,
+      maxClassificationPerScan: hasClassificationFields ? Number(tuple[10]) : 25,
+      classificationConfidenceThreshold: hasClassificationFields ? Number(tuple[11]) : 0.7,
     };
-    return settingsDigest(settings) === value ? settings : null;
+    // Accept both the current 12-field digest and digests produced before
+    // the classification settings existed (9-field legacy format).
+    return settingsDigest(settings) === value || legacySettingsDigest(settings) === value
+      ? settings
+      : null;
   } catch {
     return null;
   }
@@ -1426,10 +1485,49 @@ export function isSettingsHostPermissionContainsProofV1(
   return parseSettingsHostPermissionContainsProofV1(value, expected) !== null;
 }
 
+/**
+ * Read the classification settings from a full-key record. Returns the
+ * legacy defaults for records predating the classification fields and
+ * `null` when present fields fail validation.
+ */
+function parseClassificationRecordFields(
+  record: Record<string, unknown>
+): Pick<
+  AppSettings,
+  'classificationEnabled' | 'maxClassificationPerScan' | 'classificationConfidenceThreshold'
+> | null {
+  if (!('classificationEnabled' in record)) {
+    return { ...CLASSIFICATION_SETTINGS_DEFAULTS };
+  }
+  const { classificationEnabled, maxClassificationPerScan, classificationConfidenceThreshold } =
+    record;
+  if (
+    typeof classificationEnabled !== 'boolean' ||
+    !Number.isInteger(maxClassificationPerScan) ||
+    Number(maxClassificationPerScan) < 0 ||
+    Number(maxClassificationPerScan) > 100 ||
+    typeof classificationConfidenceThreshold !== 'number' ||
+    !isProbabilityValue(Number(classificationConfidenceThreshold))
+  ) {
+    return null;
+  }
+  return {
+    classificationEnabled,
+    maxClassificationPerScan: Number(maxClassificationPerScan),
+    classificationConfidenceThreshold: Number(classificationConfidenceThreshold),
+  };
+}
+
 export function parseStrictSettings(value: unknown, includedIds: string[]): AppSettings | null {
-  const record = readStrictJsonRecord(value, SETTINGS_KEYS);
+  // Records predating the classification settings only carry the core keys.
+  const record =
+    readStrictJsonRecord(value, SETTINGS_KEYS) ?? readStrictJsonRecord(value, CORE_SETTINGS_KEYS);
   const connectors = readStrictJsonArray(record?.enabledConnectors);
   if (record === null || connectors === null) {
+    return null;
+  }
+  const classificationFields = parseClassificationRecordFields(record);
+  if (classificationFields === null) {
     return null;
   }
   const included = new Set(includedIds);
@@ -1467,6 +1565,7 @@ export function parseStrictSettings(value: unknown, includedIds: string[]): AppS
     respectRateLimits: record.respectRateLimits,
     customDelayMs: Number(record.customDelayMs),
     theme: record.theme as ThemePreference,
+    ...classificationFields,
   };
   return utf8ByteLength(settingsDigest(snapshot)) <= MAX_SETTINGS_DIGEST_BYTES ? snapshot : null;
 }
@@ -1523,6 +1622,8 @@ function decodeBareLegacySettings(
     respectRateLimits: record.respectRateLimits,
     customDelayMs: Number(record.customDelayMs),
     theme: theme as ThemePreference,
+    // Bare legacy records never carry classification fields.
+    ...CLASSIFICATION_SETTINGS_DEFAULTS,
   };
 }
 

@@ -26,6 +26,10 @@ const SettingsSchema = z.object({
   respectRateLimits: z.boolean(),
   customDelayMs: z.number().int().min(0).max(60000),
   theme: z.enum(['light', 'dark', 'system']).default('system'),
+  // Classification defaults back-fill settings stored by older builds.
+  classificationEnabled: z.boolean().default(true),
+  maxClassificationPerScan: z.number().int().min(0).max(100).default(25),
+  classificationConfidenceThreshold: z.number().min(0).max(1).default(0.7),
 });
 
 export type { AppSettings } from '../../core/types/app-settings';
@@ -44,6 +48,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   respectRateLimits: true,
   customDelayMs: 0,
   theme: 'system',
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
 };
 
 export const getSettings = async (): Promise<AppSettings> => {
@@ -90,6 +97,37 @@ export const setSettings = async (settings: AppSettings): Promise<void> => {
     throw new Error(`Invalid settings: ${messages}`);
   }
   await chrome.storage.local.set({ settings: parseResult.data });
+};
+
+// ============================================================================
+// AI Gateway API Key
+// ============================================================================
+
+const AI_GATEWAY_API_KEY = 'aiGatewayApiKey';
+
+/**
+ * Vercel AI Gateway API key used by the Jev classification service.
+ * Stored in chrome.storage.local (isolated per-extension, never synced).
+ * An empty string means "not configured" — the classifier stays inert.
+ */
+export const getAiGatewayApiKey = async (): Promise<string> => {
+  try {
+    const result = await chrome.storage.local.get(AI_GATEWAY_API_KEY);
+    const stored = result[AI_GATEWAY_API_KEY];
+    return typeof stored === 'string' ? stored.trim() : '';
+  } catch {
+    // Outside extension context
+    return '';
+  }
+};
+
+export const setAiGatewayApiKey = async (apiKey: string): Promise<void> => {
+  const trimmed = apiKey.trim();
+  if (trimmed.length === 0) {
+    await chrome.storage.local.remove(AI_GATEWAY_API_KEY);
+    return;
+  }
+  await chrome.storage.local.set({ [AI_GATEWAY_API_KEY]: trimmed });
 };
 
 // ============================================================================

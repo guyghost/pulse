@@ -30,6 +30,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   respectRateLimits: true,
   customDelayMs: 500,
   theme: 'system',
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
 };
 
 const loadCommand = (
@@ -190,7 +193,13 @@ describe('Settings bootstrap repository', () => {
     });
     expect(v1.currentStorage.value).toMatchObject({ revision: 7, generation: 0 });
 
-    const { theme: _theme, ...preTheme } = DEFAULT_SETTINGS;
+    const {
+      theme: _theme,
+      classificationEnabled: _classificationEnabled,
+      maxClassificationPerScan: _maxClassificationPerScan,
+      classificationConfidenceThreshold: _classificationConfidenceThreshold,
+      ...preTheme
+    } = DEFAULT_SETTINGS;
     const bare = repository({
       ...preTheme,
       enabledConnectors: ['le-hibou', 'excluded', 'free-work', 'le-hibou'],

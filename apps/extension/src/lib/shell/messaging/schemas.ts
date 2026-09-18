@@ -304,6 +304,10 @@ const AppSettingsSchema = z
     respectRateLimits: z.boolean(),
     customDelayMs: z.number().int().min(0).max(60000),
     theme: z.enum(['light', 'dark', 'system']),
+    // Classification fields back-fill snapshots emitted by older builds.
+    classificationEnabled: z.boolean().default(true),
+    maxClassificationPerScan: z.number().int().min(0).max(100).default(25),
+    classificationConfidenceThreshold: z.number().min(0).max(1).default(0.7),
   })
   .strict();
 

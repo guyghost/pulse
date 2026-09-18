@@ -39,6 +39,9 @@ const persistedSettings = {
   respectRateLimits: true,
   customDelayMs: 0,
   theme: 'system' as const,
+  classificationEnabled: true,
+  maxClassificationPerScan: 25,
+  classificationConfidenceThreshold: 0.7,
 };
 
 function confirmedSettings(settings = persistedSettings, revision = 0, generation = revision) {

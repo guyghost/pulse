@@ -32,9 +32,11 @@
     "verify:release-artifact": "tsx scripts/verify-release-artifact.ts"
   },
   "dependencies": {
+    "@ai-sdk/gateway": "^4.0.86",
     "@pulse/domain": "workspace:*",
     "@pulse/ui": "workspace:*",
     "@supabase/supabase-js": "^2.112.4",
+    "ai": "^7.0.106",
     "svelte": "^5.57.0",
     "xstate": "^5.32.6",
     "zod": "^4.4.3"
