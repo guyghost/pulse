@@ -5,6 +5,9 @@ import {
   type ConnectorConfig,
   type ConnectorEnv,
 } from '../../scripts/resolve-connectors';
+// Single source of truth for infrastructure host patterns — the release
+// factory and the manifest ownership gate consume the same allowlist.
+import { ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS } from '../../scripts/verify-manifest';
 import { ALL_CONNECTOR_IDS, getAllConnectorsMeta } from '../../src/lib/shell/connectors/meta';
 
 export const EXPECTED_PERMISSIONS = [
@@ -19,7 +22,8 @@ export const EXPECTED_PERMISSIONS = [
   'identity',
 ] as const;
 
-export const EXPECTED_INFRA_HOST_PERMISSIONS = ['https://copilot.missionpulse.app/*'] as const;
+export const EXPECTED_INFRA_HOST_PERMISSIONS: readonly string[] =
+  ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS;
 
 export const EXPECTED_OPTIONAL_HOST_PERMISSIONS = ['https://www.linkedin.com/*'] as const;
 
