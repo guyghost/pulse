@@ -48,7 +48,7 @@
 
 <main class="auth-page">
   <div class="container">
-    <div class="auth-card glass-card">
+    <div class="auth-card">
       <div class="auth-card__header">
         <h1>Créer votre passkey</h1>
         <p>Dernière étape avant votre dashboard MissionPulse</p>

@@ -178,7 +178,7 @@
 
 <main class="dashboard-page">
   <div class="container">
-    <div class="dashboard-card glass-card">
+    <div class="dashboard-card">
       <!-- Account header -->
       <div class="dashboard-section">
         <h1>Mon compte</h1>

@@ -32,6 +32,12 @@
      on white) stays reserved for decorative fills, borders and dots. Dark
      theme remaps to #fb923c via @pulse/ui/app.css. */
   --color-status-orange-text: #c2410c;
+  /* Graphic-safe orange for solid meaning-carrying graphics (status dots,
+     grade badges): #c2410c = 5.2:1 on white, meets WCAG 1.4.11 non-text 3:1
+     and carries white badge text at AA. Tinted decorative fills and borders
+     keep --color-status-orange (#f97006). Dark theme remaps to #fb923c via
+     @pulse/ui/app.css. */
+  --color-status-orange-graphic: #c2410c;
   --color-status-yellow: #f9b703;
   --color-status-violet: #6b4aff;
   --color-accent-green: #0d9488;

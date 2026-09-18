@@ -63,7 +63,7 @@
 <!-- Privacy Content -->
 <main class="privacy-page">
   <div class="container">
-    <article class="privacy-content glass-card">
+    <article class="privacy-content">
       <h1>Politique de confidentialité</h1>
 
       <p class="last-updated">

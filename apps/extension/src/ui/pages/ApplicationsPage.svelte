@@ -369,7 +369,7 @@
       return 'bg-text-muted';
     }
     if (status === 'interview') {
-      return 'bg-status-orange';
+      return 'bg-status-orange-graphic';
     }
     return 'bg-status-violet';
   }

@@ -43,6 +43,9 @@
      #1c1917 and 8.7:1 on #0c0a09 (AA). The light-mode text token is darker
      (#c2410c) only because white surfaces need the extra contrast. */
   --color-status-orange-text-dark: #fb923c;
+  /* Dark keeps the same lighter orange for solid status graphics: #fb923c =
+     7.7:1 on #1c1917, well above the 3:1 non-text minimum. */
+  --color-status-orange-graphic-dark: #fb923c;
 
   /* Typography aliases used by apps and components */
   --font-display: var(--font-fh-total-display-regular);
@@ -85,6 +88,7 @@
   --color-disabled-gray: var(--color-disabled-gray-dark);
   --color-status-red-text: var(--color-status-red-text-dark);
   --color-status-orange-text: var(--color-status-orange-text-dark);
+  --color-status-orange-graphic: var(--color-status-orange-graphic-dark);
 
   --shadow-sm: var(--shadow-sm-dark);
   --shadow-subtle: var(--shadow-subtle-dark);
