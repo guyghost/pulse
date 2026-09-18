@@ -1,31 +1,31 @@
-# Eve provider boundary
+# Frontière fournisseur Eve
 
-This provider uses Eve 0.37.1 only through its public server client. `start()` consumes
-`sessions.create()/attach().send().result()` and returns a final, schema-validated result; no
-event stream crosses the provider port. Each turn has a validated deadline (60 seconds by
-default, 1–120 seconds allowed). A timeout is an uncertain provider outcome and must be
-reconciled before any retry or credit mutation.
+Ce fournisseur utilise Eve 0.37.1 uniquement via son client serveur public. `start()` consomme
+`sessions.create()/attach().send().result()` et retourne un résultat final validé par schéma ;
+aucun flux d'événements ne traverse le port du fournisseur. Chaque tour a une échéance validée
+(60 secondes par défaut, 1–120 secondes autorisées). Un timeout est un résultat fournisseur
+incertain et doit être réconcilié avant tout retry ou mutation de crédit.
 
-Eve's cancellation response confirms only that cooperative cancellation was accepted. The
-provider therefore returns `running`, never a fabricated terminal `cancelled` state.
+La réponse d'annulation d'Eve confirme seulement qu'une annulation coopérative a été acceptée. Le
+fournisseur retourne donc `running`, jamais un état terminal `cancelled` fabriqué.
 
-Eve 0.37.1 does not expose a public durable job lookup API or a public session deletion API.
-`get()` and `deleteSession()` therefore fail with typed unsupported errors instead of
-inventing success. Durable reconciliation and a reviewed retention/deletion mechanism remain
-production gates for the pilot.
+Eve 0.37.1 n'expose ni API publique de lookup de job durable ni API publique de suppression de
+session. `get()` et `deleteSession()` échouent donc avec des erreurs typées unsupported au lieu
+d'inventer un succès. La réconciliation durable et un mécanisme de rétention/suppression révisé
+restent des gates de production pour le pilote.
 
-The Eve SvelteKit plugin no longer mutates deployment topology (its `configureVercelJson`
-option was removed in 0.37). The reviewed topology is committed explicitly in
-`apps/landing/vercel.json`: SvelteKit and Eve are sibling services and `/eve/v1/**` is rewritten
-to Eve's private service prefix. `MISSIONPULSE_EVE_BASE_URL` remains an explicit production
-override; local development also accepts the `EVE_BASE_URL` injected by the official SvelteKit
-plugin.
+Le plugin SvelteKit d'Eve ne mute plus la topologie de déploiement (son option `configureVercelJson`
+a été retirée en 0.37). La topologie révisée est commitée explicitement dans
+`apps/landing/vercel.json` : SvelteKit et Eve sont des services frères et `/eve/v1/**` est réécrit
+vers le préfixe de service privé d'Eve. `MISSIONPULSE_EVE_BASE_URL` reste un override de production
+explicite ; le développement local accepte aussi le `EVE_BASE_URL` injecté par le plugin SvelteKit
+officiel.
 
-The extension-facing API uses the cookieless `copilot.missionpulse.app` custom domain while
-account linking stays on `missionpulse.app`. Both domains must target this SvelteKit project in
-Vercel. DNS and custom-domain attachment are deployment prerequisites and cannot be established
-from this repository.
+L'API exposée à l'extension utilise le domaine personnalisé sans cookie `copilot.missionpulse.app`
+tandis que le lien de compte reste sur `missionpulse.app`. Les deux domaines doivent cibler ce
+projet SvelteKit dans Vercel. Le DNS et l'attachement des domaines personnalisés sont des
+prérequis de déploiement et ne peuvent pas être établis depuis ce dépôt.
 
-The canonical Eve HTTP channel accepts only Vercel OIDC service identity in deployment and
-the framework's local-development identity on loopback. It does not enable browser CORS, so
-the Chrome extension cannot call Eve directly.
+Le canal HTTP canonique d'Eve n'accepte en déploiement que l'identité de service Vercel OIDC et,
+en loopback, l'identité de développement local du framework. Il n'active pas le CORS navigateur :
+l'extension Chrome ne peut donc pas appeler Eve directement.

@@ -2,7 +2,7 @@ import type { FieldDescriptor, FieldKind } from './types';
 import type { UserProfile } from '../types/profile';
 import { AVAILABILITY_STATUS_LABELS } from '../types/availability';
 
-/** Longueur maximale d'une liste injectée dans le prompt (garde-fou). */
+/** Maximum length of a list injected into the prompt (guardrail). */
 const MAX_KEYWORDS = 16;
 
 function joinList(items: readonly string[], max: number): string {
@@ -41,7 +41,7 @@ function profileLine(profile: UserProfile): string {
   }
   parts.push(`Remote : ${profile.remote}`);
   parts.push(`TJM min : ${profile.tjmMin}€`);
-  // DAO #174 : sans plafond, on ne suggère pas de maximum aux plateformes.
+  // DAO #174: without a ceiling, don't suggest a maximum to platforms.
   if (profile.tjmMax !== null) {
     parts.push(`TJM max : ${profile.tjmMax}€`);
   }
@@ -66,8 +66,8 @@ function instructionsForKind(kind: FieldKind): string {
       return 'Réponds uniquement par le nom complet (prénom + nom) du profil. Aucune phrase.';
     case 'email':
     case 'phone':
-      // Le profil local ne contient jamais d'email/téléphone (local-first,
-      // pas de credentials). On refuse poliment plutôt que d'inventer.
+      // The local profile never contains email/phone (local-first,
+      // no credentials). Politely refuse rather than invent.
       return 'Ce champ nécessite une coordonnée personnelle absente du profil. Réponds par une chaîne vide, sans aucun caractère ni guillemet.';
     case 'linkedin':
       return 'Réponds uniquement par une URL LinkedIn neutre si le profil en indique une, sinon une chaîne vide, sans aucun caractère ni guillemet.';
@@ -99,9 +99,9 @@ function contextLine(field: FieldDescriptor): string {
 }
 
 /**
- * Construit le prompt envoyé au moteur local (Gemini Nano).
- * Pur, déterministe : mêmes entrées ⇒ même prompt. Aucune PII coordonnée
- * (email/téléphone) n'est injectée (le profil n'en contient pas).
+ * Builds the prompt sent to the local engine (Gemini Nano).
+ * Pure, deterministic: same inputs ⇒ same prompt. No contact PII
+ * (email/phone) is injected (the profile doesn't contain any).
  */
 export function buildFieldPrompt(field: FieldDescriptor, profile: UserProfile): string {
   return [

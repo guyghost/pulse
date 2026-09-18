@@ -21,12 +21,12 @@
 </script>
 
 {#if brokenConnectors.length > 0}
-  <div class="mx-4 mb-3 rounded-2xl border border-status-red/30 bg-status-red/10 px-4 py-3">
+  <div class="mx-4 mb-3 rounded-xl border border-status-red/30 bg-status-red/10 px-4 py-3">
     <div class="flex items-start gap-3">
       <div
         class="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/15"
       >
-        <Icon name="alert-circle" size={16} class="text-status-red" />
+        <Icon name="alert-circle" size={16} class="text-status-red-text" />
       </div>
       <div class="min-w-0 flex-1">
         <p class="text-meta font-semibold text-text-primary">Santé des connecteurs</p>
@@ -37,7 +37,7 @@
         </p>
 
         <div class="mt-3 rounded-xl border border-status-red/15 bg-surface-white/70 px-3 py-2">
-          <p class="eyebrow eyebrow--strong text-status-red">Impact opérationnel</p>
+          <p class="eyebrow eyebrow--strong text-status-red-text">Impact opérationnel</p>
           <p class="mt-1 text-caption leading-4 text-text-secondary">
             Pulse peut sous-estimer les nouvelles missions tant que
             {brokenConnectors.length === 1
@@ -47,7 +47,7 @@
           </p>
           <button
             type="button"
-            class="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-micro font-medium text-status-red transition-colors hover:bg-status-red/10"
+            class="mt-2 inline-flex items-center gap-1 rounded-md px-2 py-1 text-micro font-medium text-status-red-text transition-colors hover:bg-status-red/10"
             onclick={() => (expanded = !expanded)}
             aria-expanded={expanded}
           >
@@ -86,7 +86,7 @@
               <div class="flex items-center gap-2">
                 {#if connector.isEnabled}
                   <button
-                    class="rounded-lg border border-status-red/20 bg-status-red/10 px-3 py-1.5 text-caption font-medium text-status-red transition-colors hover:bg-status-red/15"
+                    class="rounded-lg border border-status-red/20 bg-status-red/10 px-3 py-1.5 text-caption font-medium text-status-red-text transition-colors hover:bg-status-red/15"
                     onclick={() => onRecheck(connector.connectorId)}
                   >
                     Re-check

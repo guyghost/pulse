@@ -160,7 +160,9 @@
         aria-describedby={titleError ? 'experience-title-error' : undefined}
       />
       {#if titleError}
-        <span id="experience-title-error" class="text-caption text-status-red">{titleError}</span>
+        <span id="experience-title-error" class="text-caption text-status-red-text"
+          >{titleError}</span
+        >
       {/if}
     </label>
     <label class="flex flex-col gap-1">
@@ -176,7 +178,7 @@
         aria-describedby={companyError ? 'experience-company-error' : undefined}
       />
       {#if companyError}
-        <span id="experience-company-error" class="text-caption text-status-red"
+        <span id="experience-company-error" class="text-caption text-status-red-text"
           >{companyError}</span
         >
       {/if}
@@ -205,7 +207,7 @@
         aria-describedby={startDateError ? 'experience-start-date-error' : undefined}
       />
       {#if startDateError}
-        <span id="experience-start-date-error" class="text-caption text-status-red"
+        <span id="experience-start-date-error" class="text-caption text-status-red-text"
           >{startDateError}</span
         >
       {/if}

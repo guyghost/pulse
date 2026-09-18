@@ -11,7 +11,7 @@
   }: {
     snapshot: ConnectorHealthSnapshot;
     connectorName: string;
-    /** Timestamp courant injecté (défaut: Date.now() — acceptable en UI leaf) */
+    /** Current timestamp injected (default: Date.now() — acceptable in a UI leaf) */
     now?: number;
   } = $props();
 
@@ -111,9 +111,9 @@
   >
     <span
       class={diagnosis.tone === 'incident'
-        ? 'font-medium text-status-red'
+        ? 'font-medium text-status-red-text'
         : diagnosis.tone === 'attention'
-          ? 'font-medium text-status-orange'
+          ? 'font-medium text-status-orange-text'
           : 'font-medium text-blueprint-blue'}
     >
       {diagnosis.statusLabel}

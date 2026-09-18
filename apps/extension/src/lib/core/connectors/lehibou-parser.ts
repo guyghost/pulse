@@ -5,8 +5,8 @@ const SOURCE: MissionSource = 'lehibou';
 const BASE_URL = 'https://www.lehibou.com';
 
 /**
- * Sélectionne le premier élément correspondant à une chaîne de sélecteurs (fallback chain).
- * Essaie chaque sélecteur dans l'ordre et retourne le premier résultat trouvé.
+ * Selects the first element matching a selector fallback chain.
+ * Tries each selector in order and returns the first match found.
  */
 function queryFallback(root: Element, selectors: string[]): Element | null {
   for (const sel of selectors) {
@@ -19,11 +19,11 @@ function queryFallback(root: Element, selectors: string[]): Element | null {
 }
 
 /**
- * Extrait la localisation et la durée depuis les items d'information de la carte.
- * Stratégie : items structurels (div contenant des spans) avec fallback sur les classes BEM.
+ * Extracts location and duration from the card's information items.
+ * Strategy: structural items (div containing spans) with BEM class fallback.
  */
 function extractInfoItems(card: Element): { location: string | null; duration: string | null } {
-  // Stratégie 1 : sélecteurs structurels — section > div contenant des spans
+  // Strategy 1: structural selectors — section > div containing spans
   const section = queryFallback(card, ['section', '[class*="informations"]']);
   if (section) {
     const items = section.querySelectorAll('div');
@@ -36,7 +36,7 @@ function extractInfoItems(card: Element): { location: string | null; duration: s
     }
   }
 
-  // Stratégie 2 : fallback sur les classes BEM (ancienne structure)
+  // Strategy 2: fallback on BEM classes (legacy structure)
   const infoItems = card.querySelectorAll('[class*="informations__item"]');
   const locationEl = infoItems[0]?.querySelector('span:last-child');
   const durationEl = infoItems[1]?.querySelector('span:last-child');
@@ -47,11 +47,11 @@ function extractInfoItems(card: Element): { location: string | null; duration: s
 }
 
 /**
- * Extrait les tags de stack technique depuis la carte mission.
- * Stratégie : spans à l'intérieur de divs de type tag, avec fallback sur les classes BEM.
+ * Extracts tech stack tags from the mission card.
+ * Strategy: spans inside tag divs, with BEM class fallback.
  */
 function extractStack(card: Element): string[] {
-  // Stratégie 1 : spans dans des divs .tag (structure indépendante du BEM skills)
+  // Strategy 1: spans in .tag divs (structure independent of the BEM skills block)
   const tagDivs = card.querySelectorAll('div.tag span');
   if (tagDivs.length > 0) {
     return Array.from(tagDivs)
@@ -59,7 +59,7 @@ function extractStack(card: Element): string[] {
       .filter(Boolean);
   }
 
-  // Stratégie 2 : fallback sur les classes BEM
+  // Strategy 2: fallback on BEM classes
   const skillEls = card.querySelectorAll('[class*="skills--title"]');
   if (skillEls.length > 0) {
     return Array.from(skillEls)
@@ -67,7 +67,7 @@ function extractStack(card: Element): string[] {
       .filter(Boolean);
   }
 
-  // Stratégie 3 : section de skills — tous les spans feuilles courts
+  // Strategy 3: skills section — all short leaf spans
   const skillSection = queryFallback(card, ['[class*="skills"]']);
   if (skillSection) {
     return Array.from(skillSection.querySelectorAll('span'))
@@ -88,15 +88,15 @@ export function parseLeHibouHTML(html: string, now: Date): Mission[] {
   const doc = parser.parseFromString(html, 'text/html');
   const missions: Mission[] = [];
 
-  // Sélection des cartes par pattern de lien structurel (href contenant /annonce/)
+  // Card selection by structural link pattern (href containing /annonce/)
   const cards = doc.querySelectorAll('a[href*="/annonce/"]');
 
   cards.forEach((card) => {
-    // Titre : heading sémantique avec fallback chain
+    // Title: semantic heading with fallback chain
     const titleEl = queryFallback(card, [
-      'h1', // Heading principal (structure actuelle)
-      'h2', // Fallback si restructuré
-      'h3', // Fallback heading tertiaire
+      'h1', // Main heading (current structure)
+      'h2', // Fallback if restructured
+      'h3', // Tertiary heading fallback
       '[role="heading"]', // ARIA heading
       'header *:first-child', // Premier enfant du header
     ]);
@@ -115,21 +115,21 @@ export function parseLeHibouHTML(html: string, now: Date): Mission[] {
     const id = `lh-${uuid}`;
     const url = `${BASE_URL}/annonce/${uuid}`;
 
-    // Localisation et durée : extraction structurelle avec fallback
+    // Location and duration: structural extraction with fallback
     const { location, duration } = extractInfoItems(card);
 
-    // Stack : extraction depuis les tags avec fallback chain
+    // Stack: extraction from tags with fallback chain
     const stack = extractStack(card);
 
-    // Remote : détection depuis le texte brut (insensible au markup)
+    // Remote: detection from raw text (markup-agnostic)
     const fullText = card.textContent?.toLowerCase() ?? '';
     const remote = detectRemote(fullText);
 
-    // TJM : extraction depuis le texte brut (insensible au markup)
+    // TJM: extraction from raw text (markup-agnostic)
     const tjmEl = queryFallback(card, [
-      'footer div', // Premier div du footer (structure actuelle)
-      '[class*="dailyPrice"]', // Fallback classe BEM
-      '[class*="price"]', // Fallback classe générique
+      'footer div', // First footer div (current structure)
+      '[class*="dailyPrice"]', // BEM class fallback
+      '[class*="price"]', // Generic class fallback
     ]);
     const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
 

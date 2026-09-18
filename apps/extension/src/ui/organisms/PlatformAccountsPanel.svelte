@@ -139,7 +139,7 @@
 
   {#if error}
     <p
-      class="mt-3 rounded-lg border border-status-red/25 bg-status-red/5 p-3 text-xs text-status-red"
+      class="mt-3 rounded-lg border border-status-red/25 bg-status-red/5 p-3 text-xs text-status-red-text"
       role="alert"
     >
       {errorLabels[error]}

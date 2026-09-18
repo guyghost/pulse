@@ -2,8 +2,8 @@
 
 [<- Retour](../README.md)
 
-Historical project bootstrapping material lives here. It is retained for context, but current implementation rules are in the root README and AGENTS.md.
+Le matériel historique de bootstrap du projet vit ici (archives — langue d'origine conservée). Les règles d'implémentation actuelles se trouvent dans le README racine et AGENTS.md.
 
 ## Documents
 
-- [Project bootstrap prompt](./project-bootstrap-prompt.md)
+- [Prompt de bootstrap du projet](./project-bootstrap-prompt.md)

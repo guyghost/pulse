@@ -1,12 +1,12 @@
 /**
  * Form Assistant settings — isolated persistence.
  *
- * Volontairement séparé du contract AppSettings (qui touche la migration
- * settings-release et 7 fichiers) : le Form Assistant est une feature Phase 1
- * autonome, son réglage vit sous sa propre clé chrome.storage.local.
+ * Deliberately separate from the AppSettings contract (which touches the
+ * settings-release migration and 7 files): the Form Assistant is a standalone
+ * Phase 1 feature, its setting lives under its own chrome.storage.local key.
  *
- * Shell module : I/O (chrome.storage). Aucune logique métier.
- * Source de vérité : src/models/form-assistant.model.md.
+ * Shell module: I/O (chrome.storage). No business logic.
+ * Source of truth: src/models/form-assistant.model.md.
  */
 import { z } from 'zod';
 

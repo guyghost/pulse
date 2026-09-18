@@ -1,152 +1,183 @@
-# Landing Feature Positioning Model
+# Landing & Store Public Surface Model
 
-Source de vérité pour la barrière d'alignement entre les fonctionnalités
-réellement livrées par l'extension MissionPulse et ce que la landing page
-(`apps/landing/src/routes/+page.svelte`) déclare comme gratuit ou Premium.
+Source de vérité pour l’alignement entre le périmètre V1 réellement activé dans
+l’extension MissionPulse et les deux surfaces publiques de lancement :
 
-Ce modèle complète `apps/extension/src/models/release-surface-alignment.model.md` (qui gouverne
-l'égalité du catalogue connecteurs / permissions / cache) en fixant la
-frontière **gratuit vs Premium** sur la surface marketing. Il ne modifie ni
-le catalogue connecteurs, ni les prix, ni la politique de confidentialité.
+- `docs/store-listing.md` ;
+- `apps/landing/src/routes/+page.svelte`.
 
-Il dépend également de `apps/extension/src/models/surface-feature-flags.model.md` : les
-`EXTENSION_SURFACE_FLAGS` (définis dans `packages/domain/src/feature-flags.ts`, partagés
-extension + landing) déterminent quelles capacités sont présentées comme **livrées** ou
-**à venir** (`tier: 'soon'`).
+Ce modèle complète `apps/extension/src/models/release-surface-alignment.model.md`
+(catalogue, permissions et preuves d’artefact) et dépend de
+`apps/extension/src/models/surface-feature-flags.model.md` ainsi que de
+`packages/domain/src/feature-flags.ts`. Il ne modifie ni le code des surfaces,
+ni le catalogue de connecteurs, ni la politique de confidentialité, ni la
+configuration de facturation.
+
+## Décision gouvernante
+
+Décision CEO du 12 septembre 2026 (`PLANS/PULSE_V1_SCOPE.md`, hors dépôt) :
+
+- V1 = extension Chrome MV3 local-first ;
+- surfaces activées : onboarding, feed, profil, CV, TJM, réglages ;
+- connecteurs distribués : Free-Work, LeHibou, Hiway, Cherry Pick ;
+- Gemini Nano est une amélioration locale optionnelle, jamais un prérequis ;
+- `applications: false`, `connected: false`, Premium dormant, Copilot/Eve
+  distant fail-closed.
+
+Aucune réintroduction publique de ces capacités n’est autorisée sans une
+nouvelle décision CEO explicite suivie d’une mise à jour de ce modèle.
 
 ## Principes
 
-1. **L'extension est la preuve.** Une capacité livrée dans l'extension au
-   lancement et accessible sans compte est `free`. La landing ne peut pas
-   l'étiqueter `premium`.
-2. **Premium est une couche connectée, pas un verrouillage de l'extension.**
-   Au lancement, `PREMIUM_FEATURE_ENABLED = false` (dormant par design —
-   voir `apps/extension/src/models/premium-feature-flag.model.md`). Le gating extension est inactif :
-   toutes les pages de l'extension sont accessibles à tous.
-3. **Le compte Premium vit sur le web.** Sa valeur est la synchronisation
-   multi-appareil via le dashboard connecté et les générations IA distantes
-   consommées via des crédits serveur.
-4. **Le LLM ne décide jamais du positionnement.** Ce modèle décide à partir
-   de preuves structurées (flag de feature, pages de navigation extension,
-   routes web, catalogue de crédits). Un LLM peut signaler une divergence,
-   pas la classer.
+1. **L’extension activée est la preuve.** Une capacité peut être présentée
+   comme livrée uniquement si sa surface de lancement est activée et validée
+   sur l’artefact exact.
+2. **Omission par défaut.** Une capacité désactivée au lancement est omise des
+   surfaces publiques V1. Le statut « à venir » est une décision de
+   communication séparée, pas un comportement implicite.
+3. **Pas de vente anticipée.** Tant que `connected: false` et Premium sont
+   dormants, la landing et la fiche Store n’affichent aucune offre ou CTA de
+   compte, dashboard, synchronisation, crédits, prix ou inscription.
+4. **Le modèle décide, pas le texte libre.** Les tests dérivent l’état public
+   depuis les flags et des chaînes interdites explicites. Un LLM peut signaler
+   une divergence ; il ne peut ni valider une promesse ni autoriser une
+   publication.
+5. **Séparation des lexical scopes.** « Se connecter à une plateforme source »
+   décrit une session Chrome existante ; « compte MissionPulse », « dashboard »
+   et « synchronisation » décrivent la couche connectée désactivée. La copie
+   publique V1 évite cette ambiguïté.
 
-## États de lancement
+## États d’une capacité publique
+
+| État           | Signification                                                                | Valeur V1 pour `applications` / `connected` / Premium / IA distante  |
+| -------------- | ---------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `omitted`      | Absente des surfaces publiques ; aucun bénéfice, prix, date ou CTA impliqué. | obligatoire                                                          |
+| `upcoming`     | Mentionnée comme future après décision CEO explicite de communication.       | interdit sans nouvelle décision                                      |
+| `offered_free` | Présentée comme livrée et accessible sans compte.                            | réservé aux surfaces activées                                        |
+| `offered_paid` | Présentée avec compte, crédits, synchronisation ou prix.                     | interdit tant que la couche connectée et Premium ne sont pas activés |
+
+Transitions autorisées :
 
 ```text
-PREMIUM_FEATURE_ENABLED = false
-  → extension gating dormant
-  → toutes les pages extension libres
-
-EXTENSION_SURFACE_FLAGS (packages/domain/src/feature-flags.ts)
-  applications: false → nav `applications` masquée, non navigable
-  connected: false    → carte « Compte et synchronisation » masquée, loadConnectedAccount() sauté
-  autres onglets: true
+omitted --CEO_COMMUNICATION_DECISION--> upcoming
+upcoming --REMOVE_PUBLIC_CLAIM--> omitted
+upcoming --CEO_ENABLE_SURFACE + RELEASE_EVIDENCE--> offered_free | offered_paid
+offered_free --SURFACE_DISABLED--> omitted
+offered_paid --SURFACE_DISABLED--> omitted
 ```
 
-## Frontière des fonctionnalités
+Toute autre transition est interdite. Un flip de flag seul ne suffit jamais :
+`CEO_ENABLE_SURFACE` exige la décision explicite, le flag partagé à `true` et
+les preuves de release du modèle `release-surface-alignment.model.md`.
 
-### `free` — livré par l'extension, local-first
+## Machine de barrière P0-4
 
-| Capacité                                | Preuve extension                                                   |
-| --------------------------------------- | ------------------------------------------------------------------ |
-| Feed unique, 4 plateformes dédupliquées | `apps/extension/src/lib/core/connectors/*-parser.ts`, nav `feed`   |
-| Score stack, TJM, remote, séniorité     | `apps/extension/src/lib/core/scoring/relevance.ts`                 |
-| Score sémantique (IA locale Chrome)     | `apps/extension/src/lib/shell/ai/semantic-scorer.ts` (Gemini Nano) |
-| Comparateur et shortlist quotidienne    | `apps/extension/src/lib/state/feed-page.svelte.ts`                 |
-| Assistant profil et CV                  | nav `profile`, `cv`                                                |
-| Radar TJM par stack (local)             | nav `tjm`                                                          |
+```text
+[draft]
+  --MODEL_REVIEWED--> [implementation_allowed]
+  --MODEL_GAP--> [blocked]
 
-### `soon` — construit, non activé au lancement (flag surface à `false`)
+[implementation_allowed]
+  --EDIT_PUBLIC_SURFACE--> [dirty]
 
-| Capacité                         | Flag surface                   | Preuve extension                                         |
-| -------------------------------- | ------------------------------ | -------------------------------------------------------- |
-| Suivi de candidatures (pipeline) | `applications: false`          | nav `applications` masquée par `isTabEnabled`            |
-| Dashboard connecté (compte)      | `connected: false`             | carte compte masquée, `loadConnectedAccount()` désactivé |
-| Génération IA distante           | `connected: false` (transitif) | l'entrée extension de la génération passe par le compte  |
+[dirty]
+  --VERIFY_PASSED--> [verified]
+  --VERIFY_FAILED--> [blocked]
 
-Une capacité `soon` ne peut être ni étiquetée `free`, ni présentée comme
-livrée dans la moindre copie de la landing. Quand le flag passe à `true`, la
-ligne bascule automatiquement (`tier` est calculé depuis
-`EXTENSION_SURFACE_FLAGS` dans `+page.svelte`).
+[blocked]
+  --EDIT_PUBLIC_SURFACE--> [dirty]        // retry après correction
+  --CEO_SCOPE_CHANGE--> [draft]           // annulation / changement de cap
 
-### `premium` — couche connectée (compte web)
+[verified]
+  --EDIT_PUBLIC_SURFACE--> [dirty]        // toute modification rouvre la barrière
+  --RELEASE_RECEIPT--> [published]        // état terminal pour ce candidat
+  --CEO_SCOPE_CHANGE--> [draft]
+```
 
-| Capacité                                 | Preuve web                                                                   |
-| ---------------------------------------- | ---------------------------------------------------------------------------- |
-| Dashboard connecté (sync multi-appareil) | `apps/landing/src/routes/dashboard/+page.svelte`, Supabase                   |
-| Génération pitch/message/résumé distante | `/api/checkout/credits`, `apps/landing/src/lib/credits.ts` (crédits serveur) |
+`published` est terminal pour un digest d’artefact donné. Un changement de
+cap redémarre à `draft` ; il n’existe aucune transition directe
+`published → verified`.
+
+## Frontière V1
+
+### `offered_free`
+
+| Capacité publique                                 | Preuve extension                                                 |
+| ------------------------------------------------- | ---------------------------------------------------------------- |
+| Feed unique, 4 plateformes dédupliquées           | `apps/extension/src/lib/core/connectors/*-parser.ts`, nav `feed` |
+| Score stack, TJM, remote, séniorité               | `apps/extension/src/lib/core/scoring/relevance.ts`               |
+| Score sémantique local optionnel (Gemini Nano)    | `apps/extension/src/lib/shell/ai/semantic-scorer.ts`             |
+| Comparateur et shortlist                          | `apps/extension/src/lib/state/feed-page.svelte.ts`               |
+| Profil et CV locaux                               | nav `profile`, `cv`                                              |
+| Radar TJM par stack                               | nav `tjm`                                                        |
+| Notifications, favoris/masquage, exports, offline | surfaces activées et tests de lancement                          |
+
+### `omitted` — interdit en public V1
+
+| Capacité / affirmation                      | Preuve d’interdiction                                             |
+| ------------------------------------------- | ----------------------------------------------------------------- |
+| Suivi de candidatures, pipeline, relances   | `EXTENSION_SURFACE_FLAGS.applications === false`                  |
+| Dashboard connecté, compte, synchronisation | `EXTENSION_SURFACE_FLAGS.connected === false`                     |
+| Premium, prix, multi-compte, crédits, packs | Premium dormant ; couche connectée désactivée                     |
+| Assistance IA de formulaire                 | hors scope V1 ; aucune promesse publique sans activation et revue |
+| Copilot / Eve distant                       | rollout fail-closed ; hors noyau local-first                      |
+| Malt, Collective, cinq sources              | catalogue de production limité à quatre connecteurs               |
+| Témoignages, traction, données d’usage      | absence de preuve externe mesurée                                 |
+
+Les formulations ambiguës sont traitées comme des promesses : « bientôt »,
+« optionnel », « en cours d’activation », « préparer vos candidatures » avec
+génération de message, ou tout CTA vers `/register`, `/dashboard` ou un
+checkout sont interdits dans l’état `omitted`.
 
 ## Invariants
 
-1. **Non-étiquetage.** Pour toute ligne de `featureMatrix` dans
-   `apps/landing/src/routes/+page.svelte`, si la capacité est listée dans le bloc `free` ci-dessus,
-   `tier` doit valoir `'free'`.
-2. **Non-gating rhétorique.** Aucune copie de la landing (`showcase-caption`,
-   sous-titres, `plan-card`, CTA) ne peut affirmer qu'une capacité `free` est
-   déverrouillée par Premium.
-3. **Prix cohérents.** Les compteurs de crédits (`PREMIUM_MONTHLY_CREDITS = 20`)
-   et les packs (`CREDIT_PACKS`) doivent refléter `apps/landing/src/lib/credits.ts`.
-   Le prix (`10€ TTC/an`) est aujourd'hui un littéral dans
-   `apps/landing/src/routes/+page.svelte` et doit rester aligné avec la
-   configuration Lemon Squeezy (`https://missionpulse.lemonsqueezy.com/checkout`);
-   il n'est pas encore porté par `credits.ts`.
-4. **Connexion vs extension.** Le mot "dashboard" qualifie la surface web
-   connectée (`/dashboard`). Les pages de l'extension ne sont jamais
-   "Premium".
-5. **Candeur sur la synchronisation.** Toute mention de synchronisation
-   multi-appareils sur la landing doit être qualifiée comme à venir
-   (`à venir`, `sera disponible`), car `loadConnectedAccount()` dans
-   `apps/extension/src/lib/state/settings-page.svelte.ts` n'est activé qu'en
-   développement (`import.meta.env.DEV`) et le dashboard (`apps/dashboard`)
-   déclare la synchronisation "à venir". À l'inverse, les générations IA
-   distantes via crédits sont livrées aujourd'hui (checkout Lemon Squeezy
-   actif) et peuvent être présentées sans réserve.
-6. **Exécution locale, synchronisation optionnelle.** Aucune copie de la
-   landing ne peut promettre un produit "100% local" ou équivalent: le
-   chemin connecté rend cette affirmation inexacte (voir
-   `docs/specs/dashboard-microfrontend.md`). Formulation attendue:
-   exécution plateforme locale + synchronisation cloud optionnelle/à venir.
-7. **Synchronisation landing ↔ flags surface.** Aucune copie de la landing
-   (metas, `showcase-caption`, sous-titres, `plan-card`, CTA) ne peut
-   présenter comme livrée une capacité dont le flag
-   `EXTENSION_SURFACE_FLAGS` est `false`. Ces capacités sont soit omises,
-   soit qualifiées « à venir » (`tier: 'soon'`, note d'activation). La copie
-   pilotée par flag utilise `trackingLive` / `connectedLive` /
-   `upcomingFeatures` dérivés de `EXTENSION_SURFACE_FLAGS` dans
-   `apps/landing/src/routes/+page.svelte` : un flip de flag met la landing à
-   jour sans édition manuelle.
+1. **Dépendance aux flags.** La homepage importe
+   `EXTENSION_SURFACE_FLAGS` depuis `@pulse/domain` et ne construit la ligne
+   « suivi de candidatures » que si `applications === true` ; sinon elle est
+   absente du rendu.
+2. **Aucune surface connectée publique.** Avec `connected === false`, la
+   homepage et la fiche Store ne contiennent aucune route, offre ou CTA de
+   compte, dashboard, synchronisation, crédits ou prix payant.
+3. **Aucune génération distante.** La copie V1 ne décrit pas de génération de
+   pitch/message, d’assistance de formulaire, de Copilot ni d’Eve.
+4. **Exactitude du catalogue.** Seules les quatre plateformes distribuées sont
+   citées ; aucun chiffre de volume plateforme n’est présenté comme preuve de
+   traction utilisateur.
+5. **Preuve locale de l’IA.** Gemini Nano est toujours qualifié d’optionnel et
+   local ; le scoring déterministe reste la promesse de base.
+6. **Tests obligatoires.** La barrière passe seulement si les tests de copie
+   V1 vérifient les chaînes interdites sur la fiche Store et la homepage, les
+   flags attendus, les quatre connecteurs exacts et l’absence de CTA connecté.
+7. **Échec explicite.** Un seul invariant violé place la machine dans
+   `blocked` ; il n’existe pas de contournement par revue textuelle.
 
-## Transitions de surface (revue)
+## Revue du modèle avant implémentation
 
-```text
-[visiteur anonyme]
-  └─ lit landing → featureMatrix suit EXTENSION_SURFACE_FLAGS (suivi + connecté = « à venir »)
-       └─ installe extension → onglets activés uniquement (feed, profil, cv, tjm, réglages)
-            └─ onglet désactivé → invisible + non navigable (garde isTabEnabled)
-            └─ (optionnel) crée un compte → /dashboard
-                 ├─ sans premium → sync dashboard désactivée, générations distantes bloquées
-                 └─ avec premium (10€ TTC/an) → sync activée, 20 générations/mois + packs crédits
-```
+- Cas nominaux : visiteur anonyme installe et utilise l’extension sans compte ;
+  surfaces libres activées ; quatre sources exactes.
+- Cas d’erreur : flag désactivé, source non distribuée, claim payant absent de
+  preuve, test d’alignement échoué.
+- Annulation / changement de cap : `CEO_SCOPE_CHANGE` ramène tous les états non
+  publiés vers `draft` ; un candidat déjà publié reste un snapshot terminal.
+- Retry : `blocked → dirty` seulement après édition de la surface publique ;
+  aucune tentative de publication pendant `blocked`.
+- Permissions : seul le CEO peut changer le cap ou activer une surface ; Tor
+  peut rédiger et corriger ; les tests décident de `verified` ; aucun LLM ne
+  décide.
+- États terminaux : `published` pour un artefact donné ; `omitted` comme état
+  stable d’une capacité hors V1.
 
-États terminaux couverts :
+Conclusion de revue : le modèle couvre le cas nominal, les erreurs, l’annulation,
+le retry, les permissions et les états terminaux. L’implémentation de P0-4 est
+autorisée.
 
-- visiteur anonyme (pas de compte) — l'extension reste entièrement fonctionnelle ;
-- compte sans premium — le scan local n'est jamais bloqué ;
-- compte premium — la valeur ajoutée est strictement connectée (sync + crédits) ;
-- génération distante bloquée par crédit épuisé — `getAccountDecision` du
-  dashboard gère l'erreur de manière typée, l'extension n'est pas affectée.
+## Preuves attendues pour `verified`
 
-## Preuves attendues pour valider la landing
-
-- `PREMIUM_FEATURE_ENABLED === false` dans `apps/extension/src/lib/core/features/flags.ts` ;
-- `EXTENSION_SURFACE_FLAGS` (`packages/domain/src/feature-flags.ts`) : `applications === false`
-  et `connected === false` au lancement ; importé par
-  `apps/landing/src/routes/+page.svelte` (`trackingLive`, `connectedLive`, `upcomingFeatures`) ;
-- la liste de navigation extension (`apps/extension/src/lib/state/app-navigation.svelte.ts`) ne contient
-  aucune route conditionnée au premium ;
-- `apps/landing/src/routes/+page.svelte` ne contient aucun `tier: 'premium'` pour une capacité
-  listée `free` dans le tableau ci-dessus ;
-- aucune capacité dont le flag surface est `false` n'apparaît avec `tier: 'free'` ni comme
-  livrée dans une copie (metas, captions, sous-titres, plans, CTA) ;
-- `apps/landing/src/lib/credits.ts` est la seule source pour le prix mensuel et les packs.
+- `EXTENSION_SURFACE_FLAGS.applications === false` ;
+- `EXTENSION_SURFACE_FLAGS.connected === false` ;
+- absence des chaînes publiques interdites dans `docs/store-listing.md` et
+  `apps/landing/src/routes/+page.svelte` ;
+- absence de CTA `/register`, `/dashboard`, checkout ou gestion de crédits ;
+- test de copie V1 et tests d’alignement landing/extension passants ;
+- `pnpm --filter @pulse/landing test` et `pnpm --filter @pulse/landing typecheck`
+  passants sur le commit candidat.

@@ -1,9 +1,9 @@
 /**
- * Content script — DOM → RawFieldInput → FieldDescriptor (sanitisé + classifié).
+ * Content script — DOM → RawFieldInput → FieldDescriptor (sanitized + classified).
  *
- * Lit uniquement des métadonnées (label/placeholder/type/required), jamais la
- * valeur courante du champ. Délègue la sanitisation + classification au Core
- * (sanitizeFieldDescriptor). Aucune logique métier ici.
+ * Only reads metadata (label/placeholder/type/required), never the current
+ * field value. Delegates sanitization + classification to the Core
+ * (sanitizeFieldDescriptor). No business logic here.
  */
 import type {
   FieldDescriptor,
@@ -19,8 +19,8 @@ function trimText(value: string, max = MAX_TEXT_LEN): string {
 }
 
 /**
- * Mappe un élément DOM vers un FieldInputType connu, ou `null` si le champ
- * n'est pas éligible (mot de passe, checkbox, hidden, date, range, …).
+ * Maps a DOM element to a known FieldInputType, or `null` when the field is
+ * not eligible (password, checkbox, hidden, date, range, …).
  */
 function resolveInputType(el: HTMLElement): FieldInputType | null {
   const tag = el.tagName.toLowerCase();
@@ -54,8 +54,8 @@ function resolveInputType(el: HTMLElement): FieldInputType | null {
 }
 
 /**
- * Résout le libellé humain d'un champ, par ordre de fiabilité décroissante.
- * Ne lève jamais ; retourne une chaîne vide si rien n'est trouvé.
+ * Resolves the human label of a field, in decreasing order of reliability.
+ * Never throws; returns an empty string when nothing is found.
  */
 function resolveLabel(el: HTMLElement): string {
   if (el.id) {
@@ -70,8 +70,8 @@ function resolveLabel(el: HTMLElement): string {
   }
   const labelledBy = el.getAttribute('aria-labelledby');
   if (labelledBy) {
-    // `aria-labelledby` peut référencer plusieurs IDs séparés par des espaces
-    // (ex : "field-label field-hint"). On concatène le texte de chacun.
+    // `aria-labelledby` may reference several space-separated IDs
+    // (e.g. "field-label field-hint"). Concatenate each text.
     const ids = labelledBy.trim().split(/\s+/);
     const texts: string[] = [];
     for (const id of ids) {
@@ -104,15 +104,15 @@ function resolveRequired(el: HTMLElement): boolean {
 }
 
 /**
- * Construit le FieldDescriptor sanit-isé pour un élément focalisé, ou `null`
- * si le champ n'est pas éligible au Form Assistant.
+ * Builds the sanitized FieldDescriptor for a focused element, or `null` when
+ * the field is not eligible for the Form Assistant.
  */
 export function detectFieldDescriptor(target: HTMLElement): FieldDescriptor | null {
   const inputType = resolveInputType(target);
   if (!inputType) {
     return null;
   }
-  // Champs non modifiables : rien à proposer.
+  // Non-editable fields: nothing to propose.
   if (
     (target as HTMLInputElement).readOnly ||
     (target as HTMLInputElement).disabled ||

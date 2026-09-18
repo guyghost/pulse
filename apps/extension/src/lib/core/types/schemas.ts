@@ -1,5 +1,5 @@
 /**
- * Schémas Zod pour la validation runtime des données externes.
+ * Zod schemas for runtime validation of external data.
  * Core = fonctions pures, pas d'I/O
  */
 import { z } from 'zod';
@@ -78,8 +78,8 @@ export const MissionSchema = z.object({
   description: z.string(),
   stack: z.array(z.string()),
   tjm: z.number().nullable(),
-  // Optionnels : les missions persistées avant l'ajout de la fourchette ne
-  // portent pas ces champs (rétrocompatibilité IndexedDB).
+  // Optional: missions persisted before the range was added don't carry
+  // these fields (IndexedDB backward compatibility).
   tjmMin: z.number().nullable().optional(),
   tjmMax: z.number().nullable().optional(),
   location: z.string().nullable(),
@@ -97,7 +97,7 @@ export const MissionSchema = z.object({
   semanticReason: z.string().nullable(),
 });
 
-// Schéma pour les missions sérialisées (dates en string depuis IndexedDB ou API)
+// Schema for serialized missions (dates as strings from IndexedDB or API)
 export const MissionSerializedSchema = z.object({
   id: z.string(),
   externalId: z.string().optional(),
@@ -108,7 +108,7 @@ export const MissionSerializedSchema = z.object({
   description: z.string(),
   stack: z.array(z.string()),
   tjm: z.number().nullable(),
-  // Optionnels : les enregistrements IndexedDB antérieurs n'ont pas de fourchette.
+  // Optional: earlier IndexedDB records have no range.
   tjmMin: z.number().nullable().optional(),
   tjmMax: z.number().nullable().optional(),
   location: z.string().nullable(),
@@ -141,10 +141,10 @@ export const AvailabilitySchema = z.object({
 });
 
 /**
- * Normalise les sentinelles historiques du plafond TJM (DAO #174). L'ancienne
- * convention codait « sans plafond » en 0 (jamais exposée dans l'UI) et le
- * défaut usine était 9999 — aucun des deux n'est un plafond délibéré. Les deux
- * deviennent `null` (sans plafond) ; une vraie borne saisie est conservée.
+ * Normalizes legacy TJM ceiling sentinels (DAO #174). The old convention
+ * encoded "no ceiling" as 0 (never exposed in the UI) and the factory default
+ * was 9999 — neither is a deliberate ceiling. Both become `null` (no ceiling);
+ * a real entered bound is preserved.
  */
 const normalizeLegacyTjmMax = (data: unknown): unknown => {
   if (!data || typeof data !== 'object') {
@@ -211,8 +211,8 @@ export const UserProfileSchema = z
         .number()
         .min(0, 'Le TJM minimum doit être positif')
         .max(5000, 'Le TJM minimum ne doit pas dépasser 5000'),
-      // DAO #174 : null = sans plafond (seul le minimum est collecté dans l'UI).
-      // .default(null) répare les rares enregistrements sans la clé.
+      // DAO #174: null = no ceiling (only the minimum is collected in the UI).
+      // .default(null) repairs the rare records missing the key.
       tjmMax: z
         .number()
         .min(0, 'Le TJM maximum doit être positif')
@@ -253,7 +253,7 @@ export const UserProfileSchema = z
   });
 
 // ============================================
-// Semantic Scoring (réponses LLM)
+// Semantic Scoring (LLM responses)
 // ============================================
 
 export const SemanticResultSchema = z.object({
@@ -277,17 +277,17 @@ export const SemanticResultSchema = z.object({
 // ============================================
 
 export const AppSettingsSchema = z.object({
-  /** Version du schéma de données */
+  /** Data schema version */
   schemaVersion: z.number().default(1),
-  /** Date de dernière synchronisation */
+  /** Last sync date */
   lastSyncAt: z.date().optional(),
-  /** Préférences d'affichage */
+  /** Display preferences */
   theme: z.enum(['light', 'dark', 'system']).default('system'),
-  /** Notifications activées */
+  /** Notifications enabled */
   notificationsEnabled: z.boolean().default(true),
 });
 
-// Schéma pour les settings sérialisés (dates en string)
+// Schema for serialized settings (dates as strings)
 export const AppSettingsSerializedSchema = z.object({
   schemaVersion: z.number().default(1),
   lastSyncAt: z.union([z.date(), z.string()]).optional(),
@@ -296,7 +296,7 @@ export const AppSettingsSerializedSchema = z.object({
 });
 
 // ============================================
-// Types dérivés des schémas (pour compatibilité)
+// Types derived from schemas (for compatibility)
 // ============================================
 
 export type MissionFromSchema = z.infer<typeof MissionSchema>;

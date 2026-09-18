@@ -94,7 +94,7 @@ vi.mock('../../../src/lib/shell/utils/retry-strategy', () => ({
   withResultRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
-// Mock CircuitBreakerRunner — simule un circuit fermé qui passe directement au connecteur
+// Mock CircuitBreakerRunner — simulates a closed circuit passing straight to the connector
 vi.mock('../../../src/lib/shell/health/circuit-breaker-runner', () => ({
   runWithCircuitBreaker: vi.fn(
     async (

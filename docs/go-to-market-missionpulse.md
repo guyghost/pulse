@@ -2,12 +2,11 @@
 
 ## Positionnement
 
-MissionPulse est le radar quotidien des freelances tech français : 4 plateformes
-distribuées par défaut, 1 feed scoré, les meilleures missions à traiter
-maintenant.
+MissionPulse : 4 plateformes. 1 feed. Tu décides. Un radar, pas quatre onglets.
+Le score propose. Tu tranches. Gratuit pour chasser. 10 €/an pour aller plus vite.
 
-ICP prioritaire : développeurs freelances 3+ ans, TJM 450-900 EUR, France ou
-remote, qui surveillent Free-Work, LeHibou, Hiway et Cherry Pick.
+ICP prioritaire : freelance tech · France & remote, qui surveillent Free-Work,
+LeHibou, Hiway et Cherry Pick. Pas de fourchette TJM publique.
 
 ## Funnel À Mesurer
 

@@ -216,7 +216,7 @@
         </Button>
       </div>
       {#if profileError}
-        <p class="text-meta text-status-red">{profileError}</p>
+        <p class="text-meta text-status-red-text">{profileError}</p>
       {/if}
     </div>
   {:else}

@@ -1,7 +1,7 @@
 /**
  * Shell utilities exports
  *
- * Ce module expose les utilitaires côté Shell (I/O, side effects).
+ * This module exposes Shell-side utilities (I/O, side effects).
  */
 
 export {

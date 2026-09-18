@@ -1,7 +1,7 @@
 /**
- * Action Svelte pour gérer le virtual scroll.
+ * Svelte action for virtual scroll handling.
  *
- * Throttle le scroll à 60fps (16ms) et gère le resize du container.
+ * Throttles scroll at 60fps (16ms) and handles container resize.
  */
 
 import type { ActionReturn } from 'svelte/action';
@@ -16,7 +16,7 @@ export interface VirtualScrollAttributes {
 }
 
 /**
- * Throttle une fonction pour limiter son exécution.
+ * Throttles a function's execution.
  */
 function throttle<T extends (...args: unknown[]) => void>(
   fn: T,
@@ -32,7 +32,7 @@ function throttle<T extends (...args: unknown[]) => void>(
     const elapsed = now - lastTime;
 
     if (elapsed >= ms) {
-      // Exécuter immédiatement si assez de temps s'est écoulé
+      // Execute immediately when enough time has elapsed
       if (rafId !== null) {
         cancelAnimationFrame(rafId);
         rafId = null;
@@ -76,7 +76,7 @@ export function virtualScroll(
   // Notifier la position initiale
   onScroll(currentScrollTop, currentContainerHeight);
 
-  // Handler de scroll throttlé
+  // Throttled scroll handler
   const handleScroll = throttle(() => {
     currentScrollTop = node.scrollTop;
     onScroll(currentScrollTop, currentContainerHeight);
@@ -103,19 +103,19 @@ export function virtualScroll(
 
   return {
     update(newOptions: VirtualScrollOptions) {
-      // Mettre à jour le callback si nécessaire
+      // Update the callback if needed
       Object.assign(options, newOptions);
     },
     destroy() {
       node.removeEventListener('scroll', handleScroll);
       resizeObserver?.disconnect();
     },
-    // Exposer une méthode pour forcer le refresh depuis l'extérieur
+    // Expose a method to force a refresh from outside
   };
 }
 
 /**
- * Helper pour créer un refresh manuel.
+ * Helper to create a manual refresh controller.
  */
 export function createVirtualScrollController() {
   let refreshCallback: (() => void) | null = null;

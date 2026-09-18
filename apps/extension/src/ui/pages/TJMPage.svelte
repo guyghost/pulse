@@ -214,7 +214,7 @@
       </button>
     {/snippet}
     {#if analysis && !isLoading}
-      <p class="text-caption text-text-muted" class:text-status-orange={dataIsStale}>
+      <p class="text-caption text-text-muted" class:text-status-orange-text={dataIsStale}>
         Mis à jour le {lastUpdatedLabel}{#if dataIsStale && dataFreshness?.ageDays !== null}
           · Données anciennes ({dataFreshness.ageDays} jour{dataFreshness.ageDays > 1 ? 's' : ''})
         {/if}
@@ -234,7 +234,7 @@
         <Icon
           name={isOffline ? 'database' : 'badge-euro'}
           size={12}
-          class={isOffline ? 'text-status-orange' : 'text-blueprint-blue'}
+          class={isOffline ? 'text-status-orange-text' : 'text-blueprint-blue'}
         />
         {isOffline ? 'Cache local' : `Profil ${profileCalibrated ? 'calibré' : 'à définir'}`}
       </span>
@@ -245,7 +245,7 @@
         <button
           type="button"
           onclick={inspectLocalSignals}
-          class="inline-flex items-center gap-1.5 rounded-lg border border-status-orange/25 bg-status-orange/8 px-3 py-1.5 text-caption font-medium text-status-orange transition-colors hover:bg-status-orange/14"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-status-orange/25 bg-status-orange/8 px-3 py-1.5 text-caption font-medium text-status-orange-text transition-colors hover:bg-status-orange/14"
         >
           <Icon name="search" size={12} />
           Inspecter les signaux locaux

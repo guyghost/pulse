@@ -134,7 +134,7 @@
       },
       onRejected: onClose,
     }}
-    class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
+    class="fixed inset-0 z-50 flex items-end justify-center bg-black/60"
   >
     <div
       bind:this={dialogElement}
@@ -145,7 +145,7 @@
     >
       <!-- Header -->
       <div
-        class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white/95 backdrop-blur-sm px-4 py-3"
+        class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white px-4 py-3"
       >
         <h2 id="mission-comparison-title" class="text-body-lg font-semibold text-text-primary">
           Comparaison ({missions.length} missions)

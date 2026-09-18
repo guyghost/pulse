@@ -1,13 +1,13 @@
 /**
  * Content script — Form Assistant orchestrator (Machine A).
  *
- * Source de vérité : src/models/form-assistant.model.md (Machine A).
+ * Source of truth: src/models/form-assistant.model.md (Machine A).
  *
- * États : disabled → idle → armed → requesting → ready → applying → filled
+ * States: disabled → idle → armed → requesting → ready → applying → filled
  *
- * Le content script ne décide JAMAIS de transitions métier : il délègue la
- * génération au service worker (qui applique Machine B) et se contente
- * d'afficher/insérer les propositions acceptées explicitement par l'utilisateur.
+ * The content script NEVER decides business transitions: it delegates
+ * generation to the service worker (which runs Machine B) and only
+ * displays/inserts proposals explicitly accepted by the user.
  */
 import type { FieldDescriptor } from '../../lib/core/form-assistant/types';
 import { detectFieldDescriptor } from './field-detector';
@@ -43,8 +43,8 @@ function makeRequestId(): string {
 }
 
 /**
- * Annule une éventuelle requête de génération en cours côté service worker.
- * Cohérent avec la transition `requesting CANCEL → armed` du modèle.
+ * Cancels any in-flight generation request on the service worker side.
+ * Consistent with the model's `requesting CANCEL → armed` transition.
  */
 function cancelInFlightRequest(): void {
   const id = activeRequestId;
@@ -56,7 +56,7 @@ function cancelInFlightRequest(): void {
     void chrome.runtime
       .sendMessage({ type: 'FORM_ASSIST_CANCEL', payload: { requestId: id } })
       .catch(() => {
-        /* SW injoignable : la garde anti-response périmée gère le cas. */
+        /* SW unreachable: the stale-response guard handles this case. */
       });
   } catch {
     /* no-op */
@@ -64,13 +64,13 @@ function cancelInFlightRequest(): void {
 }
 
 /**
- * Applique une valeur à un champ en contournant les setters surchargés par les
- * frameworks (React/Svelte) : on appelle le setter natif du prototype puis on
- * émet l'événement `input` attendu par ces frameworks.
+ * Applies a value to a field while bypassing setters overridden by frameworks
+ * (React/Svelte): call the native prototype setter then emit the `input`
+ * event those frameworks expect.
  *
- * Retourne `false` si l'écriture n'a pas pu être effectuée (ex : contenteditable
- * avec execCommand indisponible), pour que l'orchestrateur puisse rester dans un
- * état interactif plutôt que de masquer silencieusement l'échec.
+ * Returns `false` when the write could not be performed (e.g. contenteditable
+ * with execCommand unavailable), so the orchestrator can stay in an interactive
+ * state instead of silently hiding the failure.
  */
 function applyValue(element: HTMLElement, value: string): boolean {
   if (element.isContentEditable) {
@@ -149,8 +149,8 @@ function handleAccept(text: string): void {
     }
   }
   if (!ok) {
-    // Rester dans un état interactif : l'utilisateur peut réessayer ou ignorer,
-    // plutôt que de masquer silencieusement un échec d'insertion.
+    // Stay in an interactive state: the user can retry or dismiss,
+    // rather than silently hiding an insertion failure.
     phase = 'ready';
     widget?.show(activeTarget, { kind: 'error', message: "Impossible d'insérer la valeur" });
     return;
@@ -184,7 +184,7 @@ async function requestProposal(target: HTMLElement, field: FieldDescriptor): Pro
     }
   }
 
-  // L'utilisateur a peut-être changé de champ, dismissé, ou annulé entre-temps.
+  // The user may have switched fields, dismissed, or cancelled in the meantime.
   if (phase !== 'requesting' || activeTarget !== target || activeRequestId !== requestId) {
     return;
   }
@@ -221,7 +221,7 @@ function handleFocusIn(event: FocusEvent): void {
   if (widget?.isHostElement(target)) {
     return;
   }
-  // Changement de champ : on annule une éventuelle requête en cours pour l'ancien.
+  // Field change: cancel any in-flight request for the previous one.
   if (phase === 'requesting') {
     cancelInFlightRequest();
   }
@@ -249,10 +249,10 @@ function handleKeyDown(event: KeyboardEvent): void {
 }
 
 /**
- * Ferme le widget quand l'utilisateur clique en dehors du champ actif et du
- * widget (comportement type Grammarly). On utilise `mousedown` plutôt que
- * `focusout`/`blur` car le target d'un mousedown observé au niveau document est
- * fiable y compris avec un shadow root closed (retargeting vers le host).
+ * Closes the widget when the user clicks outside the active field and the
+ * widget (Grammarly-like behavior). Uses `mousedown` rather than
+ * `focusout`/`blur` because a document-level mousedown target is reliable
+ * even with a closed shadow root (retargeting to the host).
  */
 function handleDocumentMouseDown(event: MouseEvent): void {
   if (!activeTarget || phase === 'disabled' || phase === 'idle') {
@@ -312,11 +312,11 @@ function init(): void {
       }
     )
     .catch(() => {
-      // SW injoignable (rare) → reste désactivé par sécurité.
+      // SW unreachable (rare) → stay disabled as a safety measure.
       applyEnabledState(false);
     });
 
-  // Réagit aux changements de réglage venant du side panel.
+  // Reacts to setting changes coming from the side panel.
   chrome.runtime.onMessage.addListener((message: { type: string; payload?: unknown }) => {
     if (message.type === 'FORM_ASSIST_ENABLED') {
       const payload = message.payload as { enabled: boolean } | undefined;
