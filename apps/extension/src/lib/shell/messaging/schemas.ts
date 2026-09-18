@@ -151,6 +151,20 @@ const FeedSavedViewSchema = z
           .enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'])
           .nullable(),
         selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
+        selectedCategory: z
+          .enum([
+            'frontend',
+            'backend',
+            'fullstack',
+            'mobile',
+            'data',
+            'devops',
+            'product',
+            'design',
+            'other',
+          ])
+          .nullable()
+          .default(null),
         selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),
         selectedScoreBucket: z.enum(['strong', 'good', 'weak']).nullable(),
         decisionPreset: z

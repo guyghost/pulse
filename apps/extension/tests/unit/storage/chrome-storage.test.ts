@@ -293,6 +293,7 @@ describe('feed saved views storage', () => {
           selectedStacks: ['Svelte'],
           selectedSource: null,
           selectedRemote: 'full' as const,
+          selectedCategory: null,
           selectedSeniority: 'senior' as const,
           selectedScoreBucket: 'strong' as const,
           decisionPreset: null,

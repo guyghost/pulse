@@ -1,3 +1,4 @@
+import type { MissionCategory } from './mission-classification';
 import type { MissionSource, RemoteType } from './mission';
 import type { SeniorityLevel } from './profile';
 
@@ -10,6 +11,7 @@ export interface FeedViewFilters {
   selectedStacks: string[];
   selectedSource: MissionSource | null;
   selectedRemote: RemoteType | null;
+  selectedCategory: MissionCategory | null;
   selectedSeniority: SeniorityLevel | null;
   selectedScoreBucket: FeedScoreBucket | null;
   decisionPreset: FeedDecisionPresetId | null;

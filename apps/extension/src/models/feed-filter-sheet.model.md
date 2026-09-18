@@ -20,6 +20,7 @@ interface FeedFilterDraft {
   selectedTjmMin: number | null;
   selectedSource: MissionSource | null;
   selectedRemote: RemoteType | null;
+  selectedCategory: MissionCategory | null;
   selectedSeniority: SeniorityLevel | null;
   selectedStacks: string[];
 }
@@ -41,6 +42,7 @@ type FeedFilterSheetEvent =
   | { type: 'SET_TJM_MIN'; tjmMin: FeedFilterDraft['selectedTjmMin'] }
   | { type: 'SET_SOURCE'; source: FeedFilterDraft['selectedSource'] }
   | { type: 'SET_REMOTE'; remote: FeedFilterDraft['selectedRemote'] }
+  | { type: 'SET_CATEGORY'; category: FeedFilterDraft['selectedCategory'] }
   | { type: 'SET_SENIORITY'; seniority: FeedFilterDraft['selectedSeniority'] }
   | { type: 'TOGGLE_STACK'; stack: string }
   | { type: 'RESET_FILTERS' }

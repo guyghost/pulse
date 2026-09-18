@@ -3,7 +3,11 @@
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { Icon, type IconName } from '@pulse/ui';
+  import { Chip } from '@pulse/ui';
   import type { MissionSource } from '$lib/core/types/mission';
+  import type { MissionCategory } from '$lib/core/types/mission-classification';
+  import { MISSION_CATEGORIES } from '$lib/core/types/mission-classification';
+  import { MISSION_CATEGORY_LABELS } from '$lib/core/classification/labels';
   import type { FeedDecisionPresetId, FeedScoreBucket } from '$lib/core/types/feed-view';
   import type {
     FeedFilterDraft,
@@ -120,6 +124,13 @@
     onEdit({
       type: 'SET_SOURCE',
       source: draft.selectedSource === source ? null : source,
+    });
+  }
+
+  function handleCategorySelect(category: MissionCategory): void {
+    onEdit({
+      type: 'SET_CATEGORY',
+      category: draft.selectedCategory === category ? null : category,
     });
   }
 
@@ -365,6 +376,29 @@
               >{contributingSourceCount} source{contributingSourceCount > 1 ? 's' : ''}</strong
             >
           </span>
+        </div>
+      </section>
+
+      <section class="pb-3 pt-4" aria-labelledby="filter-category-title">
+        <div class="flex items-center justify-between gap-3">
+          <h3 id="filter-category-title" class="text-caption font-semibold text-text-primary">
+            Catégorie
+          </h3>
+          <span class="text-micro font-medium text-text-subtle">
+            {draft.selectedCategory === null
+              ? 'Toutes'
+              : (MISSION_CATEGORY_LABELS[draft.selectedCategory] ?? 'Toutes')}
+          </span>
+        </div>
+        <div class="mt-3 flex flex-wrap gap-2" role="group" aria-label="Sélectionner une catégorie">
+          {#each MISSION_CATEGORIES as category (category)}
+            <Chip
+              label={MISSION_CATEGORY_LABELS[category]}
+              size="sm"
+              selected={draft.selectedCategory === category}
+              onclick={() => handleCategorySelect(category)}
+            />
+          {/each}
         </div>
       </section>
     </div>

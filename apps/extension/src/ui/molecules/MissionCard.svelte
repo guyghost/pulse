@@ -8,6 +8,7 @@
   import { Icon } from '@pulse/ui';
   import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import { missionRatePosition } from '$lib/core/scoring/mission-rate-position';
+  import { missionCategoryLabel } from '$lib/core/classification/labels';
   import { scoreToGrade } from '$lib/core/types/score';
   import {
     formatAbsoluteDate,
@@ -103,6 +104,17 @@
 
   const seniorityLabel = $derived(
     mission.seniority ? (seniorityLabels[mission.seniority] ?? mission.seniority) : null
+  );
+
+  // Jev classification (DAO #203): category chip + remote hint, both only
+  // rendered when the service stored a confident classification. The remote
+  // hint appears only when the source did not expose a remote policy.
+  const classification = $derived(mission.classification ?? null);
+  const categoryLabel = $derived(
+    classification ? missionCategoryLabel(classification.category) : null
+  );
+  const remoteCompatibleHint = $derived(
+    classification !== null && mission.remote === null ? classification.remoteCompatible : null
   );
 
   const tjmValue = $derived(formatTJMValue(mission.tjm));
@@ -397,6 +409,12 @@
 
   <!-- Tags -->
   <div class="mt-1.5 flex flex-wrap gap-1.5">
+    {#if categoryLabel}
+      <Badge label={categoryLabel} variant="status" />
+    {/if}
+    {#if remoteCompatibleHint === true}
+      <Badge label="Remote compatible" variant="success" />
+    {/if}
     {#each mission.stack.slice(0, 3) as tech (tech)}
       <Badge label={tech} variant="tech" />
     {/each}

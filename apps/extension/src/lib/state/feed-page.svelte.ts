@@ -14,6 +14,8 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
+import type { MissionCategory } from '$lib/core/types/mission-classification';
+import { missionCategoryLabel } from '$lib/core/classification/labels';
 import { untrack } from 'svelte';
 import { SvelteSet } from 'svelte/reactivity';
 import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
@@ -227,6 +229,12 @@ export function countMissionsForFilterDraft(
     if (draft.selectedRemote !== null && mission.remote !== draft.selectedRemote) {
       return false;
     }
+    if (
+      draft.selectedCategory !== null &&
+      mission.classification?.category !== draft.selectedCategory
+    ) {
+      return false;
+    }
     if (draft.selectedSeniority !== null && mission.seniority !== draft.selectedSeniority) {
       return false;
     }
@@ -291,6 +299,7 @@ export function createFeedPageState(
   let selectedStacks = $state<string[]>([]);
   let selectedSource = $state<MissionSource | null>(null);
   let selectedRemote = $state<RemoteType | null>(null);
+  let selectedCategory = $state<MissionCategory | null>(null);
   let selectedSeniority = $state<SeniorityLevel | null>(null);
   let selectedScoreBucket = $state<ScoreBucket | null>(null);
   let selectedTjmMin = $state<number | null>(null);
@@ -441,6 +450,7 @@ export function createFeedPageState(
     searchQuery.trim().length > 0 ||
       selectedSource !== null ||
       selectedRemote !== null ||
+      selectedCategory !== null ||
       selectedStacks.length > 0 ||
       selectedSeniority !== null ||
       selectedScoreBucket !== null ||
@@ -489,10 +499,18 @@ export function createFeedPageState(
   const decisionFilteredMissions = $derived.by(() => {
     let result = baseFilteredMissions;
 
-    if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
+    if (
+      selectedRemote !== null ||
+      selectedCategory !== null ||
+      selectedStacks.length > 0 ||
+      selectedSeniority !== null
+    ) {
       const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
+          return false;
+        }
+        if (selectedCategory !== null && m.classification?.category !== selectedCategory) {
           return false;
         }
         if (selectedSeniority !== null && m.seniority !== selectedSeniority) {
@@ -562,10 +580,18 @@ export function createFeedPageState(
     if (selectedSource !== null) {
       result = result.filter((m) => m.source === selectedSource);
     }
-    if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
+    if (
+      selectedRemote !== null ||
+      selectedCategory !== null ||
+      selectedStacks.length > 0 ||
+      selectedSeniority !== null
+    ) {
       const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
+          return false;
+        }
+        if (selectedCategory !== null && m.classification?.category !== selectedCategory) {
           return false;
         }
         if (selectedSeniority !== null && m.seniority !== selectedSeniority) {
@@ -789,6 +815,7 @@ export function createFeedPageState(
       sortBy,
       selectedSource ?? '',
       selectedRemote ?? '',
+      selectedCategory ?? '',
       selectedSeniority ?? '',
       selectedScoreBucket ?? '',
       decisionPreset ?? '',
@@ -1016,6 +1043,11 @@ export function createFeedPageState(
     selectedRemote = remote;
   }
 
+  function setSelectedCategory(category: MissionCategory | null): void {
+    activeSavedViewId = null;
+    selectedCategory = category;
+  }
+
   function setSelectedSeniority(seniority: SeniorityLevel | null): void {
     activeSavedViewId = null;
     selectedSeniority = seniority;
@@ -1070,6 +1102,7 @@ export function createFeedPageState(
       selectedTjmMin,
       selectedSource,
       selectedRemote,
+      selectedCategory,
       selectedSeniority,
       selectedStacks: [...selectedStacks],
     };
@@ -1082,6 +1115,7 @@ export function createFeedPageState(
     selectedTjmMin = draft.selectedTjmMin;
     selectedSource = draft.selectedSource;
     selectedRemote = draft.selectedRemote;
+    selectedCategory = draft.selectedCategory;
     selectedSeniority = draft.selectedSeniority;
     selectedStacks = [...draft.selectedStacks];
     showNewOnly = false;
@@ -1125,6 +1159,7 @@ export function createFeedPageState(
     selectedStacks = [];
     selectedSource = null;
     selectedRemote = null;
+    selectedCategory = null;
     selectedSeniority = null;
     selectedScoreBucket = null;
     selectedTjmMin = null;
@@ -1140,6 +1175,7 @@ export function createFeedPageState(
       selectedStacks: [...selectedStacks],
       selectedSource,
       selectedRemote,
+      selectedCategory,
       selectedSeniority,
       selectedScoreBucket,
       decisionPreset,
@@ -1174,6 +1210,9 @@ export function createFeedPageState(
     }
     if (filters.selectedRemote === 'full') {
       return 'Full remote';
+    }
+    if (filters.selectedCategory !== null) {
+      return missionCategoryLabel(filters.selectedCategory);
     }
     if (filters.selectedStacks.length > 0) {
       return filters.selectedStacks.slice(0, 2).join(' + ');
@@ -1221,6 +1260,7 @@ export function createFeedPageState(
     selectedStacks = [...filters.selectedStacks];
     selectedSource = filters.selectedSource;
     selectedRemote = filters.selectedRemote;
+    selectedCategory = filters.selectedCategory ?? null;
     selectedSeniority = filters.selectedSeniority;
     selectedScoreBucket = filters.selectedScoreBucket;
     selectedTjmMin = null;
@@ -1643,6 +1683,9 @@ export function createFeedPageState(
     get selectedRemote() {
       return selectedRemote;
     },
+    get selectedCategory() {
+      return selectedCategory;
+    },
     get selectedSeniority() {
       return selectedSeniority;
     },
@@ -1853,6 +1896,7 @@ export function createFeedPageState(
     toggleStack,
     setSelectedSource,
     setSelectedRemote,
+    setSelectedCategory,
     setSelectedSeniority,
     setSelectedScoreBucket,
     applyDecisionPreset,
