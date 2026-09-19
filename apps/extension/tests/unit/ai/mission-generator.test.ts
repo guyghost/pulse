@@ -139,3 +139,24 @@ describe('mission generator — scenario replay', () => {
     expect(asset?.content).toBe(validPitch);
   });
 });
+
+describe('mission generator — meta-commentary regression (DAO #208)', () => {
+  it('S7 — generates an asset even when the single-line output starts with "Voici"', async () => {
+    sessionFactory(['Voici un pitch convaincant de plus de vingt caractères pour ACME.']);
+
+    const asset = await generateAsset('mission-1', 'pitch', makeMission(), profile);
+
+    expect(asset).not.toBeNull();
+    expect(asset?.content).toBe(
+      'Voici un pitch convaincant de plus de vingt caractères pour ACME.'
+    );
+  });
+
+  it('S8 — keeps the content written after a meta-intro colon', async () => {
+    sessionFactory(["Voici ma candidature : six ans d'expérience React et TypeScript."]);
+
+    const asset = await generateAsset('mission-1', 'cover-message', makeMission(), profile);
+
+    expect(asset?.content).toBe("six ans d'expérience React et TypeScript.");
+  });
+});
