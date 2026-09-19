@@ -397,6 +397,12 @@ export type BridgeMessage =
   // Side panel → SW: enable/disable the feature (persisted).
   | { type: 'FORM_ASSIST_ENABLE'; payload: { enabled: boolean } }
   | { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean; engine: 'local' | 'remote' } }
+  // AI Gateway key (side panel ↔ service worker, DAO #204). The value never
+  // travels back to the panel: reads only expose whether a key is configured.
+  | { type: 'AI_GATEWAY_KEY_STATUS' }
+  | { type: 'AI_GATEWAY_KEY_STATUS_RESULT'; payload: { configured: boolean } }
+  | { type: 'AI_GATEWAY_KEY_SET'; payload: { key: string } }
+  | { type: 'AI_GATEWAY_KEY_SET_RESULT'; payload: { configured: boolean } }
   // Content → SW: request a proposal for a field (Machine B).
   // The field is a canonical FieldDescriptor (sanitized, no DOM PII).
   | { type: 'FORM_ASSIST_REQUEST'; payload: { requestId: string; field: FieldDescriptor } }

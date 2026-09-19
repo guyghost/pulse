@@ -1721,6 +1721,19 @@ export const MessageSchemas = {
       engine: z.enum(['local', 'remote']),
     }),
   }),
+  AI_GATEWAY_KEY_STATUS: z.object({ type: z.literal('AI_GATEWAY_KEY_STATUS') }),
+  AI_GATEWAY_KEY_STATUS_RESULT: z.object({
+    type: z.literal('AI_GATEWAY_KEY_STATUS_RESULT'),
+    payload: z.object({ configured: z.boolean() }),
+  }),
+  AI_GATEWAY_KEY_SET: z.object({
+    type: z.literal('AI_GATEWAY_KEY_SET'),
+    payload: z.object({ key: z.string().min(1).max(400) }),
+  }),
+  AI_GATEWAY_KEY_SET_RESULT: z.object({
+    type: z.literal('AI_GATEWAY_KEY_SET_RESULT'),
+    payload: z.object({ configured: z.boolean() }),
+  }),
   FORM_ASSIST_REQUEST: z.object({
     type: z.literal('FORM_ASSIST_REQUEST'),
     payload: z.object({
