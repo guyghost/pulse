@@ -14,7 +14,9 @@ import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabil
 import { downloadCSV, downloadJSON, downloadMarkdown } from '$lib/shell/export/download';
 import { getFavorites, getHidden } from '$lib/shell/facades/feed-data.facade';
 import {
+  getAiGatewayApiKey,
   getSettings,
+  setAiGatewayApiKey,
   setSettingsConfirmed,
   getProfile,
   saveProfile,
@@ -116,6 +118,14 @@ export class SettingsPageController {
 
   aiAvailability = $state<AiAvailability>('no');
   maxSemanticPerScan = $state(10);
+
+  classificationEnabled = $state(true);
+  maxClassificationPerScan = $state(25);
+  classificationConfidenceThreshold = $state(0.7);
+  aiGatewayKeyConfigured = $state(false);
+  aiGatewayKeyDraft = $state('');
+  aiGatewayKeySaving = $state(false);
+  aiGatewayKeyError = $state<string | null>(null);
 
   scanInterval = $state(30);
   notifications = $state(true);
@@ -244,6 +254,7 @@ export class SettingsPageController {
       this.loadProfile(),
       this.loadAiAvailability(),
       this.loadSettings(),
+      this.loadAiGatewayKeyStatus(),
       // Surface flag: no account/sync I/O when the connected feature is off.
       features.isFeatureEnabled('connected') ? this.loadConnectedAccount() : Promise.resolve(),
       this.loadScanHistory(),
@@ -291,6 +302,14 @@ export class SettingsPageController {
       this.aiAvailability = await isPromptApiAvailable();
     } catch {
       this.aiAvailability = 'no';
+    }
+  }
+
+  async loadAiGatewayKeyStatus(): Promise<void> {
+    try {
+      this.aiGatewayKeyConfigured = (await getAiGatewayApiKey()).length > 0;
+    } catch {
+      this.aiGatewayKeyConfigured = false;
     }
   }
 
@@ -354,6 +373,9 @@ export class SettingsPageController {
     this.autoScan = settings.autoScan;
     this.maxSemanticPerScan = settings.maxSemanticPerScan;
     this.theme = settings.theme;
+    this.classificationEnabled = settings.classificationEnabled;
+    this.maxClassificationPerScan = settings.maxClassificationPerScan;
+    this.classificationConfidenceThreshold = settings.classificationConfidenceThreshold;
     const shippedIds = this.shippedConnectorCatalog.map((connector) => connector.id);
     this.enabledConnectorIds = settings.enabledConnectors.filter((id): id is ConnectorId =>
       shippedIds.includes(id as ConnectorId)
@@ -635,6 +657,65 @@ export class SettingsPageController {
 
   async updateTheme(value: 'light' | 'dark' | 'system'): Promise<void> {
     await this.persistSettings((settings) => ({ ...settings, theme: value }));
+  }
+
+  async toggleClassification(): Promise<void> {
+    await this.persistSettings((settings) => ({
+      ...settings,
+      classificationEnabled: !settings.classificationEnabled,
+    }));
+  }
+
+  async updateMaxClassificationPerScan(value: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(100, Math.round(value)));
+    await this.persistSettings((settings) => ({
+      ...settings,
+      maxClassificationPerScan: clamped,
+    }));
+  }
+
+  async updateClassificationConfidenceThreshold(value: number): Promise<void> {
+    const clamped = Math.max(0, Math.min(1, value));
+    await this.persistSettings((settings) => ({
+      ...settings,
+      classificationConfidenceThreshold: clamped,
+    }));
+  }
+
+  /**
+   * Persist the drafted AI Gateway key. The draft never touches storage —
+   * only the trimmed value is written, and the draft is cleared afterwards
+   * so the plaintext does not linger in component state.
+   */
+  async saveAiGatewayKey(): Promise<void> {
+    if (this.aiGatewayKeySaving) {
+      return;
+    }
+    this.aiGatewayKeySaving = true;
+    this.aiGatewayKeyError = null;
+    try {
+      await setAiGatewayApiKey(this.aiGatewayKeyDraft);
+      this.aiGatewayKeyConfigured = this.aiGatewayKeyDraft.trim().length > 0;
+      this.aiGatewayKeyDraft = '';
+    } catch {
+      this.aiGatewayKeyError = 'Impossible d’enregistrer la clé';
+    } finally {
+      this.aiGatewayKeySaving = false;
+    }
+  }
+
+  async removeAiGatewayKey(): Promise<void> {
+    this.aiGatewayKeySaving = true;
+    this.aiGatewayKeyError = null;
+    try {
+      await setAiGatewayApiKey('');
+      this.aiGatewayKeyConfigured = false;
+      this.aiGatewayKeyDraft = '';
+    } catch {
+      this.aiGatewayKeyError = 'Impossible de supprimer la clé';
+    } finally {
+      this.aiGatewayKeySaving = false;
+    }
   }
 
   async toggleConnector(connectorId: ConnectorId): Promise<void> {

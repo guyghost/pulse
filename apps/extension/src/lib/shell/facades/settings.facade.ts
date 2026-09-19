@@ -28,6 +28,8 @@ export async function setSettingsConfirmed(settings: AppSettings): Promise<AppSe
   return structuredClone((await saveSettingsRelease(settings)).settings);
 }
 
+export { getAiGatewayApiKey, setAiGatewayApiKey } from '$lib/shell/storage/chrome-storage';
+
 export async function getProfile(): Promise<UserProfile | null> {
   const response = await sendMessage({ type: 'GET_PROFILE' });
   return response.type === 'PROFILE_RESULT' ? response.payload : null;

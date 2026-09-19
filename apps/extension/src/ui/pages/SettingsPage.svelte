@@ -812,6 +812,146 @@
           {/each}
         </div>
       </div>
+
+      <!-- Classification cloud (Jev — DAO #202/#204) -->
+      <div
+        class="rounded-lg border border-border-light px-3 py-3 {settings.classificationEnabled
+          ? ''
+          : 'opacity-60'}"
+      >
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex items-start gap-3">
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
+            >
+              <Icon name="scan-line" size={14} class="text-blueprint-blue" />
+            </div>
+            <div>
+              <p class="text-body-lg font-medium text-text-primary">Classification cloud (Jev)</p>
+              <p class="mt-0.5 text-meta text-text-subtle">
+                Catégorise chaque mission via Vercel AI Gateway. Votre profil n'est jamais envoyé.
+              </p>
+            </div>
+          </div>
+          <Toggle
+            checked={settings.classificationEnabled}
+            aria-label="Activer la classification des missions"
+            onclick={() => settings.toggleClassification()}
+          />
+        </div>
+
+        <div class="mt-2 flex items-center justify-between gap-2">
+          <span class="text-micro font-medium text-text-subtle">État du service</span>
+          <span
+            class="text-micro font-medium {settings.classificationEnabled &&
+            settings.aiGatewayKeyConfigured
+              ? 'text-accent-green'
+              : 'text-text-subtle'}"
+          >
+            {#if !settings.classificationEnabled}
+              Désactivée
+            {:else if settings.aiGatewayKeyConfigured}
+              Active — clé configurée
+            {:else}
+              Inactive — clé manquante
+            {/if}
+          </span>
+        </div>
+
+        {#if settings.classificationEnabled}
+          <div class="mt-3 grid grid-cols-2 gap-2">
+            <label class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
+              <span class="eyebrow">Classifiées / scan</span>
+              <select
+                class="soft-ring mt-1 h-8 w-full appearance-none rounded-lg border border-border-light bg-surface-white px-2 text-caption text-text-primary"
+                aria-label="Missions classifiées par scan"
+                value={settings.maxClassificationPerScan}
+                onchange={(event) =>
+                  settings.updateMaxClassificationPerScan(Number(event.currentTarget.value))}
+              >
+                {#each [0, 10, 25, 50, 100] as budget (budget)}
+                  <option value={budget}>{budget}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
+              <span class="eyebrow">Seuil de confiance</span>
+              <select
+                class="soft-ring mt-1 h-8 w-full appearance-none rounded-lg border border-border-light bg-surface-white px-2 text-caption text-text-primary"
+                aria-label="Seuil de confiance minimal"
+                value={settings.classificationConfidenceThreshold}
+                onchange={(event) =>
+                  settings.updateClassificationConfidenceThreshold(
+                    Number(event.currentTarget.value)
+                  )}
+              >
+                {#each [0.5, 0.6, 0.7, 0.8, 0.9] as threshold (threshold)}
+                  <option value={threshold}>{Math.round(threshold * 100)} %</option>
+                {/each}
+              </select>
+            </label>
+          </div>
+        {:else}
+          <p
+            class="mt-3 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta text-text-subtle"
+          >
+            Activez la classification pour catégoriser les nouvelles missions.
+          </p>
+        {/if}
+
+        <div class="mt-3 border-t border-border-light pt-3">
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-caption font-medium text-text-primary">Clé Vercel AI Gateway</p>
+            <span
+              class="text-micro font-medium {settings.aiGatewayKeyConfigured
+                ? 'text-accent-green'
+                : 'text-text-subtle'}"
+            >
+              {settings.aiGatewayKeyConfigured ? 'Configurée' : 'Absente'}
+            </span>
+          </div>
+          <div class="mt-2 flex items-center gap-2">
+            <input
+              type="password"
+              class="soft-ring h-9 min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 text-caption text-text-primary placeholder:text-text-subtle"
+              placeholder={settings.aiGatewayKeyConfigured
+                ? '•••••••• (saisir pour remplacer)'
+                : 'Clé AI Gateway'}
+              aria-label="Clé Vercel AI Gateway"
+              autocomplete="off"
+              bind:value={settings.aiGatewayKeyDraft}
+            />
+            <Button
+              variant="primary"
+              size="sm"
+              disabled={settings.aiGatewayKeySaving ||
+                settings.aiGatewayKeyDraft.trim().length === 0}
+              onclick={() => settings.saveAiGatewayKey()}
+            >
+              Enregistrer
+            </Button>
+            {#if settings.aiGatewayKeyConfigured}
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={settings.aiGatewayKeySaving}
+                onclick={() => settings.removeAiGatewayKey()}
+              >
+                Supprimer
+              </Button>
+            {/if}
+          </div>
+          {#if settings.aiGatewayKeyError}
+            <p class="mt-1.5 text-micro font-medium text-status-red" role="alert">
+              {settings.aiGatewayKeyError}
+            </p>
+          {/if}
+          <p class="mt-2 text-micro leading-4 text-text-subtle">
+            La clé reste dans le stockage local de l'extension et n'est jamais exportée. Sans clé,
+            la classification reste inactive et le score local suffit.
+          </p>
+        </div>
+      </div>
     </div>
 
     <!-- Form Assistant (Machine D — src/models/form-assistant.model.md) -->
