@@ -19,6 +19,33 @@ export const GeneratedAssetSchema = z.object({
  * Parse raw LLM output into a clean string.
  * Strips markdown formatting, code fences, etc.
  */
+/**
+ * Intro words that LLMs prepend to generated content ("Voici le pitch:",
+ * "Here is your cover message"). Matching is case-insensitive on the
+ * trimmed line.
+ */
+const META_INTRO_WORDS = ['voici', 'here is', 'voilà'] as const;
+
+const isMetaIntroLine = (line: string): boolean => {
+  const lowered = line.trim().toLowerCase();
+  return META_INTRO_WORDS.some((word) => lowered.startsWith(word));
+};
+
+/**
+ * Split a meta-intro line at its first colon: "Voici ma candidature: text"
+ * keeps "text". Returns null when the line is pure meta-commentary (nothing
+ * usable after the colon).
+ */
+const stripMetaIntro = (line: string): string | null => {
+  const trimmed = line.trim();
+  const colonIndex = trimmed.indexOf(':');
+  if (colonIndex === -1) {
+    return null;
+  }
+  const remainder = trimmed.slice(colonIndex + 1).trim();
+  return remainder.length > 0 ? remainder : null;
+};
+
 export const cleanGenerationOutput = (raw: string): string => {
   let cleaned = raw.trim();
 
@@ -36,20 +63,28 @@ export const cleanGenerationOutput = (raw: string): string => {
     cleaned = cleaned.slice(1, -1).trim();
   }
 
-  // Strip leading/trailing lines that look like meta-commentary
-  const lines = cleaned.split('\n');
-  const contentLines = lines.filter((line) => {
-    const trimmed = line.trim().toLowerCase();
-    return (
-      !trimmed.startsWith('voici') &&
-      !trimmed.startsWith('here is') &&
-      !trimmed.startsWith('voilà') &&
-      !trimmed.startsWith('--') &&
-      trimmed.length > 0
-    );
-  });
+  // Strip lines that look like meta-commentary ("Voici le pitch:", "--").
+  // Content written after the intro colon survives; a pure intro line is
+  // dropped. The filter can never empty a non-empty output: a single-line
+  // generation starting with "Voici ..." IS the content (DAO #208).
+  const contentLines: string[] = [];
+  for (const line of cleaned.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith('--')) {
+      continue;
+    }
+    if (isMetaIntroLine(trimmed)) {
+      const remainder = stripMetaIntro(trimmed);
+      if (remainder !== null) {
+        contentLines.push(remainder);
+      }
+      continue;
+    }
+    contentLines.push(line);
+  }
 
-  return contentLines.join('\n').trim();
+  const filtered = contentLines.join('\n').trim();
+  return filtered.length > 0 ? filtered : cleaned;
 };
 
 /**

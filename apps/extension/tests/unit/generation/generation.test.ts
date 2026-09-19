@@ -156,6 +156,27 @@ describe('parse-generation-result', () => {
       const result = cleanGenerationOutput(input);
       expect(result).not.toContain('Here is');
     });
+
+    it('keeps single-line outputs that start with a meta word (DAO #208)', () => {
+      const input = 'Voici un pitch convaincant de plus de vingt caractères pour ACME.';
+      // The filter can never empty a non-empty output: the line IS the content.
+      expect(cleanGenerationOutput(input)).toBe(input);
+    });
+
+    it('keeps the content written after a meta-intro colon (DAO #208)', () => {
+      const input = "Voici ma candidature : six ans d'expérience React et TypeScript.";
+      expect(cleanGenerationOutput(input)).toBe("six ans d'expérience React et TypeScript.");
+    });
+
+    it('falls back to the cleaned text when every line is pure meta-commentary', () => {
+      const input = 'Voici le pitch:';
+      expect(cleanGenerationOutput(input)).toBe('Voici le pitch:');
+    });
+
+    it('keeps dash-prefixed lines stripped without breaking the fallback', () => {
+      const input = '--\nVoici le pitch:\n--\nJe suis un développeur senior.';
+      expect(cleanGenerationOutput(input)).toBe('Je suis un développeur senior.');
+    });
   });
 
   describe('isValidGeneration', () => {
