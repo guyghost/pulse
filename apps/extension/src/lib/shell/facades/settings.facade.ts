@@ -28,7 +28,26 @@ export async function setSettingsConfirmed(settings: AppSettings): Promise<AppSe
   return structuredClone((await saveSettingsRelease(settings)).settings);
 }
 
-export { getAiGatewayApiKey, setAiGatewayApiKey } from '$lib/shell/storage/chrome-storage';
+/**
+ * AI Gateway key management routes through the service worker (bridge): the
+ * side panel never touches chrome.storage directly and never receives the
+ * key value — only whether one is configured.
+ */
+export async function getAiGatewayKeyStatus(): Promise<{ configured: boolean }> {
+  const response = await sendMessage({ type: 'AI_GATEWAY_KEY_STATUS' });
+  if (response?.type !== 'AI_GATEWAY_KEY_STATUS_RESULT') {
+    throw new Error('Unexpected AI Gateway key status response.');
+  }
+  return response.payload;
+}
+
+export async function saveAiGatewayKey(key: string): Promise<{ configured: boolean }> {
+  const response = await sendMessage({ type: 'AI_GATEWAY_KEY_SET', payload: { key } });
+  if (response?.type !== 'AI_GATEWAY_KEY_SET_RESULT') {
+    throw new Error('Unexpected AI Gateway key save response.');
+  }
+  return response.payload;
+}
 
 export async function getProfile(): Promise<UserProfile | null> {
   const response = await sendMessage({ type: 'GET_PROFILE' });

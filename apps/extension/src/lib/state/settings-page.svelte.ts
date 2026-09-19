@@ -14,9 +14,9 @@ import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabil
 import { downloadCSV, downloadJSON, downloadMarkdown } from '$lib/shell/export/download';
 import { getFavorites, getHidden } from '$lib/shell/facades/feed-data.facade';
 import {
-  getAiGatewayApiKey,
+  getAiGatewayKeyStatus,
   getSettings,
-  setAiGatewayApiKey,
+  saveAiGatewayKey,
   setSettingsConfirmed,
   getProfile,
   saveProfile,
@@ -307,7 +307,7 @@ export class SettingsPageController {
 
   async loadAiGatewayKeyStatus(): Promise<void> {
     try {
-      this.aiGatewayKeyConfigured = (await getAiGatewayApiKey()).length > 0;
+      this.aiGatewayKeyConfigured = (await getAiGatewayKeyStatus()).configured;
     } catch {
       this.aiGatewayKeyConfigured = false;
     }
@@ -694,8 +694,8 @@ export class SettingsPageController {
     this.aiGatewayKeySaving = true;
     this.aiGatewayKeyError = null;
     try {
-      await setAiGatewayApiKey(this.aiGatewayKeyDraft);
-      this.aiGatewayKeyConfigured = this.aiGatewayKeyDraft.trim().length > 0;
+      const { configured } = await saveAiGatewayKey(this.aiGatewayKeyDraft.trim());
+      this.aiGatewayKeyConfigured = configured;
       this.aiGatewayKeyDraft = '';
     } catch {
       this.aiGatewayKeyError = 'Impossible d’enregistrer la clé';
@@ -708,8 +708,8 @@ export class SettingsPageController {
     this.aiGatewayKeySaving = true;
     this.aiGatewayKeyError = null;
     try {
-      await setAiGatewayApiKey('');
-      this.aiGatewayKeyConfigured = false;
+      const { configured } = await saveAiGatewayKey('');
+      this.aiGatewayKeyConfigured = configured;
       this.aiGatewayKeyDraft = '';
     } catch {
       this.aiGatewayKeyError = 'Impossible de supprimer la clé';

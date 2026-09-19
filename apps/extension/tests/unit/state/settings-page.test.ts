@@ -741,3 +741,201 @@ describe('SettingsPageController — shipped connector catalogue', () => {
     controller.destroy();
   });
 });
+
+describe('SettingsPageController — Jev classification settings (DAO #204)', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('reads only the configured flag from the SW — never the key value', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'AI_GATEWAY_KEY_STATUS') {
+        return Promise.resolve({
+          type: 'AI_GATEWAY_KEY_STATUS_RESULT',
+          payload: { configured: true },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadAiGatewayKeyStatus();
+
+    expect(controller.aiGatewayKeyConfigured).toBe(true);
+    const statusCall = bridgeMock.sendMessage.mock.calls.find(
+      (call) => call[0]?.type === 'AI_GATEWAY_KEY_STATUS'
+    );
+    expect(statusCall?.[0]).toEqual({ type: 'AI_GATEWAY_KEY_STATUS' });
+    controller.destroy();
+  });
+
+  it('persists a confirmed classification toggle', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
+      }
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        return Promise.resolve(
+          committedSettings(message as Parameters<typeof committedSettings>[0])
+        );
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+    expect(controller.classificationEnabled).toBe(true);
+
+    await controller.toggleClassification();
+
+    expect(controller.classificationEnabled).toBe(false);
+    const saveCall = bridgeMock.sendMessage.mock.calls.find(
+      (call) => call[0]?.type === 'MUTATE_SETTINGS_RELEASE'
+    );
+    expect(saveCall?.[0]).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          settings: expect.objectContaining({ classificationEnabled: false }),
+        }),
+      })
+    );
+    controller.destroy();
+  });
+
+  it('clamps an out-of-range classification budget to the schema bounds', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
+      }
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        return Promise.resolve(
+          committedSettings(message as Parameters<typeof committedSettings>[0])
+        );
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+
+    await controller.updateMaxClassificationPerScan(150);
+    expect(controller.maxClassificationPerScan).toBe(100);
+
+    controller.destroy();
+  });
+
+  it('clamps a negative classification budget to zero', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
+      }
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        return Promise.resolve(
+          committedSettings(message as Parameters<typeof committedSettings>[0])
+        );
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+
+    await controller.updateMaxClassificationPerScan(-5);
+    expect(controller.maxClassificationPerScan).toBe(0);
+
+    controller.destroy();
+  });
+
+  it('clamps an out-of-range confidence threshold to [0, 1]', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
+      }
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        return Promise.resolve(
+          committedSettings(message as Parameters<typeof committedSettings>[0])
+        );
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+
+    await controller.updateClassificationConfidenceThreshold(1.5);
+    expect(controller.classificationConfidenceThreshold).toBe(1);
+
+    controller.destroy();
+  });
+
+  it('saves the gateway key through the bridge and clears the draft', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'AI_GATEWAY_KEY_SET') {
+        const key = (message.payload as { key: string }).key;
+        return Promise.resolve({
+          type: 'AI_GATEWAY_KEY_SET_RESULT',
+          payload: { configured: key.trim().length > 0 },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    controller.aiGatewayKeyDraft = '  test-key  ';
+    await controller.saveAiGatewayKey();
+
+    const setCall = bridgeMock.sendMessage.mock.calls.find(
+      (call) => call[0]?.type === 'AI_GATEWAY_KEY_SET'
+    );
+    expect(setCall?.[0]).toEqual({
+      type: 'AI_GATEWAY_KEY_SET',
+      payload: { key: 'test-key' },
+    });
+    expect(controller.aiGatewayKeyConfigured).toBe(true);
+    expect(controller.aiGatewayKeyDraft).toBe('');
+    expect(controller.aiGatewayKeyError).toBeNull();
+    controller.destroy();
+  });
+
+  it('surfaces an accessible error and keeps the draft when the save fails', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'AI_GATEWAY_KEY_SET') {
+        return Promise.reject(new Error('SW injoignable'));
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    controller.aiGatewayKeyDraft = 'test-key';
+    await controller.saveAiGatewayKey();
+
+    expect(controller.aiGatewayKeyError).toBe('Impossible d’enregistrer la clé');
+    expect(controller.aiGatewayKeyDraft).toBe('test-key');
+    expect(controller.aiGatewayKeyConfigured).toBe(false);
+    controller.destroy();
+  });
+
+  it('removes the key by persisting an empty value', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'AI_GATEWAY_KEY_SET') {
+        return Promise.resolve({
+          type: 'AI_GATEWAY_KEY_SET_RESULT',
+          payload: { configured: false },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    controller.aiGatewayKeyConfigured = true;
+    await controller.removeAiGatewayKey();
+
+    const setCall = bridgeMock.sendMessage.mock.calls.find(
+      (call) => call[0]?.type === 'AI_GATEWAY_KEY_SET'
+    );
+    expect(setCall?.[0]).toEqual({ type: 'AI_GATEWAY_KEY_SET', payload: { key: '' } });
+    expect(controller.aiGatewayKeyConfigured).toBe(false);
+    controller.destroy();
+  });
+});

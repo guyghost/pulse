@@ -26,6 +26,8 @@ import {
   getFeedSortBy,
   setFeedSavedViews,
   setFeedSortBy,
+  getAiGatewayApiKey,
+  setAiGatewayApiKey,
 } from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
@@ -2405,6 +2407,45 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           sendResponse({
             type: 'FORM_ASSIST_STATUS_RESULT',
             payload: { enabled: false, engine: 'local' },
+          });
+        });
+      return true;
+    }
+
+    // AI Gateway key (DAO #204): the value stays in the service worker —
+    // reads only expose whether a key is configured, never the key itself.
+    if (message.type === 'AI_GATEWAY_KEY_STATUS') {
+      getAiGatewayApiKey()
+        .then((key) => {
+          sendResponse({
+            type: 'AI_GATEWAY_KEY_STATUS_RESULT',
+            payload: { configured: key.length > 0 },
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] AI_GATEWAY_KEY_STATUS error:', err);
+          sendResponse({
+            type: 'AI_GATEWAY_KEY_STATUS_RESULT',
+            payload: { configured: false },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'AI_GATEWAY_KEY_SET') {
+      setAiGatewayApiKey(message.payload.key)
+        .then(() => getAiGatewayApiKey())
+        .then((key) => {
+          sendResponse({
+            type: 'AI_GATEWAY_KEY_SET_RESULT',
+            payload: { configured: key.length > 0 },
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] AI_GATEWAY_KEY_SET error:', err);
+          sendResponse({
+            type: 'AI_GATEWAY_KEY_SET_RESULT',
+            payload: { configured: false },
           });
         });
       return true;
