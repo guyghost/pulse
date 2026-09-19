@@ -50,6 +50,27 @@ export interface ClassificationSettings {
   confidenceThreshold: number;
 }
 
+/** Per-scan counters surfaced to the AI diagnostics panel (DAO #207). */
+export interface ClassifierScanDiagnostics {
+  /** Uncached missions that needed a classification before the budget cap. */
+  candidates: number;
+  /** Gateway evaluations performed (retries included, cache hits excluded). */
+  evaluated: number;
+  /** Classifications applied (confidence above threshold). */
+  classified: number;
+  /** Evaluated missions dropped: malformed answer or low confidence. */
+  rejected: number;
+  /** Missions abandoned after retries (network, timeout, provider error). */
+  failures: number;
+  /** Mean confidence of applied classifications in [0, 1]; null when none. */
+  averageConfidence: number | null;
+}
+
+export interface ClassifierScanResult {
+  classifications: Map<string, MissionClassification>;
+  diagnostics: ClassifierScanDiagnostics;
+}
+
 /**
  * Abort `evaluate` after TIMEOUT_MS even when the caller passes no signal,
  * and forward the caller's abort to the in-flight request.
@@ -95,45 +116,56 @@ export const isClassificationAvailable = async (): Promise<boolean> => {
  * - Uncached missions are evaluated up to `settings.maxPerScan`, sequentially.
  * - Uncertain or malformed answers are dropped (mission stays unclassified).
  *
- * @returns Map of mission ID to its validated classification (cached + new).
+ * @returns Applied classifications plus the scan's diagnostics counters.
  */
 export const classifyMissions = async (
   missions: readonly Mission[],
   settings: ClassificationSettings,
   signal?: AbortSignal
-): Promise<Map<string, MissionClassification>> => {
-  const results = new Map<string, MissionClassification>();
+): Promise<ClassifierScanResult> => {
+  const classifications = new Map<string, MissionClassification>();
+  const diagnostics: ClassifierScanDiagnostics = {
+    candidates: 0,
+    evaluated: 0,
+    classified: 0,
+    rejected: 0,
+    failures: 0,
+    averageConfidence: null,
+  };
   if (!settings.enabled || missions.length === 0) {
-    return results;
+    return { classifications, diagnostics };
   }
 
   const apiKey = await getAiGatewayApiKey();
   if (apiKey.length === 0) {
-    return results;
+    return { classifications, diagnostics };
   }
 
   const cacheInputs = missions.map(buildCacheInput);
   const cached = await getCachedClassifications(cacheInputs);
   for (const [id, classification] of cached) {
-    results.set(id, classification);
+    classifications.set(id, classification);
   }
 
   const pending = missions
     .filter((mission) => !cached.has(mission.id))
     .slice(0, Math.max(0, settings.maxPerScan));
   if (pending.length === 0) {
-    return results;
+    return { classifications, diagnostics };
   }
+  diagnostics.candidates = pending.length;
 
   const gateway = createGateway({ apiKey });
   const questions: ClassificationQuestions = buildClassificationQuestions();
   const toCache: ClassificationCacheWrite[] = [];
+  const appliedConfidences: number[] = [];
 
   for (const mission of pending) {
     if (signal?.aborted) {
       break;
     }
 
+    let missionFailed = false;
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt++) {
       try {
         const result = await withTimeout(
@@ -150,6 +182,7 @@ export const classifyMissions = async (
             }),
           signal
         );
+        diagnostics.evaluated += 1;
 
         const classification = parseClassification(result.answers, {
           confidenceThreshold: settings.confidenceThreshold,
@@ -157,8 +190,11 @@ export const classifyMissions = async (
         });
 
         if (classification) {
-          results.set(mission.id, classification);
+          classifications.set(mission.id, classification);
           toCache.push({ ...buildCacheInput(mission), classification });
+          appliedConfidences.push(classification.confidence);
+        } else {
+          diagnostics.rejected += 1;
         }
         // A successful call (even a dropped low-confidence one) is final.
         break;
@@ -167,10 +203,19 @@ export const classifyMissions = async (
           await abortableDelay(RETRY_DELAY_MS, signal);
           continue;
         }
-        // Last attempt failed: leave this mission unclassified and move on.
+        missionFailed = true;
       }
     }
+    if (missionFailed) {
+      diagnostics.failures += 1;
+    }
   }
+
+  diagnostics.classified = toCache.length;
+  diagnostics.averageConfidence =
+    appliedConfidences.length > 0
+      ? appliedConfidences.reduce((sum, value) => sum + value, 0) / appliedConfidences.length
+      : null;
 
   try {
     await cacheClassifications(toCache);
@@ -178,12 +223,14 @@ export const classifyMissions = async (
     // Cache write failures must never lose fresh classifications.
   }
 
-  return results;
+  return { classifications, diagnostics };
 };
 
 export interface ClassificationEnrichResult {
   missions: Mission[];
   changed: boolean;
+  /** Per-scan counters for the AI diagnostics panel. */
+  diagnostics: ClassifierScanDiagnostics;
 }
 
 /**
@@ -197,21 +244,32 @@ export const enrichMissionsWithClassification = async (
   signal?: AbortSignal
 ): Promise<ClassificationEnrichResult> => {
   if (!settings.enabled || missions.length === 0) {
-    return { missions, changed: false };
+    return { missions, changed: false, diagnostics: emptyDiagnostics() };
   }
 
-  const results = await classifyMissions(missions, settings, signal);
-  if (results.size === 0) {
-    return { missions, changed: false };
+  const { classifications, diagnostics } = await classifyMissions(missions, settings, signal);
+  if (classifications.size === 0) {
+    return { missions, changed: false, diagnostics };
   }
 
   let changed = false;
   for (const mission of missions) {
-    const classification = results.get(mission.id);
+    const classification = classifications.get(mission.id);
     if (classification) {
       mission.classification = classification;
       changed = true;
     }
   }
-  return { missions, changed };
+  return { missions, changed, diagnostics };
 };
+
+function emptyDiagnostics(): ClassifierScanDiagnostics {
+  return {
+    candidates: 0,
+    evaluated: 0,
+    classified: 0,
+    rejected: 0,
+    failures: 0,
+    averageConfidence: null,
+  };
+}

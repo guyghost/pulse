@@ -77,6 +77,7 @@ import {
 } from '../lib/shell/notifications/daily-digest';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { clearExpiredClassificationCache } from '../lib/shell/storage/classification-cache';
+import { appendAiDiagnosticsEntry } from '../lib/shell/storage/ai-diagnostics';
 import {
   getAllHealthSnapshots,
   readHealthSnapshotsForProbeReconciliation,
@@ -967,11 +968,22 @@ async function executeAcceptedScanOperation(
           const stored = await getMissions();
           const pending = stored.filter((mission) => !mission.classification);
           if (pending.length > 0 && !operation.controller.signal.aborted) {
-            const { changed } = await enrichMissionsWithClassification(
+            const { changed, diagnostics } = await enrichMissionsWithClassification(
               pending,
               classificationSettings,
               operation.controller.signal
             );
+            if (diagnostics.candidates > 0) {
+              await appendAiDiagnosticsEntry({
+                scanAt: Date.now(),
+                candidates: diagnostics.candidates,
+                classified: diagnostics.classified,
+                rejectedLowConfidence: diagnostics.rejected,
+                failures: diagnostics.failures,
+                evaluations: diagnostics.evaluated,
+                averageConfidence: diagnostics.averageConfidence,
+              });
+            }
             if (changed && !operation.controller.signal.aborted) {
               await saveMissions(stored, operation.controller.signal);
               if (trigger !== 'alarm') {
