@@ -1127,6 +1127,91 @@
       </div>
     </div>
 
+    <!-- Diagnostics IA (DAO #207) -->
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-body-lg font-medium text-text-primary">Diagnostics IA</h3>
+        <p class="mt-1 text-meta text-text-subtle">
+          État des trois moteurs et activité de classification des 30 derniers jours. Compteurs
+          locaux uniquement, aucun contenu de mission.
+        </p>
+      </div>
+
+      <div class="grid gap-2 sm:grid-cols-3">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="eyebrow">Gemini Nano</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.aiAvailability === 'available'
+              ? 'Disponible'
+              : settings.aiAvailability === 'after-download'
+                ? 'Téléchargement requis'
+                : 'Indisponible'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="eyebrow">Classification Jev</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {#if !settings.classificationEnabled}
+              Désactivée
+            {:else if settings.aiGatewayKeyConfigured}
+              Active
+            {:else}
+              Clé manquante
+            {/if}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="eyebrow">Assistant de candidature</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
+            {settings.formAssistEnabled ? 'Activé' : 'Désactivé'}
+          </p>
+        </div>
+      </div>
+
+      <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-meta font-medium text-text-primary">Classification — 30 derniers jours</p>
+          <span class="text-micro text-text-subtle"
+            >{settings.aiDiagnosticsSummary.scans} scans</span
+          >
+        </div>
+        {#if settings.aiDiagnosticsSummary.scans === 0}
+          <p class="mt-2 text-caption text-text-subtle">
+            Aucune classification enregistrée pour le moment.
+          </p>
+        {:else}
+          <div class="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <div class="rounded-md bg-surface-white px-2.5 py-2">
+              <p class="eyebrow">Classifiées</p>
+              <p class="mt-1 text-caption font-semibold text-text-primary">
+                {settings.aiDiagnosticsSummary.classified}
+              </p>
+            </div>
+            <div class="rounded-md bg-surface-white px-2.5 py-2">
+              <p class="eyebrow">Rejetées (confiance)</p>
+              <p class="mt-1 text-caption font-semibold text-text-primary">
+                {settings.aiDiagnosticsSummary.rejectedLowConfidence}
+              </p>
+            </div>
+            <div class="rounded-md bg-surface-white px-2.5 py-2">
+              <p class="eyebrow">Échecs gateway</p>
+              <p class="mt-1 text-caption font-semibold text-text-primary">
+                {settings.aiDiagnosticsSummary.failures}
+              </p>
+            </div>
+            <div class="rounded-md bg-surface-white px-2.5 py-2">
+              <p class="eyebrow">Confiance moy.</p>
+              <p class="mt-1 text-caption font-semibold text-text-primary">
+                {settings.aiDiagnosticsSummary.averageConfidence === null
+                  ? '—'
+                  : `${Math.round(settings.aiDiagnosticsSummary.averageConfidence * 100)} %`}
+              </p>
+            </div>
+          </div>
+        {/if}
+      </div>
+    </div>
+
     <div class="section-card rounded-xl p-5 space-y-4">
       <div>
         <h3 class="text-body-lg font-medium text-text-primary">Diagnostic</h3>

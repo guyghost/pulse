@@ -135,9 +135,10 @@ describe('mission classifier — scenario replay', () => {
     hoisted.apiKey = '';
 
     const missions = [makeMission(), makeMission({ id: 'mission-2' })];
-    const results = await classifyMissions(missions, settings());
+    const { classifications: results, diagnostics } = await classifyMissions(missions, settings());
 
     expect(results.size).toBe(0);
+    expect(diagnostics.evaluated).toBe(0);
     expect(evaluateMock).not.toHaveBeenCalled();
     expect(createGatewayMock).not.toHaveBeenCalled();
   });
@@ -146,13 +147,21 @@ describe('mission classifier — scenario replay', () => {
     mockEvaluate(confidentAnswers);
     const missions = [makeMission(), makeMission({ id: 'mission-2', title: 'Data engineer' })];
 
-    const results = await classifyMissions(missions, settings());
+    const { classifications: results, diagnostics } = await classifyMissions(missions, settings());
 
     expect(results.size).toBe(2);
     expect(results.get('mission-1')).toMatchObject({
       category: 'frontend',
       remoteCompatible: true,
     });
+    expect(diagnostics).toMatchObject({
+      candidates: 2,
+      evaluated: 2,
+      classified: 2,
+      rejected: 0,
+      failures: 0,
+    });
+    expect(diagnostics.averageConfidence).toBeCloseTo(0.92);
 
     // Gateway contract: Jev model id + zero data retention on every call.
     expect(evaluateMock).toHaveBeenCalledTimes(2);
@@ -183,13 +192,14 @@ describe('mission classifier — scenario replay', () => {
     ]);
     mockEvaluate(confidentAnswers);
 
-    const results = await classifyMissions(
+    const { classifications: results, diagnostics } = await classifyMissions(
       [cached, makeMission({ id: 'mission-2', title: 'Backend Node' })],
       settings()
     );
 
     expect(results.get('mission-1')).toMatchObject({ category: 'mobile' });
     expect(results.get('mission-2')).toMatchObject({ category: 'frontend' });
+    expect(diagnostics.candidates).toBe(1);
     // Only the uncached mission hit the gateway.
     expect(evaluateMock).toHaveBeenCalledTimes(1);
     expect(evaluateMock.mock.calls[0][0].state).toMatchObject({
@@ -203,9 +213,13 @@ describe('mission classifier — scenario replay', () => {
       makeMission({ id: `mission-${index}`, title: `Mission ${index}` })
     );
 
-    const results = await classifyMissions(missions, settings({ maxPerScan: 2 }));
+    const { classifications: results, diagnostics } = await classifyMissions(
+      missions,
+      settings({ maxPerScan: 2 })
+    );
 
     expect(evaluateMock).toHaveBeenCalledTimes(2);
+    expect(diagnostics.evaluated).toBe(2);
     expect(results.size).toBe(2);
   });
 
@@ -215,9 +229,13 @@ describe('mission classifier — scenario replay', () => {
       remoteCompatible: { type: 'boolean', probability: 0.95 },
     });
 
-    const results = await classifyMissions([makeMission()], settings());
+    const { classifications: results, diagnostics } = await classifyMissions(
+      [makeMission()],
+      settings()
+    );
 
     expect(results.size).toBe(0);
+    expect(diagnostics.rejected).toBe(1);
     const cachedKeys = Object.keys(mockStorage).filter((key) =>
       key.startsWith('classification-mission')
     );
@@ -233,10 +251,11 @@ describe('mission classifier — scenario replay', () => {
       makeMission({ id: 'mission-1', title: 'Mission 1' }),
     ];
 
-    const results = await classifyMissions(missions, settings());
+    const { classifications: results, diagnostics } = await classifyMissions(missions, settings());
 
     // mission-0 attempted twice (initial + retry) then abandoned.
     expect(evaluateMock).toHaveBeenCalledTimes(3);
+    expect(diagnostics.failures).toBe(1);
     expect(results.has('mission-0')).toBe(false);
     expect(results.get('mission-1')).toMatchObject({ category: 'frontend' });
   });
@@ -267,7 +286,7 @@ describe('mission classifier — scenario replay', () => {
       remoteCompatible: { type: 'boolean', probability: 0.9 },
     });
 
-    const results = await classifyMissions([updated], settings());
+    const { classifications: results } = await classifyMissions([updated], settings());
 
     expect(results.get('mission-1')).toMatchObject({ category: 'fullstack' });
     expect(evaluateMock).toHaveBeenCalledTimes(1);
@@ -277,7 +296,10 @@ describe('mission classifier — scenario replay', () => {
     mockEvaluate(confidentAnswers);
     const missions = [makeMission()];
 
-    const results = await classifyMissions(missions, settings({ enabled: false }));
+    const { classifications: results } = await classifyMissions(
+      missions,
+      settings({ enabled: false })
+    );
 
     expect(results.size).toBe(0);
     expect(evaluateMock).not.toHaveBeenCalled();
@@ -320,9 +342,14 @@ describe('mission classifier — scenario replay', () => {
     const controller = new AbortController();
     controller.abort();
 
-    const results = await classifyMissions([makeMission()], settings(), controller.signal);
+    const { classifications: results, diagnostics } = await classifyMissions(
+      [makeMission()],
+      settings(),
+      controller.signal
+    );
 
     expect(results.size).toBe(0);
+    expect(diagnostics.evaluated).toBe(0);
     expect(evaluateMock).not.toHaveBeenCalled();
   });
 });

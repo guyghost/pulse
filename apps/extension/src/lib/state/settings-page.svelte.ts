@@ -11,6 +11,12 @@ import {
   type ExportFormat,
 } from '$lib/core/export/mission-export';
 import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
+import { getAiDiagnostics } from '$lib/shell/storage/ai-diagnostics';
+import {
+  summarizeAiDiagnostics,
+  type AiDiagnosticsSummary,
+  type AiScanDiagnosticsEntry,
+} from '$lib/core/metrics/ai-diagnostics';
 import { downloadCSV, downloadJSON, downloadMarkdown } from '$lib/shell/export/download';
 import { getFavorites, getHidden } from '$lib/shell/facades/feed-data.facade';
 import {
@@ -126,6 +132,7 @@ export class SettingsPageController {
   aiGatewayKeyDraft = $state('');
   aiGatewayKeySaving = $state(false);
   aiGatewayKeyError = $state<string | null>(null);
+  aiDiagnosticsEntries = $state<AiScanDiagnosticsEntry[]>([]);
 
   scanInterval = $state(30);
   notifications = $state(true);
@@ -255,6 +262,7 @@ export class SettingsPageController {
       this.loadAiAvailability(),
       this.loadSettings(),
       this.loadAiGatewayKeyStatus(),
+      this.loadAiDiagnostics(),
       // Surface flag: no account/sync I/O when the connected feature is off.
       features.isFeatureEnabled('connected') ? this.loadConnectedAccount() : Promise.resolve(),
       this.loadScanHistory(),
@@ -311,6 +319,18 @@ export class SettingsPageController {
     } catch {
       this.aiGatewayKeyConfigured = false;
     }
+  }
+
+  async loadAiDiagnostics(): Promise<void> {
+    try {
+      this.aiDiagnosticsEntries = await getAiDiagnostics();
+    } catch {
+      this.aiDiagnosticsEntries = [];
+    }
+  }
+
+  get aiDiagnosticsSummary(): AiDiagnosticsSummary {
+    return summarizeAiDiagnostics(this.aiDiagnosticsEntries);
   }
 
   /**
