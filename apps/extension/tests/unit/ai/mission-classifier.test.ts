@@ -160,6 +160,7 @@ describe('mission classifier — scenario replay', () => {
     expect(firstCall.providerOptions).toEqual({
       gateway: { zeroDataRetention: true },
     });
+    expect(firstCall.model).toMatchObject({ modelId: 'typesafe-ai/jev' });
     expect(createGatewayMock).toHaveBeenCalledWith({ apiKey: 'test-gateway-key' });
 
     // Classifications are cached for the next scan.
