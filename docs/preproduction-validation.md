@@ -26,7 +26,7 @@ supabase db lint --local --workdir apps/landing
 Attendu :
 
 - toutes les migrations s'appliquent depuis une base vide ;
-- les 21 assertions pgTAP passent ;
+- les assertions pgTAP passent (105 tests sur 3 fichiers au 21/09) ;
 - le lint du schéma ne remonte aucune erreur ;
 - les politiques RLS, privilèges service-only, limites atomiques et purges
   restent conformes au modèle.
