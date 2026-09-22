@@ -188,6 +188,24 @@ describe('MissionCard', () => {
     expect(target.textContent).toContain(`Publiée ${expectedDate}`);
   });
 
+  it('affiche le badge de vélocité pour une mission publiée il y a moins d’une heure (DAO #209)', async () => {
+    const recent = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const target = mountCard({ mission: makeMission({ publishedAt: recent }) });
+    await tick();
+
+    const badge = target.querySelector('[data-testid="velocity-badge"]');
+    expect(badge).not.toBeNull();
+    expect(badge?.textContent).toContain('Publiée il y a < 1h');
+  });
+
+  it('conserve la date absolue pour une mission plus ancienne (DAO #209)', async () => {
+    const target = mountCard();
+    await tick();
+    // Default fixture is from 2026 — well outside the one-hour velocity window.
+    expect(target.querySelector('[data-testid="velocity-badge"]')).toBeNull();
+    expect(target.textContent).toContain('Publiée');
+  });
+
   it('masque la date de publication absente ou invalide', async () => {
     const missing = mountCard({ mission: makeMission({ publishedAt: null }) });
     await tick();
@@ -573,7 +591,8 @@ describe('MissionCard', () => {
     expect(spotlight).not.toBeNull();
     expect(spotlight?.textContent).toContain('Top Match');
     expect(spotlight?.textContent).toContain('100% télétravail');
-    expect(spotlight?.textContent).toContain('+40% vs plancher (700€/j)');
+    expect(spotlight?.textContent).toContain('+40% vs plancher');
+    expect(spotlight?.textContent).toContain('700');
   });
 
   it('ne rend pas le bandeau Spotlight pour les missions de rang B ou C', async () => {

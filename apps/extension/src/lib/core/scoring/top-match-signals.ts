@@ -1,8 +1,9 @@
 import type { Mission } from '../types/mission';
+import { formatTJM } from '../utils/format';
 import { getMissionScore } from './mission-grade';
 
 export interface TopMatchSignals {
-  /** True when mission qualifies as a top match (Grade A, score >= 80). */
+  /** True when mission qualifies as a top match (Grade A, score >= 85). */
   isTopMatch: boolean;
   /** Canonical numeric score (0-100) or null. */
   score: number | null;
@@ -13,7 +14,7 @@ export interface TopMatchSignals {
 export interface TopMatchSignalsOptions {
   /** Minimum profile floor daily rate for comparing TJM. */
   profileTjmMin?: number | null;
-  /** Score threshold to qualify as top match (defaults to 80, Grade A). */
+  /** Score threshold to qualify as top match (defaults to 85 per proposal #210). */
   threshold?: number;
 }
 
@@ -25,7 +26,7 @@ export function deriveTopMatchSignals(
   mission: Mission,
   options: TopMatchSignalsOptions = {}
 ): TopMatchSignals {
-  const threshold = options.threshold ?? 80;
+  const threshold = options.threshold ?? 85;
   const score = getMissionScore(mission);
   const isTopMatch = typeof score === 'number' && score >= threshold;
 
@@ -52,12 +53,12 @@ export function deriveTopMatchSignals(
     const diff = effectiveTjm - floor;
     if (diff > 0) {
       const pct = Math.round((diff / floor) * 100);
-      highlights.push(`+${pct}% vs plancher (${effectiveTjm}€/j)`);
+      highlights.push(`+${pct}% vs plancher (${formatTJM(effectiveTjm)})`);
     } else if (diff === 0) {
-      highlights.push(`TJM aligné au plancher (${effectiveTjm}€/j)`);
+      highlights.push(`TJM aligné au plancher (${formatTJM(effectiveTjm)})`);
     }
   } else if (typeof effectiveTjm === 'number' && effectiveTjm > 0) {
-    highlights.push(`${effectiveTjm}€/j annoncé`);
+    highlights.push(`${formatTJM(effectiveTjm)} annoncé`);
   }
 
   // 3. Remote / location flexibility

@@ -81,7 +81,9 @@ describe('deriveTopMatchSignals', () => {
     const signals = deriveTopMatchSignals(mission, { profileTjmMin: 500 });
 
     // (700 - 500) / 500 = 40%
-    expect(signals.highlights).toContain('+40% vs plancher (700€/j)');
+    expect(
+      signals.highlights.some((h) => h.includes('+40% vs plancher') && h.includes('700'))
+    ).toBe(true);
   });
 
   it('mentions full remote and stack competence highlights', () => {
@@ -95,9 +97,9 @@ describe('deriveTopMatchSignals', () => {
     expect(signals.highlights).toContain('100% télétravail');
   });
 
-  it('falls back gracefully when scoreBreakdown is absent but legacy score is >= 80', () => {
+  it('falls back gracefully when scoreBreakdown is absent but legacy score is >= 85', () => {
     const mission = makeMission({
-      score: 82,
+      score: 86,
       stack: ['Vue', 'Node'],
       remote: 'hybrid',
       tjm: 600,
@@ -106,7 +108,7 @@ describe('deriveTopMatchSignals', () => {
 
     expect(signals.isTopMatch).toBe(true);
     expect(signals.highlights).toContain('Stack : Vue, Node');
-    expect(signals.highlights).toContain('600€/j annoncé');
+    expect(signals.highlights.some((h) => h.includes('600') && h.includes('annoncé'))).toBe(true);
     expect(signals.highlights).toContain('Télétravail hybride');
   });
 });
