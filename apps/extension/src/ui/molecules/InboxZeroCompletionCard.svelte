@@ -55,7 +55,7 @@
       onclick={onReviewAll}
       data-testid="review-all-feed-btn"
     >
-      <Icon name="rotate-ccw" size={13} />
+      <Icon name="eye" size={13} />
       <span>Revoir tout le feed</span>
     </button>
     <button
