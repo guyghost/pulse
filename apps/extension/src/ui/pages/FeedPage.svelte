@@ -64,6 +64,8 @@
   import CatchUpBriefingBanner from '../molecules/CatchUpBriefingBanner.svelte';
   import { computeCatchUpBriefing } from '$lib/core/feed/catch-up-briefing';
   import { getLastVisitAt, touchLastVisitAt } from '$lib/shell/storage/catch-up-visit';
+  import { createPitchCopyController } from '$lib/state/pitch-copy.svelte';
+  import { generateQuickPitch } from '$lib/core/pitch/quick-pitch';
 
   const {
     onNavigateToOnboarding,
@@ -952,6 +954,34 @@
     void handleTrackingTransition(investigationMission.id, 'selected');
   }
 
+  // ── 1-Click Pitch & Fast-Apply (DAO #211) ──────────────────────────
+  const drawerPitchController = createPitchCopyController();
+
+  async function handleFastApply(mission: Mission): Promise<void> {
+    handleOpenExternalUrl(mission.url);
+    await handleTrackingTransition(mission.id, 'applied');
+  }
+
+  async function handleDrawerFastApply(): Promise<void> {
+    if (!investigationMission) {
+      return;
+    }
+    await handleFastApply(investigationMission);
+  }
+
+  async function handleDrawerCopyPitch(): Promise<void> {
+    if (!investigationMission) {
+      return;
+    }
+    const pitch = generateQuickPitch(investigationMission, page.profile);
+    const success = await drawerPitchController.copy(pitch);
+    if (success) {
+      showToast('Accroche personnalisée copiée dans le presse-papier !', 'success', 3000);
+    } else {
+      showToast('Impossible de copier l’accroche.', 'error', 3000);
+    }
+  }
+
   (async () => {
     const [bannerDismissed, storedAlertPreferences] = await Promise.all([
       getProfileBannerDismissed(),
@@ -1653,6 +1683,11 @@
           onStatusTransition={handleTrackingTransition}
           onCopyLink={page.handleCopyLink}
           onOpenLink={handleOpenExternalUrl}
+          userProfile={page.profile}
+          onFastApply={handleFastApply}
+          onCopyPitch={() => {
+            showToast('Accroche personnalisée copiée dans le presse-papier !', 'success', 3000);
+          }}
           onInvestigateMission={(mission) => (investigationMission = mission)}
           onRetry={handleMissionFeedScanAction}
           onStartScan={handleMissionFeedScanAction}
@@ -1824,6 +1859,9 @@
     onHide={handleInvestigationHide}
     onSelectForTracking={handleInvestigationSelectForTracking}
     onRetryTracking={() => void retryTrackingLoad()}
+    onFastApply={handleDrawerFastApply}
+    onCopyPitch={handleDrawerCopyPitch}
+    copyPitchStatus={drawerPitchController.status}
   />
 {/if}
 

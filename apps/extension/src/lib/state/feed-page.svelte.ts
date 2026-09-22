@@ -1707,6 +1707,9 @@ export function createFeedPageState(
     get firstName() {
       return firstName;
     },
+    get profile() {
+      return profile;
+    },
     get profileLoaded() {
       return profileLoaded;
     },

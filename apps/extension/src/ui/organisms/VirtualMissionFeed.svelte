@@ -6,6 +6,12 @@
   import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
   import { createLinkCopyController, type LinkCopyController } from '$lib/state/link-copy.svelte';
+  import {
+    createPitchCopyController,
+    type PitchCopyController,
+  } from '$lib/state/pitch-copy.svelte';
+  import { generateQuickPitch } from '$lib/core/pitch/quick-pitch';
+  import type { UserProfile } from '$lib/core/types/profile';
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
@@ -32,9 +38,28 @@
     }
   }
 
+  // 1-click pitch copy ownership (DAO #211): same pattern as copy-link,
+  // ensuring clean timer teardowns and testability without mocks.
+  const pitchCopyControllers: Record<string, PitchCopyController> = {};
+
+  function pitchCopyControllerFor(missionId: string): PitchCopyController {
+    return (pitchCopyControllers[missionId] ??= createPitchCopyController());
+  }
+
+  async function requestCopyPitch(mission: Mission): Promise<void> {
+    const pitch = generateQuickPitch(mission, userProfile ?? null);
+    const succeeded = await pitchCopyControllerFor(mission.id).copy(pitch);
+    if (succeeded) {
+      onCopyPitch?.(mission);
+    }
+  }
+
   $effect(() => {
     return () => {
       for (const controller of Object.values(copyControllers)) {
+        controller.dispose();
+      }
+      for (const controller of Object.values(pitchCopyControllers)) {
         controller.dispose();
       }
     };
@@ -67,6 +92,9 @@
     onCopyLink,
     onOpenLink,
     onInvestigateMission,
+    userProfile = null as UserProfile | null,
+    onCopyPitch,
+    onFastApply,
     onRetry,
     onStartScan,
     onClearFilters,
@@ -101,6 +129,10 @@
     onCopyLink?: (id: string) => void;
     onOpenLink?: (url: string) => void;
     onInvestigateMission?: (mission: Mission) => void;
+    /** User profile for generating tailored pitches (DAO #211) */
+    userProfile?: UserProfile | null;
+    onCopyPitch?: (mission: Mission) => void;
+    onFastApply?: (mission: Mission) => void;
     onRetry?: () => void;
     onStartScan?: () => void;
     onClearFilters?: () => void;
@@ -295,6 +327,9 @@
           onStatusTransition={(status) => onStatusTransition?.(mission.id, status)}
           onCopyLink={() => void requestCopyLink(mission)}
           copyStatus={copyControllerFor(mission.id).status}
+          onCopyPitch={() => void requestCopyPitch(mission)}
+          copyPitchStatus={pitchCopyControllerFor(mission.id).status}
+          onFastApply={onFastApply ? () => onFastApply(mission) : undefined}
           onInvestigate={() => onInvestigateMission?.(mission)}
           {onOpenLink}
         />

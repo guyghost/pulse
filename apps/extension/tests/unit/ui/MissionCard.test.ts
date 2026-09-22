@@ -814,9 +814,63 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
       'Masquer les détails de la mission Developpeur fullstack TypeScript',
       ...collapsedLabels.slice(1),
       'Copier le lien de la mission',
+      'Copier l’accroche de candidature',
       'Ouvrir la mission sur la plateforme source',
       'Analyser',
     ]);
+  });
+
+  it('appelle onCopyPitch lors du clic sur le bouton d’accroche IA (DAO #211)', async () => {
+    const onCopyPitch = vi.fn();
+    const target = mountCard({ onCopyPitch });
+    await tick();
+
+    // Expand
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const pitchBtn = target.querySelector('[data-testid="copy-pitch-btn"]') as HTMLButtonElement;
+    expect(pitchBtn).not.toBeNull();
+    pitchBtn.click();
+    expect(onCopyPitch).toHaveBeenCalledTimes(1);
+  });
+
+  it('reflète l’état copié pour l’accroche IA avec accessibilité (DAO #211)', async () => {
+    const target = mountCard({ copyPitchStatus: 'copied' });
+    await tick();
+
+    // Expand
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const pitchBtn = target.querySelector('[data-testid="copy-pitch-btn"]') as HTMLButtonElement;
+    expect(pitchBtn?.getAttribute('aria-label')).toBe('Accroche copiée dans le presse-papier');
+    expect(target.textContent).toContain('Accroche personnalisée copiée');
+  });
+
+  it('affiche le bouton Postuler et déclenche onFastApply (DAO #211)', async () => {
+    const onFastApply = vi.fn();
+    const target = mountCard({ onFastApply });
+    await tick();
+
+    // Expand
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
+    await tick();
+
+    const applyBtn = target.querySelector('[data-testid="fast-apply-btn"]') as HTMLButtonElement;
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn.textContent).toContain('Postuler');
+    applyBtn.click();
+    expect(onFastApply).toHaveBeenCalledTimes(1);
   });
 
   it('n’introduit aucun tabindex positif', async () => {

@@ -19,6 +19,7 @@
   import { parseIsoDateTimeToEpochMs } from '$lib/core/utils/iso-time';
   import { deriveTopMatchSignals } from '$lib/core/scoring/top-match-signals';
   import { formatVelocityLabel } from '$lib/core/feed/catch-up-briefing';
+  import type { PitchCopyStatus } from '$lib/state/pitch-copy.svelte';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
   import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
@@ -48,6 +49,9 @@
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
     profileTjmMin = null as number | null,
     copyStatus = 'idle' as 'idle' | 'copied',
+    onCopyPitch = null as (() => void) | null,
+    copyPitchStatus = 'idle' as PitchCopyStatus,
+    onFastApply = null as (() => void) | null,
   }: {
     mission: Mission;
     isSeen?: boolean;
@@ -78,6 +82,12 @@
      * copy request through onCopyLink. The error state is perceptible:
      * tooltip, icon and a polite live announcement (DAO #178). */
     copyStatus?: 'idle' | 'copied' | 'error';
+    /** 1-click pitch copy callback (DAO #211) */
+    onCopyPitch?: () => void;
+    /** Transient status of the pitch copy action (DAO #211) */
+    copyPitchStatus?: PitchCopyStatus;
+    /** 1-click fast apply callback opening source and marking applied (DAO #211) */
+    onFastApply?: () => void;
   } = $props();
 
   // Collapsed by default: the feed's quick scan comes first. Compact density:
@@ -286,6 +296,16 @@
   function handleInvestigate(e: MouseEvent) {
     e.stopPropagation();
     onInvestigate?.();
+  }
+
+  function handleCopyPitch(e: MouseEvent) {
+    e.stopPropagation();
+    onCopyPitch?.();
+  }
+
+  function handleFastApply(e: MouseEvent) {
+    e.stopPropagation();
+    onFastApply?.();
   }
 </script>
 
@@ -756,10 +776,18 @@
       {/snippet}
     </Tooltip>
     {#if expanded}
-      <!-- Copy feedback announcements (DAO #178): the region stays mounted so
+      <!-- Copy feedback announcements (DAO #178 & #211): the region stays mounted so
            screen readers catch the message; empty while idle. -->
       <span class="sr-only" role="status" aria-live="polite">
-        {copied ? 'Lien copié' : copyStatus === 'error' ? 'Échec de la copie du lien' : ''}
+        {copied
+          ? 'Lien copié'
+          : copyStatus === 'error'
+            ? 'Échec de la copie du lien'
+            : copyPitchStatus === 'copied'
+              ? 'Accroche personnalisée copiée'
+              : copyPitchStatus === 'error'
+                ? 'Échec de la copie de l’accroche'
+                : ''}
       </span>
       <Tooltip
         label={copied
@@ -794,6 +822,43 @@
         {/snippet}
       </Tooltip>
       <Tooltip
+        label={copyPitchStatus === 'copied'
+          ? 'Accroche copiée !'
+          : copyPitchStatus === 'copying'
+            ? 'Copie en cours...'
+            : copyPitchStatus === 'error'
+              ? 'Échec de la copie'
+              : 'Copier l’accroche'}
+        description="Phrase d'introduction percutante prête à coller pour postuler."
+      >
+        {#snippet children(tooltip: TooltipTriggerState)}
+          <button
+            class="{HIT_TARGET_EXTENSION} inline-flex size-8 cursor-pointer items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue-on-tint active:bg-page-canvas"
+            onclick={handleCopyPitch}
+            onkeydown={tooltip.onKeydown}
+            aria-label={copyPitchStatus === 'copied'
+              ? 'Accroche copiée dans le presse-papier'
+              : 'Copier l’accroche de candidature'}
+            aria-describedby={tooltip.isOpen ? tooltip.id : undefined}
+            data-testid="copy-pitch-btn"
+          >
+            <Icon
+              name={copyPitchStatus === 'copied'
+                ? 'check'
+                : copyPitchStatus === 'error'
+                  ? 'x-circle'
+                  : 'sparkles'}
+              size={13}
+              class={copyPitchStatus === 'copied'
+                ? 'text-accent-green'
+                : copyPitchStatus === 'error'
+                  ? 'text-status-red-text'
+                  : ''}
+            />
+          </button>
+        {/snippet}
+      </Tooltip>
+      <Tooltip
         label="Ouvrir la mission"
         description="Passez à la plateforme source pour vérifier ou postuler."
       >
@@ -809,6 +874,18 @@
           </button>
         {/snippet}
       </Tooltip>
+      {#if onFastApply}
+        <button
+          type="button"
+          class="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-blueprint-blue/30 bg-blueprint-blue/8 px-2.5 text-caption font-semibold text-blueprint-blue transition-colors duration-150 hover:border-blueprint-blue/50 hover:bg-blueprint-blue/15 active:translate-y-px"
+          onclick={handleFastApply}
+          aria-label="Postuler et marquer la mission comme envoyée"
+          data-testid="fast-apply-btn"
+        >
+          <Icon name="send" size={12} />
+          <span>Postuler</span>
+        </button>
+      {/if}
       <button
         type="button"
         class="ml-auto inline-flex h-8 cursor-pointer items-center gap-1.5 rounded-lg bg-blueprint-blue-strong px-3 text-body font-medium text-white shadow-subtle-2 transition-colors duration-150 ease-out hover:bg-blueprint-blue-strong/90 active:translate-y-px"

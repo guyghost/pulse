@@ -26,6 +26,9 @@
     onHide,
     onSelectForTracking,
     onRetryTracking,
+    onFastApply,
+    onCopyPitch,
+    copyPitchStatus = 'idle' as 'idle' | 'copying' | 'copied' | 'error',
   }: {
     mission: Mission;
     isCompared?: boolean;
@@ -41,6 +44,12 @@
     onHide?: () => void;
     onSelectForTracking?: () => void;
     onRetryTracking?: () => void;
+    /** 1-click fast apply (DAO #211) */
+    onFastApply?: () => void;
+    /** 1-click pitch copy callback (DAO #211) */
+    onCopyPitch?: () => void;
+    /** Transient status of the pitch copy action (DAO #211) */
+    copyPitchStatus?: 'idle' | 'copying' | 'copied' | 'error';
   } = $props();
 
   let modalRoot = $state<HTMLElement | null>(null);
@@ -262,7 +271,15 @@
   }
 
   function handleOpenForTracking(): void {
-    onOpenLink?.(mission.url);
+    if (onFastApply) {
+      onFastApply();
+    } else {
+      onOpenLink?.(mission.url);
+    }
+  }
+
+  function handleCopyPitch(): void {
+    onCopyPitch?.();
   }
 </script>
 
@@ -374,7 +391,7 @@
               </div>
             </div>
 
-            <div class="mt-4 flex items-stretch gap-2" data-actions-menu>
+            <div class="mt-4 flex flex-wrap sm:flex-nowrap items-stretch gap-2" data-actions-menu>
               <button
                 type="button"
                 class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-body-lg font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
@@ -387,11 +404,36 @@
               </button>
               <button
                 type="button"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3.5 text-body-lg font-medium text-text-primary transition-colors hover:bg-subtle-gray hover:text-blueprint-blue-on-tint"
+                onclick={handleCopyPitch}
+                aria-label="Copier l'accroche personnalisée"
+                data-testid="drawer-copy-pitch-btn"
+              >
+                <Icon
+                  name={copyPitchStatus === 'copied'
+                    ? 'check'
+                    : copyPitchStatus === 'error'
+                      ? 'x-circle'
+                      : 'sparkles'}
+                  size={14}
+                  class={copyPitchStatus === 'copied'
+                    ? 'text-accent-green'
+                    : copyPitchStatus === 'error'
+                      ? 'text-status-red-text'
+                      : 'text-blueprint-blue'}
+                />
+                <span
+                  >{copyPitchStatus === 'copied' ? 'Accroche copiée !' : 'Copier l’accroche'}</span
+                >
+              </button>
+              <button
+                type="button"
                 class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blueprint-blue px-3 text-body-lg font-semibold text-surface-white transition-colors hover:bg-blueprint-blue/90"
                 onclick={handleOpenForTracking}
+                data-testid="drawer-fast-apply-btn"
               >
-                <Icon name="external-link" size={14} />
-                Ouvrir pour postuler
+                <Icon name="send" size={14} />
+                Postuler & Suivre
               </button>
               <div class="relative">
                 <button
@@ -414,6 +456,18 @@
                     aria-label="Actions secondaires"
                     onkeydown={handleActionsMenuKeydown}
                   >
+                    <button
+                      type="button"
+                      class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray"
+                      onclick={() => {
+                        actionsMenuOpen = false;
+                        handleCopyPitch();
+                      }}
+                      role="menuitem"
+                    >
+                      <Icon name="sparkles" size={14} class="text-blueprint-blue" />
+                      Copier l’accroche IA
+                    </button>
                     <button
                       type="button"
                       class="flex w-full items-center gap-2.5 rounded-lg px-3 py-2.5 text-left text-body-lg text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
