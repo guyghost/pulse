@@ -19,12 +19,62 @@ export interface QuickPitchOptions {
 }
 
 /**
- * Finds intersecting skills between the user's keywords and the mission stack.
- * Case-insensitive, preserving canonical casing from mission or profile.
+ * Compares a mission tech string with a profile keyword safely.
+ * Avoids false positives from raw substring inclusion (e.g. "C" matching "React" or "Go" matching "Django")
+ * while supporting common variations like "React" <-> "React.js" or "React / Next.js".
+ */
+export function matchesSkill(tech: string, profileKeyword: string): boolean {
+  const techLower = tech.trim().toLowerCase();
+  const profileLower = profileKeyword.trim().toLowerCase();
+
+  if (!techLower || !profileLower) {
+    return false;
+  }
+
+  // Exact match
+  if (techLower === profileLower) {
+    return true;
+  }
+
+  // Normalize runtime extensions (.js, .ts)
+  const stripExtension = (s: string) => s.replace(/\.(js|ts)$/i, '');
+  if (stripExtension(techLower) === stripExtension(profileLower)) {
+    return true;
+  }
+
+  // Tokenize compound tech strings like "React / Next.js" or "TypeScript, Node"
+  const techTokens = techLower
+    .split(/[/,\s|]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+  const profileTokens = profileLower
+    .split(/[/,\s|]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+  // Exact match within token list
+  if (techTokens.includes(profileLower) || profileTokens.includes(techLower)) {
+    return true;
+  }
+
+  // Match token with stripped extension (e.g. "React.js" in token list vs "React")
+  if (
+    techTokens.some((t) => stripExtension(t) === stripExtension(profileLower)) ||
+    profileTokens.some((t) => stripExtension(t) === stripExtension(techLower))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
+ * Extracts matching skills between mission stack and profile keywords.
+ * Pure core function: zero I/O, zero async, strictly deterministic.
  */
 export function extractMatchingSkills(
-  missionStack: readonly string[] | undefined,
-  profileKeywords: readonly string[] | undefined
+  missionStack?: string[] | null,
+  profileKeywords?: string[] | null
 ): string[] {
   if (
     !missionStack ||
@@ -35,12 +85,9 @@ export function extractMatchingSkills(
     return [];
   }
 
-  const normalizedProfile = new Map<string, string>();
-  for (const kw of profileKeywords) {
-    const trimmed = kw.trim();
-    if (trimmed) {
-      normalizedProfile.set(trimmed.toLowerCase(), trimmed);
-    }
+  const validProfileKeywords = profileKeywords.map((k) => k.trim()).filter(Boolean);
+  if (validProfileKeywords.length === 0) {
+    return [];
   }
 
   const matches: string[] = [];
@@ -49,16 +96,10 @@ export function extractMatchingSkills(
     if (!trimmed) {
       continue;
     }
-    const lower = trimmed.toLowerCase();
-    if (normalizedProfile.has(lower)) {
-      matches.push(trimmed);
-    } else {
-      // Check partial match (e.g. "React" matches "React.js" or "React / Next")
-      for (const [pLower, pOriginal] of normalizedProfile) {
-        if (lower.includes(pLower) || pLower.includes(lower)) {
-          matches.push(trimmed);
-          break;
-        }
+    for (const kw of validProfileKeywords) {
+      if (matchesSkill(trimmed, kw)) {
+        matches.push(trimmed);
+        break;
       }
     }
   }

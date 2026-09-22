@@ -61,6 +61,25 @@ describe('extractMatchingSkills', () => {
     expect(matched).not.toContain('Vue 3');
   });
 
+  it('does not cause false positives for short keywords like C, Go, or R', () => {
+    const matched = extractMatchingSkills(
+      ['React', 'Scala', 'Django', 'MongoDB', 'Rust'],
+      ['C', 'Go', 'R']
+    );
+    expect(matched).toEqual([]);
+  });
+
+  it('matches compound tech tokens and runtime variants', () => {
+    const matched = extractMatchingSkills(
+      ['React / Next.js', 'Vue.js', 'Go / Gin', 'C / C++'],
+      ['React', 'Vue', 'Go', 'C']
+    );
+    expect(matched).toContain('React / Next.js');
+    expect(matched).toContain('Vue.js');
+    expect(matched).toContain('Go / Gin');
+    expect(matched).toContain('C / C++');
+  });
+
   it('returns empty array when either argument is empty or undefined', () => {
     expect(extractMatchingSkills([], ['React'])).toEqual([]);
     expect(extractMatchingSkills(['React'], [])).toEqual([]);
