@@ -61,6 +61,9 @@
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
   import { getScanSignalStats } from '$lib/shell/storage/scan-signal-stats';
   import type { DedupStats } from '$lib/core/connectors/source-health-signals';
+  import CatchUpBriefingBanner from '../molecules/CatchUpBriefingBanner.svelte';
+  import { computeCatchUpBriefing } from '$lib/core/feed/catch-up-briefing';
+  import { getLastVisitAt, touchLastVisitAt } from '$lib/shell/storage/catch-up-visit';
 
   const {
     onNavigateToOnboarding,
@@ -521,7 +524,48 @@
     page.displayMissions.filter((mission) => missionMatchesAlert(mission, alertPreferences))
   );
 
-  const visibleFeedMissions = $derived(showAlertOnly ? alertMissions : page.displayMissions);
+  // ── Catch-up briefing (DAO #209) ───────────────────────────────────
+  // Daily ritual on panel reopen: a discreet banner resuming missions that
+  // arrived since the last active session, with a one-click wave filter.
+  // lastVisitAt lives in chrome.storage.local (throttled to 30 min).
+  let lastVisitAt = $state<Date | null>(null);
+  let lastVisitHydrated = $state(false);
+  let baselinePersisted = $state(false);
+  let waveActive = $state(false);
+
+  $effect(() => {
+    if (lastVisitHydrated) {
+      return;
+    }
+    lastVisitHydrated = true;
+    void getLastVisitAt().then((value) => {
+      lastVisitAt = value;
+      if (!value) {
+        void touchLastVisitAt(new Date());
+      }
+    });
+  });
+
+  const briefing = $derived(computeCatchUpBriefing(page.displayMissions, lastVisitAt, new Date()));
+  const briefingWaveIds = $derived(new Set(briefing?.waveMissionIds ?? []));
+
+  // Advance the baseline once per session once a briefing is actually shown,
+  // so the next reopen computes its delta against this session.
+  $effect(() => {
+    if (!briefing || baselinePersisted) {
+      return;
+    }
+    baselinePersisted = true;
+    void touchLastVisitAt(new Date());
+  });
+
+  const visibleFeedMissions = $derived(
+    showAlertOnly
+      ? alertMissions
+      : waveActive
+        ? page.displayMissions.filter((mission) => briefingWaveIds.has(mission.id))
+        : page.displayMissions
+  );
   const visibleFeedMissionCount = $derived(visibleFeedMissions.length);
   const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
   const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
@@ -537,7 +581,9 @@
       (page.arrivalStackState.value === 'refresh-error' && page.arrivalStackState.drawerOpen)
   );
   const missionFeedResetKey = $derived(
-    `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}`
+    `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}::wave:${
+      waveActive ? 'on' : 'off'
+    }`
   );
   // ── Feed story projection ────────────────────────────────────────────
   // The story strip is a surface for states that need a decision. Calm states
@@ -1540,6 +1586,14 @@
           Voir tout le feed
         </button>
       </div>
+    {/if}
+    {#if briefing && hasVisibleFeedMissions}
+      <CatchUpBriefingBanner
+        {briefing}
+        {waveActive}
+        onShowWave={() => (waveActive = true)}
+        onExitWave={() => (waveActive = false)}
+      />
     {/if}
     {#if hasVisibleFeedMissions && !page.heroCompact}
       <div

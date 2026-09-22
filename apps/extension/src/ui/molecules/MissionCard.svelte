@@ -18,6 +18,7 @@
   } from '$lib/core/utils/format';
   import { parseIsoDateTimeToEpochMs } from '$lib/core/utils/iso-time';
   import { deriveTopMatchSignals } from '$lib/core/scoring/top-match-signals';
+  import { formatVelocityLabel } from '$lib/core/feed/catch-up-briefing';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
   import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
@@ -151,6 +152,12 @@
   // "null"/"Invalid Date") when missing or not ISO-parsable. Pure core
   // formatting keeps the card mock-free testable.
   const publishedLabel = $derived(formatPublishedDate(mission.publishedAt));
+
+  // Market-velocity badge (DAO #209): a mission published less than an hour
+  // ago is a fast-moving opportunity. Discrete chip in the quick-scan line —
+  // it reuses the existing line slot, so the card's predictable height for
+  // the lazy/virtualized list is never altered.
+  const velocityLabel = $derived(formatVelocityLabel(mission, new Date()));
 
   const availableTransitions = $derived(
     trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []
@@ -472,7 +479,18 @@
       {/if}
       <span class="text-text-secondary">{seniorityLabel}</span>
     {/if}
-    {#if publishedLabel}
+    {#if velocityLabel}
+      {#if mission.location || seniorityLabel}
+        <span class="text-text-muted" aria-hidden="true">•</span>
+      {/if}
+      <span
+        class="inline-flex items-center gap-1 rounded-full bg-accent-green/10 py-0.5 pl-1.5 pr-2 text-micro font-medium text-accent-green"
+        data-testid="velocity-badge"
+      >
+        <span class="h-1.5 w-1.5 rounded-full bg-accent-green" aria-hidden="true"></span>
+        {velocityLabel}
+      </span>
+    {:else if publishedLabel}
       {#if mission.location || seniorityLabel}
         <span class="text-text-muted" aria-hidden="true">•</span>
       {/if}
