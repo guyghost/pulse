@@ -17,6 +17,7 @@
     formatTimestamp,
   } from '$lib/core/utils/format';
   import { parseIsoDateTimeToEpochMs } from '$lib/core/utils/iso-time';
+  import { deriveTopMatchSignals } from '$lib/core/scoring/top-match-signals';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
   import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
@@ -157,6 +158,8 @@
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
   const missionGrade = $derived(getMissionGrade(mission));
+  const topMatchSignals = $derived(deriveTopMatchSignals(mission, { profileTjmMin }));
+  const isTopMatch = $derived(topMatchSignals.isTopMatch);
   const semanticDisplayValue = $derived(mission.scoreBreakdown?.semantic ?? mission.semanticScore);
   const semanticReason = $derived(mission.scoreBreakdown?.semanticReason ?? mission.semanticReason);
   const hasScoreDetails = $derived(
@@ -290,14 +293,40 @@
       }
     },
   }}
-  class="group relative rounded-xl border border-border-light bg-surface-white px-3 py-2.5 transition-[border-color,opacity] duration-200 ease-out hover:border-disabled-gray {isSeen
-    ? ''
-    : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
+  class="group relative rounded-xl border px-3 py-2.5 transition-[border-color,box-shadow,opacity] duration-200 ease-out {isTopMatch
+    ? 'border-blueprint-blue/35 bg-surface-white shadow-[0_2px_12px_-3px_rgba(11,100,233,0.1)] hover:border-blueprint-blue/50'
+    : isSeen
+      ? 'border-border-light bg-surface-white hover:border-disabled-gray'
+      : 'border-blueprint-blue/20 bg-surface-white hover:border-disabled-gray'} {isHidden
+    ? 'opacity-50'
+    : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
     : ''}"
   style="contain: layout style paint;"
   aria-label={`Mission ${mission.title || 'sans titre'} chez ${mission.client || 'client non précisé'}`}
+  data-top-match={isTopMatch ? 'true' : undefined}
 >
+  <!-- Spotlight highlight banner for Top Match (Grade A) -->
+  {#if isTopMatch && topMatchSignals.highlights.length > 0}
+    <div
+      class="mb-2 flex flex-wrap items-center gap-1.5 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-2.5 py-1 text-micro text-blueprint-blue-on-tint"
+      aria-label="Points forts de la mission"
+      data-testid="spotlight-highlights"
+    >
+      <span class="inline-flex items-center gap-1 font-semibold text-blueprint-blue-on-tint">
+        <Icon name="sparkles" size={11} />
+        <span>Top Match</span>
+      </span>
+      <span class="text-blueprint-blue-on-tint/40" aria-hidden="true">•</span>
+      {#each topMatchSignals.highlights as highlight, i (i)}
+        <span>{highlight}</span>
+        {#if i < topMatchSignals.highlights.length - 1}
+          <span class="text-blueprint-blue-on-tint/40" aria-hidden="true">•</span>
+        {/if}
+      {/each}
+    </div>
+  {/if}
+
   <!-- Header row -->
   <div class="flex items-start justify-between gap-3">
     <div class="min-w-0 flex-1">

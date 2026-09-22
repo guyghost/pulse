@@ -555,6 +555,41 @@ describe('MissionCard', () => {
     expect(scoreEl!.className).toContain('bg-accent-green/15');
   });
 
+  it('met en valeur la carte Note A avec le traitement Spotlight et ses points forts', async () => {
+    const target = mountCard({
+      mission: makeMission({
+        score: 88,
+        tjm: 700,
+        remote: 'full',
+      }),
+      profileTjmMin: 500,
+    });
+    await tick();
+    const article = target.querySelector('article');
+    expect(article?.getAttribute('data-top-match')).toBe('true');
+    expect(article?.className).toContain('border-blueprint-blue/35');
+
+    const spotlight = target.querySelector('[data-testid="spotlight-highlights"]');
+    expect(spotlight).not.toBeNull();
+    expect(spotlight?.textContent).toContain('Top Match');
+    expect(spotlight?.textContent).toContain('100% télétravail');
+    expect(spotlight?.textContent).toContain('+40% vs plancher (700€/j)');
+  });
+
+  it('ne rend pas le bandeau Spotlight pour les missions de rang B ou C', async () => {
+    const target = mountCard({
+      mission: makeMission({
+        score: 65,
+        tjm: 500,
+      }),
+    });
+    await tick();
+    const article = target.querySelector('article');
+    expect(article?.getAttribute('data-top-match')).toBeNull();
+    const spotlight = target.querySelector('[data-testid="spotlight-highlights"]');
+    expect(spotlight).toBeNull();
+  });
+
   it('affiche la note B avec la couleur intermédiaire', async () => {
     const target = mountCard({ mission: makeMission({ score: 65 }) });
     await tick();
