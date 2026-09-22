@@ -540,6 +540,9 @@
     lastVisitHydrated = true;
     void getLastVisitAt().then((value) => {
       lastVisitAt = value;
+      if (!value) {
+        void touchLastVisitAt(new Date());
+      }
     });
   });
 

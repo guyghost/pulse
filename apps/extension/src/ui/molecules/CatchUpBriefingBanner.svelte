@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { CatchUpBriefing } from '$lib/core/feed/catch-up-briefing';
+  import { formatTJM } from '$lib/core/utils/format';
   import { Icon } from '@pulse/ui';
 
   const {
@@ -34,7 +35,7 @@
       parts.push(`${briefing.gradeA} ${pluralized(briefing.gradeA, 'pépite', 'pépites')}`);
     }
     if (typeof briefing.meanTjm === 'number') {
-      parts.push(`TJM moyen ${briefing.meanTjm} €/j`);
+      parts.push(`TJM moyen ${formatTJM(briefing.meanTjm)}`);
     }
     if (briefing.topMission?.title) {
       parts.push(`Top : ${briefing.topMission.title}`);
