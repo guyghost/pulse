@@ -15,6 +15,8 @@
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
+  import InboxZeroCompletionCard from '../molecules/InboxZeroCompletionCard.svelte';
+  import type { SessionTriageProgress } from '$lib/core/feed/session-triage';
 
   const BATCH_SIZE = 20;
 
@@ -95,6 +97,8 @@
     userProfile = null as UserProfile | null,
     onCopyPitch,
     onFastApply,
+    triageProgress = null as SessionTriageProgress | null,
+    onReviewAll,
     onRetry,
     onStartScan,
     onClearFilters,
@@ -133,6 +137,9 @@
     userProfile?: UserProfile | null;
     onCopyPitch?: (mission: Mission) => void;
     onFastApply?: (mission: Mission) => void;
+    /** Session triage progress and Inbox Zero state (DAO #212) */
+    triageProgress?: SessionTriageProgress | null;
+    onReviewAll?: () => void;
     onRetry?: () => void;
     onStartScan?: () => void;
     onClearFilters?: () => void;
@@ -294,6 +301,15 @@
         </div>
         <p class="text-meta leading-relaxed text-text-secondary">{error}</p>
       </div>
+    {/if}
+
+    {#if triageProgress?.isInboxZero}
+      <InboxZeroCompletionCard
+        favoritesCount={triageProgress.favoritesCount}
+        totalCount={triageProgress.totalCount}
+        {onReviewAll}
+        onTriggerScan={onStartScan}
+      />
     {/if}
 
     <!-- Lazy-loaded list: renders only visibleCount missions, loads more on scroll -->

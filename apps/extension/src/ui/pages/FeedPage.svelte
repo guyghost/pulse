@@ -66,6 +66,8 @@
   import { getLastVisitAt, touchLastVisitAt } from '$lib/shell/storage/catch-up-visit';
   import { createPitchCopyController } from '$lib/state/pitch-copy.svelte';
   import { generateQuickPitch } from '$lib/core/pitch/quick-pitch';
+  import SessionTriageGauge from '../atoms/SessionTriageGauge.svelte';
+  import { computeSessionTriageProgress } from '$lib/core/feed/session-triage';
 
   const {
     onNavigateToOnboarding,
@@ -573,6 +575,11 @@
   const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
   const feedChromeBusy = $derived(controller.isScanning || feedIsColdLoading);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
+
+  // Session triage progress (DAO #212)
+  const triageProgress = $derived(
+    computeSessionTriageProgress(page.displayMissions, page.seenIds, page.favorites, page.hidden)
+  );
 
   // Focus lens (notification deep-link): banner shows when the feed is filtered
   // to the notified missions. See src/models/notification-deep-link.model.md.
@@ -1640,12 +1647,15 @@
             actuels.
           </p>
         </div>
-        <span
-          class="shrink-0 rounded-lg border border-border-light bg-surface-white px-2 py-1 font-mono text-meta font-semibold tabular-nums text-text-primary"
-          aria-label={`${formatMissionCount(visibleFeedMissionCount)} dans la liste`}
-        >
-          {visibleFeedMissionCount}
-        </span>
+        <div class="flex items-center gap-2">
+          <SessionTriageGauge progress={triageProgress} />
+          <span
+            class="shrink-0 rounded-lg border border-border-light bg-surface-white px-2 py-1 font-mono text-meta font-semibold tabular-nums text-text-primary"
+            aria-label={`${formatMissionCount(visibleFeedMissionCount)} dans la liste`}
+          >
+            {visibleFeedMissionCount}
+          </span>
+        </div>
       </div>
     {:else}
       <h2 id="mission-feed-title" class="sr-only">
@@ -1688,6 +1698,8 @@
           onCopyPitch={() => {
             showToast('Accroche personnalisée copiée dans le presse-papier !', 'success', 3000);
           }}
+          {triageProgress}
+          onReviewAll={handleClearMissionFilters}
           onInvestigateMission={(mission) => (investigationMission = mission)}
           onRetry={handleMissionFeedScanAction}
           onStartScan={handleMissionFeedScanAction}
