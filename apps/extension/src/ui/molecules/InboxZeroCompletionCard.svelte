@@ -26,7 +26,7 @@
     <Icon name="check-circle" size={24} />
   </div>
 
-  <h3 class="mt-3.5 text-heading-md font-semibold text-text-primary">Veille à jour !</h3>
+  <h3 class="mt-3.5 text-heading font-semibold text-text-primary">Veille à jour !</h3>
 
   <p class="mt-1 max-w-sm text-body leading-relaxed text-text-subtle">
     Vous avez qualifié toutes les opportunités du marché ({totalCount} mission{totalCount > 1
