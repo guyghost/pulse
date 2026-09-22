@@ -141,13 +141,52 @@ describe('MissionInvestigationDrawer modal focus', () => {
     await tick();
 
     const items = document.querySelectorAll('[role="menu"] button');
-    expect(items.length).toBe(2);
-    const [compare, hide] = items;
+    expect(items.length).toBe(3);
+    const [pitch, compare, hide] = items;
+    expect(pitch.getAttribute('role')).toBe('menuitem');
+    expect(pitch.textContent).toContain('Copier l’accroche');
     expect(compare.getAttribute('role')).toBe('menuitemcheckbox');
     expect(compare.getAttribute('aria-checked')).toBe('false');
     expect(compare.getAttribute('aria-pressed')).toBeNull();
     expect(hide.getAttribute('role')).toBe('menuitemcheckbox');
     expect(hide.getAttribute('aria-checked')).toBe('false');
     expect(hide.getAttribute('aria-pressed')).toBeNull();
+  });
+
+  it('appelle onCopyPitch lors du clic sur le bouton Copier l’accroche (DAO #211)', async () => {
+    const onCopyPitch = vi.fn();
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(MissionInvestigationDrawer, {
+      target,
+      props: { mission, onClose: () => {}, onCopyPitch },
+    });
+    await tick();
+
+    const pitchBtn = document.querySelector<HTMLButtonElement>(
+      '[data-testid="drawer-copy-pitch-btn"]'
+    );
+    expect(pitchBtn).not.toBeNull();
+    pitchBtn!.click();
+    expect(onCopyPitch).toHaveBeenCalledTimes(1);
+  });
+
+  it('appelle onFastApply lors du clic sur le bouton Postuler & Suivre (DAO #211)', async () => {
+    const onFastApply = vi.fn();
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(MissionInvestigationDrawer, {
+      target,
+      props: { mission, onClose: () => {}, onFastApply },
+    });
+    await tick();
+
+    const applyBtn = document.querySelector<HTMLButtonElement>(
+      '[data-testid="drawer-fast-apply-btn"]'
+    );
+    expect(applyBtn).not.toBeNull();
+    expect(applyBtn!.textContent).toContain('Postuler & Suivre');
+    applyBtn!.click();
+    expect(onFastApply).toHaveBeenCalledTimes(1);
   });
 });
