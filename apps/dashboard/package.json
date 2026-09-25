@@ -17,12 +17,12 @@
     "@pulse/domain": "workspace:*",
     "@pulse/ui": "workspace:*",
     "@supabase/ssr": "^0.12.5",
-    "@supabase/supabase-js": "^2.112.4",
+    "@supabase/supabase-js": "^2.117.0",
     "@vercel/microfrontends": "^2.4.0",
-    "svelte": "^5.57.0"
+    "svelte": "^5.57.1"
   },
   "devDependencies": {
-    "@playwright/test": "1.61.1",
+    "@playwright/test": "1.63.0",
     "@pulse/tsconfig": "workspace:*",
     "@sveltejs/adapter-vercel": "^6.3.4",
     "@sveltejs/kit": "^2.70.3",
