@@ -3,6 +3,7 @@
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
   import { Icon, type IconName } from '@pulse/ui';
   import { formatRelativeTime } from '$lib/core/utils/format';
+  import { createClock } from '$lib/state/clock.svelte';
   import { getConnectorErrorCopy } from '../copy/connector-error-copy';
 
   const {
@@ -41,8 +42,9 @@
 
   const isSessionError = $derived(connectorErrorCopy.reconnectRecommended);
 
+  const clock = createClock();
   const relativeTime = $derived(
-    formatRelativeTime(persisted?.lastSyncAt ?? null, Date.now()) ?? undefined
+    formatRelativeTime(persisted?.lastSyncAt ?? null, clock.now) ?? undefined
   );
 
   type ConnectorStateConfig = {

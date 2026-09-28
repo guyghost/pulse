@@ -20,6 +20,7 @@
   import { deriveTopMatchSignals } from '$lib/core/scoring/top-match-signals';
   import { formatVelocityLabel } from '$lib/core/feed/catch-up-briefing';
   import type { PitchCopyStatus } from '$lib/state/pitch-copy.svelte';
+  import { createClock } from '$lib/state/clock.svelte';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import { swipe } from '../actions/swipe';
   import Tooltip, { type TooltipTriggerState } from '../atoms/Tooltip.svelte';
@@ -167,7 +168,8 @@
   // ago is a fast-moving opportunity. Discrete chip in the quick-scan line —
   // it reuses the existing line slot, so the card's predictable height for
   // the lazy/virtualized list is never altered.
-  const velocityLabel = $derived(formatVelocityLabel(mission, new Date()));
+  const clock = createClock();
+  const velocityLabel = $derived(formatVelocityLabel(mission, new Date(clock.now)));
 
   const availableTransitions = $derived(
     trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []

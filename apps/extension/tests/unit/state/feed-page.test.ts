@@ -714,6 +714,24 @@ describe('feed page state', () => {
     expect(draft.selectedStacks).toEqual([]);
   });
 
+  it('keeps hidden missions in the session-triage scope so they count as qualified', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'm1', score: 90 }),
+      makeMission({ id: 'm2', score: 70 }),
+      makeMission({ id: 'm3', score: 50 }),
+    ]);
+
+    page.handleHide('m2');
+
+    // The hidden mission leaves the visible list…
+    expect(page.displayMissions.map((m) => m.id)).not.toContain('m2');
+    // …but stays in the triage scope, which counts it as processed instead of
+    // silently shrinking the denominator.
+    expect(page.triageMissions.map((m) => m.id).sort()).toEqual(['m1', 'm2', 'm3']);
+  });
+
   it('counts only explicit full or hybrid remote as remote-compatible insight', () => {
     expect(isRemoteCompatibleInsight(makeMission({ remote: 'full' }))).toBe(true);
     expect(isRemoteCompatibleInsight(makeMission({ remote: 'hybrid' }))).toBe(true);

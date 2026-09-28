@@ -30,10 +30,6 @@ export const DEFAULT_FRESHNESS_DECAY_DAYS = 14;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * Best available numeric score for a mission (0-100).
- * Prefers the structured breakdown, falls back to legacy fields.
- */
-/**
  * Compute a freshness score (0-100) based on the publication date.
  *
  * - Published today or in the future: 100

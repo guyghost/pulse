@@ -36,6 +36,33 @@ describe('filterSmartNotifications', () => {
     makeMission({ id: 'd', score: 75, stack: ['Java', 'Spring'], tjm: 650 }),
   ];
 
+  it('uses the canonical fused score (scoreBreakdown.total) for the threshold', () => {
+    const fused = makeMission({
+      id: 'fused-low',
+      score: 95,
+      semanticScore: 95,
+      scoreBreakdown: {
+        criteria: {
+          stack: 0,
+          location: 0,
+          tjm: 0,
+          remote: 0,
+          seniorityBonus: 0,
+          startDateBonus: 0,
+        },
+        deterministic: 10,
+        semantic: 95,
+        semanticReason: null,
+        total: 40,
+        grade: 'C',
+      },
+    });
+
+    expect(
+      filterSmartNotifications([fused], [], { ...DEFAULT_SMART_CRITERIA, scoreThreshold: 50 })
+    ).toEqual([]);
+  });
+
   it('filters by score threshold', () => {
     const result = filterSmartNotifications(missions, [], {
       ...DEFAULT_SMART_CRITERIA,

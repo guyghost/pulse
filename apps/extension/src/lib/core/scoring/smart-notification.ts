@@ -1,4 +1,5 @@
 import type { Mission } from '../types/mission';
+import { getMissionScore } from './mission-grade';
 
 /**
  * Configuration for smart notification filtering.
@@ -31,9 +32,9 @@ export const DEFAULT_SMART_CRITERIA: SmartNotificationCriteria = {
 };
 
 /**
- * Returns the best available score for a mission.
+ * Canonical mission score — same source as the feed ranking/grade.
  */
-const bestScore = (mission: Mission): number | null => mission.semanticScore ?? mission.score;
+const bestScore = (mission: Mission): number | null => getMissionScore(mission);
 
 /**
  * Filters missions using smart notification criteria.

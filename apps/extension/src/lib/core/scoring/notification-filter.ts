@@ -1,11 +1,14 @@
 import type { Mission } from '../types/mission';
+import { getMissionScore } from './mission-grade';
 
 /**
- * Returns the best available score for a mission.
- * Prefers semantic score (more accurate) over basic score.
+ * Returns the canonical mission score, identical to the one displayed/ranked in
+ * the feed (`scoreBreakdown.total ?? semanticScore ?? score`). Notification
+ * thresholds must apply to the same score the user sees — not to the semantic
+ * component alone.
  * Pure function.
  */
-const bestScore = (mission: Mission): number | null => mission.semanticScore ?? mission.score;
+const bestScore = (mission: Mission): number | null => getMissionScore(mission);
 
 /**
  * Filters missions that should trigger a notification.

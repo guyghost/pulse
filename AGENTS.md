@@ -42,7 +42,7 @@ src/lib/
 ├── core/                              # Fonctions PURES — zéro I/O, zéro async, zéro side effect
 │   ├── types/                         # Types, interfaces, value objects
 │   │   ├── mission.ts                 # Mission, MissionSource, RemoteType
-│   │   ├── connector.ts               # PlatformConnector, ConnectorError, ConnectorStatus
+│   │   ├── connector-status.ts        # ConnectorStatus (état d'un connecteur)
 │   │   └── profile.ts                 # UserProfile
 │   ├── scoring/                       # Scoring et déduplication
 │   │   ├── relevance.ts               # scoreMission(mission, profile) → 0-100
@@ -317,21 +317,30 @@ src/ui/
 
 ## Connecteurs — Pattern d'implémentation
 
-L'interface `PlatformConnector` est définie dans le Core (`src/lib/core/types/connector.ts`). Les implémentations vivent dans le Shell (`src/lib/shell/connectors/`).
+L'interface `PlatformConnector` est définie dans le Shell (`src/lib/shell/connectors/platform-connector.ts`), car elle retourne des I/O typées (`Result`). Les implémentations vivent à côté (`src/lib/shell/connectors/`).
 
 ```typescript
-// src/lib/core/types/connector.ts — Interface pure
+// src/lib/shell/connectors/platform-connector.ts — frontière I/O
+import type { Result, AppError } from '$lib/core/errors';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
+
 export interface PlatformConnector {
   readonly id: string;
   readonly name: string;
   readonly baseUrl: string;
   readonly icon: string;
 
-  detectSession(): Promise<boolean>;
-  fetchMissions(): Promise<Mission[]>;
-  getLastSync(): Promise<Date | null>;
+  detectSession(now: number, signal?: AbortSignal): Promise<Result<boolean, AppError>>;
+  fetchMissions(
+    now: number,
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
+  ): Promise<Result<Mission[], AppError>>;
+  getLastSync(now: number): Promise<Result<Date | null, AppError>>;
 }
 ```
+
+L'erreur typée `ConnectorError` est un variant de `AppError`, défini dans `src/lib/core/errors/app-error.ts`.
 
 Convention pour ajouter un connecteur :
 
@@ -343,7 +352,7 @@ Convention pour ajouter un connecteur :
 
 Le scraping est aujourd'hui piloté directement par les connecteurs shell et l'orchestration du scanner côté service worker. Le parser reste pur dans `core/`, et toute récupération réseau/session reste dans `shell/`.
 
-Quand un connecteur casse (DOM changé), il doit throw une `ConnectorError` typée. Le `ConnectorRunner` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
+Quand un connecteur casse (DOM changé), il doit retourner/lever une `ConnectorError` typée. Le `ConnectorRunner` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
 
 ### Inclure / exclure des connecteurs au build
 

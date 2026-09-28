@@ -578,7 +578,7 @@
 
   // Session triage progress (DAO #212)
   const triageProgress = $derived(
-    computeSessionTriageProgress(page.displayMissions, page.seenIds, page.favorites, page.hidden)
+    computeSessionTriageProgress(page.triageMissions, page.seenIds, page.favorites, page.hidden)
   );
 
   // Focus lens (notification deep-link): banner shows when the feed is filtered

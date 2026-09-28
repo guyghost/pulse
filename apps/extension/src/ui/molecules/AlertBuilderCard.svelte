@@ -6,6 +6,7 @@
   import { summarizeSmartNotificationPreview } from '$lib/core/scoring/smart-notification';
   import { scoreToGrade } from '$lib/core/types/score';
   import { formatTJMValue } from '$lib/core/utils/format';
+  import { createClock } from '$lib/state/clock.svelte';
   import OperationalStatusBadge from '../atoms/OperationalStatusBadge.svelte';
 
   const {
@@ -55,8 +56,9 @@
     hour: '2-digit',
     minute: '2-digit',
   });
+  const clock = createClock();
   const muteUntilTime = $derived(mutedUntil ? Date.parse(mutedUntil) : Number.NaN);
-  const isMuteActive = $derived(Number.isFinite(muteUntilTime) && muteUntilTime > Date.now());
+  const isMuteActive = $derived(Number.isFinite(muteUntilTime) && muteUntilTime > clock.now);
   const alertSummary = $derived(
     !enabled
       ? 'Désactivée'

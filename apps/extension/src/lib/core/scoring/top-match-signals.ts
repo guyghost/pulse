@@ -2,8 +2,15 @@ import type { Mission } from '../types/mission';
 import { formatTJM } from '../utils/format';
 import { getMissionScore } from './mission-grade';
 
+/**
+ * Score bar (inclusive) for the "Top Match" spotlight. Deliberately stricter
+ * than Grade A (80): Top Match is the high-confidence subset of A missions. Do
+ * not conflate it with `GRADE_A_SCORE_THRESHOLD` (types/score.ts).
+ */
+export const TOP_MATCH_SCORE_THRESHOLD = 85;
+
 export interface TopMatchSignals {
-  /** True when mission qualifies as a top match (Grade A, score >= 85). */
+  /** True when mission qualifies as a top match (score >= 85, stricter than Grade A). */
   isTopMatch: boolean;
   /** Canonical numeric score (0-100) or null. */
   score: number | null;
@@ -14,7 +21,7 @@ export interface TopMatchSignals {
 export interface TopMatchSignalsOptions {
   /** Minimum profile floor daily rate for comparing TJM. */
   profileTjmMin?: number | null;
-  /** Score threshold to qualify as top match (defaults to 85 per proposal #210). */
+  /** Score threshold to qualify as top match (defaults to `TOP_MATCH_SCORE_THRESHOLD`). */
   threshold?: number;
 }
 
@@ -26,7 +33,7 @@ export function deriveTopMatchSignals(
   mission: Mission,
   options: TopMatchSignalsOptions = {}
 ): TopMatchSignals {
-  const threshold = options.threshold ?? 85;
+  const threshold = options.threshold ?? TOP_MATCH_SCORE_THRESHOLD;
   const score = getMissionScore(mission);
   const isTopMatch = typeof score === 'number' && score >= threshold;
 

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { OnboardingPreviewInput } from '$lib/core/scoring/onboarding-preview';
 import { previewOnboardingMatch, REFERENCE_MISSION } from '$lib/core/scoring/onboarding-preview';
 import { scoreToGrade } from '$lib/core/types/score';
+import { MISSION_SOURCES } from '$lib/core/types/mission';
 import { scoreMission } from '$lib/core/scoring/relevance';
 
 const neutralInput: OnboardingPreviewInput = {
@@ -84,5 +85,11 @@ describe('previewOnboardingMatch', () => {
     expect(REFERENCE_MISSION.id).toBe('reference-mission');
     expect(REFERENCE_MISSION.tjm).toBe(520);
     expect(previewOnboardingMatch(neutralInput)).toEqual(previewOnboardingMatch(neutralInput));
+  });
+
+  it('exposes a structurally valid reference mission (no cast escape hatch)', () => {
+    expect(REFERENCE_MISSION.scrapedAt).toBeInstanceOf(Date);
+    expect(Number.isNaN(REFERENCE_MISSION.scrapedAt.getTime())).toBe(false);
+    expect(MISSION_SOURCES).toContain(REFERENCE_MISSION.source);
   });
 });

@@ -14,6 +14,7 @@
 import type { Mission } from '../types/mission';
 import { parseIsoDateTimeToEpochMs } from '../utils/iso-time';
 import { getMissionScore } from '../scoring/mission-grade';
+import { GRADE_A_SCORE_THRESHOLD } from '../types/score';
 
 /** Minimum gap between sessions before a briefing is computed (30 min). */
 export const MIN_BRIEFING_INTERVAL_MS = 30 * 60 * 1000;
@@ -21,8 +22,8 @@ export const MIN_BRIEFING_INTERVAL_MS = 30 * 60 * 1000;
 /** A mission published within this window counts as "market velocity" (< 1 h). */
 export const VELOCITY_WINDOW_MS = 60 * 60 * 1000;
 
-/** Numeric score threshold for a mission to count as a Grade A "pépite". */
-export const GRADE_A_SCORE_THRESHOLD = 80;
+/** Grade A "pépite" threshold — single source of truth in `types/score.ts`. */
+export { GRADE_A_SCORE_THRESHOLD };
 
 export interface CatchUpBriefing {
   /** Number of missions that arrived strictly after the last visit. */

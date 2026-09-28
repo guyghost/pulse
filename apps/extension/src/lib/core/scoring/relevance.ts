@@ -234,7 +234,7 @@ const rawLocationScore = (missionLocation: string | null, profileLocation: strin
 /**
  * Raw TJM match percentage (0-100).
  * - Within range: 100
- * - Unknown TJM: ~50
+ * - Unknown TJM: 48 (slightly below neutral)
  * - Outside range: scaled by distance
  */
 const rawTjmScore = (missionTjm: number | null, min: number, max: number): number => {
@@ -267,7 +267,7 @@ const rawTjmScore = (missionTjm: number | null, min: number, max: number): numbe
 /**
  * Raw work mode match percentage (0-100).
  * - Profile accepts any: 100
- * - Unknown work mode: ~50
+ * - Unknown work mode: 47 (slightly below neutral)
  * - Exact match: 100
  * - No match: 0
  */
