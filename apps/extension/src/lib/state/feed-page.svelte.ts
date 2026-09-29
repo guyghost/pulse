@@ -485,25 +485,27 @@ export function createFeedPageState(
 
   const availableStacks = $derived(rankStacksByCount(stackCounts));
 
-  // Shared base filter (enabled connectors + favorites + hidden) reused by both
-  // sourceCountBaseMissions and dashboardScopeMissions so this prefix runs once.
-  // Output-equivalent to the previous inline prefix in both deriveds.
-  const baseFilteredMissions = $derived.by(() => {
-    let result = missions ?? [];
+  // Shared scope pipeline, factored into helpers so the visible list and the
+  // session-triage list are computed over the SAME filters. The triage variant
+  // only differs by keeping hidden missions in scope (`includeHidden`), so an
+  // active search/source/stack filter cannot re-admit unrelated hidden missions
+  // from the full catalogue.
+  function applyBaseFilters(input: Mission[], includeHidden: boolean): Mission[] {
+    let result = input;
     if (controller.enabledConnectorIds.size > 0) {
       result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
     }
     if (showFavoritesOnly) {
       result = filterFavoritesOnly(result, favorites);
     }
-    if (!showHidden) {
+    if (!includeHidden && !showHidden) {
       result = filterHidden(result, hidden);
     }
     return result;
-  });
+  }
 
-  const decisionFilteredMissions = $derived.by(() => {
-    let result = baseFilteredMissions;
+  function applyDecisionFilters(input: Mission[]): Mission[] {
+    let result = input;
 
     if (
       selectedRemote !== null ||
@@ -541,7 +543,38 @@ export function createFeedPageState(
     }
 
     return result;
-  });
+  }
+
+  function applyNewQueueScope(input: Mission[]): Mission[] {
+    if (!newQueueRequested) {
+      return input;
+    }
+    if (stableQueueIds) {
+      return input.filter((mission) => stableQueueIds.has(mission.id));
+    }
+    return input.filter((mission) => !seenSet.has(mission.id));
+  }
+
+  function resolveScopedList(input: Mission[]): Mission[] {
+    // Focus lens (F1, F2): when focused, the feed shows ONLY the missions from
+    // the consumed deep-link intent, regardless of seen/new/source filters.
+    if (focusMode === 'focused' && focusIntent) {
+      const focused = selectFocusMissions(allMissions, focusIntent);
+      if (focused.length > 0) {
+        if (sortBy === 'score') {
+          return rankMissions(focused, new Date());
+        }
+        return sortMissions(focused, sortBy);
+      }
+    }
+
+    const scopedMissions =
+      selectedSource === null ? input : input.filter((m) => m.source === selectedSource);
+    return sortCurrentMissions(scopedMissions);
+  }
+
+  const baseFilteredMissions = $derived(applyBaseFilters(missions ?? [], false));
+  const decisionFilteredMissions = $derived(applyDecisionFilters(baseFilteredMissions));
 
   const newQueueRequested = $derived(showNewOnly || decisionPreset === 'new');
   const stableQueueActive = $derived(arrivalQueueState.queue.value === 'stable-queue');
@@ -569,17 +602,7 @@ export function createFeedPageState(
     return sortCurrentMissions(scoped.filter((mission) => !seenSet.has(mission.id)));
   });
 
-  const sourceCountBaseMissions = $derived.by(() => {
-    if (!newQueueRequested) {
-      return decisionFilteredMissions;
-    }
-
-    if (stableQueueIds) {
-      return decisionFilteredMissions.filter((mission) => stableQueueIds.has(mission.id));
-    }
-
-    return decisionFilteredMissions.filter((mission) => !seenSet.has(mission.id));
-  });
+  const sourceCountBaseMissions = $derived(applyNewQueueScope(decisionFilteredMissions));
 
   const dashboardScopeMissions = $derived.by(() => {
     let result = baseFilteredMissions;
@@ -747,49 +770,19 @@ export function createFeedPageState(
 
   const sourceMissionCounts = $derived(feedAggregates.sourceMissionCounts);
 
-  const displayMissions = $derived.by(() => {
-    // Focus lens (F1, F2): when focused, the feed shows ONLY the missions from
-    // the consumed deep-link intent, regardless of seen/new/source filters.
-    // Focus is an explicit id allow-list applied last, so seen-marking (which
-    // powers the badge) doesn't defeat it. Empty match = no override (F-empty).
-    if (focusMode === 'focused' && focusIntent) {
-      const focused = selectFocusMissions(allMissions, focusIntent);
-      if (focused.length > 0) {
-        // Same pattern as sortCurrentMissions: if/else to avoid the Rollup
-        // warning on __PURE__ annotation in a ternary branch.
-        if (sortBy === 'score') {
-          return rankMissions(focused, new Date());
-        }
-        return sortMissions(focused, sortBy);
-      }
-    }
+  const displayMissions = $derived(resolveScopedList(sourceCountBaseMissions));
 
-    const scopedMissions =
-      selectedSource === null
-        ? sourceCountBaseMissions
-        : sourceCountBaseMissions.filter((m) => m.source === selectedSource);
-
-    // 'score' sort uses the composite ranking (relevance + freshness + source
-    // diversity) instead of a plain single-key sort. Users can switch to 'date'
-    // or 'tjm' for an explicit single-key sort.
-    return sortCurrentMissions(scopedMissions);
-  });
-
-  // Session triage scope (DAO #212): mirrors the displayed list but always
-  // re-includes hidden missions, which the triage contract counts as qualified
-  // (core/feed/session-triage.ts). Passing `displayMissions` alone — which has
-  // already dropped hidden missions — would shrink the denominator instead of
-  // marking them processed, and would make the result depend on `showHidden`.
-  const triageMissions = $derived.by(() => {
-    if (showHidden || Object.keys(hidden).length === 0) {
-      return displayMissions;
-    }
-    const visibleIds = new Set(displayMissions.map((mission) => mission.id));
-    const hiddenInCatalog = allMissions.filter(
-      (mission) => !visibleIds.has(mission.id) && mission.id in hidden
-    );
-    return [...displayMissions, ...hiddenInCatalog];
-  });
+  // Session triage scope (DAO #212): exactly the displayed scope (search,
+  // connector, decision and source filters, focus lens) but with hidden missions
+  // kept in so they count as qualified (core/feed/session-triage.ts) instead of
+  // shrinking the denominator. Hidden missions outside the active filters stay
+  // out, so the gauge never contradicts the visible count.
+  const triageBaseMissions = $derived(applyBaseFilters(missions ?? [], true));
+  const triageDecisionFilteredMissions = $derived(applyDecisionFilters(triageBaseMissions));
+  const triageSourceCountBaseMissions = $derived(
+    applyNewQueueScope(triageDecisionFilteredMissions)
+  );
+  const triageMissions = $derived(resolveScopedList(triageSourceCountBaseMissions));
 
   const feedPresentation = $derived(
     deriveFeedPresentation({
