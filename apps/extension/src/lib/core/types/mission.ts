@@ -2,8 +2,21 @@ import type { SeniorityLevel } from './profile';
 import type { ScoreBreakdown } from './score';
 import type { MissionClassification } from './mission-classification';
 
-export type MissionSource =
-  'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick' | 'malt';
+/**
+ * Canonical runtime list of mission sources — the single source of truth for
+ * the `MissionSource` type, the Zod schema (`MissionSourceSchema`) and parser
+ * validation. Add a source here and every consumer follows.
+ */
+export const MISSION_SOURCES = [
+  'free-work',
+  'lehibou',
+  'hiway',
+  'collective',
+  'cherry-pick',
+  'malt',
+] as const;
+
+export type MissionSource = (typeof MISSION_SOURCES)[number];
 
 export type RemoteType = 'full' | 'hybrid' | 'onsite';
 

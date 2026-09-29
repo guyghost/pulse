@@ -5,7 +5,7 @@
  * transformed missions. The pipeline is designed for testability and extensibility.
  *
  * Pipeline stages:
- *   extract → normalize → dedup → filter → score → enrich(semantic) → classify(jev) → persist
+ *   extract → filter → dedup → score → enrich(semantic) → classify(jev) → track → persist
  *
  * Shell module: orchestrates I/O but delegates pure logic to core.
  */
@@ -228,7 +228,7 @@ export const trackStage: PipelineStage = {
 };
 
 /**
- * Stage 7: Persist — save scored missions to IndexedDB.
+ * Stage 8: Persist — save scored missions to IndexedDB.
  */
 export const persistStage: PipelineStage = {
   name: 'persist',

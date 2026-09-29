@@ -1,5 +1,6 @@
 import type { Mission, RemoteType } from '../types/mission';
 import type { UserProfile } from '../types/profile';
+import { createMission } from '../connectors/parser-utils';
 import { scoreMission } from './relevance';
 import { scoreToGrade, type Grade } from '../types/score';
 
@@ -8,21 +9,25 @@ import { scoreToGrade, type Grade } from '../types/score';
  * Deterministic reference mission — a "typical" market posting the wizard
  * scores against so users see the effect of their criteria immediately.
  */
-export const REFERENCE_MISSION: Mission = {
+// Built through the canonical factory so it is a real `Mission` (typed
+// `scrapedAt: Date`, a valid `MissionSource`, scoring fields defaulted) instead
+// of an `as unknown as Mission` cast. `source` is never displayed in the
+// wizard — it only needs to be a valid enum member.
+export const REFERENCE_MISSION: Mission = createMission({
   id: 'reference-mission',
   title: 'Développeur React/Node — plateforme SaaS',
   client: 'Studio produit',
+  description: '',
   stack: ['React', 'TypeScript', 'Node.js'],
   tjm: 520,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
+  duration: null,
   url: 'https://example.com/reference',
-  source: 'reference',
-  scrapedAt: '2026-01-01T00:00:00.000Z',
-  publishedAt: null,
-  description: '',
-} as unknown as Mission;
+  source: 'free-work',
+  scrapedAt: new Date('2026-01-01T00:00:00.000Z'),
+});
 
 /** Draft criteria as edited in the wizard; all fields optional/neutral. */
 export interface OnboardingPreviewInput {

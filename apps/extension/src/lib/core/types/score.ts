@@ -17,6 +17,16 @@
 export type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
 
 /**
+ * Lower bound (inclusive) of the Grade A range. A "Top Match" is a strictly
+ * higher bar (see `TOP_MATCH_SCORE_THRESHOLD` in top-match-signals.ts) — do not
+ * conflate the two.
+ */
+export const GRADE_A_SCORE_THRESHOLD = 80;
+
+/** Lower bound (inclusive) of the Grade B range. */
+export const GRADE_B_SCORE_THRESHOLD = 60;
+
+/**
  * Breakdown of deterministic (rule-based) scoring by criterion.
  * Each criterion is a match percentage 0-100 (unweighted),
  * directly gradable via scoreToGrade().
@@ -61,10 +71,10 @@ export interface ScoreBreakdown {
  * Pure function — no I/O, no side effects.
  */
 export function scoreToGrade(score: number): Grade {
-  if (score >= 80) {
+  if (score >= GRADE_A_SCORE_THRESHOLD) {
     return 'A';
   }
-  if (score >= 60) {
+  if (score >= GRADE_B_SCORE_THRESHOLD) {
     return 'B';
   }
   if (score >= 40) {

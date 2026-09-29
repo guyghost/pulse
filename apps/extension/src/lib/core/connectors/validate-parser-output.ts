@@ -7,7 +7,10 @@
  * Located in core/ because it's pure (no I/O, no async).
  */
 
-import type { Mission } from '../types/mission';
+import { MISSION_SOURCES, type Mission } from '../types/mission';
+
+/** O(1) membership for the single-source-of-truth source list. */
+const VALID_SOURCES = new Set<string>(MISSION_SOURCES);
 
 export interface ParserValidationResult {
   valid: boolean;
@@ -38,8 +41,7 @@ export const validateMission = (
   }
 
   // Required: source (valid MissionSource)
-  const validSources = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'];
-  if (typeof m.source !== 'string' || !validSources.includes(m.source)) {
+  if (typeof m.source !== 'string' || !VALID_SOURCES.has(m.source)) {
     return { valid: false, reason: `Invalid source: ${m.source}` };
   }
 

@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@pulse/ui';
   import { formatRelativeTime } from '$lib/core/utils/format';
+  import { createClock } from '$lib/state/clock.svelte';
 
   const {
     lastScanAt,
@@ -10,7 +11,8 @@
     missionCount: number;
   } = $props();
 
-  const timeAgo = $derived(formatRelativeTime(lastScanAt, Date.now()));
+  const clock = createClock();
+  const timeAgo = $derived(formatRelativeTime(lastScanAt, clock.now));
 </script>
 
 {#if timeAgo}

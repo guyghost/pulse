@@ -714,6 +714,43 @@ describe('feed page state', () => {
     expect(draft.selectedStacks).toEqual([]);
   });
 
+  it('keeps hidden missions in the session-triage scope so they count as qualified', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'm1', score: 90 }),
+      makeMission({ id: 'm2', score: 70 }),
+      makeMission({ id: 'm3', score: 50 }),
+    ]);
+
+    page.handleHide('m2');
+
+    // The hidden mission leaves the visible list…
+    expect(page.displayMissions.map((m) => m.id)).not.toContain('m2');
+    // …but stays in the triage scope, which counts it as processed instead of
+    // silently shrinking the denominator.
+    expect(page.triageMissions.map((m) => m.id).sort()).toEqual(['m1', 'm2', 'm3']);
+  });
+
+  it('keeps hidden missions out of the triage scope when they do not match the active filter', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'react-1', score: 90, stack: ['React'] }),
+      makeMission({ id: 'vue-hidden', score: 70, stack: ['Vue'] }),
+      makeMission({ id: 'react-2', score: 60, stack: ['React'] }),
+    ]);
+
+    page.toggleStack('React');
+    page.handleHide('vue-hidden');
+
+    // The active stack filter drops vue-hidden from both the visible list and
+    // the triage scope — an unfiltered re-admission would inflate the
+    // denominator with a mission the user cannot see.
+    expect(page.displayMissions.map((m) => m.id).sort()).toEqual(['react-1', 'react-2']);
+    expect(page.triageMissions.map((m) => m.id).sort()).toEqual(['react-1', 'react-2']);
+  });
+
   it('counts only explicit full or hybrid remote as remote-compatible insight', () => {
     expect(isRemoteCompatibleInsight(makeMission({ remote: 'full' }))).toBe(true);
     expect(isRemoteCompatibleInsight(makeMission({ remote: 'hybrid' }))).toBe(true);

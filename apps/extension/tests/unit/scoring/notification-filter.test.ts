@@ -159,6 +159,35 @@ describe('filterNotifiableMissions', () => {
     expect(result.map((m) => m.title)).toEqual(['Semantic winner', 'Basic only']);
   });
 
+  it('uses the canonical fused score (scoreBreakdown.total) over the semantic component', () => {
+    const missions = [
+      makeMission({
+        id: 'fused-low',
+        score: 95,
+        semanticScore: 95,
+        scoreBreakdown: {
+          criteria: {
+            stack: 0,
+            location: 0,
+            tjm: 0,
+            remote: 0,
+            seniorityBonus: 0,
+            startDateBonus: 0,
+          },
+          deterministic: 10,
+          semantic: 95,
+          semanticReason: null,
+          total: 40,
+          grade: 'C',
+        },
+      }),
+    ];
+
+    // Canonical total is 40 → below a 50 threshold, even though the semantic
+    // component (95) alone would pass it.
+    expect(filterNotifiableMissions(missions, [], 50)).toEqual([]);
+  });
+
   it('maintains order when scores are equal', () => {
     const missions = [
       makeMission({ id: '1', score: 75, title: 'First' }),

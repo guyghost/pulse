@@ -3,19 +3,13 @@
  * Core = fonctions pures, pas d'I/O
  */
 import { z } from 'zod';
+import { MISSION_SOURCES } from './mission';
 
 // ============================================
 // Enums
 // ============================================
 
-export const MissionSourceSchema = z.enum([
-  'free-work',
-  'lehibou',
-  'hiway',
-  'collective',
-  'cherry-pick',
-  'malt',
-]);
+export const MissionSourceSchema = z.enum(MISSION_SOURCES);
 
 export const RemoteTypeSchema = z.enum(['full', 'hybrid', 'onsite']);
 

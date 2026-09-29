@@ -56,6 +56,7 @@ import {
 import { journalFirstViews } from '$lib/shell/storage/review-journal';
 import { rankStacksByCount } from '$lib/core/filters/stack-ranking';
 import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
+import { GRADE_A_SCORE_THRESHOLD, GRADE_B_SCORE_THRESHOLD } from '$lib/core/types/score';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
 import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
@@ -152,19 +153,24 @@ function getMissionScore(mission: Mission): number {
 }
 
 function getScoreBucket(score: number): ScoreBucket {
-  if (score >= 80) {
+  if (score >= GRADE_A_SCORE_THRESHOLD) {
     return 'strong';
   }
-  if (score >= 60) {
+  if (score >= GRADE_B_SCORE_THRESHOLD) {
     return 'good';
   }
   return 'weak';
 }
 
 const SCORE_BUCKETS: Array<Omit<ScoreBucketSummary, 'count'>> = [
-  { bucket: 'strong', label: 'Prioritaires', min: 80, max: null },
-  { bucket: 'good', label: 'À comparer', min: 60, max: 79 },
-  { bucket: 'weak', label: 'À qualifier', min: 0, max: 59 },
+  { bucket: 'strong', label: 'Prioritaires', min: GRADE_A_SCORE_THRESHOLD, max: null },
+  {
+    bucket: 'good',
+    label: 'À comparer',
+    min: GRADE_B_SCORE_THRESHOLD,
+    max: GRADE_A_SCORE_THRESHOLD - 1,
+  },
+  { bucket: 'weak', label: 'À qualifier', min: 0, max: GRADE_B_SCORE_THRESHOLD - 1 },
 ];
 
 const MAX_SAVED_VIEWS = 12;
@@ -202,7 +208,7 @@ function matchesDecisionPreset(
   profileTjmMin: number | null
 ): boolean {
   if (preset === 'priority') {
-    return getMissionScore(mission) >= 80;
+    return getMissionScore(mission) >= GRADE_A_SCORE_THRESHOLD;
   }
   if (preset === 'remote-compatible') {
     return isRemoteCompatibleInsight(mission);
@@ -479,25 +485,27 @@ export function createFeedPageState(
 
   const availableStacks = $derived(rankStacksByCount(stackCounts));
 
-  // Shared base filter (enabled connectors + favorites + hidden) reused by both
-  // sourceCountBaseMissions and dashboardScopeMissions so this prefix runs once.
-  // Output-equivalent to the previous inline prefix in both deriveds.
-  const baseFilteredMissions = $derived.by(() => {
-    let result = missions ?? [];
+  // Shared scope pipeline, factored into helpers so the visible list and the
+  // session-triage list are computed over the SAME filters. The triage variant
+  // only differs by keeping hidden missions in scope (`includeHidden`), so an
+  // active search/source/stack filter cannot re-admit unrelated hidden missions
+  // from the full catalogue.
+  function applyBaseFilters(input: Mission[], includeHidden: boolean): Mission[] {
+    let result = input;
     if (controller.enabledConnectorIds.size > 0) {
       result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
     }
     if (showFavoritesOnly) {
       result = filterFavoritesOnly(result, favorites);
     }
-    if (!showHidden) {
+    if (!includeHidden && !showHidden) {
       result = filterHidden(result, hidden);
     }
     return result;
-  });
+  }
 
-  const decisionFilteredMissions = $derived.by(() => {
-    let result = baseFilteredMissions;
+  function applyDecisionFilters(input: Mission[]): Mission[] {
+    let result = input;
 
     if (
       selectedRemote !== null ||
@@ -535,7 +543,38 @@ export function createFeedPageState(
     }
 
     return result;
-  });
+  }
+
+  function applyNewQueueScope(input: Mission[]): Mission[] {
+    if (!newQueueRequested) {
+      return input;
+    }
+    if (stableQueueIds) {
+      return input.filter((mission) => stableQueueIds.has(mission.id));
+    }
+    return input.filter((mission) => !seenSet.has(mission.id));
+  }
+
+  function resolveScopedList(input: Mission[]): Mission[] {
+    // Focus lens (F1, F2): when focused, the feed shows ONLY the missions from
+    // the consumed deep-link intent, regardless of seen/new/source filters.
+    if (focusMode === 'focused' && focusIntent) {
+      const focused = selectFocusMissions(allMissions, focusIntent);
+      if (focused.length > 0) {
+        if (sortBy === 'score') {
+          return rankMissions(focused, new Date());
+        }
+        return sortMissions(focused, sortBy);
+      }
+    }
+
+    const scopedMissions =
+      selectedSource === null ? input : input.filter((m) => m.source === selectedSource);
+    return sortCurrentMissions(scopedMissions);
+  }
+
+  const baseFilteredMissions = $derived(applyBaseFilters(missions ?? [], false));
+  const decisionFilteredMissions = $derived(applyDecisionFilters(baseFilteredMissions));
 
   const newQueueRequested = $derived(showNewOnly || decisionPreset === 'new');
   const stableQueueActive = $derived(arrivalQueueState.queue.value === 'stable-queue');
@@ -563,17 +602,7 @@ export function createFeedPageState(
     return sortCurrentMissions(scoped.filter((mission) => !seenSet.has(mission.id)));
   });
 
-  const sourceCountBaseMissions = $derived.by(() => {
-    if (!newQueueRequested) {
-      return decisionFilteredMissions;
-    }
-
-    if (stableQueueIds) {
-      return decisionFilteredMissions.filter((mission) => stableQueueIds.has(mission.id));
-    }
-
-    return decisionFilteredMissions.filter((mission) => !seenSet.has(mission.id));
-  });
+  const sourceCountBaseMissions = $derived(applyNewQueueScope(decisionFilteredMissions));
 
   const dashboardScopeMissions = $derived.by(() => {
     let result = baseFilteredMissions;
@@ -634,7 +663,7 @@ export function createFeedPageState(
       const bucket = getScoreBucket(score);
       counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
 
-      if (score >= 80) {
+      if (score >= GRADE_A_SCORE_THRESHOLD) {
         priorityPresetCount += 1;
       }
       if (!seenSet.has(mission.id)) {
@@ -665,7 +694,7 @@ export function createFeedPageState(
     // actually visible (respects score bucket, decision preset, new-only and
     // source filters). displayMissions is the same set visibleCount derives from.
     for (const mission of displayMissions) {
-      if (getMissionScore(mission) >= 80) {
+      if (getMissionScore(mission) >= GRADE_A_SCORE_THRESHOLD) {
         highScoreCount += 1;
       }
       if (!seenSet.has(mission.id)) {
@@ -741,33 +770,19 @@ export function createFeedPageState(
 
   const sourceMissionCounts = $derived(feedAggregates.sourceMissionCounts);
 
-  const displayMissions = $derived.by(() => {
-    // Focus lens (F1, F2): when focused, the feed shows ONLY the missions from
-    // the consumed deep-link intent, regardless of seen/new/source filters.
-    // Focus is an explicit id allow-list applied last, so seen-marking (which
-    // powers the badge) doesn't defeat it. Empty match = no override (F-empty).
-    if (focusMode === 'focused' && focusIntent) {
-      const focused = selectFocusMissions(allMissions, focusIntent);
-      if (focused.length > 0) {
-        // Same pattern as sortCurrentMissions: if/else to avoid the Rollup
-        // warning on __PURE__ annotation in a ternary branch.
-        if (sortBy === 'score') {
-          return rankMissions(focused, new Date());
-        }
-        return sortMissions(focused, sortBy);
-      }
-    }
+  const displayMissions = $derived(resolveScopedList(sourceCountBaseMissions));
 
-    const scopedMissions =
-      selectedSource === null
-        ? sourceCountBaseMissions
-        : sourceCountBaseMissions.filter((m) => m.source === selectedSource);
-
-    // 'score' sort uses the composite ranking (relevance + freshness + source
-    // diversity) instead of a plain single-key sort. Users can switch to 'date'
-    // or 'tjm' for an explicit single-key sort.
-    return sortCurrentMissions(scopedMissions);
-  });
+  // Session triage scope (DAO #212): exactly the displayed scope (search,
+  // connector, decision and source filters, focus lens) but with hidden missions
+  // kept in so they count as qualified (core/feed/session-triage.ts) instead of
+  // shrinking the denominator. Hidden missions outside the active filters stay
+  // out, so the gauge never contradicts the visible count.
+  const triageBaseMissions = $derived(applyBaseFilters(missions ?? [], true));
+  const triageDecisionFilteredMissions = $derived(applyDecisionFilters(triageBaseMissions));
+  const triageSourceCountBaseMissions = $derived(
+    applyNewQueueScope(triageDecisionFilteredMissions)
+  );
+  const triageMissions = $derived(resolveScopedList(triageSourceCountBaseMissions));
 
   const feedPresentation = $derived(
     deriveFeedPresentation({
@@ -1804,6 +1819,9 @@ export function createFeedPageState(
     },
     get displayMissions() {
       return displayMissions;
+    },
+    get triageMissions() {
+      return triageMissions;
     },
     get stableQueueActive() {
       return stableQueueActive;
