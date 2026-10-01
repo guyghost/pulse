@@ -25,6 +25,7 @@
     summarizeApplicationPipeline,
     isDueFollowUp,
     isTerminalStatus,
+    isTrackedDossier,
   } from '$lib/core/tracking/pipeline-summary';
   import { buildKanbanBoard, getTrackingLastActivity } from '$lib/core/tracking/kanban-projection';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
@@ -113,15 +114,14 @@
         record: tracking.getTrackingForMission(mission.id) ?? null,
       }))
       .filter(
-        (item): item is TrackedMission =>
-          item.record !== null && item.record.currentStatus !== 'detected'
+        (item): item is TrackedMission => item.record !== null && isTrackedDossier(item.record)
       )
       .sort((a, b) => getLastActivity(b.record) - getLastActivity(a.record));
   });
 
   const overviewActivities = $derived.by<ActivityOverviewItem[]>(() => {
     const trackingActivities = [...tracking.trackings.values()]
-      .filter((record) => record.currentStatus !== 'detected')
+      .filter(isTrackedDossier)
       .map((record) => ({
         mission: missions.find((mission) => mission.id === record.missionId) ?? null,
         missionId: record.missionId,
@@ -905,7 +905,7 @@
             <div>
               <h3 class="text-body-lg font-medium text-text-primary">Candidatures</h3>
               <p class="mt-0.5 text-meta text-text-subtle">
-                {kanbanActiveCount} dossiers actifs, de la sélection à l’offre.
+                {kanbanActiveCount} dossiers actifs, de la relance planifiée à l’offre.
               </p>
             </div>
           </div>

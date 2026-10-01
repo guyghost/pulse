@@ -46,6 +46,30 @@ describe('buildKanbanBoard', () => {
     ]);
   });
 
+  it('adds a detected column only for explicitly scheduled dossiers', () => {
+    const scheduled = {
+      ...makeTracking('scheduled', 'detected'),
+      nextActionAt: '2020-01-01T09:00:00Z',
+    };
+    const board = buildKanbanBoard(
+      [makeMission('scheduled')],
+      [
+        scheduled,
+        makeTracking('untracked', 'detected'),
+        { ...makeTracking('terminal', 'accepted'), nextActionAt: scheduled.nextActionAt },
+      ]
+    );
+    expect(board[0].status).toBe('detected');
+    expect(board[0].cards.map((card) => card.missionId)).toEqual(['scheduled']);
+    expect(board.reduce((total, column) => total + column.cards.length, 0)).toBe(1);
+    expect(
+      buildKanbanBoard([], [{ ...scheduled, nextActionAt: null }]).some(
+        (column) => column.status === 'detected'
+      )
+    ).toBe(false);
+    expect(scheduled.currentStatus).toBe('detected');
+  });
+
   it('places each tracked record in the column matching its currentStatus', () => {
     const missions = [makeMission('m1'), makeMission('m2')];
     const columns = buildKanbanBoard(missions, [

@@ -33,6 +33,37 @@ const draft = (overrides: Partial<CandidateExperienceDraft> = {}): CandidateExpe
 });
 
 describe('controlled experience import', () => {
+  it('groups duplicate incoming identities into the exact final proposed facts', () => {
+    const incoming = [
+      draft({ description: 'First description', skills: ['TypeScript'] }),
+      draft({
+        title: ' developer ',
+        company: ' A ',
+        startDate: '2023-1-01',
+        sourceExternalId: 'linkedin-experience-1',
+        description: 'Second description',
+        skills: ['React'],
+      }),
+    ];
+    const rows = previewExperienceImport([], incoming);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe('new');
+    expect(rows[0].proposed.description).toBe('Second description');
+    expect(rows[0].proposed.skills).toEqual(['TypeScript', 'React']);
+    expect(
+      mergeExperiences(
+        [],
+        rows.map((row) => row.draft),
+        0
+      )
+    ).toEqual(mergeExperiences([], incoming, 0));
+    const manual = { ...exp, source: 'manual' as const };
+    const manualRows = previewExperienceImport([manual], incoming);
+    expect(manualRows).toHaveLength(1);
+    expect(manualRows[0].status).toBe('identical');
+    expect(manualRows[0].proposed).toEqual(manual);
+  });
+
   it('previews the actual approved end-date update without mutating current facts', () => {
     const incoming = draft({
       isCurrent: false,

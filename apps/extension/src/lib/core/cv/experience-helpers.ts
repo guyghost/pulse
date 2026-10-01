@@ -215,25 +215,43 @@ export interface ExperienceImportPreview {
   status: 'new' | 'modified' | 'identical';
 }
 
-/** Preview exactly the values the persistence merge will produce. */
+/** Group incoming identities and preview exactly their final persistence merge. */
 export function previewExperienceImport(
   current: readonly Experience[],
   incoming: readonly CandidateExperienceDraft[]
 ): ExperienceImportPreview[] {
-  return incoming.map((draft) => {
-    const existing = current.find((exp) => matchesExperience(exp, draft)) ?? null;
-    const proposed = mergeExperiences(existing ? [existing] : [], [draft], 0)[0];
+  let merged = [...current];
+  const importedIds: string[] = [];
+  for (const draft of incoming) {
+    const existing = merged.find((exp) => matchesExperience(exp, draft));
+    const next = mergeExperiences(merged, [draft], 0);
+    const target = existing ?? next.find((exp) => !merged.some((item) => item.id === exp.id));
+    if (target && !importedIds.includes(target.id)) {
+      importedIds.push(target.id);
+    }
+    merged = next;
+  }
+  return importedIds.flatMap((id) => {
+    const proposed = merged.find((exp) => exp.id === id);
+    if (!proposed) {
+      return [];
+    }
+    const existing = current.find((exp) => exp.id === id) ?? null;
+    // A selected row carries the grouped facts, never the original duplicate rows.
+    const { id: _id, updatedAt: _updatedAt, ...draft } = proposed;
     const comparable = (exp: Experience) => ({ ...exp, positionIndex: 0, updatedAt: 0 });
-    return {
-      draft,
-      current: existing,
-      proposed,
-      status: !existing
-        ? 'new'
-        : JSON.stringify(comparable(existing)) === JSON.stringify(comparable(proposed))
-          ? 'identical'
-          : 'modified',
-    };
+    return [
+      {
+        draft,
+        current: existing,
+        proposed,
+        status: !existing
+          ? ('new' as const)
+          : JSON.stringify(comparable(existing)) === JSON.stringify(comparable(proposed))
+            ? ('identical' as const)
+            : ('modified' as const),
+      },
+    ];
   });
 }
 

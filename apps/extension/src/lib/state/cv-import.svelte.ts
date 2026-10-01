@@ -56,7 +56,12 @@ export function createCvImportStore(onSaved: (experiences: Experience[]) => void
           status = 'Aucune expérience renseignée sur votre profil LinkedIn.';
           return;
         }
-        draft = extracted.profile;
+        draft = {
+          ...extracted.profile,
+          experiences: previewExperienceImport(current, extracted.profile.experiences).map(
+            (row) => row.draft
+          ),
+        };
         selected = previewExperienceImport(current, draft.experiences).flatMap((row, index) =>
           row.status === 'identical' ? [] : [index]
         );

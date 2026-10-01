@@ -99,3 +99,72 @@ sur « Staging changes from tasks », comme sur les lots précédents. Le backup
 hors index, aucun fichier du contrôleur inclus, uniquement les 23 fichiers du lot
 (rapport compris). Reprise du commit avec `SKIP_SIMPLE_GIT_HOOKS=1` après ces
 vérifications ; aucune restauration ni suppression de backup.
+
+## Correction après relecture — passe 1/5
+
+Base : `0a3bd20e9932d8a695d1ede01fbdc7419b0f4333`. Relecture traitée :
+`task-3-review.md`, constats Important et Minor. Aucun autre périmètre rouvert,
+aucun sous-agent, aucun fichier du contrôleur modifié.
+
+### Relance explicite d’une mission détectée
+
+Le statut `detected` est conservé lors de la planification. Les nouveaux prédicats
+purs `isTrackedDossier` et `isActiveDossier` reconnaissent un dossier détecté dès
+qu’une échéance valide a été explicitement enregistrée. La liste des missions
+suivies, les recommandations, le journal, le compteur de relances et les compteurs
+du pipeline utilisent cette règle. Une étape/colonne « Détectée » apparaît dans
+le pipeline et le kanban seulement si de tels dossiers existent. Aucune sélection
+ni candidature envoyée n’est déduite de cette échéance.
+
+Une échéance passée apparaît immédiatement dans « À relancer » ; une échéance
+future reste un dossier suivi sans être annoncée échue. Après effacement, la
+mission détectée sort des dossiers suivis. Les états `accepted`, `rejected` et
+`archived` restent exclus des relances et du kanban actif, même avec une ancienne
+date. Les résultats terminaux gardent leurs compteurs de résultat existants.
+
+### Prévisualisation unique des identités LinkedIn dupliquées
+
+`previewExperienceImport` suit maintenant les identités canoniques pendant la
+vraie fusion séquentielle, puis expose une ligne par identité avec son résultat
+final : dernière description non vide et compétences combinées. Le module d’état
+normalise le brouillon sur ces lignes **avant** l’initialisation de la sélection ;
+la confirmation transmet une expérience agrégée par case cochée. Le compteur de
+succès correspond donc aux expériences validées, et non aux lignes brutes de
+l’extraction. Les expériences manuelles correspondantes restent intégralement
+conservées et classées identiques.
+
+### Preuves de la correction
+
+Commandes, préfixées par le PATH Node/pnpm documenté plus haut :
+
+```sh
+pnpm --filter @pulse/extension exec vitest run --maxWorkers=2 tests/unit/cv tests/unit/tracking tests/unit/ui/ApplicationsPage.test.ts
+pnpm --filter @pulse/extension exec playwright test --config playwright.ux-check.config.ts --workers=1 tests/e2e/linkedin-import.test.ts tests/e2e/cv-export-followup.test.ts
+pnpm --filter @pulse/extension exec eslint src/lib/core/tracking/pipeline-summary.ts src/lib/core/tracking/kanban-projection.ts src/ui/pages/ApplicationsPage.svelte src/lib/core/cv/experience-helpers.ts src/lib/state/cv-import.svelte.ts tests/unit/tracking/pipeline-summary.test.ts tests/unit/tracking/kanban-projection.test.ts tests/unit/cv/controlled-import-export.test.ts tests/unit/cv/import-selection.test.ts tests/e2e/cv-export-followup.test.ts
+pnpm --filter @pulse/extension typecheck
+```
+
+- **233/233 tests unitaires, 14 fichiers, 0 skip**, en 17,20 s. Cas ajoutés :
+  échéances détectées passées/futures/invalides, compteurs et colonne cohérents,
+  suppression de l’échéance, absence de transition implicite, fusion des doublons
+  en un aperçu exact, compétences combinées, conservation manuelle, sélection et
+  transmission uniques, compteur de succès égal à un.
+- **10/10 E2E**, en 34,40 s. Le nouveau scénario démarre sans suivi, enregistre une
+  relance passée et vérifie son affichage immédiat, lit le suivi réellement
+  persisté par le stub (`currentStatus=detected`, historique uniquement détecté),
+  vérifie la colonne dédiée, décale l’échéance dans le futur puis l’efface. Les
+  neuf scénarios précédents restent verts.
+- **Lint ciblé : code 0, aucun avertissement ni erreur.**
+- **Typecheck extension : code 0.**
+- Auto-relecture : aucune nouvelle transition, I/O core ou modification de
+  stockage ; les règles d’identité positionnelle/manuelle et les statuts terminaux
+  sont préservés. Les limites de validation live LinkedIn/MV3/PDF restent celles
+  du rapport initial. Le build initial réussi n’a pas été relancé pour cette
+  correction ciblée, qui est vérifiée par compilation TypeScript et les montages
+  Svelte des tests.
+
+Commit de correction : `fix(cv): align reminder visibility and grouped import previews`.
+Le hook standard a de nouveau réussi ESLint/Prettier, puis échoué au restaging.
+Après vérification des 11 chemins indexés et de l’absence de différences hors
+index, reprise avec `SKIP_SIMPLE_GIT_HOOKS=1`. Backup
+`1d052441beeddc411e34f55b09361d274c376254` conservé intact ; aucun push.

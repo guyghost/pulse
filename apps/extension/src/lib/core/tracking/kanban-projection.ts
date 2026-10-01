@@ -1,11 +1,12 @@
 import type { Mission } from '../types/mission';
 import type { ApplicationStatus, MissionTracking } from '../types/tracking';
 import { STATUS_LABELS } from '../types/tracking';
+import { isActiveDossier } from './pipeline-summary';
 
 /**
  * Kanban board projection (models/application-kanban.model.md).
  * Read-only view over tracked missions; column membership is derived from
- * `currentStatus` only — this module never decides a transition.
+ * `currentStatus` and explicit scheduling — this module never decides a transition.
  */
 export interface KanbanCard {
   missionId: string;
@@ -45,9 +46,10 @@ export function getTrackingLastActivity(record: MissionTracking | null): number 
 }
 
 /**
- * Project tracked missions into the five active pipeline columns.
+ * Project tracked missions into active pipeline columns. Explicitly scheduled
+ * detected dossiers get their own column, without implying selection or sending.
  *
- * Pure: terminal (accepted/rejected/archived) and undetected records are
+ * Pure: terminal (accepted/rejected/archived) and unscheduled detected records are
  * excluded, cards are ordered by descending last activity, and the sum of
  * all cards equals the number of active tracked dossiers.
  */
@@ -59,7 +61,7 @@ export function buildKanbanBoard(
 
   const cards: KanbanCard[] = [];
   for (const record of trackings) {
-    if (!KANBAN_STATUSES.includes(record.currentStatus)) {
+    if (!isActiveDossier(record)) {
       continue;
     }
     const mission = missionsById.get(record.missionId);
@@ -75,7 +77,10 @@ export function buildKanbanBoard(
 
   cards.sort((left, right) => right.lastActivityAt - left.lastActivityAt);
 
-  return KANBAN_STATUSES.map((status) => ({
+  const statuses: ApplicationStatus[] = cards.some((card) => card.status === 'detected')
+    ? ['detected', ...KANBAN_STATUSES]
+    : KANBAN_STATUSES;
+  return statuses.map((status) => ({
     status,
     label: STATUS_LABELS[status],
     cards: cards.filter((card) => card.status === status),
