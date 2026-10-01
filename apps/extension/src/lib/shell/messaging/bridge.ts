@@ -14,7 +14,7 @@ import type { CanonicalCandidateProfileDraft } from '../../core/profile-extracto
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AppError } from '../../core/errors/app-error';
-import type { TJMAnalysis, TJMPeriod, TJMRegion } from '../../core/types/tjm';
+import type { TJMSampleAnalysis, TJMFilters } from '../../core/types/tjm';
 import type { SavedFeedView } from '../../core/types/feed-view';
 import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
@@ -128,9 +128,9 @@ export type BridgeMessage =
   | { type: 'ALERT_HISTORY_RESULT'; payload: AlertHistoryEntry[] }
   | {
       type: 'GET_TJM_ANALYSIS';
-      payload?: { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod };
+      payload?: TJMFilters;
     }
-  | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMAnalysis | null } }
+  | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMSampleAnalysis | null } }
   | { type: 'GET_SEEN_MISSIONS' }
   | { type: 'SEEN_MISSIONS_RESULT'; payload: string[] }
   | { type: 'SAVE_SEEN_MISSIONS'; payload: string[] }

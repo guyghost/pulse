@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import { TJMFiltersSchema, TJMSampleAnalysisSchema } from '../storage/tjm-schemas';
 import type { MissionTracking } from '../../core/types/tracking';
 import {
   TASK5_APPLICATION_TRACKING_ERROR_CODES,
@@ -221,81 +222,6 @@ const AlertHistorySchema = z
   .array(AlertHistoryEntrySchema)
   .max(20)
   .refine(maxBytes(30_000), { message: 'Alert history payload exceeds 30KB limit' });
-
-const TJMRegionSchema = z.enum([
-  'ile-de-france',
-  'lyon',
-  'marseille',
-  'toulouse',
-  'bordeaux',
-  'nantes',
-  'lille',
-  'strasbourg',
-  'rennes',
-  'grenoble',
-  'montpellier',
-  'nice',
-  'remote',
-  'other',
-]);
-
-const TJMTrendSchema = z.enum(['up', 'stable', 'down']);
-
-const TJMRangeSchema = z
-  .object({
-    min: z.number(),
-    max: z.number(),
-    median: z.number(),
-  })
-  .strict();
-
-const TJMAnalysisSchema = z
-  .object({
-    trend: TJMTrendSchema,
-    confidence: z.number().min(0).max(1),
-    dataPoints: z.number().int().min(0),
-    junior: TJMRangeSchema,
-    confirmed: TJMRangeSchema,
-    senior: TJMRangeSchema,
-    trendDetail: z.string().nullable(),
-    recommendation: z.string().nullable(),
-    lastUpdated: z.string().nullable(),
-    topStacks: z.array(
-      z
-        .object({
-          stack: z.string().min(1).max(120),
-          average: z.number(),
-          trend: TJMTrendSchema,
-          sampleCount: z.number().int().min(0),
-          lastUpdated: z.string().nullable(),
-        })
-        .strict()
-    ),
-    regionInsights: z.array(
-      z
-        .object({
-          region: TJMRegionSchema,
-          label: z.string().min(1).max(120),
-          average: z.number(),
-          min: z.number(),
-          max: z.number(),
-          sampleCount: z.number().int().min(0),
-          trend: TJMTrendSchema,
-        })
-        .strict()
-    ),
-  })
-  .strict();
-
-const TJMPeriodSchema = z.enum(['7d', '30d', 'all']);
-
-const TJMAnalysisRequestSchema = z
-  .object({
-    profileStacks: z.array(z.string().min(1).max(120)).max(50).optional(),
-    region: TJMRegionSchema.optional(),
-    period: TJMPeriodSchema.optional(),
-  })
-  .strict();
 
 const PersistedConnectorStatusSchema = z
   .object({
@@ -871,11 +797,11 @@ export const MessageSchemas = {
   }),
   GET_TJM_ANALYSIS: z.object({
     type: z.literal('GET_TJM_ANALYSIS'),
-    payload: TJMAnalysisRequestSchema.optional(),
+    payload: TJMFiltersSchema.optional(),
   }),
   TJM_ANALYSIS_RESULT: z.object({
     type: z.literal('TJM_ANALYSIS_RESULT'),
-    payload: z.object({ analysis: TJMAnalysisSchema.nullable() }).strict(),
+    payload: z.object({ analysis: TJMSampleAnalysisSchema.nullable() }).strict(),
   }),
   GET_SEEN_MISSIONS: z.object({ type: z.literal('GET_SEEN_MISSIONS') }),
   SEEN_MISSIONS_RESULT: z.object({

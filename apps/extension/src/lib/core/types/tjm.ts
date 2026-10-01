@@ -3,6 +3,8 @@
  * Pure types — no I/O, no async, no side effects.
  */
 import type { SeniorityLevel } from './profile';
+import type { MissionCategory } from './mission-classification';
+import type { MissionSource, RemoteType } from './mission';
 
 /** Direction of TJM trend for a given technology stack */
 export type TJMTrend = 'up' | 'stable' | 'down';
@@ -122,4 +124,46 @@ export interface TJMSeriesPoint {
 /** History of TJM records, indexed by stack */
 export interface TJMHistory {
   records: TJMRecord[];
+  /** Identifiable snapshots; absent in legacy storage. */
+  observations?: TJMObservation[];
+}
+
+/** A real announcement snapshot, never reconstructed from aggregate records. */
+export interface TJMObservation {
+  identity: string;
+  observedAt: string;
+  source: MissionSource;
+  stacks: string[];
+  tjm: number | null;
+  category: MissionCategory | null;
+  seniority: SeniorityLevel | null;
+  remote: RemoteType | null;
+  region: TJMRegion | null;
+}
+
+export interface TJMFilters {
+  profileStacks?: string[];
+  region?: TJMRegion | 'unknown';
+  period?: TJMPeriod;
+  category?: MissionCategory | 'unknown';
+  seniority?: SeniorityLevel | 'unknown';
+  remote?: RemoteType | 'unknown';
+}
+
+export interface TJMPopulation {
+  total: number;
+  priced: number;
+  withoutTjm: number;
+  range: TJMRange | null;
+}
+
+/** Unique announcements in the selected local sample, distinct from legacy trends. */
+export interface TJMSampleAnalysis extends TJMPopulation {
+  lastUpdated: string | null;
+  firstObservedAt: string | null;
+  unknown: { category: number; seniority: number; remote: number; region: number };
+  sources: { source: MissionSource; count: number }[];
+  levels: { seniority: SeniorityLevel | 'unknown'; population: TJMPopulation }[];
+  /** Unsegmented legacy aggregates, displayed separately and never used for medians. */
+  legacy: { recordCount: number; series: TJMSeriesPoint[] };
 }

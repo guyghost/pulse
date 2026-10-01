@@ -19,8 +19,11 @@ import type {
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
-import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '../lib/core/tjm-history';
-import type { TJMHistory, TJMPeriod, TJMRegion } from '../lib/core/types/tjm';
+import {
+  addObservations,
+  extractObservations,
+  analyzeTJMObservations,
+} from '../lib/core/tjm-history/observations';
 import {
   getFeedSavedViews,
   getFeedSortBy,
@@ -184,42 +187,6 @@ function trackingFailureMessage(
     type: 'TRACKING_FAILED',
     payload: createSerializedApplicationTrackingError(intent, missionId, code),
   };
-}
-
-function buildTJMAnalysis(
-  history: TJMHistory,
-  profileStacks: string[] | undefined,
-  region: TJMRegion | undefined,
-  period: TJMPeriod | undefined,
-  now: Date
-) {
-  const hasStackFilter = profileStacks !== undefined && profileStacks.length > 0;
-  const hasRegionFilter = region !== undefined;
-  const normalizedStacks = hasStackFilter
-    ? new Set(profileStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean))
-    : null;
-
-  const filteredByStackAndRegion =
-    !hasStackFilter && !hasRegionFilter
-      ? history
-      : {
-          records: history.records.filter((record) => {
-            if (normalizedStacks && !normalizedStacks.has(record.stack)) {
-              return false;
-            }
-            if (hasRegionFilter && record.region !== region) {
-              return false;
-            }
-            return true;
-          }),
-        };
-
-  // Period windowing is applied last so dataPoints reflects the window
-  // (see models/tjm-analysis-period.model.md).
-  return analyzeTJMHistory(
-    filterTJMHistoryByPeriod(filteredByStackAndRegion, period ?? 'all', now),
-    now
-  );
 }
 
 function getBridgeErrorCode(error: import('../lib/core/errors/app-error').AppError): string {
@@ -1583,16 +1550,14 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'GET_TJM_ANALYSIS') {
-      loadTJMHistory()
-        .then((history) => {
+      Promise.all([loadTJMHistory(), getMissions()])
+        .then(([history, missions]) => {
           sendResponse({
             type: 'TJM_ANALYSIS_RESULT',
             payload: {
-              analysis: buildTJMAnalysis(
-                history,
-                message.payload?.profileStacks,
-                message.payload?.region,
-                message.payload?.period,
+              analysis: analyzeTJMObservations(
+                addObservations(history, extractObservations(missions)),
+                message.payload ?? {},
                 new Date()
               ),
             },

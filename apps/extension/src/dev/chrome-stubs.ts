@@ -1,6 +1,11 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
-import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '$lib/core/tjm-history';
-import type { TJMHistory, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
+import { parseTJMHistory } from '$lib/shell/storage/tjm-schemas';
+import {
+  addObservations,
+  extractObservations,
+  analyzeTJMObservations,
+} from '$lib/core/tjm-history/observations';
+import type { TJMFilters } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
 import {
@@ -1159,35 +1164,14 @@ function createChromeStubs() {
               payload: getDevConnectorHealthSnapshots(),
             };
           case 'GET_TJM_ANALYSIS': {
-            const history = storage.tjm_history as TJMHistory | undefined;
-            const payload = message.payload as
-              { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod } | undefined;
-            const normalizedStacks =
-              payload?.profileStacks && payload.profileStacks.length > 0
-                ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))
-                : null;
-            const records = history?.records ?? [];
-            const filteredByStackAndRegion = records.filter((record) => {
-              if (normalizedStacks && !normalizedStacks.has(record.stack.toLowerCase().trim())) {
-                return false;
-              }
-              if (payload?.region && record.region !== payload.region) {
-                return false;
-              }
-              return true;
-            });
-
+            const history = parseTJMHistory(storage.tjm_history);
+            const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
             return {
               type: 'TJM_ANALYSIS_RESULT',
               payload: {
-                analysis: analyzeTJMHistory(
-                  {
-                    records: filterTJMHistoryByPeriod(
-                      { records: filteredByStackAndRegion },
-                      payload?.period ?? 'all',
-                      new Date()
-                    ).records,
-                  },
+                analysis: analyzeTJMObservations(
+                  addObservations(history, extractObservations(missions)),
+                  (message.payload ?? {}) as TJMFilters,
                   new Date()
                 ),
               },

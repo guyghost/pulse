@@ -2734,6 +2734,15 @@ describe('background auto-scan notifications', () => {
   it('routes TJM analysis through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const response = vi.fn();
+    getMissions.mockResolvedValueOnce([
+      makeMission({
+        stack: ['Svelte', 'TypeScript'],
+        location: 'Lyon',
+        remote: 'full',
+        seniority: 'senior',
+        scrapedAt: new Date('2026-05-20T10:00:00Z'),
+      }),
+    ]);
     loadTJMHistory.mockResolvedValueOnce({
       records: [
         {
@@ -2763,7 +2772,12 @@ describe('background auto-scan notifications', () => {
       messageListener?.(
         {
           type: 'GET_TJM_ANALYSIS',
-          payload: { profileStacks: ['Svelte'], region: 'remote' },
+          payload: {
+            profileStacks: ['Svelte'],
+            region: 'lyon',
+            seniority: 'senior',
+            remote: 'full',
+          },
         },
         {},
         response
@@ -2776,8 +2790,12 @@ describe('background auto-scan notifications', () => {
       type: 'TJM_ANALYSIS_RESULT',
       payload: {
         analysis: expect.objectContaining({
-          dataPoints: 1,
-          topStacks: [expect.objectContaining({ stack: 'svelte' })],
+          total: 1,
+          priced: 1,
+          withoutTjm: 0,
+          range: { min: 700, max: 700, median: 700 },
+          lastUpdated: '2026-05-20T10:00:00.000Z',
+          legacy: expect.objectContaining({ recordCount: 2 }),
         }),
       },
     });
