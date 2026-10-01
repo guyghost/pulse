@@ -137,6 +137,38 @@ describe('TJMPage region filter (TJM-01)', () => {
     expect(getTJMAnalysis.mock.calls.length).toBe(callCountBefore);
   });
 
+  it('shows the profile as incomplete until both the floor and seniority are set', async () => {
+    getProfile.mockResolvedValue({
+      tjmMin: 500,
+      tjmMax: null,
+      keywords: [],
+      seniority: null,
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(TJMPage, { target });
+    await tick();
+    await flush();
+
+    expect(target.textContent).toContain('Profil à définir');
+  });
+
+  it('treats a profile with a TJM floor and no ceiling as calibrated', async () => {
+    getProfile.mockResolvedValue({
+      tjmMin: 500,
+      tjmMax: null,
+      keywords: [],
+      seniority: 'senior',
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(TJMPage, { target });
+    await tick();
+    await flush();
+
+    expect(target.textContent).toContain('Profil calibré');
+  });
+
   it('resets period and region to their defaults when the page becomes active again', async () => {
     const target = document.createElement('div');
     document.body.appendChild(target);

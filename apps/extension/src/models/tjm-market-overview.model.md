@@ -1,7 +1,7 @@
 # TJM Market Overview — Model
 
 > Source de vérité pour l'en-tête KPI du dashboard TJM (« Analyse TJM »).
-> Proposition Mobbin Cloudflare : cartes KPI big-number (médiane, cible,
+> Proposition Mobbin Cloudflare : cartes KPI big-number (médiane, plancher,
 > tendance) avec sparkline de la série agrégée.
 
 ## Contexte
@@ -12,14 +12,20 @@ KPI : grands chiffres + inline sparkline, avant tout contenu narratif.
 
 ## Projection KPI (pure, depuis `TJMAnalysis` + profil)
 
-| KPI         | Source                                    | Format                   |
-| ----------- | ----------------------------------------- | ------------------------ |
-| Médiane     | `analysis[level].median`                  | `500 €/j`                |
-| Votre cible | `profile.tjmMin–tjmMax` (si renseigné)    | `450–550 €/j`, sinon `—` |
-| Tendance    | `analysis.trend` + `analysis.trendDetail` | flèche + libellé         |
+| KPI            | Source                                    | Format               |
+| -------------- | ----------------------------------------- | -------------------- |
+| Médiane        | `analysis[level].median`                  | `500 €/j`            |
+| Votre plancher | `profile.tjmMin` (si renseigné)           | `450 €/j`, sinon `—` |
+| Tendance       | `analysis.trend` + `analysis.trendDetail` | flèche + libellé     |
+
+`profile.tjmMax` est facultatif : `null` signifie qu'aucun plafond n'est
+défini et n'empêche pas de comparer le TJM minimum au marché.
 
 - `level` = niveau de séniorité du profil (déjà calculé par la page). Aucun
   nouveau calcul : le bandeau est une **projection pure** de l'analyse existante.
+- La comparaison du plancher et la géométrie du repère sont calculées par
+  `core/tjm-history/market-position.ts` ; le composant ne fait que rendre la
+  projection.
 
 ## Série sparkline — extension du core
 
@@ -50,6 +56,6 @@ profil déjà chargé par la page. Changement de période/région → nouvelle a
 
 1. Aucun calcul dans le shell ni dans le markup : KPI et série viennent du core.
 2. Si `series.length < 2` → la sparkline est masquée (pas de ligne à 1 point).
-3. Si la cible profil est absente → le KPI cible affiche `—`, jamais `0`.
+3. Si le TJM minimum du profil est absent → le KPI plancher affiche `—`, jamais `0`.
 4. La médiane affichée est toujours celle du niveau sélectionné, cohérente avec
    la carte de niveau correspondante.

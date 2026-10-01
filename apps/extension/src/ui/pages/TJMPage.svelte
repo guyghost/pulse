@@ -129,7 +129,9 @@
   }
 
   const isOffline = $derived(connection.status === 'offline');
-  const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax !== null);
+  const profileCalibrated = $derived(
+    userTjmMin > 0 && userSeniority !== null && (userTjmMax === null || userTjmMax >= userTjmMin)
+  );
   const dataFreshness = $derived(
     analysis ? getTJMDataFreshness(analysis.lastUpdated, new Date(analysisReferenceTime)) : null
   );
@@ -224,7 +226,7 @@
     {/if}
 
     <p class="mt-2 text-caption leading-5 text-text-muted">
-      Tendances tirées des missions stockées localement, croisées avec votre fourchette cible.
+      Tendances tirées des missions stockées localement, comparées à votre TJM minimum acceptable.
     </p>
 
     <div class="mt-4 flex flex-wrap items-center gap-2">
@@ -258,7 +260,7 @@
           class="inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-1.5 text-caption font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
         >
           <Icon name="sliders-horizontal" size={12} />
-          Ajuster mon TJM cible
+          Ajuster mon TJM minimum
         </button>
       {/if}
       {#if onNavigateToFeed && !isOffline}
