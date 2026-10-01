@@ -32,21 +32,26 @@ export const saveTJMHistory = async (history: TJMHistory): Promise<void> => {
 };
 
 /**
- * Extract TJM records from missions and merge them into the stored history.
- * Uses the provided date for the record date.
+ * Persist legacy aggregates from feed winners and observations from source announcements.
+ * Uses the provided date only for legacy records; observations keep their own scrape dates.
  *
- * @param missions - Missions to extract TJM data from
- * @param date - ISO 8601 date string for the records
+ * @param missions - Feed winners used by the legacy aggregate history
+ * @param date - ISO 8601 date string for the legacy records
+ * @param sourceMissions - Eligible source announcements before heuristic feed deduplication
  * @returns Updated history after merge
  */
 // Serialize local read-modify-write operations across overlapping scan effects.
 let recordQueue: Promise<unknown> = Promise.resolve();
-export const recordTJMFromMissions = (missions: Mission[], date: string): Promise<TJMHistory> => {
+export const recordTJMFromMissions = (
+  missions: Mission[],
+  date: string,
+  sourceMissions: Mission[] = missions
+): Promise<TJMHistory> => {
   const operation = recordQueue.then(async () => {
     const history = await loadTJMHistory();
     const updated = addObservations(
       addRecords(history, extractRecords(missions, date)),
-      extractObservations(missions)
+      extractObservations(sourceMissions)
     );
     await saveTJMHistory(updated);
     return updated;

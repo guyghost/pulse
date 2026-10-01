@@ -26,10 +26,18 @@ La date observée est `mission.scrapedAt`, conservée telle quelle lors de l’e
 À l’ouverture, le worker lit l’historique et les missions déjà présentes en IndexedDB,
 puis les combine en mémoire : le premier échantillon est disponible sans nouveau scan,
 sans antidater ou rafraîchir artificiellement une observation. Cette lecture n’écrit pas
-l’historique. Les dates invalides et futures n’entrent pas dans les statistiques.
+l’historique. Une publication autrefois éliminée avant sa persistance n’est pas
+reconstructible à partir de la mission gagnante ou des moyennes : le bootstrap utilise
+uniquement les publications réellement disponibles, avec leurs propres dimensions.
+Les dates invalides et futures n’entrent pas dans les statistiques.
 
-Après un scan, `persistPostCommitEffects` enregistre les agrégats et observations,
-y compris les annonces sans TJM ou technologie. Cet effet reste non bloquant pour le
+Après un scan, `persistPostCommitEffects` enregistre les agrégats à partir des
+gagnantes du feed (`result.missions`) et les observations à partir de toutes les
+annonces source éligibles (`result.sourceMissions`), y compris celles écartées par la
+déduplication heuristique du feed et celles sans TJM ou technologie. La déduplication
+source + URL appartient uniquement au calcul TJM et ne doit pas hériter des fusions
+interplateformes du feed. Une collecte commune et des collectes séparées des mêmes
+publications produisent donc la même population identifiable. Cet effet reste non bloquant pour le
 commit du scan. Les écritures successives sont sérialisées pour éviter la perte d’un
 lot en cas de concurrence. Deux instantanés d’une même identité/date sont remplacés,
 les autres dates restent disponibles. Aucune purge automatique n’est introduite.

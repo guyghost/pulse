@@ -1232,9 +1232,13 @@ async function persistPostCommitEffects(
     }
   })();
 
-  if (missions.length > 0) {
+  if (missions.length > 0 || result.sourceMissions.length > 0) {
     try {
-      await recordTJMFromMissions(missions, new Date(now).toISOString().slice(0, 10));
+      await recordTJMFromMissions(
+        missions,
+        new Date(now).toISOString().slice(0, 10),
+        result.sourceMissions
+      );
     } catch {
       // TJM history is non-critical.
     }

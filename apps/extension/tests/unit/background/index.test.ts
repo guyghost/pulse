@@ -941,6 +941,38 @@ describe('background auto-scan notifications', () => {
     ]);
   });
 
+  it('projects all source announcements to TJM while keeping the feed winners as legacy inputs', async () => {
+    const winner = makeMission({
+      id: 'lh-a',
+      source: 'lehibou',
+      url: 'https://www.lehibou.com/annonce/a',
+      tjm: 600,
+    });
+    const discarded = makeMission({
+      id: 'fw-b',
+      source: 'free-work',
+      url: 'https://www.free-work.com/job/b',
+      tjm: null,
+    });
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions: [winner],
+        sourceMissions: [winner, discarded],
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
+
+    await alarmListener?.({ name: 'auto-scan', scheduledTime: 1779436800002 });
+    await vi.waitFor(() => {
+      expect(recordTJMFromMissions).toHaveBeenCalledWith([winner], expect.any(String), [
+        winner,
+        discarded,
+      ]);
+    });
+    expect(saveMissions.mock.calls[0]?.[0]).toEqual([winner]);
+  });
+
   it('badges only notifiable missions even when the unseen pool is large', async () => {
     const manyUnseen = Array.from({ length: 1000 }, (_, index) =>
       makeMission({ id: `bulk-${index}`, score: 40 })

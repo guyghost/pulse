@@ -1,8 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import { addRecords } from '../../../src/lib/core/tjm-history';
-import { extractObservations } from '../../../src/lib/core/tjm-history/observations';
+import { deduplicateMissionsDetailed } from '../../../src/lib/core/scoring/dedup';
 import {
+  analyzeTJMObservations,
+  extractObservations,
+} from '../../../src/lib/core/tjm-history/observations';
+import {
+  clearTJMHistory,
   loadTJMHistory,
   recordTJMFromMissions,
   saveTJMHistory,
@@ -74,6 +79,76 @@ describe('TJM history persistence', () => {
       stacks: [],
       observedAt: '2026-08-01T10:15:00.000Z',
     });
+  });
+
+  it('retains the same source population for a combined scan and separate scans after feed deduplication', async () => {
+    const priced: Mission = {
+      ...mission,
+      id: 'lh-a',
+      title: 'Développeur React TypeScript',
+      client: 'Acme',
+      stack: ['React', 'TypeScript'],
+      location: 'Lyon',
+      remote: 'hybrid',
+      source: 'lehibou',
+      url: 'https://www.lehibou.com/annonce/a',
+      tjm: 600,
+      scrapedAt: new Date('2026-09-30T12:00:00Z'),
+      seniority: 'senior',
+      classification: {
+        category: 'frontend',
+        remoteCompatible: true,
+        confidence: 1,
+        classifiedAt: 1,
+      },
+    };
+    const unpriced: Mission = {
+      ...priced,
+      id: 'fw-b',
+      source: 'free-work',
+      url: 'https://www.free-work.com/fr/tech-it/react/job-mission/b',
+      tjm: null,
+      seniority: null,
+      classification: null,
+    };
+    const sourceMissions = [priced, unpriced];
+    const combinedFeed = deduplicateMissionsDetailed(sourceMissions);
+    expect(combinedFeed.missions).toHaveLength(1);
+    expect(combinedFeed.duplicateRelations).toHaveLength(1);
+
+    await recordTJMFromMissions(combinedFeed.missions, '2026-10-01', sourceMissions);
+    const combinedHistory = await loadTJMHistory();
+    const now = new Date('2026-10-01T12:00:00Z');
+    const combined = analyzeTJMObservations(combinedHistory, {}, now);
+
+    await clearTJMHistory();
+    for (const sourceMission of sourceMissions) {
+      const singleFeed = deduplicateMissionsDetailed([sourceMission]);
+      await recordTJMFromMissions(singleFeed.missions, '2026-10-01', [sourceMission]);
+    }
+    const separate = analyzeTJMObservations(await loadTJMHistory(), {}, now);
+    expect(combined).toMatchObject({
+      total: 2,
+      priced: 1,
+      withoutTjm: 1,
+      range: { median: 600 },
+      unknown: { category: 1, seniority: 1, remote: 0, region: 0 },
+      sources: [
+        { source: 'lehibou', count: 1 },
+        { source: 'free-work', count: 1 },
+      ],
+    });
+    expect(separate).toEqual(combined);
+    expect(combinedHistory.records.every((record) => record.sampleCount === 1)).toBe(true);
+    expect(combinedHistory.observations).toHaveLength(2);
+    expect(
+      combinedHistory.observations?.every(
+        (observation) => observation.observedAt === '2026-09-30T12:00:00.000Z'
+      )
+    ).toBe(true);
+    expect(
+      combinedHistory.observations?.find((observation) => observation.source === 'free-work')
+    ).toMatchObject({ tjm: null, category: null, seniority: null });
   });
 
   it('serializes concurrent scan effects so neither observation is lost', async () => {
