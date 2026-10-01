@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SIDE_PANEL, enableAllSurfaceFlags } from './helpers';
+import { SIDE_PANEL } from './helpers';
 
 const mission = {
   id: 'mission-pipeline-1',
@@ -24,7 +24,9 @@ const mission = {
 };
 
 async function mockApplicationsPipelineBridge(page: Page) {
-  await page.addInitScript(
+  await page.goto(SIDE_PANEL);
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
+  await page.evaluate(
     ({ missionRow }) => {
       const generatedAsset = {
         id: 'asset-pipeline-1',
@@ -54,67 +56,51 @@ async function mockApplicationsPipelineBridge(page: Page) {
         value: bridgeMessages,
       });
 
-      let chromeValue: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return chromeValue;
-        },
-        set(value: unknown) {
-          chromeValue = value;
-          const chromeApi = value as {
-            runtime?: {
-              sendMessage?: (message: { type: string; payload?: unknown }) => Promise<unknown>;
-            };
+      const chromeApi = window.chrome;
+      const originalSendMessage = chromeApi.runtime?.sendMessage;
+      if (!originalSendMessage) {
+        return;
+      }
+
+      chromeApi.runtime.sendMessage = async (message) => {
+        bridgeMessages.push(message.type);
+
+        if (message.type === 'GET_FEED_MISSIONS') {
+          return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
+        }
+
+        if (message.type === 'GET_TRACKINGS') {
+          return { type: 'TRACKINGS_RESULT', payload: [tracking] };
+        }
+
+        if (message.type === 'GET_GENERATED_ASSETS') {
+          return { type: 'GENERATED_ASSETS_RESULT', payload: generatedAssets };
+        }
+
+        if (message.type === 'GENERATE_ASSET') {
+          generatedAssets = [generatedAsset];
+          tracking = {
+            ...tracking,
+            currentStatus: 'application_prepared',
+            generatedAssetIds: [generatedAsset.id],
+            history: [
+              ...tracking.history,
+              {
+                from: 'selected',
+                to: 'application_prepared',
+                timestamp: generatedAsset.createdAt,
+                note: 'Candidature préparée par assistant.',
+              },
+            ],
           };
-
-          const originalSendMessage = chromeApi.runtime?.sendMessage;
-          if (!originalSendMessage) {
-            return;
-          }
-
-          chromeApi.runtime.sendMessage = async (message) => {
-            bridgeMessages.push(message.type);
-
-            if (message.type === 'GET_FEED_MISSIONS') {
-              return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
-            }
-
-            if (message.type === 'GET_TRACKINGS') {
-              return { type: 'TRACKINGS_RESULT', payload: [tracking] };
-            }
-
-            if (message.type === 'GET_GENERATED_ASSETS') {
-              return { type: 'GENERATED_ASSETS_RESULT', payload: generatedAssets };
-            }
-
-            if (message.type === 'GENERATE_ASSET') {
-              generatedAssets = [generatedAsset];
-              tracking = {
-                ...tracking,
-                currentStatus: 'application_prepared',
-                generatedAssetIds: [generatedAsset.id],
-                history: [
-                  ...tracking.history,
-                  {
-                    from: 'selected',
-                    to: 'application_prepared',
-                    timestamp: generatedAsset.createdAt,
-                    note: 'Candidature préparée par assistant.',
-                  },
-                ],
-              };
-              return {
-                type: 'GENERATION_RESULT',
-                payload: { asset: generatedAsset, creditBalance: 9, creditsConsumed: 1 },
-              };
-            }
-
-            return originalSendMessage.call(chromeApi.runtime, message);
+          return {
+            type: 'GENERATION_RESULT',
+            payload: { asset: generatedAsset, creditBalance: 9, creditsConsumed: 1 },
           };
-        },
-      });
+        }
+
+        return originalSendMessage.call(chromeApi.runtime, message);
+      };
     },
     { missionRow: mission }
   );
@@ -125,8 +111,11 @@ test.describe('applications pipeline', () => {
     page,
   }) => {
     await mockApplicationsPipelineBridge(page);
-    await enableAllSurfaceFlags(page);
-    await page.goto(SIDE_PANEL);
+    const seeded = await page.evaluate(async () => {
+      const result = await chrome.runtime.sendMessage({ type: 'GET_FEED_MISSIONS' });
+      return result.payload.map((item: { id: string }) => item.id);
+    });
+    expect(seeded).toEqual([mission.id]);
 
     const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     await expect(nav).toBeVisible();

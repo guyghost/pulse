@@ -130,6 +130,7 @@ export type BridgeMessage =
       type: 'GET_TJM_ANALYSIS';
       payload?: TJMFilters;
     }
+  | { type: 'TJM_DATA_UPDATED' }
   | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMSampleAnalysis | null } }
   | { type: 'GET_SEEN_MISSIONS' }
   | { type: 'SEEN_MISSIONS_RESULT'; payload: string[] }

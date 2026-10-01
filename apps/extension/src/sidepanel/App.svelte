@@ -653,7 +653,10 @@
               if (import.meta.env.DEV) console.error('[ApplicationsPage crash]', e);
             }}
           >
-            <ApplicationsPage onNavigateToFeed={() => nav.navigateWithFallback('feed')} />
+            <ApplicationsPage
+              active={nav.currentPage === 'applications'}
+              onNavigateToFeed={() => nav.navigateWithFallback('feed')}
+            />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState

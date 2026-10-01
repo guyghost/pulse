@@ -92,14 +92,7 @@
     }
     if (!wasActive) {
       wasActive = true;
-      untrack(() => {
-        if (
-          Object.keys(state.filters).some((key) => key !== 'period') ||
-          state.filters.period !== 'all'
-        ) {
-          state.reset();
-        }
-      });
+      untrack(() => state.activate());
     }
   });
 </script>

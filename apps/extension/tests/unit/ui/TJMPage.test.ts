@@ -221,6 +221,42 @@ describe('TJM sample states', () => {
     await unmount(page);
   });
 
+  it('refreshes default filters on activation and only invalidates after TJM persistence', async () => {
+    getTJMAnalysis.mockResolvedValue(analysis);
+    const target = document.createElement('div');
+    const page = mount(TJMPageActivationStub, { target });
+    await tick();
+    await flush();
+    const initialCalls = getTJMAnalysis.mock.calls.length;
+    page.setActive(false);
+    await tick();
+    page.setActive(true);
+    await tick();
+    await flush();
+    expect(getTJMAnalysis).toHaveBeenCalledTimes(initialCalls + 1);
+    const notify = subscribeMessages.mock.calls.at(-1)![0];
+    notify({ type: 'SCAN_COMPLETE', payload: { missions: [] } });
+    expect(getTJMAnalysis).toHaveBeenCalledTimes(initialCalls + 1);
+    let resolveEarlier!: (value: TJMSampleAnalysis) => void;
+    getTJMAnalysis.mockImplementationOnce(
+      () =>
+        new Promise<TJMSampleAnalysis>((resolve) => {
+          resolveEarlier = resolve;
+        })
+    );
+    notify({ type: 'TJM_DATA_UPDATED' });
+    getTJMAnalysis.mockResolvedValueOnce({ ...analysis, total: 4, withoutTjm: 2 });
+    notify({ type: 'TJM_DATA_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[data-testid="tjm-sample-total"]')?.textContent).toBe('4');
+    resolveEarlier(analysis);
+    await flush();
+    await tick();
+    expect(target.querySelector('[data-testid="tjm-sample-total"]')?.textContent).toBe('4');
+    await unmount(page);
+  });
+
   it('discards late responses when filters change quickly and carries every segment', async () => {
     getTJMAnalysis.mockResolvedValue(analysis);
     const target = document.createElement('div');

@@ -875,14 +875,6 @@
             </div>
             <div>
               <p class="text-body-lg font-medium text-text-primary">Service cloud facultatif</p>
-              <p class="mt-0.5 text-meta text-text-subtle">
-                Catégorise les missions via Vercel AI Gateway avec une clé personnelle. Titre,
-                technologies, mode de travail et description sont transmis (texte limité). Votre
-                profil utilisateur et les champs structurés TJM/localisation ne sont pas ajoutés. Le
-                titre et la description peuvent contenir un tarif, un lieu ou d’autres données de
-                l’annonce. Les sessions et cookies ne sont pas ajoutés à l’envoi. La conservation
-                des données est désactivée dans la requête.
-              </p>
             </div>
           </div>
           <Toggle
@@ -894,6 +886,15 @@
             onclick={() => settings.toggleClassification()}
           />
         </div>
+
+        <p class="mt-3 text-meta text-text-subtle">
+          Catégorise les missions via Vercel AI Gateway avec une clé personnelle. Titre,
+          technologies, mode de travail et description sont transmis (texte limité). Votre profil
+          utilisateur et les champs structurés TJM/localisation ne sont pas ajoutés. Le titre et la
+          description peuvent contenir un tarif, un lieu ou d’autres données de l’annonce. Les
+          sessions et cookies ne sont pas ajoutés à l’envoi. La conservation des données est
+          désactivée dans la requête.
+        </p>
 
         <div class="mt-2 flex items-center justify-between gap-2">
           <span class="text-micro font-medium text-text-subtle">État du service</span>

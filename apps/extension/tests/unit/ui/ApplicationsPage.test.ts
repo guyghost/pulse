@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, tick } from 'svelte';
+import { mount, tick, unmount } from 'svelte';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 
 const sendMessage = vi.hoisted(() => vi.fn());
+const subscribeMessages = vi.hoisted(() => vi.fn(() => () => {}));
 const getMissions = vi.hoisted(() => vi.fn());
 const showToast = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const showToastAction = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
   sendMessage,
-  subscribeMessages: () => () => {},
+  subscribeMessages,
 }));
 vi.mock('../../../src/lib/shell/facades/feed-data.facade', () => ({ getMissions }));
 vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
@@ -126,6 +127,34 @@ describe('ApplicationsPage next-action toast', () => {
     vi.clearAllMocks();
   });
 
+  it('retains the selected dossier and dirty reminder while showing a refresh error', async () => {
+    const target = document.createElement('div');
+    const page = mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    const input = target.querySelector<HTMLInputElement>('[aria-label="Prochaine action"]')!;
+    input.value = '2026-12-12T10:00';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    getMissions.mockRejectedValueOnce(new Error('Catalogue momentanément indisponible'));
+    const notify = subscribeMessages.mock.calls.at(-1)![0] as (message: { type: string }) => void;
+    notify({ type: 'MISSIONS_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain(
+      'Catalogue momentanément indisponible'
+    );
+    expect(target.textContent).toContain('Mission Svelte');
+    expect(input.value).toBe('2026-12-12T10:00');
+    getMissions.mockResolvedValue([mission]);
+    notify({ type: 'TRACKING_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')).toBeNull();
+    expect(input.value).toBe('2026-12-12T10:00');
+    await unmount(page);
+  });
+
   it('labels Gemini Nano as the free local kit without cloud transfer', async () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
@@ -177,7 +206,7 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
     await flush();
 
-    expect(getMissions).not.toHaveBeenCalled();
+    expect(getMissions).toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(
       'Impossible de charger le suivi des candidatures.',
       'error'
@@ -215,7 +244,7 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
 
     expect(sendMessage).toHaveBeenCalledTimes(2);
-    expect(getMissions).not.toHaveBeenCalled();
+    expect(getMissions).toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledTimes(2);
     expect(showToast).toHaveBeenNthCalledWith(
       2,

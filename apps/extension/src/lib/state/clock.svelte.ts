@@ -39,6 +39,7 @@ function stopClock(): void {
 export interface ReactiveClock {
   /** Current timestamp (ms) — reactive, updates on the shared tick. */
   readonly now: number;
+  refresh(): void;
 }
 
 /**
@@ -64,6 +65,9 @@ export function createClock(): ReactiveClock {
   });
 
   return {
+    refresh() {
+      now = Date.now();
+    },
     get now() {
       return now;
     },

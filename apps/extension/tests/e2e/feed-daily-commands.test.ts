@@ -1,12 +1,68 @@
+import type { Page } from '@playwright/test';
 import { test, expect } from './fixtures';
 import { dismissFeedTour, missionCards } from './helpers';
+async function seedDailyMissions(page: Page, selected = false) {
+  await page.evaluate(async (isSelected) => {
+    const result = await chrome.runtime.sendMessage({ type: 'GET_FEED_MISSIONS' });
+    const base = result.payload[0];
+    if (!base) {
+      throw new Error('Demo runtime not ready');
+    }
+    const missions = [1, 2].map((index) => ({
+      ...base,
+      id: `daily-command-${index}`,
+      title: `Mission quotidienne ${index}`,
+      score: 95 - index,
+      stack: ['React', 'TypeScript'],
+    }));
+    localStorage.setItem('__missionpulse_dev_missions', JSON.stringify(missions));
+    localStorage.setItem(
+      '__missionpulse_dev_trackings',
+      JSON.stringify(
+        isSelected
+          ? [
+              {
+                missionId: missions[0].id,
+                currentStatus: 'selected',
+                history: [{ from: null, to: 'selected', timestamp: Date.now(), note: null }],
+                generatedAssetIds: [],
+                userRating: null,
+                notes: '',
+                nextActionAt: null,
+              },
+            ]
+          : []
+      )
+    );
+  }, selected);
+  await page.reload();
+  await dismissFeedTour(page);
+  await expect(missionCards(page).filter({ hasText: 'Mission quotidienne 1' })).toBeVisible();
+  const records = await page.evaluate(
+    async () => (await chrome.runtime.sendMessage({ type: 'GET_TRACKINGS' })).payload
+  );
+  expect(records.map((record: { currentStatus: string }) => record.currentStatus)).toEqual(
+    selected ? ['selected'] : []
+  );
+}
+
+async function expectSingleConfirmation(page: Page) {
+  const records = await page.evaluate(
+    async () => (await chrome.runtime.sendMessage({ type: 'GET_TRACKINGS' })).payload
+  );
+  const record = records.find(
+    (item: { missionId: string }) => item.missionId === 'daily-command-1'
+  );
+  expect(record.history.filter((entry: { to: string }) => entry.to === 'applied')).toHaveLength(1);
+}
+
 for (const width of [320, 400]) {
   test(`daily feed commands, modal keyboard and application confirmation at ${width}px`, async ({
     page,
   }) => {
     await page.setViewportSize({ width, height: 800 });
-    await dismissFeedTour(page);
-    const card = missionCards(page).first();
+    await seedDailyMissions(page);
+    const card = missionCards(page).filter({ hasText: 'Mission quotidienne 1' });
     await expect(card).toBeVisible();
     await card.getByRole('button', { name: /Afficher les détails de la mission/ }).click();
 
@@ -28,8 +84,11 @@ for (const width of [320, 400]) {
     await card.getByRole('button', { name: 'Ouvrir pour postuler', exact: true }).click();
     await expect(card.getByText('Sélectionnée', { exact: true })).toBeVisible();
     await expect(card.getByText('Envoyée', { exact: true })).toHaveCount(0);
-    await card.getByRole('button', { name: 'J’ai envoyé ma candidature', exact: true }).click();
+    await card
+      .getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+      .click();
     await expect(card.getByText('Envoyée', { exact: true })).toBeVisible();
+    await expectSingleConfirmation(page);
     const trigger = page.getByRole('button', { name: 'Afficher les filtres', exact: true });
     await trigger.click();
     const dialog = page.getByRole('dialog', { name: 'Filtrer les missions' });
@@ -61,7 +120,8 @@ for (const width of [320, 400]) {
     await trigger.click();
     await dialog
       .getByRole('button', { name: 'Supprimer la recherche Ma veille', exact: true })
-      .click();
+      .focus();
+    await page.keyboard.press('Enter');
     await expect(dialog.getByRole('button', { name: 'Ma veille', exact: true })).toHaveCount(0);
     await page.keyboard.press('Escape');
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
@@ -87,8 +147,8 @@ for (const width of [320, 400]) {
 test('failed opening and repeated clicks never record sending; failed confirmation stays recoverable', async ({
   page,
 }) => {
-  await dismissFeedTour(page);
-  const card = missionCards(page).first();
+  await seedDailyMissions(page, true);
+  const card = missionCards(page).filter({ hasText: 'Mission quotidienne 1' });
   await card.getByRole('button', { name: /Afficher les détails de la mission/ }).click();
   await page.evaluate(() => {
     const runtime = window.chrome.runtime;
@@ -101,7 +161,7 @@ test('failed opening and repeated clicks never record sending; failed confirmati
         counters.open++;
         return { type: 'EXTERNAL_URL_OPENED', payload: { opened: false } };
       }
-      if (message.type === 'UPDATE_TRACKING') {
+      if (message.type === 'UPDATE_TRACKING' && counters.transition === 0) {
         counters.transition++;
         return {
           type: 'TRACKING_FAILED',
@@ -132,12 +192,19 @@ test('failed opening and repeated clicks never record sending; failed confirmati
         .__dailyApplicationCounters
   );
   expect(counters).toEqual({ open: 1, transition: 0 });
-  await card.getByRole('button', { name: 'J’ai envoyé ma candidature', exact: true }).click();
+  await card
+    .getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+    .click();
   await expect(
     page.getByText('Impossible d’enregistrer le nouveau statut.', { exact: true })
   ).toBeVisible();
   await expect(card.getByText('Envoyée', { exact: true })).toHaveCount(0);
   await expect(
-    card.getByRole('button', { name: 'J’ai envoyé ma candidature', exact: true })
+    card.getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
   ).toBeEnabled();
+  await card
+    .getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+    .click();
+  await expect(card.getByText('Envoyée', { exact: true })).toBeVisible();
+  await expectSingleConfirmation(page);
 });

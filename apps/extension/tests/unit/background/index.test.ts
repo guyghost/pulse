@@ -1314,6 +1314,36 @@ describe('background auto-scan notifications', () => {
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
+  it('keeps the successful terminal when TJM persistence fails and emits no invalidation', async () => {
+    recordTJMFromMissions.mockRejectedValueOnce(new Error('Storage unavailable'));
+    const missions = [makeMission({ id: 'committed-with-failed-tjm' })];
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions,
+        sourceMissions: missions,
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
+    messageListener?.(
+      { type: 'SCAN_START', payload: { operationId: 'failed-tjm', trigger: 'manual' } },
+      {},
+      vi.fn()
+    );
+    await vi.waitFor(() => expect(clearScanCheckpoint).toHaveBeenCalledWith('failed-tjm'));
+    const messages = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message as { type: string });
+    expect(
+      messages
+        .filter((message) =>
+          ['SCAN_COMPLETE', 'SCAN_ERROR', 'SCAN_CANCELLED'].includes(message.type)
+        )
+        .map((message) => message.type)
+    ).toEqual(['SCAN_COMPLETE']);
+    expect(messages.some((message) => message.type === 'TJM_DATA_UPDATED')).toBe(false);
+  });
+
   it('publishes committed completion before deferred projections and makes late cancel a no-op', async () => {
     expect(messageListener).toBeTypeOf('function');
     let releaseProjection: (() => void) | undefined;
@@ -1347,6 +1377,7 @@ describe('background auto-scan notifications', () => {
       expect(recordTJMFromMissions).toHaveBeenCalledTimes(1);
     });
 
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ type: 'TJM_DATA_UPDATED' });
     const terminalsBeforeProjection = vi
       .mocked(chrome.runtime.sendMessage)
       .mock.calls.map(([message]) => message)
@@ -1383,6 +1414,7 @@ describe('background auto-scan notifications', () => {
       });
       expect(runScan).toHaveBeenCalledTimes(2);
     });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'TJM_DATA_UPDATED' });
     expect(saveConnectorStatuses).toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-after-projections');

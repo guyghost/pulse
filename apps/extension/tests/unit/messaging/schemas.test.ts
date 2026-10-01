@@ -69,6 +69,10 @@ const validSettings = {
 // ============================================================================
 
 describe('validateMessage — structure de base', () => {
+  it('accepts the committed TJM population invalidation', () => {
+    expect(validateMessage({ type: 'TJM_DATA_UPDATED' }).valid).toBe(true);
+  });
+
   it('rejette null', () => {
     const r = validateMessage(null);
     expect(r.valid).toBe(false);

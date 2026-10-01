@@ -366,13 +366,12 @@ describe('operational UI constraints', () => {
     expect(profileSource).toContain('onclick={openProfileEditing}');
   });
 
-  it('routes the offline TJM story toward cached signal investigation', () => {
+  it('keeps the local TJM sample and filter context accessible offline', () => {
     const source = readFileSync('src/ui/pages/TJMPage.svelte', 'utf8');
-
-    expect(source).toContain("'Cache local'");
-    expect(source).toContain('Inspecter les signaux locaux');
-    expect(source).toContain('function inspectLocalSignals()');
-    expect(source).toContain('onclick={inspectLocalSignals}');
+    expect(source).toContain('OfflineNotice');
+    expect(source).toContain('TJMSampleDashboard');
+    expect(source).toContain('{context}');
+    expect(source).not.toContain('{#if !isOffline}');
   });
 
   it('keeps TJM actions tied to pricing decisions instead of refresh only', () => {
@@ -408,22 +407,15 @@ describe('operational UI constraints', () => {
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
   });
 
-  it('routes Applications story actions to the operationally recommended dossier', () => {
+  it('keeps actionable reminders before the collapsible pipeline without recommending terminal dossiers', () => {
     const source = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
-
-    expect(source).toContain('const recommendedTrackedMission = $derived.by');
     expect(source).toContain('!isTerminalStatus(record.currentStatus)');
     expect(source).toContain('isDueFollowUp(record, now)');
-    expect(source).toContain("record.currentStatus === 'application_prepared'");
-    expect(source).toContain('onPrimaryAction={handleApplicationStoryAction}');
-    expect(source).toContain('function openRecommendedDossier()');
-    expect(source).toContain('function getRecommendedDossierReason');
-    expect(source).toContain('aria-label="Dossier recommandé"');
-    expect(source).toContain('Dossier recommandé');
-    expect(source.indexOf('Dossier recommandé')).toBeLessThan(
+    expect(source).toContain('recommendedTrackedMission?.mission.id');
+    expect(source.indexOf('aria-label="À relancer"')).toBeLessThan(
       source.indexOf('<ApplicationPipelineSummary')
     );
-    expect(source).not.toContain('selectMission(trackedMissions[0].mission.id)');
+    expect(source).toContain('Activité et étapes du suivi');
   });
 
   it('keeps application decision history visible in the selected dossier', () => {
@@ -515,9 +507,9 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
     expect(storySource).toContain('data-testid="operational-story-inline"');
-    // Quiet single-line row: icon | truncated title | action. No tinted box,
-    // no badge chip — severity rides on the leading icon (feed-story.model.md).
-    expect(storySource).toContain('grid-cols-[auto_minmax(0,1fr)_auto]');
+    // The title owns its row; the action cannot squeeze it to a single digit.
+    expect(storySource).toContain('grid-cols-[auto_minmax(0,1fr)]');
+    expect(storySource).toContain('col-start-2');
     expect(storySource).toContain('inlineIconClass');
     expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
     expect(badgeSource).toContain('whitespace-nowrap');

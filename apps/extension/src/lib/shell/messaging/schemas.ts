@@ -799,6 +799,7 @@ export const MessageSchemas = {
     type: z.literal('GET_TJM_ANALYSIS'),
     payload: TJMFiltersSchema.optional(),
   }),
+  TJM_DATA_UPDATED: z.object({ type: z.literal('TJM_DATA_UPDATED') }),
   TJM_ANALYSIS_RESULT: z.object({
     type: z.literal('TJM_ANALYSIS_RESULT'),
     payload: z.object({ analysis: TJMSampleAnalysisSchema.nullable() }).strict(),

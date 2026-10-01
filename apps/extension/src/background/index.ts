@@ -1239,6 +1239,9 @@ async function persistPostCommitEffects(
         new Date(now).toISOString().slice(0, 10),
         result.sourceMissions
       );
+      await chrome.runtime.sendMessage({ type: 'TJM_DATA_UPDATED' }).catch(() => {
+        // No panel is listening; the next activation reads the committed population.
+      });
     } catch {
       // TJM history is non-critical.
     }

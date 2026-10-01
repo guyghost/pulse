@@ -1,4 +1,7 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import { createClock } from '$lib/state/clock.svelte';
+  import { createApplicationsDataState } from '$lib/state/applications-data.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import { features } from '$lib/state/features.svelte';
   import type { Mission } from '$lib/core/types/mission';
@@ -12,12 +15,10 @@
   } from '$lib/core/types/tracking';
   import { STATUS_LABELS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { formatTJM } from '$lib/core/utils/format';
-  import { getMissions } from '$lib/shell/facades/feed-data.facade';
   import {
     createAvailabilityDeps,
     getAvailabilityPushTargets,
   } from '$lib/shell/facades/availability.facade';
-  import { createTrackingStore } from '$lib/state/tracking.svelte';
   import { createAvailabilityStore } from '$lib/state/availability.svelte';
   import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
@@ -38,11 +39,14 @@
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import FormAssistPanel from '../organisms/FormAssistPanel.svelte';
 
-  const { onNavigateToFeed }: { onNavigateToFeed?: () => void } = $props();
+  const { active = true, onNavigateToFeed }: { active?: boolean; onNavigateToFeed?: () => void } =
+    $props();
   const connection = getConnectionStore();
   const isOffline = $derived(connection.status === 'offline');
 
-  const tracking = createTrackingStore();
+  const clock = createClock();
+  const data = createApplicationsDataState();
+  const tracking = $derived(data.tracking);
   const availabilityStore = createAvailabilityStore(createAvailabilityDeps());
   const availabilityPlatforms = getAvailabilityPushTargets();
 
@@ -50,6 +54,13 @@
 
   $effect(() => {
     const unsubscribe = subscribeMessages((message) => {
+      if (
+        ['MISSIONS_UPDATED', 'SCAN_COMPLETE', 'TRACKING_UPDATED', 'TRACKING_RESTORED'].includes(
+          message.type
+        )
+      ) {
+        void loadApplications();
+      }
       if (message.type === 'PROFILE_UPDATED') {
         availabilityStore.applyProfileUpdate(message.payload.availability ?? null);
       }
@@ -57,16 +68,17 @@
     return unsubscribe;
   });
 
-  let missions = $state<Mission[]>([]);
-  let isLoading = $state(true);
+  const missions = $derived(data.missions);
+  const isLoading = $derived(data.isLoading);
   let selectedMissionId = $state<string | null>(null);
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
   // nextActionInput is intentionally writable: bound to a text input and reset on save.
   // Cannot be a read-only $derived because the user edits it; the $effect resets it on selection/tracking change.
-  // eslint-disable-next-line svelte/prefer-writable-derived
+
   let nextActionInput = $state('');
-  let loadError = $state<string | null>(null);
+  const loadError = $derived(data.error);
+  let reminderDirty = $state(false);
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
   const generationTypeIcons = GENERATION_TYPE_ICONS as Record<GenerationType, IconName>;
@@ -147,12 +159,12 @@
   });
 
   const todayActivities = $derived.by(() => {
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const oneDayAgo = clock.now - 24 * 60 * 60 * 1000;
     return overviewActivities.filter(({ timestamp }) => timestamp >= oneDayAgo).slice(0, 3);
   });
 
   const weekActivities = $derived.by(() => {
-    const now = Date.now();
+    const now = clock.now;
     const oneDayAgo = now - 24 * 60 * 60 * 1000;
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
     return overviewActivities
@@ -176,11 +188,14 @@
   );
 
   $effect(() => {
-    nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
+    const savedValue = selectedTracking?.nextActionAt ?? null;
+    if (!reminderDirty) {
+      nextActionInput = isoToDateTimeLocal(savedValue);
+    }
   });
 
   const pipelineSummary = $derived.by(() =>
-    summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
+    summarizeApplicationPipeline([...tracking.trackings.values()], clock.now)
   );
 
   const kanbanColumns = $derived(buildKanbanBoard(missions, [...tracking.trackings.values()]));
@@ -189,7 +204,7 @@
   );
 
   const recommendedTrackedMission = $derived.by(() => {
-    const now = Date.now();
+    const now = clock.now;
     // Terminal missions (accepted/rejected/archived) are outcomes, not actionable
     // dossiers — never recommend them, even when a stale nextActionAt survives.
     const actionable = trackedMissions.filter(
@@ -213,7 +228,7 @@
 
   const dueMissions = $derived(
     trackedMissions
-      .filter(({ record }) => isDueFollowUp(record, Date.now()))
+      .filter(({ record }) => isDueFollowUp(record, clock.now))
       .sort((a, b) => getNextActionTimestamp(a.record) - getNextActionTimestamp(b.record))
   );
   let reminderBusy = $state(false);
@@ -336,20 +351,27 @@
     return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
   }
 
+  let assetsRequest = 0;
   async function loadAssets(missionId: string): Promise<void> {
+    const request = ++assetsRequest;
     try {
       const response = await sendMessage({
         type: 'GET_GENERATED_ASSETS',
         payload: { missionId },
       });
-      assets = response.type === 'GENERATED_ASSETS_RESULT' ? response.payload : [];
+      if (request === assetsRequest && selectedMissionId === missionId) {
+        assets = response.type === 'GENERATED_ASSETS_RESULT' ? response.payload : [];
+      }
     } catch {
-      assets = [];
+      if (request === assetsRequest && selectedMissionId === missionId) {
+        assets = [];
+      }
     }
   }
 
   async function selectMission(missionId: string): Promise<void> {
     selectedMissionId = missionId;
+    reminderDirty = false;
     reminderStatus = '';
     reminderError = '';
     await loadAssets(missionId);
@@ -378,7 +400,7 @@
         }
       : null;
     try {
-      await tracking.transitionStatus(missionId, status);
+      await data.mutate((store) => store.transitionStatus(missionId, status));
     } catch (cause) {
       await showToast(trackingFailureMessage(cause), 'error');
       return;
@@ -388,7 +410,7 @@
       onClick: () => {
         void (async () => {
           try {
-            await tracking.restoreTracking(missionId, previousTracking);
+            await data.mutate((store) => store.restoreTracking(missionId, previousTracking));
           } catch (cause) {
             await showToast(trackingFailureMessage(cause), 'error');
           }
@@ -424,8 +446,9 @@
     }
     reminderBusy = true;
     try {
-      await tracking.updateNextActionAt(missionId, value);
+      await data.mutate((store) => store.updateNextActionAt(missionId, value));
       if (selectedMissionId === missionId) {
+        reminderDirty = false;
         if (clear) {
           nextActionInput = '';
         }
@@ -454,11 +477,14 @@
     }
 
     generatingType = type;
+    const missionId = selectedMission.id;
     try {
-      const response = await sendMessage({
-        type: 'GENERATE_ASSET',
-        payload: { missionId: selectedMission.id, generationType: type },
-      });
+      const response = await data.mutate(() =>
+        sendMessage({
+          type: 'GENERATE_ASSET',
+          payload: { missionId, generationType: type },
+        })
+      );
 
       if (response.type !== 'GENERATION_RESULT' || !response.payload.asset) {
         const error = response.type === 'GENERATION_RESULT' ? response.payload.error : null;
@@ -472,13 +498,15 @@
         return;
       }
 
-      assets = [
-        response.payload.asset,
-        ...assets.filter((asset) => asset.id !== response.payload.asset?.id),
-      ];
+      if (selectedMissionId === missionId) {
+        assets = [
+          response.payload.asset,
+          ...assets.filter((asset) => asset.id !== response.payload.asset?.id),
+        ];
+      }
       await showToast('Contenu généré', 'success');
       try {
-        await tracking.loadTrackings();
+        await loadApplications();
       } catch (cause) {
         await showToast(trackingFailureMessage(cause), 'error');
       }
@@ -499,24 +527,38 @@
   }
 
   async function loadApplications(): Promise<void> {
-    isLoading = true;
-    loadError = null;
-    try {
-      await tracking.loadTrackings();
-      missions = await getMissions();
-      selectedMissionId = recommendedTrackedMission?.mission.id ?? missions[0]?.id ?? null;
-      if (selectedMissionId) {
-        await loadAssets(selectedMissionId);
+    const committed = await data.refresh();
+    if (!committed) {
+      if (data.error) {
+        await showToast(data.error, 'error');
       }
-    } catch (cause) {
-      loadError = trackingFailureMessage(cause);
-      await showToast(loadError, 'error');
-    } finally {
-      isLoading = false;
+      return;
     }
   }
 
-  void loadApplications();
+  $effect(() => {
+    if (data.hasSnapshot && !missions.some((mission) => mission.id === selectedMissionId)) {
+      const id = recommendedTrackedMission?.mission.id ?? missions[0]?.id ?? null;
+      if (id) {
+        untrack(() => {
+          void selectMission(id);
+        });
+      }
+    }
+  });
+
+  $effect(() => {
+    if (active) {
+      untrack(() => {
+        clock.refresh();
+        void loadApplications();
+      });
+    }
+  });
+  $effect(() => () => {
+    data.dispose();
+    assetsRequest++;
+  });
 </script>
 
 <PageShell>
@@ -537,7 +579,15 @@
     {/snippet}
   </PageHeader>
 
-  {#if !isLoading && !loadError}
+  {#if loadError && data.hasSnapshot}
+    <div role="alert" class="section-card rounded-xl p-4 text-meta">
+      <p>{loadError} Les dernières données chargées restent affichées.</p>
+      <button class="mt-2 rounded-lg border p-2" onclick={() => loadApplications()}
+        >Réessayer</button
+      >
+    </div>
+  {/if}
+  {#if !isLoading && data.hasSnapshot}
     <section class="section-card space-y-2 rounded-xl p-4" aria-label="À relancer">
       <h2 class="text-body-lg font-semibold">À relancer ({dueMissions.length})</h2>
       {#each dueMissions as item (item.mission.id)}
@@ -595,7 +645,7 @@
         <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
       </div>
     </div>
-  {:else if loadError}
+  {:else if loadError && !data.hasSnapshot}
     <div>
       <OperationalEmptyState
         title="Le suivi des candidatures ne peut pas être chargé"
@@ -693,6 +743,9 @@
                     type="datetime-local"
                     class="block w-full min-w-0 max-w-full rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
                     bind:value={nextActionInput}
+                    oninput={() => {
+                      reminderDirty = true;
+                    }}
                     aria-label="Prochaine action"
                     disabled={reminderBusy}
                   />

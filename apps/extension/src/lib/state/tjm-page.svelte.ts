@@ -103,6 +103,10 @@ export function createTJMPageState() {
       return userTjmMin;
     },
     refresh,
+    activate() {
+      filters = { period: 'all' };
+      void loadProfile();
+    },
     setFilter<K extends keyof TJMFilters>(key: K, value: TJMFilters[K]) {
       if (filters[key] === value) {
         return;
@@ -119,9 +123,8 @@ export function createTJMPageState() {
     },
     init() {
       disposed = false;
-      void loadProfile();
       const unsubscribe = subscribeMessages((message) => {
-        if (message.type === 'SCAN_COMPLETE') {
+        if (message.type === 'TJM_DATA_UPDATED') {
           void refresh();
         }
         if (message.type === 'PROFILE_UPDATED') {

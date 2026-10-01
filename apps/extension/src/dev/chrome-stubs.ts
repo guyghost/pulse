@@ -1299,6 +1299,7 @@ function createChromeStubs() {
                       detail: runtimeMissions,
                     })
                   );
+                  emitRuntimeMessage({ type: 'TJM_DATA_UPDATED' });
                 },
                 Math.max(800, 500 + groupedBySource.length * 250)
               )
@@ -1444,8 +1445,14 @@ function createChromeStubs() {
           case 'SHOW_TOAST':
             console.log('[Chrome Stub] Toast:', message.payload);
             return { type: 'TOAST_SHOWN' };
+          // Mirror worker broadcasts through the existing runtime for dev/test drivers.
+          case 'MISSIONS_UPDATED':
+          case 'TRACKING_UPDATED':
+          case 'TRACKING_RESTORED':
+          case 'SCAN_PARTIAL_RESULT':
+          case 'SCAN_COMPLETE':
+          case 'TJM_DATA_UPDATED':
           case 'PROFILE_UPDATED':
-            console.log('[Chrome Stub] Profile updated notification', message.payload);
             emitRuntimeMessage(message);
             return null;
           case 'RESET_LOCAL_DATA':
@@ -1484,6 +1491,9 @@ function createChromeStubs() {
             writeDevStorage(DEV_MISSION_FEEDBACK_KEY, items.missionLocalFeedback);
           }
           Object.assign(storage, items);
+          if ('tjm_history' in items) {
+            emitRuntimeMessage({ type: 'TJM_DATA_UPDATED' });
+          }
         },
         remove: async (keys: string | string[]) => {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
