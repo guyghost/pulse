@@ -391,14 +391,14 @@ describe('operational UI constraints', () => {
     const dashboardSource = readFileSync('src/ui/organisms/TJMDashboard.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(pageSource).toContain('Ajuster mon TJM cible');
+    expect(pageSource).toContain('Ajuster mon TJM minimum');
     expect(pageSource).toContain('Scanner le feed');
     expect(pageSource).toContain('onNavigateToProfile');
     expect(pageSource).toContain('onNavigateToFeed');
     expect(dashboardSource).toContain('type TjmSetupStep');
     expect(dashboardSource).toContain('3 étapes pour alimenter le radar TJM');
     expect(dashboardSource).toContain('Alimenter le radar TJM');
-    expect(dashboardSource).toContain('Ajuster mon TJM cible');
+    expect(dashboardSource).toContain('Ajuster mon TJM minimum');
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigateWithFallback('profile')}");
     expect(appSource).toContain("onNavigateToFeed={() => nav.navigateWithFallback('feed')}");
   });

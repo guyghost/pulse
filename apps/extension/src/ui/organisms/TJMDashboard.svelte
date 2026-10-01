@@ -61,18 +61,27 @@
   const isTargetInverted = $derived(
     userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0)
   );
-  const userTargetMedian = $derived(
-    userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted
-      ? Math.round((userTjmMin + (userTjmMax ?? 0)) / 2)
-      : null
-  );
+  const userTargetFloor = $derived(userTjmMin > 0 && !isTargetInverted ? userTjmMin : null);
   const userTargetDelta = $derived(
-    selectedMarketRange && userTargetMedian !== null
-      ? userTargetMedian - selectedMarketRange.median
+    selectedMarketRange && userTargetFloor !== null && userSeniority !== null
+      ? userTargetFloor - selectedMarketRange.median
       : null
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
-  const hasTjmTarget = $derived(userTjmMin > 0 && (userTjmMax ?? 0) > 0 && !isTargetInverted);
+  const hasTjmTarget = $derived(userTjmMin > 0 && !isTargetInverted);
+  const missingProfileDetails = $derived.by(() => {
+    const missing: string[] = [];
+    if (!hasTjmTarget) {
+      missing.push('votre TJM minimum accepté');
+    }
+    if (!userSeniority) {
+      missing.push('votre niveau de séniorité');
+    }
+    return missing;
+  });
+  const profileCompletionDescription = $derived(
+    `Renseignez ${missingProfileDetails.join(' et ')} dans le profil pour comparer votre plancher à la médiane du marché.`
+  );
   const selectedLevelLabel = $derived.by(() => {
     const key = userSeniority ?? 'confirmed';
     return levels.find((level) => level.key === key)?.label ?? 'Confirmé';
@@ -96,15 +105,15 @@
       })
       .join(' ');
   });
-  // Positioning geometry: projects the market range and the user target onto a
-  // shared 0–100 scale so both bars stay comparable in one glance.
+  // Positioning geometry: projects the market range and the user's TJM floor
+  // onto a shared 0–100 scale for a quick comparison.
   const positioning = $derived.by(() => {
-    if (!selectedMarketRange || userTargetMedian === null) {
+    if (!selectedMarketRange || userTargetFloor === null || userSeniority === null) {
       return null;
     }
     const market = selectedMarketRange;
     const lo = Math.min(market.min, userTjmMin);
-    const hi = Math.max(market.max, userTjmMax);
+    const hi = Math.max(market.max, userTjmMin);
     const pad = Math.max(40, Math.round((hi - lo) * 0.08));
     const scaleMin = lo - pad;
     const scaleMax = hi + pad;
@@ -114,8 +123,7 @@
       marketLeft: pct(market.min),
       marketWidth: Math.max(3, pct(market.max) - pct(market.min)),
       medianLeft: pct(market.median),
-      userLeft: pct(userTjmMin),
-      userWidth: Math.max(3, pct(userTjmMax) - pct(userTjmMin)),
+      floorLeft: pct(userTjmMin),
       marketMedian: market.median,
     };
   });
@@ -128,17 +136,18 @@
       action: onOpenFeed,
     },
     {
-      title: 'Ajuster mon TJM cible',
+      title: 'Ajuster mon TJM minimum',
       description: hasTjmTarget
-        ? 'Votre fourchette existe déjà; vérifiez qu’elle correspond à votre prochaine négociation.'
-        : 'Définir une fourchette min/max pour comparer votre cible au marché observé.',
+        ? 'Votre plancher est déjà défini. Vérifiez qu’il correspond à votre minimum acceptable.'
+        : 'Définir le TJM minimum acceptable pour le comparer au marché observé.',
       icon: 'badge-euro',
       actionLabel: 'Ouvrir le profil',
       action: onOpenProfile,
     },
     {
       title: 'Relancer l’analyse',
-      description: 'Transformer les missions stockées et votre fourchette en recommandation TJM.',
+      description:
+        'Comparer votre plancher aux tendances calculées à partir des missions stockées.',
       icon: 'refresh-cw',
       actionLabel: 'Réessayer',
       action: onRetry,
@@ -200,13 +209,23 @@
       };
     }
 
-    if (userTargetDelta === null || selectedMarketRange === null) {
+    if (!hasTjmTarget || !userSeniority) {
       return {
         severity: 'attention' as const,
         statusLabel: 'Profil incomplet',
         title: 'Le positionnement TJM ne peut pas encore être décidé',
+        description: profileCompletionDescription,
+        evidence,
+      };
+    }
+
+    if (!selectedMarketRange || userTargetDelta === null) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Données insuffisantes',
+        title: 'Le marché ne permet pas encore de comparer votre plancher',
         description:
-          'Ajoutez une fourchette TJM et une séniorité dans le profil pour comparer votre position au marché.',
+          'Scannez des missions avec un TJM ou élargissez la période et la région sélectionnées.',
         evidence,
       };
     }
@@ -217,7 +236,7 @@
         statusLabel: 'Confiance faible',
         title: 'Le marché observé est encore trop peu fiable pour changer votre TJM',
         description:
-          'Gardez votre fourchette actuelle et scannez plus de missions avant de négocier sur cette base.',
+          'Gardez votre TJM minimum actuel et scannez plus de missions avant de négocier sur cette base.',
         evidence,
       };
     }
@@ -226,7 +245,7 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'À justifier',
-        title: `Votre cible est ${formatDelta(userTargetDelta)} au-dessus de la médiane`,
+        title: `Votre plancher est ${formatDelta(userTargetDelta)} au-dessus de la médiane`,
         description:
           'Acceptez ce niveau seulement si la mission coche fortement stack, remote et contexte client. Sinon, préparez une marge de négociation.',
         evidence,
@@ -237,9 +256,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Sous-positionné',
-        title: `Votre cible est ${formatDelta(userTargetDelta)} sous la médiane`,
+        title: `Votre plancher est ${formatDelta(userTargetDelta)} sous la médiane`,
         description:
-          'L’analyse indique une marge de rehausse. La prochaine action est de relever la fourchette ou de filtrer les missions trop basses.',
+          'L’analyse indique une marge de rehausse. Vous pouvez relever votre TJM minimum ou filtrer les missions trop basses.',
         evidence,
       };
     }
@@ -247,10 +266,10 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Aligné',
-      title: 'Votre TJM est cohérent avec le marché observé',
+      title: 'Votre plancher est cohérent avec le marché observé',
       description:
         analysis.recommendation ??
-        'Conservez la fourchette actuelle et utilisez les écarts par stack ou région pour arbitrer mission par mission.',
+        'Conservez votre minimum acceptable et utilisez les écarts par stack ou région pour arbitrer mission par mission.',
       evidence,
     };
   });
@@ -303,13 +322,13 @@
             </p>
           </div>
           <div>
-            <p class="eyebrow eyebrow--strong">Votre cible</p>
+            <p class="eyebrow eyebrow--strong">Votre plancher</p>
             <p
               class="mt-1.5 font-mono text-heading-lg tabular-nums leading-none {isTargetInverted
                 ? 'text-status-red-text'
                 : 'text-text-primary'}"
             >
-              {hasTjmTarget ? `${userTjmMin}–${userTjmMax}€` : '—'}
+              {hasTjmTarget ? (formatTJMValue(userTjmMin) ?? '—') : '—'}
             </p>
             <p class="mt-1 text-micro text-text-subtle">
               {isTargetInverted
@@ -393,7 +412,7 @@
             <div class="min-w-0">
               <p class="eyebrow eyebrow--strong">Votre positionnement</p>
               <p class="mt-1 text-meta leading-relaxed text-text-subtle">
-                Cible {userTjmMin}–{userTjmMax}€ ·
+                Plancher {formatTJMValue(userTjmMin)} ·
                 {userSeniority
                   ? levels.find((level) => level.key === userSeniority)?.label
                   : 'Confirmé'}
@@ -424,12 +443,12 @@
               </div>
             </div>
             <div class="flex items-center gap-3">
-              <span class="w-16 shrink-0 text-micro text-text-muted">Votre cible</span>
+              <span class="w-16 shrink-0 text-micro text-text-muted">Votre plancher</span>
               <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
                 <div
-                  class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-[left,width] duration-500"
-                  style:left="{positioning.userLeft}%"
-                  style:width="{positioning.userWidth}%"
+                  class="absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-blueprint-blue transition-[left] duration-500"
+                  style:left="{positioning.floorLeft}%"
+                  title="Votre plancher TJM"
                 ></div>
               </div>
             </div>
@@ -438,7 +457,7 @@
           <div class="mt-2 flex items-center gap-3">
             <span class="w-16 shrink-0"></span>
             <p class="flex-1 text-micro leading-relaxed text-text-muted">
-              Trait plein : médiane marché
+              Repère bleu : votre plancher. Trait sombre : médiane marché
               <span class="font-mono tabular-nums text-text-subtle"
                 >{formatTJMValue(positioning.marketMedian)}/j</span
               >.
@@ -601,8 +620,7 @@
               Alimenter le radar TJM
             </h3>
             <p class="mt-1 text-meta leading-5 text-text-subtle">
-              L’analyse devient utile quand les missions scannées et votre fourchette cible se
-              répondent.
+              L’analyse devient utile quand les missions scannées et votre TJM minimum se répondent.
             </p>
           </div>
           <Icon name="badge-euro" size={16} class="mt-1 shrink-0 text-blueprint-blue" />

@@ -95,6 +95,30 @@ describe('TJMDashboard inverted target validation (TJM-02)', () => {
     expect(rendered).not.toContain('Fourchette invalide');
   });
 
+  it('compares an open-ended TJM floor with the market without requiring a ceiling', async () => {
+    const target = mountDashboard({ userTjmMin: 500, userTjmMax: null });
+    await tick();
+
+    const rendered = text(target);
+
+    expect(rendered).toContain('Votre plancher');
+    expect(rendered).toContain('500 €');
+    expect(rendered).toContain('-150€');
+    expect(rendered).toContain('Votre positionnement');
+    expect(rendered).not.toContain('Profil incomplet');
+  });
+
+  it('asks for the missing TJM floor instead of an unsupported min/max range', async () => {
+    const target = mountDashboard({ userSeniority: 'senior', userTjmMin: 0, userTjmMax: null });
+    await tick();
+
+    const rendered = text(target);
+
+    expect(rendered).toContain('TJM minimum accepté');
+    expect(rendered).not.toContain('min/max');
+    expect(rendered).not.toContain('séniorité');
+  });
+
   it('expose les régions dans une structure sémantique stable', async () => {
     const target = mountDashboard();
     await tick();
