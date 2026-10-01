@@ -27,6 +27,8 @@
     onSelectForTracking,
     onRetryTracking,
     onFastApply,
+    onConfirmApplied,
+    statusPending = false,
     onCopyPitch,
     copyPitchStatus = 'idle' as 'idle' | 'copying' | 'copied' | 'error',
   }: {
@@ -46,6 +48,8 @@
     onRetryTracking?: () => void;
     /** 1-click fast apply (DAO #211) */
     onFastApply?: () => void;
+    onConfirmApplied?: () => void;
+    statusPending?: boolean;
     /** 1-click pitch copy callback (DAO #211) */
     onCopyPitch?: () => void;
     /** Transient status of the pitch copy action (DAO #211) */
@@ -193,7 +197,7 @@
           { label: 'Compétences', value: criteria.stack },
           { label: 'TJM', value: criteria.tjm },
           { label: 'Localisation', value: criteria.location },
-          { label: 'Remote', value: criteria.remote },
+          { label: 'Mode de travail', value: criteria.remote },
         ]
       : []
   );
@@ -429,12 +433,21 @@
               <button
                 type="button"
                 class="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-lg bg-blueprint-blue px-3 text-body-lg font-semibold text-surface-white transition-colors hover:bg-blueprint-blue/90"
+                disabled={statusPending}
                 onclick={handleOpenForTracking}
                 data-testid="drawer-fast-apply-btn"
               >
                 <Icon name="send" size={14} />
-                Postuler & Suivre
+                Ouvrir pour postuler
               </button>
+              {#if onConfirmApplied && (trackingStatus === null || trackingStatus === 'detected' || trackingStatus === 'selected' || trackingStatus === 'application_prepared')}
+                <button
+                  type="button"
+                  class="soft-ring min-h-11 rounded-lg border border-blueprint-blue/30 px-3 text-caption"
+                  disabled={statusPending}
+                  onclick={onConfirmApplied}>J’ai envoyé ma candidature</button
+                >
+              {/if}
               <div class="relative">
                 <button
                   type="button"

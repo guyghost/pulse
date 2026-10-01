@@ -309,7 +309,9 @@ describe('feed saved views storage', () => {
 
     await setFeedSavedViews(views);
 
-    await expect(getFeedSavedViews()).resolves.toEqual(views);
+    await expect(getFeedSavedViews()).resolves.toEqual(
+      views.map((view) => ({ ...view, filters: { ...view.filters, scoreFilterMode: 'exact' } }))
+    );
   });
 
   it('falls back to an empty list when stored saved views are invalid', async () => {

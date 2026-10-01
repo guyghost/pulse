@@ -106,6 +106,9 @@ function buildKeyIdentifier(config: ShortcutConfig): string {
  * Global keydown handler.
  */
 function handleKeydown(event: KeyboardEvent): void {
+  if (event.defaultPrevented || document.querySelector('[role="dialog"][aria-modal="true"]')) {
+    return;
+  }
   // Don't trigger shortcuts when typing in inputs
   if (isInputFocused()) {
     // Except for Escape which should always work

@@ -137,7 +137,7 @@ const SeenMissionIdsSchema = z
   .max(10_000)
   .refine(maxBytes(160_000), { message: 'Seen mission ids payload exceeds 160KB limit' });
 
-const FeedSortSchema = z.enum(['score', 'date', 'tjm']);
+const FeedSortSchema = z.enum(['score', 'date', 'tjm', 'personalized']);
 
 const FeedSavedViewSchema = z
   .object({
@@ -145,6 +145,8 @@ const FeedSavedViewSchema = z
     name: z.string().min(1).max(48),
     filters: z
       .object({
+        scoreFilterMode: z.enum(['minimum', 'exact']).default('exact'),
+        selectedTjmMin: z.number().positive().nullable().optional(),
         searchQuery: z.string().max(120),
         selectedStacks: z.array(z.string().min(1).max(48)).max(24),
         selectedSource: z

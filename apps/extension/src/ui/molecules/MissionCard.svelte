@@ -52,6 +52,9 @@
     copyStatus = 'idle' as 'idle' | 'copied',
     onCopyPitch = null as (() => void) | null,
     copyPitchStatus = 'idle' as PitchCopyStatus,
+    onConfirmApplied,
+    feedback = null,
+    onFeedback,
     onFastApply = null as (() => void) | null,
   }: {
     mission: Mission;
@@ -87,8 +90,11 @@
     onCopyPitch?: () => void;
     /** Transient status of the pitch copy action (DAO #211) */
     copyPitchStatus?: PitchCopyStatus;
-    /** 1-click fast apply callback opening source and marking applied (DAO #211) */
+    /** 1-click fast apply callback opening the source without claiming an application was sent (DAO #211) */
     onFastApply?: () => void;
+    onConfirmApplied?: () => void;
+    feedback?: 'relevant' | 'off-target' | null;
+    onFeedback?: (value: 'relevant' | 'off-target' | null) => void;
   } = $props();
 
   // Collapsed by default: the feed's quick scan comes first. Compact density:
@@ -347,9 +353,9 @@
         <span>Top Match</span>
       </span>
       <span class="text-blueprint-blue-on-tint/40" aria-hidden="true">•</span>
-      {#each topMatchSignals.highlights as highlight, i (i)}
+      {#each topMatchSignals.highlights.slice(0, 2) as highlight, i (i)}
         <span>{highlight}</span>
-        {#if i < topMatchSignals.highlights.length - 1}
+        {#if i < Math.min(2, topMatchSignals.highlights.length) - 1}
           <span class="text-blueprint-blue-on-tint/40" aria-hidden="true">•</span>
         {/if}
       {/each}
@@ -391,7 +397,7 @@
           <span
             class="inline-flex items-center rounded-full border border-border-light px-2 py-0.5 text-micro capitalize text-text-subtle"
           >
-            {mission.remote}
+            {{ full: 'Télétravail', hybrid: 'Hybride', onsite: 'Présentiel' }[mission.remote]}
           </span>
         {/if}
       </div>
@@ -471,7 +477,7 @@
       <Badge label={categoryLabel} variant="status" />
     {/if}
     {#if remoteCompatibleHint === true}
-      <Badge label="Remote compatible" variant="success" />
+      <Badge label="Télétravail possible" variant="success" />
     {/if}
     {#each mission.stack.slice(0, 3) as tech (tech)}
       <Badge label={tech} variant="tech" />
@@ -688,11 +694,15 @@
         Statut actuel : {STATUS_LABELS[trackingStatus]}
       </span>
       {#each availableTransitions as nextStatus, i (i)}
-        {@const label = STATUS_LABELS[nextStatus]}
+        {@const label =
+          nextStatus === 'applied' ? 'J’ai envoyé ma candidature' : STATUS_LABELS[nextStatus]}
         {#if onStatusTransition}
           <button
             class="inline-flex min-h-8 cursor-pointer items-center gap-1 rounded-lg border border-transparent bg-page-canvas px-2.5 text-caption text-text-secondary transition-colors duration-150 hover:border-border-light hover:bg-subtle-gray hover:text-text-primary active:border-transparent disabled:cursor-wait disabled:opacity-50"
-            onclick={() => onStatusTransition?.(nextStatus)}
+            onclick={() =>
+              nextStatus === 'applied' && onConfirmApplied
+                ? onConfirmApplied()
+                : onStatusTransition?.(nextStatus)}
             aria-label={`Passer le statut à ${label}`}
             disabled={isStatusTransitionPending}
           >
@@ -881,11 +891,12 @@
           type="button"
           class="inline-flex h-8 cursor-pointer items-center gap-1 rounded-lg border border-blueprint-blue/30 bg-blueprint-blue/8 px-2.5 text-caption font-semibold text-blueprint-blue transition-colors duration-150 hover:border-blueprint-blue/50 hover:bg-blueprint-blue/15 active:translate-y-px"
           onclick={handleFastApply}
-          aria-label="Postuler et marquer la mission comme envoyée"
+          aria-label="Ouvrir pour postuler"
+          disabled={isStatusTransitionPending}
           data-testid="fast-apply-btn"
         >
           <Icon name="send" size={12} />
-          <span>Postuler</span>
+          <span>Ouvrir pour postuler</span>
         </button>
       {/if}
       <button
@@ -898,4 +909,47 @@
       </button>
     {/if}
   </div>
+  {#if expanded}
+    {#if onConfirmApplied && (trackingStatus === null || trackingStatus === 'detected' || trackingStatus === 'selected' || (trackingStatus === 'application_prepared' && !expanded))}
+      <button
+        type="button"
+        class="soft-ring min-h-11 w-full rounded-lg border border-blueprint-blue/30 px-2 text-caption text-blueprint-blue"
+        disabled={isStatusTransitionPending}
+        onclick={(event) => {
+          event.stopPropagation();
+          onConfirmApplied?.();
+        }}>J’ai envoyé ma candidature</button
+      >
+    {/if}
+    {#if onFeedback}
+      <div class="flex flex-wrap gap-2 pt-2" role="group" aria-label="Retour local de pertinence">
+        <button
+          type="button"
+          class="soft-ring min-h-11 rounded-lg border border-border-light px-2 text-caption"
+          aria-pressed={feedback === 'relevant'}
+          onclick={(event) => {
+            event.stopPropagation();
+            onFeedback?.(feedback === 'relevant' ? null : 'relevant');
+          }}>Pertinent</button
+        >
+        <button
+          type="button"
+          class="soft-ring min-h-11 rounded-lg border border-border-light px-2 text-caption"
+          aria-pressed={feedback === 'off-target'}
+          onclick={(event) => {
+            event.stopPropagation();
+            onFeedback?.(feedback === 'off-target' ? null : 'off-target');
+          }}>Hors cible</button
+        >
+        {#if feedback}<button
+            type="button"
+            class="soft-ring min-h-11 px-2 text-caption"
+            onclick={(event) => {
+              event.stopPropagation();
+              onFeedback?.(null);
+            }}>Effacer le retour</button
+          >{/if}
+      </div>
+    {/if}
+  {/if}
 </article>

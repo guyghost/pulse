@@ -1,7 +1,11 @@
 /** Pure policy and DOM eligibility predicates for the shared modal registry. */
 
 export type ModalSurface =
-  'backup_restore' | 'mission_comparison' | 'mission_investigation' | 'keyboard_shortcuts_help';
+  | 'backup_restore'
+  | 'mission_comparison'
+  | 'mission_investigation'
+  | 'keyboard_shortcuts_help'
+  | 'feed_filters';
 
 export type ModalFocusVariant =
   | 'backup_valid'
@@ -9,7 +13,8 @@ export type ModalFocusVariant =
   | 'backup_validation_pending'
   | 'comparison'
   | 'investigation'
-  | 'shortcuts_help';
+  | 'shortcuts_help'
+  | 'filters';
 
 export type InitialFocusVariant = ModalFocusVariant;
 export type ModalCloseReason = 'explicit' | 'escape' | 'business_success';
@@ -53,6 +58,7 @@ const VARIANT_SURFACE: Record<ModalFocusVariant, ModalSurface> = {
   comparison: 'mission_comparison',
   investigation: 'mission_investigation',
   shortcuts_help: 'keyboard_shortcuts_help',
+  filters: 'feed_filters',
 };
 
 export function variantBelongsToSurface(
@@ -87,6 +93,7 @@ export function selectInitialFocusTarget(
         return 'first-mission-link';
       }
       return 'dialog';
+    case 'filters':
     case 'investigation':
       if (facts.closeButtonAvailable) {
         return 'close-button';

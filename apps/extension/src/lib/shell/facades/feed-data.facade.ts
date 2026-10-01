@@ -11,7 +11,7 @@ import type { PersistedConnectorStatus } from '../../core/types/connector-status
 import type { SavedFeedView } from '../../core/types/feed-view';
 import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 
-export type FeedSortBy = 'score' | 'date' | 'tjm';
+export type FeedSortBy = 'score' | 'date' | 'tjm' | 'personalized';
 
 export { getConnectorsMeta } from '../connectors/meta';
 export { markAsSeen } from '../../core/seen/mark-seen';
@@ -188,3 +188,5 @@ export function subscribeToNotificationClicked(handler: () => void): () => void 
     chrome.runtime.onMessage.removeListener(listener);
   };
 }
+
+export { getMissionFeedback, saveMissionFeedback } from '../storage/mission-feedback';

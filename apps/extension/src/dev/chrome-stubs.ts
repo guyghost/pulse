@@ -40,6 +40,7 @@ import type { SettingsReleaseMutationIntent } from '$lib/shell/settings-release/
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
+const DEV_MISSION_FEEDBACK_KEY = '__missionpulse_dev_local_feedback';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
 const DEV_PROFILE_STORAGE_KEY = '__missionpulse_dev_profile';
@@ -474,6 +475,7 @@ const storage: Record<string, unknown> = {
   favoriteMissions: readDevStorage<Record<string, number>>(DEV_FAVORITES_STORAGE_KEY, {}),
   hiddenMissions: readDevStorage<Record<string, number>>(DEV_HIDDEN_STORAGE_KEY, {}),
   seenMissions: readDevStorage<string[]>(DEV_SEEN_STORAGE_KEY, []),
+  missionLocalFeedback: readDevStorage<Record<string, string>>(DEV_MISSION_FEEDBACK_KEY, {}),
   feedSavedViews: readDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, []),
   connectedAlertPreferences: readDevStorage<ConnectedAlertPreferences>(
     DEV_ALERT_PREFERENCES_STORAGE_KEY,
@@ -1487,6 +1489,9 @@ function createChromeStubs() {
           return result;
         },
         set: async (items: Record<string, unknown>) => {
+          if ('missionLocalFeedback' in items) {
+            writeDevStorage(DEV_MISSION_FEEDBACK_KEY, items.missionLocalFeedback);
+          }
           Object.assign(storage, items);
         },
         remove: async (keys: string | string[]) => {

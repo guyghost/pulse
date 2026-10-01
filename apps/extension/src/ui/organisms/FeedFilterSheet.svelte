@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { tick } from 'svelte';
+  import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import { fade, fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { Icon, type IconName } from '@pulse/ui';
@@ -39,6 +39,14 @@
     tjmTarget = null,
     onEdit,
     onDismiss,
+    sortBy = 'score',
+    onSort,
+    favoritesOnly = false,
+    onToggleFavorites,
+    savedViews = [],
+    onSaveView,
+    onApplyView,
+    onDeleteView,
   }: {
     draft: FeedFilterDraft;
     visibleCount: number;
@@ -46,8 +54,44 @@
     tjmTarget?: number | null;
     onEdit: (event: FilterEvent) => void;
     onDismiss: (reason: FeedFilterSheetDismissReason) => void;
+    sortBy?: import('$lib/core/types/feed-view').FeedSortBy;
+    onSort?: (value: import('$lib/core/types/feed-view').FeedSortBy) => void;
+    favoritesOnly?: boolean;
+    onToggleFavorites?: () => void;
+    savedViews?: import('$lib/core/types/feed-view').SavedFeedView[];
+    onSaveView?: (name: string) => Promise<void>;
+    onApplyView?: (id: string) => void;
+    onDeleteView?: (id: string) => void;
   } = $props();
 
+  let modalRoot = $state<HTMLElement | null>(null);
+  let savedName = $state('');
+  let saveError = $state('');
+  let saving = $state(false);
+  function close(reason: FeedFilterSheetDismissReason) {
+    if (!requestModalClose(modalRoot, reason === 'escape' ? 'escape' : 'explicit')) {
+      onDismiss(reason);
+    }
+  }
+  async function saveView() {
+    if (saving) {
+      return;
+    }
+    saving = true;
+    saveError = '';
+    try {
+      await onSaveView?.(savedName);
+      savedName = '';
+    } catch (cause) {
+      saveError =
+        cause instanceof Error &&
+        (cause.message.includes('Donnez un nom') || cause.message.includes('Limite de 12'))
+          ? cause.message
+          : 'Impossible d’enregistrer la recherche. Réessayez.';
+    } finally {
+      saving = false;
+    }
+  }
   let panel = $state<HTMLElement | null>(null);
   const failedSourceIcons = $state<Record<string, boolean>>({});
   const prefersReducedMotion =
@@ -71,7 +115,7 @@
     },
     {
       id: 'remote',
-      label: 'Remote',
+      label: 'Télétravail',
       icon: 'wifi',
       active: draft.decisionPreset === 'remote-compatible',
       onSelect: () => togglePreset('remote-compatible'),
@@ -99,10 +143,6 @@
         ? 1
         : 0
   );
-
-  $effect(() => {
-    void tick().then(() => panel?.focus());
-  });
 
   function togglePreset(preset: FeedDecisionPresetId): void {
     onEdit({ type: 'TOGGLE_PRESET', preset });
@@ -146,12 +186,26 @@
   }
 </script>
 
-<div class="pointer-events-none absolute inset-0 z-50" data-testid="feed-filter-sheet-layer">
+<div
+  bind:this={modalRoot}
+  use:modalFocus={{
+    surface: 'feed_filters',
+    variant: 'filters',
+    ownerScopePath: ['feed', 'filters'],
+    onBeforeClose: (reason) => {
+      onDismiss(reason === 'escape' ? 'escape' : 'button');
+      return 'accepted';
+    },
+    onRejected: () => onDismiss('button'),
+  }}
+  class="pointer-events-none fixed inset-0 z-50"
+  data-testid="feed-filter-sheet-layer"
+>
   <button
     type="button"
     class="pointer-events-auto absolute inset-0 cursor-default bg-text-primary/24"
     aria-label="Fermer les filtres"
-    onclick={() => onDismiss('scrim')}
+    onclick={() => close('scrim')}
     transition:fade={{ duration: scrimDuration }}
   ></button>
 
@@ -169,7 +223,7 @@
       type="button"
       class="soft-ring absolute -top-[3.75rem] left-4 inline-flex h-11 w-11 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-secondary shadow-sm transition-[background-color,color,transform] duration-200 hover:bg-subtle-gray hover:text-text-primary active:scale-95"
       aria-label="Fermer les filtres et revenir au feed"
-      onclick={() => onDismiss('button')}
+      onclick={() => close('button')}
     >
       <Icon name="x" size={20} />
     </button>
@@ -188,6 +242,96 @@
     </div>
 
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5">
+      <section class="space-y-3 py-3" aria-label="Commandes du feed">
+        <button
+          type="button"
+          class="soft-ring min-h-11 rounded-xl border border-border-light px-3 text-caption"
+          aria-pressed={favoritesOnly}
+          onclick={onToggleFavorites}>Favoris</button
+        >
+        <label class="block text-caption"
+          >Trier les missions
+          <select
+            class="soft-ring mt-1 h-11 w-full rounded-xl border border-border-light px-3"
+            aria-label="Trier les missions"
+            value={sortBy}
+            onchange={(event) =>
+              onSort?.(event.currentTarget.value as import('$lib/core/types/feed-view').FeedSortBy)}
+          >
+            <option value="score">Note</option><option value="date">Date</option><option value="tjm"
+              >TJM</option
+            ><option value="personalized">Personnalisé (retours locaux)</option>
+          </select>
+        </label>
+        <p class="text-micro text-text-subtle">
+          Le tri personnalisé priorise les missions marquées pertinentes et abaisse celles hors
+          cible. La note reste inchangée. Cliquez à nouveau sur un retour pour l’effacer.
+        </p>
+        <label class="block text-caption"
+          >Mode de travail
+          <select
+            class="soft-ring mt-1 h-11 w-full rounded-xl border border-border-light px-3"
+            aria-label="Mode de travail"
+            value={draft.selectedRemote ?? ''}
+            onchange={(event) =>
+              onEdit({
+                type: 'SET_REMOTE',
+                remote: (event.currentTarget.value || null) as
+                  import('$lib/core/types/mission').RemoteType | null,
+              })}
+          >
+            <option value="">Tous</option><option value="full">Télétravail</option><option
+              value="hybrid">Hybride</option
+            ><option value="onsite">Présentiel</option>
+          </select>
+        </label>
+        <form
+          onsubmit={(event) => {
+            event.preventDefault();
+            void saveView();
+          }}
+          class="space-y-2"
+        >
+          <label class="block text-caption" for="saved-feed-name">Nom de la recherche</label>
+          <input
+            id="saved-feed-name"
+            class="soft-ring h-11 w-full rounded-xl border border-border-light px-3"
+            maxlength="48"
+            bind:value={savedName}
+          />
+          <button
+            type="submit"
+            class="soft-ring min-h-11 rounded-xl border border-blueprint-blue/30 px-3 text-caption"
+            disabled={saving || savedViews.length >= 12}>Enregistrer la recherche</button
+          >
+          {#if savedViews.length >= 12}<p class="text-caption">
+              Limite de 12 recherches atteinte. Supprimez-en une pour continuer.
+            </p>{/if}
+          {#if saveError}<p role="alert" class="text-caption text-status-red-text">
+              {saveError}
+            </p>{/if}
+        </form>
+        <div aria-label="Recherches enregistrées" class="space-y-1">
+          {#each savedViews as view (view.id)}
+            <div class="flex min-w-0 gap-2">
+              <button
+                type="button"
+                class="soft-ring min-h-11 min-w-0 flex-1 rounded-lg border border-border-light px-2 text-caption break-words"
+                onclick={() => {
+                  onApplyView?.(view.id);
+                  close('button');
+                }}>{view.name}</button
+              >
+              <button
+                type="button"
+                class="soft-ring min-h-11 shrink-0 rounded-lg px-2 text-caption"
+                aria-label={`Supprimer la recherche ${view.name}`}
+                onclick={() => onDeleteView?.(view.id)}>Supprimer</button
+              >
+            </div>
+          {/each}
+        </div>
+      </section>
       <div class="mt-3 grid grid-cols-3 gap-2" aria-label="Filtres rapides">
         {#each quickFilters as filter (filter.id)}
           <button
@@ -210,7 +354,11 @@
       <div class="mt-4 divide-y divide-border-light border-y border-border-light">
         <label class="grid min-h-14 grid-cols-[1.75rem_1fr_7.25rem] items-center gap-2 py-2">
           <Icon name="star" size={20} class="text-text-subtle" />
-          <span class="text-caption font-medium text-text-primary">Note minimale</span>
+          <span class="text-caption font-medium text-text-primary"
+            >{draft.scoreFilterMode === 'exact'
+              ? 'Groupe exact (historique)'
+              : 'Note minimale'}</span
+          >
           <span class="relative min-w-0">
             <select
               class="soft-ring h-10 w-full appearance-none rounded-xl border border-border-light bg-surface-white px-3 pr-8 text-caption text-text-primary"
@@ -219,9 +367,9 @@
               onchange={handleScoreChange}
             >
               <option value="">Toutes</option>
-              <option value="strong">A</option>
-              <option value="good">B</option>
-              <option value="weak">C</option>
+              <option value="strong">A ≥ 80</option>
+              <option value="good">B ≥ 60</option>
+              <option value="weak">C ≥ 40</option>
             </select>
             <Icon
               name="chevron-down"
@@ -425,7 +573,7 @@
       <button
         type="button"
         class="inline-flex items-center gap-1.5 text-micro font-semibold text-blueprint-blue transition-colors hover:text-blueprint-blue/80"
-        onclick={() => onDismiss('button')}
+        onclick={() => close('button')}
       >
         <Icon name="check-circle" size={15} />
         Terminer

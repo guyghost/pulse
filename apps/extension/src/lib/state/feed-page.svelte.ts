@@ -106,6 +106,14 @@ import {
   type FeedFilterSheetEvent,
 } from '../../models/feed-filter-sheet.model';
 
+import {
+  matchesMinimumScore,
+  sortByLocalFeedback,
+  type MissionFeedback,
+  type MissionFeedbackMap,
+} from '$lib/core/feed/local-feedback';
+import { getMissionFeedback, saveMissionFeedback } from '$lib/shell/facades/feed-data.facade';
+
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
 export type DecisionPresetId = FeedDecisionPresetId;
@@ -249,7 +257,9 @@ export function countMissionsForFilterDraft(
     }
     if (
       draft.selectedScoreBucket !== null &&
-      getScoreBucket(getMissionScore(mission)) !== draft.selectedScoreBucket
+      !(draft.scoreFilterMode === 'exact'
+        ? getScoreBucket(getMissionScore(mission)) === draft.selectedScoreBucket
+        : matchesMinimumScore(mission, draft.selectedScoreBucket))
     ) {
       return false;
     }
@@ -293,6 +303,9 @@ export function createFeedPageState(
   // ============================================================
   // Mutable $state fields — accessible directly for bind:
   // ============================================================
+  let feedback = $state<MissionFeedbackMap>({});
+  let feedbackWriteQueue = Promise.resolve();
+  let scoreFilterMode = $state<'minimum' | 'exact'>('minimum');
   let sortBy = $state<SortBy>('score');
 
   // Restore persisted sortBy via facade
@@ -401,6 +414,7 @@ export function createFeedPageState(
     toastMessage: (id, snapshot) => (id in snapshot ? 'Mission restaurée' : 'Mission masquée'),
   });
 
+  const pendingViewDeletes = new SvelteSet<string>();
   const viewDeleteUndo: UndoController<{
     views: SavedFeedView[];
     activeId: string | null;
@@ -408,16 +422,25 @@ export function createFeedPageState(
   }> = createUndoController({
     kind: 'delete-view',
     onCommit: (_id, _snapshot, { stillPending }) => {
+      pendingViewDeletes.delete(_id);
       // Re-include any view whose undo window is still open — its in-memory
       // deletion must not be finalized by a sibling view's commit.
       const restoreViews = stillPending.flatMap((p) =>
         p.snapshot.views.filter((v) => v.id === p.targetId)
       );
-      setFeedSavedViews([...savedViews, ...restoreViews]).catch(() => {});
+      setFeedSavedViews([...savedViews, ...restoreViews]).catch(() => {
+        savedViews = [...savedViews, ..._snapshot.views.filter((view) => view.id === _id)];
+        showToast('Suppression impossible : recherche restaurée.', 'error');
+      });
     },
     onRestore: (_id, snapshot) => {
-      savedViews = snapshot.views;
-      activeSavedViewId = snapshot.activeId;
+      pendingViewDeletes.delete(_id);
+      if (!savedViews.some((view) => view.id === _id)) {
+        savedViews = [...savedViews, ...snapshot.views.filter((view) => view.id === _id)];
+      }
+      if (activeSavedViewId === null) {
+        activeSavedViewId = snapshot.activeId;
+      }
     },
     toastMessage: (_id, snapshot) => `Vue « ${snapshot.name} » supprimée`,
   });
@@ -531,7 +554,12 @@ export function createFeedPageState(
       });
     }
     if (selectedScoreBucket !== null) {
-      result = result.filter((m) => getScoreBucket(getMissionScore(m)) === selectedScoreBucket);
+      const minimum = selectedScoreBucket;
+      result = result.filter((m) =>
+        scoreFilterMode === 'exact'
+          ? getScoreBucket(getMissionScore(m)) === selectedScoreBucket
+          : matchesMinimumScore(m, minimum)
+      );
     }
     const tjmFloor = selectedTjmMin;
     if (tjmFloor !== null) {
@@ -561,6 +589,9 @@ export function createFeedPageState(
     if (focusMode === 'focused' && focusIntent) {
       const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
+        if (sortBy === 'personalized') {
+          return sortByLocalFeedback(focused, feedback);
+        }
         if (sortBy === 'score') {
           return rankMissions(focused, new Date());
         }
@@ -588,6 +619,9 @@ export function createFeedPageState(
     // if/else instead of a ternary: calls in ternary branches are annotated
     // /* @__PURE__ */ by esbuild at a position Rollup can't interpret, which
     // emits a warning on every build.
+    if (sortBy === 'personalized') {
+      return sortByLocalFeedback(input, feedback);
+    }
     if (sortBy === 'score') {
       return rankMissions(input, new Date());
     }
@@ -717,7 +751,7 @@ export function createFeedPageState(
         },
         {
           id: 'remote-compatible',
-          label: 'Remote compatible',
+          label: 'Télétravail et hybride',
           description: 'Full remote ou hybride',
           count: remoteCompatiblePresetCount,
           active: decisionPreset === 'remote-compatible',
@@ -766,7 +800,9 @@ export function createFeedPageState(
       showHidden
   );
 
-  const savedViewLimitReached = $derived(savedViews.length >= MAX_SAVED_VIEWS);
+  const savedViewLimitReached = $derived(
+    savedViews.length + pendingViewDeletes.size >= MAX_SAVED_VIEWS
+  );
 
   const sourceMissionCounts = $derived(feedAggregates.sourceMissionCounts);
 
@@ -1070,6 +1106,7 @@ export function createFeedPageState(
 
   function setSelectedScoreBucket(bucket: ScoreBucket | null): void {
     activeSavedViewId = null;
+    scoreFilterMode = 'minimum';
     selectedScoreBucket = bucket;
   }
 
@@ -1113,6 +1150,7 @@ export function createFeedPageState(
   function committedFilterDraft(): FeedFilterDraft {
     return {
       decisionPreset: decisionPreset ?? (showNewOnly ? 'new' : null),
+      scoreFilterMode,
       selectedScoreBucket,
       selectedTjmMin,
       selectedSource,
@@ -1126,6 +1164,7 @@ export function createFeedPageState(
   function applyFilterDraft(draft: FeedFilterDraft): void {
     activeSavedViewId = null;
     decisionPreset = draft.decisionPreset;
+    scoreFilterMode = draft.scoreFilterMode ?? 'minimum';
     selectedScoreBucket = draft.selectedScoreBucket;
     selectedTjmMin = draft.selectedTjmMin;
     selectedSource = draft.selectedSource;
@@ -1186,6 +1225,8 @@ export function createFeedPageState(
 
   function currentFilters(): FeedViewFilters {
     return {
+      scoreFilterMode,
+      selectedTjmMin,
       searchQuery,
       selectedStacks: [...selectedStacks],
       selectedSource,
@@ -1241,15 +1282,21 @@ export function createFeedPageState(
   }
 
   async function persistSavedViews(nextViews: SavedFeedView[]): Promise<void> {
-    savedViews = nextViews;
     await setFeedSavedViews(nextViews);
+    savedViews = nextViews;
   }
 
   async function saveCurrentView(name = ''): Promise<void> {
+    if (!name.trim()) {
+      throw new Error('Donnez un nom à la recherche.');
+    }
+    if (savedViews.length + pendingViewDeletes.size >= MAX_SAVED_VIEWS) {
+      throw new Error('Limite de 12 recherches atteinte.');
+    }
     const filters = currentFilters();
     const now = Date.now();
     const view: SavedFeedView = {
-      id: `feed-view-${now}`,
+      id: `feed-view-${now}-${crypto.randomUUID()}`,
       name: normalizeSavedViewName(name, filters),
       filters,
       createdAt: now,
@@ -1278,7 +1325,14 @@ export function createFeedPageState(
     selectedCategory = filters.selectedCategory ?? null;
     selectedSeniority = filters.selectedSeniority;
     selectedScoreBucket = filters.selectedScoreBucket;
-    selectedTjmMin = null;
+    scoreFilterMode = filters.scoreFilterMode ?? 'exact';
+    selectedTjmMin = filters.selectedTjmMin ?? null;
+    if (scoreFilterMode === 'exact' && selectedScoreBucket) {
+      showToast(
+        'Recherche historique : groupe de notes exact conservé. Choisissez une note minimale pour le modifier.',
+        'info'
+      );
+    }
     decisionPreset = filters.decisionPreset ?? null;
     showNewOnly = filters.showNewOnly;
     showFavoritesOnly = filters.showFavoritesOnly;
@@ -1307,6 +1361,7 @@ export function createFeedPageState(
     if (activeSavedViewId === viewId) {
       activeSavedViewId = null;
     }
+    pendingViewDeletes.add(viewId);
     viewDeleteUndo.request(viewId, {
       views: previousViews,
       activeId: previousActiveSavedViewId,
@@ -1453,6 +1508,16 @@ export function createFeedPageState(
           hidden = h;
         })
         .catch(() => {});
+    });
+
+    $effect(() => {
+      getMissionFeedback()
+        .then((stored) => {
+          feedback = stored;
+        })
+        .catch(() => {
+          showToast('Retours locaux indisponibles.', 'error');
+        });
     });
 
     // Load saved views
@@ -1671,7 +1736,7 @@ export function createFeedPageState(
     set sortBy(v: SortBy) {
       activeSavedViewId = null;
       sortBy = v;
-      setFeedSortBy(v);
+      setFeedSortBy(v).catch(() => showToast('Impossible d’enregistrer le tri.', 'error'));
     },
 
     get showFavoritesOnly() {
@@ -1900,6 +1965,26 @@ export function createFeedPageState(
       }
     },
 
+    get feedback() {
+      return feedback;
+    },
+    async setFeedback(id: string, value: MissionFeedback | null): Promise<void> {
+      feedbackWriteQueue = feedbackWriteQueue.then(async () => {
+        const next = { ...feedback };
+        if (value) {
+          next[id] = value;
+        } else {
+          delete next[id];
+        }
+        try {
+          await saveMissionFeedback(next);
+          feedback = next;
+        } catch {
+          showToast('Impossible d’enregistrer le retour local.', 'error');
+        }
+      });
+      await feedbackWriteQueue;
+    },
     // Actions
     handleMissionSeen,
     handleMissionReadSignal,

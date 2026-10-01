@@ -112,8 +112,8 @@ export type BridgeMessage =
   | { type: 'SAVE_FEED_HIDDEN'; payload: Record<string, number> }
   | { type: 'FEED_HIDDEN_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_FEED_SORT' }
-  | { type: 'FEED_SORT_RESULT'; payload: 'score' | 'date' | 'tjm' }
-  | { type: 'SAVE_FEED_SORT'; payload: 'score' | 'date' | 'tjm' }
+  | { type: 'FEED_SORT_RESULT'; payload: 'score' | 'date' | 'tjm' | 'personalized' }
+  | { type: 'SAVE_FEED_SORT'; payload: 'score' | 'date' | 'tjm' | 'personalized' }
   | { type: 'FEED_SORT_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_FEED_SAVED_VIEWS' }
   | { type: 'FEED_SAVED_VIEWS_RESULT'; payload: SavedFeedView[] }

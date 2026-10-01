@@ -135,7 +135,7 @@ export const setAiGatewayApiKey = async (apiKey: string): Promise<void> => {
 // ============================================================================
 
 const FEED_SORT_KEY = 'feedSortBy';
-const VALID_SORT_VALUES = ['score', 'date', 'tjm'] as const;
+const VALID_SORT_VALUES = ['score', 'date', 'tjm', 'personalized'] as const;
 type FeedSortBy = (typeof VALID_SORT_VALUES)[number];
 
 export const getFeedSortBy = async (): Promise<FeedSortBy> => {
@@ -152,11 +152,7 @@ export const getFeedSortBy = async (): Promise<FeedSortBy> => {
 };
 
 export const setFeedSortBy = async (value: FeedSortBy): Promise<void> => {
-  try {
-    await chrome.storage.local.set({ [FEED_SORT_KEY]: value });
-  } catch {
-    // Outside extension context
-  }
+  await chrome.storage.local.set({ [FEED_SORT_KEY]: value });
 };
 
 // ============================================================================
@@ -171,6 +167,8 @@ const FeedSavedViewSchema = z
     name: z.string().min(1).max(48),
     filters: z
       .object({
+        scoreFilterMode: z.enum(['minimum', 'exact']).default('exact'),
+        selectedTjmMin: z.number().positive().nullable().optional(),
         searchQuery: z.string().max(120),
         selectedStacks: z.array(z.string().min(1).max(48)).max(24),
         selectedSource: z
@@ -230,9 +228,5 @@ export const setFeedSavedViews = async (views: SavedFeedView[]): Promise<void> =
     throw new Error(`Invalid feed saved views: ${messages}`);
   }
 
-  try {
-    await chrome.storage.local.set({ [FEED_SAVED_VIEWS_KEY]: parseResult.data });
-  } catch {
-    // Outside extension context
-  }
+  await chrome.storage.local.set({ [FEED_SAVED_VIEWS_KEY]: parseResult.data });
 };

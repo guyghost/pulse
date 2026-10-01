@@ -185,7 +185,7 @@ describe('MissionInvestigationDrawer modal focus', () => {
       '[data-testid="drawer-fast-apply-btn"]'
     );
     expect(applyBtn).not.toBeNull();
-    expect(applyBtn!.textContent).toContain('Postuler & Suivre');
+    expect(applyBtn!.textContent).toContain('Ouvrir pour postuler');
     applyBtn!.click();
     expect(onFastApply).toHaveBeenCalledTimes(1);
   });

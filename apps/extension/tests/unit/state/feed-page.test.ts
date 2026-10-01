@@ -11,6 +11,8 @@ import type { FeedController } from '../../../src/lib/shell/facades/feed-control
 import type { FeedFilterDraft } from '../../../src/models/feed-filter-sheet.model';
 
 const feedDataMock = vi.hoisted(() => ({
+  getMissionFeedback: vi.fn(async () => ({})),
+  saveMissionFeedback: vi.fn(async () => {}),
   getSeenIds: vi.fn(),
   saveSeenIds: vi.fn(),
   getFavorites: vi.fn(),
@@ -30,6 +32,7 @@ const feedDataMock = vi.hoisted(() => ({
   syncFavoriteMission: vi.fn(),
 }));
 const toastMock = vi.hoisted(() => ({
+  showToast: vi.fn(),
   showToastAction: vi.fn(),
 }));
 
@@ -787,5 +790,88 @@ describe('feed page state', () => {
     // Visible set is exactly the 2 high-score, still-unseen missions.
     expect(page.dashboardSummary.newCount).toBe(2);
     expect(page.dashboardSummary.highScoreCount).toBe(2);
+  });
+  it('minimum B and C keep the A missions while the distribution remains exact', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'a', score: 80 }),
+      makeMission({ id: 'b', score: 60 }),
+      makeMission({ id: 'c', score: 40 }),
+      makeMission({ id: 'below', score: 39 }),
+    ]);
+    page.setSelectedScoreBucket('good');
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['a', 'b']);
+    page.setSelectedScoreBucket('weak');
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['a', 'b', 'c']);
+    expect(page.scoreDistribution.map((bucket) => bucket.count)).toEqual([1, 1, 2]);
+  });
+  it('rejects empty names, quota overflow and persistence failure without losing saved views', async () => {
+    const page = createFeedPageState(createFeedStore(), makeController());
+    await expect(page.saveCurrentView('  ')).rejects.toThrow('nom');
+    feedDataMock.setFeedSavedViews.mockRejectedValueOnce(new Error('quota'));
+    await expect(page.saveCurrentView('Ma recherche')).rejects.toThrow('quota');
+    expect(page.savedViews).toHaveLength(0);
+    for (let index = 0; index < 12; index++) {
+      await page.saveCurrentView(`Recherche ${index}`);
+    }
+    await expect(page.saveCurrentView('Treizième')).rejects.toThrow('12');
+    expect(page.savedViews).toHaveLength(12);
+  });
+  it('saves minimum semantics and TJM, and applies legacy exact groups explicitly', async () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([makeMission({ id: 'a', score: 90 }), makeMission({ id: 'b', score: 65 })]);
+    page.openFilterSheet();
+    page.editFilterSheet({ type: 'SET_SCORE_BUCKET', bucket: 'good' });
+    page.editFilterSheet({ type: 'SET_TJM_MIN', tjmMin: 650 });
+    await page.saveCurrentView('Minimum B');
+    const view = page.savedViews[0];
+    expect(view.filters).toMatchObject({ scoreFilterMode: 'minimum', selectedTjmMin: 650 });
+    page.clearAllFilters();
+    page.applySavedView(view.id);
+    expect(page.visibleCount).toBe(2);
+    const legacy = { ...view, filters: { ...view.filters, scoreFilterMode: undefined } };
+    page.savedViews[0] = legacy;
+    page.applySavedView(legacy.id);
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['b']);
+    page.openFilterSheet();
+    page.editFilterSheet({ type: 'SET_REMOTE', remote: 'hybrid' });
+    expect(page.visibleCount).toBe(1);
+    page.editFilterSheet({ type: 'SET_SCORE_BUCKET', bucket: 'good' });
+    expect(page.visibleCount).toBe(2);
+  });
+  it('serializes concurrent feedback writes and preserves the canonical score', async () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([makeMission({ id: 'a', score: 90 }), makeMission({ id: 'b', score: 60 })]);
+    await Promise.all([page.setFeedback('a', 'off-target'), page.setFeedback('b', 'relevant')]);
+    page.sortBy = 'personalized';
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['b', 'a']);
+    expect(feed.missions.map((row) => row.score)).toEqual([90, 60]);
+    await page.setFeedback('a', null);
+    expect(page.feedback).toEqual({ b: 'relevant' });
+    feedDataMock.saveMissionFeedback.mockRejectedValueOnce(new Error('quota'));
+    await page.setFeedback('b', 'off-target');
+    expect(page.feedback.b).toBe('relevant');
+  });
+  it('restores only the failed deleted search and keeps sibling searches', async () => {
+    vi.useFakeTimers();
+    try {
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.saveCurrentView('Première');
+      await page.saveCurrentView('Deuxième');
+      const id = page.savedViews[1].id;
+      page.deleteSavedView(id);
+      feedDataMock.setFeedSavedViews.mockRejectedValueOnce(new Error('quota'));
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(page.savedViews.map((view) => view.name).sort()).toEqual(['Deuxième', 'Première']);
+      expect(toastMock.showToast).toHaveBeenCalledWith(
+        'Suppression impossible : recherche restaurée.',
+        'error'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });

@@ -104,7 +104,7 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(feedSource).toContain('class="relative h-full overflow-y-auto"');
+    expect(feedSource).toContain('class="relative min-h-0 flex-1 overflow-y-auto"');
     expect(feedSource).toContain('data-testid="feed-scroll-container"');
     expect(feedSource).toContain('data-testid="mission-feed"');
     expect(feedSource).toContain(
