@@ -998,3 +998,20 @@ describe('SettingsPageController — readable effective states', () => {
     controller.destroy();
   });
 });
+
+it('reports a platform opening failure without changing the source selection', async () => {
+  bridgeMock.sendMessage.mockResolvedValue({ type: 'PROFILE_RESULT', payload: null });
+  vi.stubGlobal('chrome', {
+    tabs: { create: vi.fn().mockRejectedValue(new Error('Tab opening refused')) },
+  });
+  const controller = new SettingsPageController({ connectorCatalog: shippedConnectorCatalog });
+  controller.enabledConnectorIds = ['free-work'];
+  try {
+    await controller.openSource('free-work');
+    expect(controller.sourcesError).toBe('Impossible d’ouvrir Free-Work. Réessayez depuis Chrome.');
+    expect(controller.enabledConnectorIds).toEqual(['free-work']);
+  } finally {
+    controller.destroy();
+    vi.unstubAllGlobals();
+  }
+});

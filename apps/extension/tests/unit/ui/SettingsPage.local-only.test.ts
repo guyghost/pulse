@@ -41,6 +41,15 @@ describe('SettingsPage with the connected surface disabled', () => {
     await tick();
 
     expect(target.textContent).toContain('Dans votre navigateur');
+    const copy = target.textContent?.replace(/\s+/g, ' ');
+    expect(copy).toContain('Titre, technologies, mode de travail et description sont transmis');
+    expect(copy).toContain(
+      'Le titre et la description peuvent contenir un tarif, un lieu ou d’autres données'
+    );
+    expect(copy).toContain(
+      'profil utilisateur et les champs structurés TJM/localisation ne sont pas ajoutés'
+    );
+    expect(copy).not.toContain('TJM, localisation et sessions ne sont pas transmis');
   });
 
   it('keeps cloud off and exposes unknown verification after an unexpected key response', async () => {

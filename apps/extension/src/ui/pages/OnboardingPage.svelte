@@ -128,6 +128,8 @@
   // states stay local (plan: "errors displayed locally").
   const sourceVerifications = $state<Record<string, SourceVerificationStatus | 'checking'>>({});
 
+  const sourceOpenErrors = $state<Record<string, string>>({});
+
   async function handleVerifySource(sourceId: string): Promise<void> {
     if (sourceVerifications[sourceId] === 'checking') {
       return;
@@ -163,10 +165,17 @@
     }
   }
 
-  function handleOpenSource(sourceId: string): void {
+  async function handleOpenSource(sourceId: string): Promise<void> {
     const source = sources.find((s) => s.id === sourceId);
-    if (source?.url) {
-      void openSourceInNewTab(source.url);
+    if (!source?.url) {
+      return;
+    }
+    delete sourceOpenErrors[sourceId];
+    try {
+      await openSourceInNewTab(source.url);
+    } catch {
+      sourceOpenErrors[sourceId] =
+        `Impossible d’ouvrir ${source.name}. Réessayez depuis Chrome, puis revérifiez la session.`;
     }
   }
 
@@ -315,6 +324,7 @@
     onRetry={retryFinalize}
     {navFailed}
     {sourceVerifications}
+    {sourceOpenErrors}
     onVerifySource={handleVerifySource}
     onOpenSource={handleOpenSource}
   />

@@ -23,6 +23,7 @@
     onRetry,
     navFailed = false,
     sourceVerifications = {},
+    sourceOpenErrors = {},
     onVerifySource = null,
     onOpenSource = null,
     notificationThreshold = 70,
@@ -35,6 +36,7 @@
     notificationThreshold?: number | null;
     /** P0-B — per-source session verification state (absent = idle). */
     sourceVerifications?: Record<string, 'ready' | 'session-missing' | 'unavailable' | 'checking'>;
+    sourceOpenErrors?: Record<string, string>;
     onVerifySource?: ((sourceId: string) => void) | null;
     onOpenSource?: ((sourceId: string) => void) | null;
   } = $props();
@@ -238,6 +240,11 @@
                 {/if}
               </span>
             </div>
+            {#if sourceOpenErrors[s.id]}
+              <p role="alert" class="mt-2 text-caption text-status-orange-text">
+                {sourceOpenErrors[s.id]}
+              </p>
+            {/if}
           </li>
         {/each}
       </ul>

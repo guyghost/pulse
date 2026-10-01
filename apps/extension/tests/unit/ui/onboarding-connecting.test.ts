@@ -40,6 +40,7 @@ function mountFlow(
   handlers: {
     onEvent?: (event: OnboardingFlowEvent) => void;
     notificationThreshold?: number | null;
+    sourceOpenErrors?: Record<string, string>;
     onVerifySource?: (sourceId: string) => void;
     onOpenSource?: (sourceId: string) => void;
     sourceVerifications?: Record<string, 'ready' | 'session-missing' | 'unavailable' | 'checking'>;
@@ -57,6 +58,7 @@ function mountFlow(
       onOpenSource: handlers.onOpenSource ?? vi.fn(),
       sourceVerifications: handlers.sourceVerifications,
       notificationThreshold: handlers.notificationThreshold,
+      sourceOpenErrors: handlers.sourceOpenErrors,
     },
   });
   return { target, instance };
@@ -199,4 +201,22 @@ describe('OnboardingFlow — effective notification threshold', () => {
     expect(target.textContent).toContain('Le seuil enregistré est indisponible');
     expect(target.textContent).not.toContain('70/100');
   });
+});
+
+it('keeps the onboarding opening error explicit while session verification remains available', async () => {
+  const { target } = mountFlow(makeSnapshot(), {
+    sourceVerifications: { lehibou: 'session-missing' },
+    sourceOpenErrors: {
+      lehibou: 'Impossible d’ouvrir LeHibou. Réessayez depuis Chrome, puis revérifiez la session.',
+    },
+  });
+  await tick();
+  expect(target.querySelector('[role="alert"]')?.textContent).toContain(
+    'Impossible d’ouvrir LeHibou'
+  );
+  expect(
+    [...target.querySelectorAll('button')].some((button) =>
+      button.textContent?.includes('Réessayer')
+    )
+  ).toBe(true);
 });

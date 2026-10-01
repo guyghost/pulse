@@ -48,3 +48,21 @@ Le contrôleur a relu visuellement navigation/profil/IA à 400 px, l’absence d
 ## Limites
 
 Les parcours navigateur utilisent le mode dev et des sessions mock ; ils ne démontrent pas la connexion réelle à chaque plateforme ni un cycle MV3 sur des comptes privés. Les tests métier couvrent les états manquants et en erreur. Aucun appel cloud réel, aucune permission nouvelle et aucune validation backend n’ont été nécessaires. La suite exhaustive du monorepo n’a pas été relancée ; les contrôles portent sur le lot et les parcours d’intégration concernés.
+
+## Correctif de relecture — Round 1
+
+Base relue : `40ab24df43dc1a4355fcbb3e77a1fe4cf364a4eb`. Les constats Important et Minor de `task-2-review.md` ont été corrigés sans extension fonctionnelle.
+
+- **Important, transmission cloud** : le texte décrit toujours titre, technologies, mode de travail et description transmis, avec texte limité. Il précise désormais que le profil utilisateur et les champs structurés TJM/localisation ne sont pas ajoutés ; le titre et la description peuvent contenir un tarif, un lieu ou d’autres données de l’annonce. Cette précision remplace l’exclusion trop large « sans profil/TJM/localisation/session » du tableau initial : aucune expurgation des textes libres n’est promise. Le test de rendu Réglages couvre ces informations et l’absence de l’ancienne promesse.
+- **Minor, ouverture de plateforme** : le helper propage désormais le rejet de `chrome.tabs.create` lorsqu’elle existe. Le fallback `window.open` reste uniquement pour l’absence de cette API, en best effort ; un retour null avec `noopener` n’est pas traité comme preuve de blocage. Le catch Réglages peut afficher son erreur existante ; l’onboarding capture aussi ce rejet et rend une alerte dans la ligne de source, en conservant l’action de vérification. Les tests couvrent succès Chrome, rejet sans fallback, API absente avec résultat null, erreur du contrôleur Réglages et affichage de l’erreur onboarding.
+
+Commandes avec le même préfixe PATH que ci-dessus :
+
+- `pnpm --filter @pulse/extension exec vitest run tests/unit/ui/SettingsPage.local-only.test.ts tests/unit/onboarding/verify-source-session.test.ts tests/unit/state/settings-page.test.ts tests/unit/ui/onboarding-connecting.test.ts` : **52/52 tests réussis**, 4 fichiers, aucune erreur non traitée.
+- `pnpm --filter @pulse/extension exec eslint <les huit fichiers source/tests de ce correctif>` : **réussi**, zéro erreur.
+- `pnpm --filter @pulse/extension typecheck` : **réussi**, code de sortie 0.
+- `git diff --check` : **réussi**.
+
+Aucune suite exhaustive ni E2E relancés : les modifications sont couvertes par les tests shell, état et rendu ciblés. Aucun appel cloud réel, activation, changement de clé, sous-agent ou push. La limite du fallback navigateur sans API Chrome reste explicite : il ne prouve pas la réussite de l’ouverture.
+
+Le même incident Git du hook `lint-staged` s’est reproduit à la remise en index, après réussite d’ESLint/Prettier sur les 8 fichiers du correctif. Index et fichiers ont été revérifiés, le rapport réindexé avec `git add -f`, puis le commit effectué avec `SKIP_SIMPLE_GIT_HOOKS=1`. Le backup automatique `f8b1663` est conservé.

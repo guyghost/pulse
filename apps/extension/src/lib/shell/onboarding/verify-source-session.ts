@@ -65,16 +65,14 @@ export async function verifySourceSession(
 /**
  * Opens the platform in a new tab (user login).
  * The side panel regains focus on return → the orchestration re-verifies.
- * `window.open` fallback for dev mode without extension context.
+ * Chrome tab errors propagate to the caller for user-facing feedback.
+ * Without the tab API, window.open is best effort: a null result with
+ * noopener is not evidence that the browser blocked the popup.
  */
 export async function openSourceInNewTab(url: string): Promise<void> {
   if (typeof chrome !== 'undefined' && chrome.tabs?.create) {
-    try {
-      await chrome.tabs.create({ url });
-      return;
-    } catch {
-      // fall through to window.open
-    }
+    await chrome.tabs.create({ url });
+    return;
   }
   window.open(url, '_blank', 'noopener');
 }

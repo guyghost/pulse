@@ -878,8 +878,10 @@
               <p class="mt-0.5 text-meta text-text-subtle">
                 Catégorise les missions via Vercel AI Gateway avec une clé personnelle. Titre,
                 technologies, mode de travail et description sont transmis (texte limité). Votre
-                profil, TJM, localisation et sessions ne sont pas transmis. La conservation des
-                données est désactivée dans la requête.
+                profil utilisateur et les champs structurés TJM/localisation ne sont pas ajoutés. Le
+                titre et la description peuvent contenir un tarif, un lieu ou d’autres données de
+                l’annonce. Les sessions et cookies ne sont pas ajoutés à l’envoi. La conservation
+                des données est désactivée dans la requête.
               </p>
             </div>
           </div>
