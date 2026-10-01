@@ -22,7 +22,11 @@ describe('projectTJMFloorAgainstMarket', () => {
   it.each([
     ['missing floor', { tjmMin: 0, tjmMax: null, seniority: 'confirmed' as const }, market],
     ['missing seniority', { tjmMin: 500, tjmMax: null, seniority: null }, market],
-    ['inverted profile range', { tjmMin: 700, tjmMax: 600, seniority: 'confirmed' as const }, market],
+    [
+      'inverted profile range',
+      { tjmMin: 700, tjmMax: 600, seniority: 'confirmed' as const },
+      market,
+    ],
     ['missing market data', { tjmMin: 500, tjmMax: null, seniority: 'confirmed' as const }, null],
   ])('returns no projection for %s', (_label, profile, range) => {
     expect(projectTJMFloorAgainstMarket(profile, range)).toBeNull();
