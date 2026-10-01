@@ -95,7 +95,10 @@ export async function setFeedSortBy(sortBy: FeedSortBy): Promise<void> {
 
 export async function getFeedSavedViews(): Promise<SavedFeedView[]> {
   const response = await sendMessage({ type: 'GET_FEED_SAVED_VIEWS' });
-  return response.type === 'FEED_SAVED_VIEWS_RESULT' ? response.payload : [];
+  if (response.type !== 'FEED_SAVED_VIEWS_RESULT') {
+    throw new Error('Impossible de charger les recherches enregistrées.');
+  }
+  return response.payload;
 }
 
 export async function setFeedSavedViews(views: SavedFeedView[]): Promise<void> {

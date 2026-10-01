@@ -7,6 +7,7 @@ import {
   needsTjmNegotiation,
 } from '../../../src/lib/state/feed-page.svelte';
 import type { Mission, MissionSource } from '../../../src/lib/core/types/mission';
+import type { SavedFeedView } from '../../../src/lib/core/types/feed-view';
 import type { FeedController } from '../../../src/lib/shell/facades/feed-controller.svelte';
 import type { FeedFilterDraft } from '../../../src/models/feed-filter-sheet.model';
 
@@ -207,9 +208,54 @@ function makeController(
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (cause: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+function makeSavedView(id: string): SavedFeedView {
+  return {
+    id,
+    name: id,
+    createdAt: 1,
+    updatedAt: 1,
+    filters: {
+      searchQuery: '',
+      selectedStacks: [],
+      selectedSource: null,
+      selectedRemote: null,
+      selectedCategory: null,
+      selectedSeniority: null,
+      selectedScoreBucket: null,
+      decisionPreset: null,
+      showNewOnly: false,
+      showFavoritesOnly: false,
+      showHidden: false,
+      sortBy: 'score',
+    },
+  };
+}
+function persistedViewFixture(initial: SavedFeedView[] = []) {
+  let persisted = [...initial];
+  feedDataMock.getFeedSavedViews.mockImplementation(async () => [...persisted]);
+  feedDataMock.setFeedSavedViews.mockImplementation(async (views: SavedFeedView[]) => {
+    persisted = [...views];
+  });
+  return {
+    get persisted() {
+      return persisted;
+    },
+  };
+}
 describe('feed page state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    feedDataMock.getMissionFeedback.mockResolvedValue({});
+    feedDataMock.saveMissionFeedback.mockResolvedValue(undefined);
     feedDataMock.getFeedSortBy.mockResolvedValue('score');
     feedDataMock.setFeedSortBy.mockResolvedValue(undefined);
     feedDataMock.saveSeenIds.mockResolvedValue(undefined);
@@ -605,7 +651,7 @@ describe('feed page state', () => {
       expect(feedDataMock.setFeedSavedViews.mock.calls.length).toBe(callsBeforeDelete);
 
       // Commit fires when the window times out (DEFAULT_UNDO_WINDOW_MS = 5000).
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(feedDataMock.setFeedSavedViews).toHaveBeenLastCalledWith([]);
     } finally {
@@ -873,5 +919,145 @@ describe('feed page state', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+  it('keeps an undoable search persisted when creating another search, then undo survives reload', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      page.deleteSavedView('A');
+      const undo = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
+      await page.saveCurrentView('B');
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'A']);
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B']);
+      undo();
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B', 'A']);
+      await vi.advanceTimersByTimeAsync(5000);
+      const reloaded = createFeedPageState(createFeedStore(), makeController());
+      await reloaded.loadSavedViews();
+      expect(reloaded.savedViews.map((view) => view.name)).toEqual(['B', 'A']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('closing during an undo window after creation preserves the temporarily removed search', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      page.deleteSavedView('A');
+      await page.saveCurrentView('B');
+      page.dispose();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'A']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a deletion during delayed creation stays hidden and commits after that creation', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      const write = deferred<void>();
+      const started = deferred<void>();
+      const persist = feedDataMock.setFeedSavedViews.getMockImplementation()!;
+      feedDataMock.setFeedSavedViews.mockImplementationOnce(async (views: SavedFeedView[]) => {
+        started.resolve();
+        await write.promise;
+        await persist(views);
+      });
+      const creation = page.saveCurrentView('B');
+      await started.promise;
+      expect(feedDataMock.setFeedSavedViews).toHaveBeenCalledTimes(1);
+      page.deleteSavedView('A');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(feedDataMock.setFeedSavedViews).toHaveBeenCalledTimes(1);
+      write.resolve();
+      await creation;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B']);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('commits one expired deletion while preserving another search still undoable during creation', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A'), makeSavedView('C')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      page.deleteSavedView('A');
+      await vi.advanceTimersByTimeAsync(1000);
+      page.deleteSavedView('C');
+      const undoC = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
+      await page.saveCurrentView('B');
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'C']);
+      undoC();
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B', 'C']);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'C']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a failed search load never writes an empty replacement, and retry preserves existing searches', async () => {
+    feedDataMock.getFeedSavedViews.mockRejectedValue(new Error('read failed'));
+    const page = createFeedPageState(createFeedStore(), makeController());
+    await expect(page.loadSavedViews()).rejects.toThrow('read failed');
+    await expect(page.saveCurrentView('B')).rejects.toThrow('read failed');
+    expect(feedDataMock.setFeedSavedViews).not.toHaveBeenCalled();
+    const disk = persistedViewFixture([makeSavedView('A')]);
+    await page.saveCurrentView('B');
+    expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'A']);
+  });
+  it('delayed search loading completes before creation and cannot overwrite the new projection', async () => {
+    const read = deferred<SavedFeedView[]>();
+    feedDataMock.getFeedSavedViews.mockReturnValueOnce(read.promise);
+    const page = createFeedPageState(createFeedStore(), makeController());
+    const loading = page.loadSavedViews();
+    const creation = page.saveCurrentView('B');
+    await Promise.resolve();
+    expect(feedDataMock.setFeedSavedViews).not.toHaveBeenCalled();
+    read.resolve([makeSavedView('A')]);
+    await Promise.all([loading, creation]);
+    expect(
+      feedDataMock.setFeedSavedViews.mock.calls[0][0].map((view: SavedFeedView) => view.name)
+    ).toEqual(['B', 'A']);
+    expect(page.savedViews.map((view) => view.name)).toEqual(['B', 'A']);
+  });
+  it('failed feedback loading never writes a replacement, and retry retains other missions', async () => {
+    feedDataMock.getMissionFeedback.mockRejectedValue(new Error('read failed'));
+    const page = createFeedPageState(createFeedStore(), makeController());
+    await expect(page.loadFeedback()).rejects.toThrow('read failed');
+    await page.setFeedback('new', 'relevant');
+    expect(feedDataMock.saveMissionFeedback).not.toHaveBeenCalled();
+    feedDataMock.getMissionFeedback.mockResolvedValue({ existing: 'off-target' });
+    await page.setFeedback('new', 'relevant');
+    expect(feedDataMock.saveMissionFeedback).toHaveBeenLastCalledWith({
+      existing: 'off-target',
+      new: 'relevant',
+    });
+  });
+  it('delayed feedback loading completes before mutation and cannot overwrite that decision', async () => {
+    const read = deferred<Record<string, 'relevant' | 'off-target'>>();
+    feedDataMock.getMissionFeedback.mockReturnValueOnce(read.promise);
+    const page = createFeedPageState(createFeedStore(), makeController());
+    const loading = page.loadFeedback();
+    const mutation = page.setFeedback('new', 'relevant');
+    await Promise.resolve();
+    expect(feedDataMock.saveMissionFeedback).not.toHaveBeenCalled();
+    read.resolve({ existing: 'off-target' });
+    await Promise.all([loading, mutation]);
+    expect(page.feedback).toEqual({ existing: 'off-target', new: 'relevant' });
+    expect(feedDataMock.saveMissionFeedback).toHaveBeenLastCalledWith({
+      existing: 'off-target',
+      new: 'relevant',
+    });
   });
 });

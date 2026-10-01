@@ -1360,3 +1360,8 @@ describe('validateMessage — GENERATE_ASSET', () => {
     expect(r.valid).toBe(false);
   });
 });
+
+it('accepts an explicit failed saved-search read separately from an empty catalogue', () => {
+  expect(validateMessage({ type: 'FEED_SAVED_VIEWS_FAILED' }).valid).toBe(true);
+  expect(validateMessage({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] }).valid).toBe(true);
+});

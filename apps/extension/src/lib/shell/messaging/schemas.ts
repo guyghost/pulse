@@ -833,6 +833,7 @@ export const MessageSchemas = {
     type: z.literal('FEED_SORT_SAVED'),
     payload: z.object({ saved: z.boolean() }),
   }),
+  FEED_SAVED_VIEWS_FAILED: z.object({ type: z.literal('FEED_SAVED_VIEWS_FAILED') }),
   GET_FEED_SAVED_VIEWS: z.object({ type: z.literal('GET_FEED_SAVED_VIEWS') }),
   FEED_SAVED_VIEWS_RESULT: z.object({
     type: z.literal('FEED_SAVED_VIEWS_RESULT'),

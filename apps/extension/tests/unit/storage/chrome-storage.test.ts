@@ -314,10 +314,10 @@ describe('feed saved views storage', () => {
     );
   });
 
-  it('falls back to an empty list when stored saved views are invalid', async () => {
+  it('rejects invalid saved views instead of claiming the catalogue is empty', async () => {
     mockStorage.feedSavedViews = [{ id: 'bad-view', name: '', filters: {} }];
 
-    await expect(getFeedSavedViews()).resolves.toEqual([]);
+    await expect(getFeedSavedViews()).rejects.toThrow();
   });
 
   it('rejects more than 12 saved views', async () => {
@@ -343,4 +343,12 @@ describe('feed saved views storage', () => {
 
     await expect(setFeedSavedViews(views)).rejects.toThrow('Invalid feed saved views');
   });
+});
+
+it('propagates saved search storage read failures and preserves the existing value', async () => {
+  const existing = [{ id: 'existing-view' }];
+  mockStorage.feedSavedViews = existing;
+  vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(new Error('read failed'));
+  await expect(getFeedSavedViews()).rejects.toThrow('read failed');
+  expect(mockStorage.feedSavedViews).toBe(existing);
 });

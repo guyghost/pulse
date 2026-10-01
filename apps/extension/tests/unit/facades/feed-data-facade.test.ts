@@ -14,6 +14,7 @@ import {
   getConnectorStatuses,
   getFavorites,
   getFeedSortBy,
+  getFeedSavedViews,
   getHidden,
   getMissions,
   getProfile,
@@ -186,4 +187,13 @@ describe('feed data facade profile bridge', () => {
       payload: { url: 'https://www.free-work.com/' },
     });
   });
+});
+
+it('distinguishes a failed saved-view read from a confirmed empty catalogue', async () => {
+  bridgeMock.sendMessage.mockResolvedValueOnce({ type: 'FEED_SAVED_VIEWS_FAILED' });
+  await expect(getFeedSavedViews()).rejects.toThrow('charger');
+  bridgeMock.sendMessage.mockRejectedValueOnce(new Error('transport'));
+  await expect(getFeedSavedViews()).rejects.toThrow('transport');
+  bridgeMock.sendMessage.mockResolvedValueOnce({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] });
+  await expect(getFeedSavedViews()).resolves.toEqual([]);
 });

@@ -1696,7 +1696,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         })
         .catch((err) => {
           console.warn('[MissionPulse] GET_FEED_SAVED_VIEWS error:', err);
-          sendResponse({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] });
+          sendResponse({ type: 'FEED_SAVED_VIEWS_FAILED' });
         });
       return true;
     }

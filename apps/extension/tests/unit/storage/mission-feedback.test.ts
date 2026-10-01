@@ -26,5 +26,16 @@ it('rejects storage failures', async () => {
 });
 it('does not interpret invalid stored feedback as a user decision', async () => {
   data.missionLocalFeedback = { m: 'cloud' };
+  await expect(getMissionFeedback()).rejects.toThrow();
+});
+
+it('distinguishes a successful absent key from failed reads', async () => {
   expect(await getMissionFeedback()).toEqual({});
+  data.missionLocalFeedback = { existing: 'relevant' };
+  chrome.storage.local.get = vi.fn(async () => {
+    throw new Error('read failed');
+  });
+  await expect(getMissionFeedback()).rejects.toThrow('read failed');
+  expect(data.missionLocalFeedback).toEqual({ existing: 'relevant' });
+  expect(set).not.toHaveBeenCalled();
 });

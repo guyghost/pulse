@@ -209,16 +209,11 @@ const FeedSavedViewSchema = z
 const FeedSavedViewsSchema = z.array(FeedSavedViewSchema).max(12);
 
 export const getFeedSavedViews = async (): Promise<SavedFeedView[]> => {
-  try {
-    const result = await chrome.storage.local.get(FEED_SAVED_VIEWS_KEY);
-    const parseResult = FeedSavedViewsSchema.safeParse(result[FEED_SAVED_VIEWS_KEY]);
-    if (parseResult.success) {
-      return parseResult.data;
-    }
-  } catch {
-    // Outside extension context
+  const result = await chrome.storage.local.get(FEED_SAVED_VIEWS_KEY);
+  if (result[FEED_SAVED_VIEWS_KEY] === undefined) {
+    return [];
   }
-  return [];
+  return FeedSavedViewsSchema.parse(result[FEED_SAVED_VIEWS_KEY]);
 };
 
 export const setFeedSavedViews = async (views: SavedFeedView[]): Promise<void> => {

@@ -910,7 +910,7 @@
     {/if}
   </div>
   {#if expanded}
-    {#if onConfirmApplied && (trackingStatus === null || trackingStatus === 'detected' || trackingStatus === 'selected' || (trackingStatus === 'application_prepared' && !expanded))}
+    {#if onConfirmApplied && !availableTransitions.includes('applied') && (trackingStatus === null || trackingStatus === 'detected' || trackingStatus === 'selected' || trackingStatus === 'application_prepared')}
       <button
         type="button"
         class="soft-ring min-h-11 w-full rounded-lg border border-blueprint-blue/30 px-2 text-caption text-blueprint-blue"

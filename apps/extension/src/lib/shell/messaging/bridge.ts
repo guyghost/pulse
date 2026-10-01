@@ -117,6 +117,7 @@ export type BridgeMessage =
   | { type: 'FEED_SORT_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_FEED_SAVED_VIEWS' }
   | { type: 'FEED_SAVED_VIEWS_RESULT'; payload: SavedFeedView[] }
+  | { type: 'FEED_SAVED_VIEWS_FAILED' }
   | { type: 'SAVE_FEED_SAVED_VIEWS'; payload: SavedFeedView[] }
   | { type: 'FEED_SAVED_VIEWS_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_CONNECTED_ALERT_PREFERENCES' }

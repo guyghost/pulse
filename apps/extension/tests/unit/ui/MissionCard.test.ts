@@ -883,30 +883,33 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
     );
     expect(tabindexes.every((value) => value <= 0)).toBe(true);
   });
-  it('keeps feedback and sending confirmation inside details and routes prepared sending to explicit confirmation', async () => {
-    const onConfirmApplied = vi.fn();
-    const onStatusTransition = vi.fn();
-    const target = mountCard({
-      trackingStatus: 'application_prepared',
-      onConfirmApplied,
-      onStatusTransition,
-      onFeedback: vi.fn(),
-    });
-    await tick();
-    expect(target.textContent).not.toContain('J’ai envoyé ma candidature');
-    expect(target.textContent).not.toContain('Hors cible');
-    (
-      target.querySelector('button[aria-label^="Afficher les détails"]') as HTMLButtonElement
-    ).click();
-    await tick();
-    const confirmation = Array.from(target.querySelectorAll('button')).filter(
-      (button) => button.textContent?.trim() === 'J’ai envoyé ma candidature'
-    );
-    expect(confirmation).toHaveLength(1);
-    confirmation[0].click();
-    expect(onConfirmApplied).toHaveBeenCalledTimes(1);
-    expect(onStatusTransition).not.toHaveBeenCalled();
-  });
+  it.each(['selected', 'application_prepared'] as const)(
+    'keeps a single explicit sending confirmation for %s inside details',
+    async (trackingStatus) => {
+      const onConfirmApplied = vi.fn();
+      const onStatusTransition = vi.fn();
+      const target = mountCard({
+        trackingStatus,
+        onConfirmApplied,
+        onStatusTransition,
+        onFeedback: vi.fn(),
+      });
+      await tick();
+      expect(target.textContent).not.toContain('J’ai envoyé ma candidature');
+      expect(target.textContent).not.toContain('Hors cible');
+      (
+        target.querySelector('button[aria-label^="Afficher les détails"]') as HTMLButtonElement
+      ).click();
+      await tick();
+      const confirmation = Array.from(target.querySelectorAll('button')).filter(
+        (button) => button.textContent?.trim() === 'J’ai envoyé ma candidature'
+      );
+      expect(confirmation).toHaveLength(1);
+      confirmation[0].click();
+      expect(onConfirmApplied).toHaveBeenCalledTimes(1);
+      expect(onStatusTransition).not.toHaveBeenCalled();
+    }
+  );
   it('disables source opening and confirmation while tracking is pending', async () => {
     const onFastApply = vi.fn();
     const onConfirmApplied = vi.fn();

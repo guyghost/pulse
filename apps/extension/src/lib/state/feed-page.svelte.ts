@@ -305,6 +305,12 @@ export function createFeedPageState(
   // ============================================================
   let feedback = $state<MissionFeedbackMap>({});
   let feedbackWriteQueue = Promise.resolve();
+  let feedbackLoaded = false;
+  let feedbackLoadPromise: Promise<void> | null = null;
+  let savedViewsLoaded = false;
+  let savedViewsLoadPromise: Promise<void> | null = null;
+  let savedViewsWriteQueue = Promise.resolve();
+  let savedViewCatalog: SavedFeedView[] = [];
   let scoreFilterMode = $state<'minimum' | 'exact'>('minimum');
   let sortBy = $state<SortBy>('score');
 
@@ -421,23 +427,27 @@ export function createFeedPageState(
     name: string;
   }> = createUndoController({
     kind: 'delete-view',
-    onCommit: (_id, _snapshot, { stillPending }) => {
-      pendingViewDeletes.delete(_id);
-      // Re-include any view whose undo window is still open — its in-memory
-      // deletion must not be finalized by a sibling view's commit.
-      const restoreViews = stillPending.flatMap((p) =>
-        p.snapshot.views.filter((v) => v.id === p.targetId)
-      );
-      setFeedSavedViews([...savedViews, ...restoreViews]).catch(() => {
-        savedViews = [...savedViews, ..._snapshot.views.filter((view) => view.id === _id)];
-        showToast('Suppression impossible : recherche restaurée.', 'error');
+    onCommit: (id, snapshot) => {
+      void queueSavedViewsWrite(async () => {
+        // The catalogue includes every undoable deletion until its own commit.
+        const next = savedViewCatalog.filter((view) => view.id !== id);
+        try {
+          await setFeedSavedViews(next);
+          savedViewCatalog = next;
+        } catch {
+          if (activeSavedViewId === null) {
+            activeSavedViewId = snapshot.activeId;
+          }
+          showToast('Suppression impossible : recherche restaurée.', 'error');
+        } finally {
+          pendingViewDeletes.delete(id);
+          projectSavedViews();
+        }
       });
     },
-    onRestore: (_id, snapshot) => {
-      pendingViewDeletes.delete(_id);
-      if (!savedViews.some((view) => view.id === _id)) {
-        savedViews = [...savedViews, ...snapshot.views.filter((view) => view.id === _id)];
-      }
+    onRestore: (id, snapshot) => {
+      pendingViewDeletes.delete(id);
+      projectSavedViews();
       if (activeSavedViewId === null) {
         activeSavedViewId = snapshot.activeId;
       }
@@ -1281,30 +1291,82 @@ export function createFeedPageState(
     return (trimmed || defaultSavedViewName(filters)).slice(0, 48);
   }
 
-  async function persistSavedViews(nextViews: SavedFeedView[]): Promise<void> {
-    await setFeedSavedViews(nextViews);
-    savedViews = nextViews;
+  function projectSavedViews(): void {
+    savedViews = savedViewCatalog.filter((view) => !pendingViewDeletes.has(view.id));
+  }
+
+  function ensureSavedViewsLoaded(): Promise<void> {
+    if (savedViewsLoaded) {
+      return Promise.resolve();
+    }
+    if (savedViewsLoadPromise) {
+      return savedViewsLoadPromise;
+    }
+    savedViewsLoadPromise = getFeedSavedViews()
+      .then((stored) => {
+        savedViewCatalog = stored;
+        savedViewsLoaded = true;
+        projectSavedViews();
+      })
+      .finally(() => {
+        savedViewsLoadPromise = null;
+      });
+    return savedViewsLoadPromise;
+  }
+
+  function ensureFeedbackLoaded(): Promise<void> {
+    if (feedbackLoaded) {
+      return Promise.resolve();
+    }
+    if (feedbackLoadPromise) {
+      return feedbackLoadPromise;
+    }
+    feedbackLoadPromise = getMissionFeedback()
+      .then((stored) => {
+        feedback = stored;
+        feedbackLoaded = true;
+      })
+      .finally(() => {
+        feedbackLoadPromise = null;
+      });
+    return feedbackLoadPromise;
+  }
+
+  function queueSavedViewsWrite(operation: () => Promise<void>): Promise<void> {
+    const result = savedViewsWriteQueue.then(async () => {
+      await ensureSavedViewsLoaded();
+      await operation();
+    });
+    savedViewsWriteQueue = result.catch(() => {});
+    return result;
   }
 
   async function saveCurrentView(name = ''): Promise<void> {
     if (!name.trim()) {
       throw new Error('Donnez un nom à la recherche.');
     }
-    if (savedViews.length + pendingViewDeletes.size >= MAX_SAVED_VIEWS) {
-      throw new Error('Limite de 12 recherches atteinte.');
-    }
     const filters = currentFilters();
-    const now = Date.now();
-    const view: SavedFeedView = {
-      id: `feed-view-${now}-${crypto.randomUUID()}`,
-      name: normalizeSavedViewName(name, filters),
-      filters,
-      createdAt: now,
-      updatedAt: now,
-    };
-    const nextViews = [view, ...savedViews].slice(0, MAX_SAVED_VIEWS);
-    await persistSavedViews(nextViews);
-    activeSavedViewId = view.id;
+    let createdViewId: string | null = null;
+    await queueSavedViewsWrite(async () => {
+      if (savedViewCatalog.length >= MAX_SAVED_VIEWS) {
+        throw new Error('Limite de 12 recherches atteinte.');
+      }
+      const now = Date.now();
+      const view: SavedFeedView = {
+        id: `feed-view-${now}-${crypto.randomUUID()}`,
+        name: normalizeSavedViewName(name, filters),
+        filters,
+        createdAt: now,
+        updatedAt: now,
+      };
+      const next = [view, ...savedViewCatalog];
+      await setFeedSavedViews(next);
+      savedViewCatalog = next;
+      // A deletion may start while this write awaits: project its current state.
+      projectSavedViews();
+      createdViewId = view.id;
+    });
+    activeSavedViewId = createdViewId;
     if (showNewOnly || decisionPreset === 'new') {
       enterStableNewQueue();
     } else {
@@ -1511,22 +1573,15 @@ export function createFeedPageState(
     });
 
     $effect(() => {
-      getMissionFeedback()
-        .then((stored) => {
-          feedback = stored;
-        })
-        .catch(() => {
-          showToast('Retours locaux indisponibles.', 'error');
-        });
-    });
-
-    // Load saved views
-    $effect(() => {
-      getFeedSavedViews()
-        .then((views) => {
-          savedViews = views;
-        })
-        .catch(() => {});
+      ensureFeedbackLoaded().catch(() =>
+        showToast('Retours locaux indisponibles. Réessayez avant de les modifier.', 'error')
+      );
+      ensureSavedViewsLoaded().catch(() =>
+        showToast(
+          'Recherches enregistrées indisponibles. Réessayez avant de les modifier.',
+          'error'
+        )
+      );
     });
 
     function applyProfile(nextProfile: UserProfile | null): void {
@@ -1970,13 +2025,14 @@ export function createFeedPageState(
     },
     async setFeedback(id: string, value: MissionFeedback | null): Promise<void> {
       feedbackWriteQueue = feedbackWriteQueue.then(async () => {
-        const next = { ...feedback };
-        if (value) {
-          next[id] = value;
-        } else {
-          delete next[id];
-        }
         try {
+          await ensureFeedbackLoaded();
+          const next = { ...feedback };
+          if (value) {
+            next[id] = value;
+          } else {
+            delete next[id];
+          }
           await saveMissionFeedback(next);
           feedback = next;
         } catch {
@@ -2010,6 +2066,8 @@ export function createFeedPageState(
     openFilterSheet,
     editFilterSheet,
     dismissFilterSheet,
+    loadSavedViews: ensureSavedViewsLoaded,
+    loadFeedback: ensureFeedbackLoaded,
     saveCurrentView,
     applySavedView,
     deleteSavedView,
