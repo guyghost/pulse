@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
+  import { projectTJMFloorAgainstMarket } from '$lib/core/tjm-history/market-position';
   import { formatStackLabel, formatTJMValue } from '$lib/core/utils/format';
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import { Skeleton } from '@pulse/ui';
@@ -61,12 +62,13 @@
   const isTargetInverted = $derived(
     userTjmMin > 0 && (userTjmMax ?? 0) > 0 && userTjmMin > (userTjmMax ?? 0)
   );
-  const userTargetFloor = $derived(userTjmMin > 0 && !isTargetInverted ? userTjmMin : null);
-  const userTargetDelta = $derived(
-    selectedMarketRange && userTargetFloor !== null && userSeniority !== null
-      ? userTargetFloor - selectedMarketRange.median
-      : null
+  const floorMarketProjection = $derived(
+    projectTJMFloorAgainstMarket(
+      { tjmMin: userTjmMin, tjmMax: userTjmMax, seniority: userSeniority },
+      selectedMarketRange
+    )
   );
+  const userTargetDelta = $derived(floorMarketProjection?.delta ?? null);
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
   const hasTjmTarget = $derived(userTjmMin > 0 && !isTargetInverted);
   const missingProfileDetails = $derived.by(() => {
@@ -105,28 +107,7 @@
       })
       .join(' ');
   });
-  // Positioning geometry: projects the market range and the user's TJM floor
-  // onto a shared 0–100 scale for a quick comparison.
-  const positioning = $derived.by(() => {
-    if (!selectedMarketRange || userTargetFloor === null || userSeniority === null) {
-      return null;
-    }
-    const market = selectedMarketRange;
-    const lo = Math.min(market.min, userTjmMin);
-    const hi = Math.max(market.max, userTjmMin);
-    const pad = Math.max(40, Math.round((hi - lo) * 0.08));
-    const scaleMin = lo - pad;
-    const scaleMax = hi + pad;
-    const span = scaleMax - scaleMin || 1;
-    const pct = (value: number) => Math.max(0, Math.min(100, ((value - scaleMin) / span) * 100));
-    return {
-      marketLeft: pct(market.min),
-      marketWidth: Math.max(3, pct(market.max) - pct(market.min)),
-      medianLeft: pct(market.median),
-      floorLeft: pct(userTjmMin),
-      marketMedian: market.median,
-    };
-  });
+  const positioning = $derived(floorMarketProjection?.positioning ?? null);
   const tjmSetupSteps = $derived.by<TjmSetupStep[]>(() => [
     {
       title: 'Scanner le feed',

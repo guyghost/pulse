@@ -23,6 +23,9 @@ défini et n'empêche pas de comparer le TJM minimum au marché.
 
 - `level` = niveau de séniorité du profil (déjà calculé par la page). Aucun
   nouveau calcul : le bandeau est une **projection pure** de l'analyse existante.
+- La comparaison du plancher et la géométrie du repère sont calculées par
+  `core/tjm-history/market-position.ts` ; le composant ne fait que rendre la
+  projection.
 
 ## Série sparkline — extension du core
 
