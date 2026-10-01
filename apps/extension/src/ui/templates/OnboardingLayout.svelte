@@ -1,52 +1,16 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
-
-  const {
-    content,
-    showHeader = true,
-  }: {
-    content: Snippet;
-    showHeader?: boolean;
-  } = $props();
+  const { content, showHeader = true }: { content: Snippet; showHeader?: boolean } = $props();
 </script>
 
-<div class="relative flex h-full flex-col px-4 py-6 overflow-y-auto">
-  <div
-    class="pointer-events-none absolute left-1/2 top-12 h-28 w-28 -translate-x-1/2 rounded-full bg-blueprint-blue/14 blur-3xl"
-  ></div>
-  <div class="section-card-strong relative w-full overflow-visible rounded-xl p-5 my-auto">
-    <div
-      class="pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full bg-blueprint-blue/12 blur-3xl"
-    ></div>
-    <div class="relative">
-      {#if showHeader}
-        <div class="mb-6">
-          <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
-          <h1 class="mt-3 text-heading-lg font-semibold leading-tight text-text-primary">
-            Configurez votre premier scan
-          </h1>
-          <p class="mt-3 text-body-lg leading-relaxed text-text-secondary">
-            Pulse utilise vos sessions Chrome pour récupérer les missions et afficher celles à
-            traiter en premier.
-          </p>
-        </div>
-
-        <div class="mb-6 grid grid-cols-3 gap-2">
-          <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="eyebrow eyebrow--caption">Scan</p>
-            <p class="mt-2 text-body-lg font-semibold text-text-primary">Multi-source</p>
-          </div>
-          <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="eyebrow eyebrow--caption">Notation</p>
-            <p class="mt-2 text-body-lg font-semibold text-text-primary">Pertinence</p>
-          </div>
-          <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="eyebrow eyebrow--caption">TJM</p>
-            <p class="mt-2 text-body-lg font-semibold text-text-primary">Ajusté</p>
-          </div>
-        </div>
-      {/if}
-
+<div class="flex h-full min-h-0 flex-col px-4 py-4">
+  <div class="section-card-strong flex h-full min-h-0 w-full flex-col rounded-xl p-4">
+    {#if showHeader}
+      <p class="mb-3 shrink-0 text-caption font-medium text-text-subtle">
+        MissionPulse · Configuration
+      </p>
+    {/if}
+    <div class="min-h-0 flex-1">
       {@render content()}
     </div>
   </div>

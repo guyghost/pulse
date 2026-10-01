@@ -4,15 +4,23 @@ import {
   type ConnectedAlertPreferences,
 } from '$lib/core/types/alert-preferences';
 import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
+import { getSettings } from './settings.facade';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 
 export async function getAlertPreferences(): Promise<ConnectedAlertPreferences> {
   const response = await sendMessage({ type: 'GET_CONNECTED_ALERT_PREFERENCES' });
   if (response.type !== 'CONNECTED_ALERT_PREFERENCES_RESULT') {
-    return DEFAULT_CONNECTED_ALERT_PREFERENCES;
+    throw new Error('Unexpected alert preferences response.');
   }
 
-  return response.payload ?? DEFAULT_CONNECTED_ALERT_PREFERENCES;
+  if (response.payload !== null) {
+    return response.payload;
+  }
+  // A valid absence uses the same threshold as the notification pipeline.
+  return {
+    ...DEFAULT_CONNECTED_ALERT_PREFERENCES,
+    scoreThreshold: (await getSettings()).notificationScoreThreshold,
+  };
 }
 
 export async function saveAlertPreferences(

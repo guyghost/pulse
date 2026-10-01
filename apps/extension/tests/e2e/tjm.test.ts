@@ -64,7 +64,9 @@ async function seedTJMHistory(page: Page) {
 test.describe('TJM page', () => {
   test('shows TJM tab in main navigation', async ({ page }) => {
     await expect(
-      page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
+      page
+        .getByRole('navigation', { name: 'Navigation principale' })
+        .getByRole('button', { name: 'TJM' })
     ).toBeVisible();
   });
 
@@ -74,7 +76,7 @@ test.describe('TJM page', () => {
     });
 
     // Scope to the main nav: the bare name 'TJM' also matches feed filter chips.
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     await nav.getByRole('button', { name: 'TJM' }).click();
     await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
     await page.getByRole('button', { name: "Rafraîchir l'analyse TJM" }).click();
@@ -87,7 +89,7 @@ test.describe('TJM page', () => {
     await seedTJMHistory(page);
 
     await page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'TJM' })
       .click();
 
@@ -107,7 +109,7 @@ test.describe('TJM page', () => {
     await page.waitForTimeout(300);
 
     await page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'TJM' })
       .click();
 

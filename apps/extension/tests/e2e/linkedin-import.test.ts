@@ -141,7 +141,7 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
 
 async function openCvPage(page: Page) {
   await page.goto(SIDE_PANEL);
-  const nav = page.getByRole('navigation', { name: 'Main navigation' });
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
   await expect(nav).toBeVisible();
   await expect(nav.getByRole('button', { name: 'CV' })).toBeVisible();
   await nav.getByRole('button', { name: 'CV' }).click();

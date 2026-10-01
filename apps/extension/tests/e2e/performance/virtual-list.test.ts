@@ -215,7 +215,7 @@ async function mockMultiBatchPartialScan(page: Page) {
   });
 
   await page.reload();
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible({
     timeout: 10000,
   });
 }

@@ -161,33 +161,35 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
     // still dispatches at the badge coordinates —
     // dispatchEvent('click') targets the element itself, without hit-testing.
     await page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'TJM' })
       .dispatchEvent('click');
     await expect(
-      page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
+      page
+        .getByRole('navigation', { name: 'Navigation principale' })
+        .getByRole('button', { name: 'TJM' })
     ).toHaveAttribute('aria-current', 'page');
 
     await page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'Réglages' })
       .dispatchEvent('click');
     await expect(
       page
-        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('navigation', { name: 'Navigation principale' })
         .getByRole('button', { name: 'Réglages' })
     ).toHaveAttribute('aria-current', 'page');
 
     await page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'Missions' })
       .dispatchEvent('click');
     await expect(
       page
-        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('navigation', { name: 'Navigation principale' })
         .getByRole('button', { name: 'Missions' })
     ).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+    await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible({
       timeout: 3000,
     });
   });
@@ -210,7 +212,7 @@ test.describe('Offline Mode', { tag: '@slow' }, () => {
       .isVisible()
       .catch(() => false);
     const hasNavigation = await page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .isVisible()
       .catch(() => false);
     expect(hasOfflineBanner || hasNavigation || true).toBe(true);

@@ -29,7 +29,7 @@ test('consent → generated dossier → review/copy → reopen', async ({ page }
 
   await enableAllSurfaceFlags(page);
   await page.goto(SIDE_PANEL);
-  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  const navigation = page.getByRole('navigation', { name: 'Navigation principale' });
   await expect(navigation).toBeVisible();
   await navigation.getByRole('button', { name: 'Suivi' }).click();
 

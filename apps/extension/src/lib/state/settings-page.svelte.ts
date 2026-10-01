@@ -1,3 +1,13 @@
+import {
+  deriveSettingsSourceStatus,
+  type SettingsSourceVerification,
+} from '$lib/core/connectors/settings-source-status';
+import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
+import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
+import {
+  verifySourceSession,
+  openSourceInNewTab,
+} from '$lib/shell/onboarding/verify-source-session';
 import type { Result } from '$lib/core/backup/backup';
 import { SvelteDate } from 'svelte/reactivity';
 import { createBackup, generateBackupFilename, serializeBackup } from '$lib/core/backup/backup';
@@ -76,6 +86,10 @@ export interface SettingsConnectorSource {
   icon: string;
   url: string;
   enabled: boolean;
+  state: ReturnType<typeof deriveSettingsSourceStatus>['state'];
+  statusLabel: string;
+  errorDetail: string | null;
+  lastSuccessLabel: string | null;
 }
 
 const formatBackupDateKey = (timestamp: number): string =>
@@ -121,14 +135,24 @@ export class SettingsPageController {
   editingProfile = $state(false);
   profileSaved = $state(false);
   profileError = $state<string | null>(null);
+  profileLoaded = $state(false);
+  profileLoadError = $state<string | null>(null);
 
   aiAvailability = $state<AiAvailability>('no');
   maxSemanticPerScan = $state(10);
 
-  classificationEnabled = $state(true);
+  classificationEnabled = $state(false);
+  settingsLoaded = $state(false);
+  sourceVerifications = $state<Record<string, SettingsSourceVerification>>({});
+  sourceStatuses = $state<PersistedConnectorStatus[]>([]);
+  sourceHealth = $state<ConnectorHealthSnapshot[]>([]);
+  sourcesError = $state<string | null>(null);
+  private destroyed = false;
+
   maxClassificationPerScan = $state(25);
   classificationConfidenceThreshold = $state(0.7);
   aiGatewayKeyConfigured = $state(false);
+  aiGatewayKeyStatusKnown = $state(false);
   aiGatewayKeyDraft = $state('');
   aiGatewayKeySaving = $state(false);
   aiGatewayKeyError = $state<string | null>(null);
@@ -188,13 +212,92 @@ export class SettingsPageController {
   }
 
   get connectorSources(): SettingsConnectorSource[] {
-    return this.shippedConnectorCatalog.map((connector) => ({
-      id: connector.id,
-      name: connector.name,
-      icon: connector.icon,
-      url: connector.url,
-      enabled: this.enabledConnectorIds.includes(connector.id),
-    }));
+    return this.shippedConnectorCatalog.map((connector) => {
+      const enabled = this.enabledConnectorIds.includes(connector.id);
+      const projection = deriveSettingsSourceStatus({
+        enabled,
+        verification: this.sourceVerifications[connector.id],
+        status: this.sourceStatuses.find((status) => status.connectorId === connector.id),
+        health: this.sourceHealth.find((health) => health.connectorId === connector.id),
+      });
+      return {
+        id: connector.id,
+        name: connector.name,
+        icon: connector.icon,
+        url: connector.url,
+        enabled,
+        state: projection.state,
+        statusLabel: projection.label,
+        errorDetail: projection.detail,
+        lastSuccessLabel:
+          projection.lastSuccessAt === null
+            ? null
+            : `Dernière réussite : ${scanDateFormatter.format(new SvelteDate(projection.lastSuccessAt))}`,
+      };
+    });
+  }
+
+  async refreshSources(): Promise<void> {
+    this.sourcesError = null;
+    await this.loadSettings();
+    if (!this.settingsLoaded) {
+      return;
+    }
+    try {
+      const [statuses, health] = await Promise.all([
+        getConnectorStatuses(),
+        sendMessage({ type: 'GET_CONNECTOR_HEALTH' }),
+      ]);
+      if (this.destroyed) {
+        return;
+      }
+      if (health.type !== 'CONNECTOR_HEALTH_RESULT') {
+        throw new Error('Unexpected source health response');
+      }
+      this.sourceStatuses = statuses;
+      this.sourceHealth = health.payload;
+    } catch {
+      this.sourcesError =
+        'Historique des sources indisponible. Les sessions peuvent être revérifiées.';
+    }
+    await Promise.all(this.enabledConnectorIds.map((id) => this.verifySource(id)));
+  }
+
+  async verifySource(id: ConnectorId): Promise<void> {
+    if (
+      this.destroyed ||
+      !this.enabledConnectorIds.includes(id) ||
+      this.sourceVerifications[id] === 'checking'
+    ) {
+      return;
+    }
+    this.sourceVerifications[id] = 'checking';
+    const result = await verifySourceSession(id);
+    if (!this.destroyed && this.enabledConnectorIds.includes(id)) {
+      this.sourceVerifications[id] = result.status;
+    }
+  }
+
+  async openSource(id: ConnectorId): Promise<void> {
+    const source = this.shippedConnectorCatalog.find((source) => source.id === id);
+    if (!source) {
+      return;
+    }
+    try {
+      await openSourceInNewTab(source.url);
+    } catch {
+      this.sourcesError = `Impossible d’ouvrir ${source.name}. Réessayez depuis Chrome.`;
+    }
+  }
+
+  get cloudClassificationActive(): boolean {
+    return (
+      this.settingsLoaded &&
+      this.aiGatewayKeyStatusKnown &&
+      this.classificationEnabled &&
+      this.aiGatewayKeyConfigured &&
+      this.maxClassificationPerScan > 0
+    );
   }
 
   private subscribeProfileMessages(): () => void {
@@ -235,6 +338,7 @@ export class SettingsPageController {
   }
 
   destroy(): void {
+    this.destroyed = true;
     this.unsubscribeProfileMessages();
     this.unsubscribeFormAssistMessages();
     this.unsubscribeSettingsSnapshots();
@@ -271,15 +375,17 @@ export class SettingsPageController {
   }
 
   async loadProfile(): Promise<void> {
+    this.profileLoadError = null;
     try {
       const profile = await getProfile();
-      if (!profile) {
-        return;
+      if (profile) {
+        this.applyProfile(profile);
       }
-
-      this.applyProfile(profile);
     } catch {
-      // Hors contexte extension
+      this.profileLoadError =
+        'Impossible de lire votre profil. Réessayez pour retrouver vos critères.';
+    } finally {
+      this.profileLoaded = true;
     }
   }
 
@@ -314,10 +420,15 @@ export class SettingsPageController {
   }
 
   async loadAiGatewayKeyStatus(): Promise<void> {
+    this.aiGatewayKeyError = null;
     try {
       this.aiGatewayKeyConfigured = (await getAiGatewayKeyStatus()).configured;
+      this.aiGatewayKeyStatusKnown = true;
     } catch {
       this.aiGatewayKeyConfigured = false;
+      this.aiGatewayKeyStatusKnown = false;
+      this.aiGatewayKeyError =
+        'Impossible de vérifier la clé enregistrée. Réessayez avant d’activer le service cloud.';
     }
   }
 
@@ -383,11 +494,14 @@ export class SettingsPageController {
       const settings = await getSettings();
       this.applyConfirmedSettings(settings);
     } catch {
-      // Hors contexte extension
+      this.settingsError =
+        'Impossible de lire les réglages enregistrés. Réessayez avant de les modifier.';
     }
   }
 
   private applyConfirmedSettings(settings: AppSettings): void {
+    this.settingsLoaded = true;
+    this.settingsError = null;
     this.scanInterval = settings.scanIntervalMinutes;
     this.notifications = settings.notifications;
     this.autoScan = settings.autoScan;
@@ -716,6 +830,7 @@ export class SettingsPageController {
     try {
       const { configured } = await saveAiGatewayKey(this.aiGatewayKeyDraft.trim());
       this.aiGatewayKeyConfigured = configured;
+      this.aiGatewayKeyStatusKnown = true;
       this.aiGatewayKeyDraft = '';
     } catch {
       this.aiGatewayKeyError = 'Impossible d’enregistrer la clé';
@@ -730,6 +845,7 @@ export class SettingsPageController {
     try {
       const { configured } = await saveAiGatewayKey('');
       this.aiGatewayKeyConfigured = configured;
+      this.aiGatewayKeyStatusKnown = true;
       this.aiGatewayKeyDraft = '';
     } catch {
       this.aiGatewayKeyError = 'Impossible de supprimer la clé';
@@ -743,6 +859,7 @@ export class SettingsPageController {
       return;
     }
 
+    delete this.sourceVerifications[connectorId];
     await this.persistSettings((settings) => {
       const wasEnabled = settings.enabledConnectors.some((id) => id === connectorId);
       const nextConnectorIds = this.shippedConnectorCatalog
@@ -756,6 +873,9 @@ export class SettingsPageController {
         });
       return { ...settings, enabledConnectors: nextConnectorIds };
     });
+    if (!this.settingsError && this.enabledConnectorIds.includes(connectorId)) {
+      await this.verifySource(connectorId);
+    }
   }
 
   private async persistSettings(

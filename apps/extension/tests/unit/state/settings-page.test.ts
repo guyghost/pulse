@@ -939,3 +939,62 @@ describe('SettingsPageController — Jev classification settings (DAO #204)', ()
     controller.destroy();
   });
 });
+
+describe('SettingsPageController — readable effective states', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('requires confirmed settings, a key and a nonzero budget to present cloud activation', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
+      }
+      return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+    });
+    const controller = new SettingsPageController();
+    controller.aiGatewayKeyConfigured = true;
+    controller.aiGatewayKeyStatusKnown = true;
+    expect(controller.cloudClassificationActive).toBe(false);
+    await controller.loadSettings();
+    expect(controller.cloudClassificationActive).toBe(true);
+    controller.aiGatewayKeyConfigured = false;
+    expect(controller.cloudClassificationActive).toBe(false);
+    controller.aiGatewayKeyConfigured = true;
+    controller.maxClassificationPerScan = 0;
+    expect(controller.cloudClassificationActive).toBe(false);
+    controller.destroy();
+  });
+
+  it('does not issue any settings write after a failed settings read', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.reject(new Error('Storage unavailable'));
+      }
+      return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+    });
+    const controller = new SettingsPageController({ connectorCatalog: shippedConnectorCatalog });
+    await controller.loadSettings();
+    expect(controller.settingsError).toContain('Impossible de lire');
+    await controller.toggleConnector('malt');
+    expect(controller.settingsLoaded).toBe(false);
+    expect(controller.enabledConnectorIds).toEqual([]);
+    expect(
+      bridgeMock.sendMessage.mock.calls.some(
+        ([message]) => message.type === 'MUTATE_SETTINGS_RELEASE'
+      )
+    ).toBe(false);
+    controller.destroy();
+  });
+
+  it('loading profile alone does not verify source sessions or request health', async () => {
+    bridgeMock.sendMessage.mockResolvedValue({ type: 'PROFILE_RESULT', payload: null });
+    const controller = new SettingsPageController();
+    await controller.loadProfile();
+    expect(
+      bridgeMock.sendMessage.mock.calls.some(([message]) => message.type === 'GET_CONNECTOR_HEALTH')
+    ).toBe(false);
+    controller.destroy();
+  });
+});

@@ -176,7 +176,7 @@ async function mockFeedTrackingBridge(
 
 async function openTrackingAction(page: Page): Promise<ReturnType<Page['getByRole']>> {
   await page.goto(SIDE_PANEL);
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible({
     timeout: 10_000,
   });
   await dismissFeedTour(page);

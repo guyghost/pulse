@@ -128,7 +128,7 @@ test.describe('applications pipeline', () => {
     await enableAllSurfaceFlags(page);
     await page.goto(SIDE_PANEL);
 
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     await expect(nav).toBeVisible();
     await nav.getByRole('button', { name: 'Suivi' }).click();
 

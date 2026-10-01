@@ -1,7 +1,7 @@
 import { test, expect } from './fixtures';
 test.describe('Navigation', () => {
   test('navigates between tabs: Feed → TJM → Settings → Feed', async ({ page }) => {
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     // Scope to the nav: the feed also contains a "Missions" heading/section.
     await expect(nav.getByRole('button', { name: 'Missions' })).toHaveAttribute(
       'aria-current',
@@ -25,7 +25,7 @@ test.describe('Navigation', () => {
   });
 
   test('active tab is visually highlighted', async ({ page }) => {
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     const feedTab = nav.getByRole('button', { name: 'Missions' });
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
 
@@ -36,7 +36,7 @@ test.describe('Navigation', () => {
   });
 
   test('page transitions are smooth (content changes on nav)', async ({ page }) => {
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
 
     await nav.getByRole('button', { name: 'TJM' }).click();
     // The TJM hero heading is now "Analyse TJM" (previously "Radar TJM").

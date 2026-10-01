@@ -676,6 +676,13 @@ function createChromeStubs() {
           case 'SAVE_SETTINGS':
             storage.settings = message.payload;
             return { type: 'SETTINGS_SAVED', payload: { saved: true, settings: message.payload } };
+          case 'AI_GATEWAY_KEY_STATUS': {
+            const key = storage.aiGatewayApiKey;
+            return {
+              type: 'AI_GATEWAY_KEY_STATUS_RESULT',
+              payload: { configured: typeof key === 'string' && key.trim().length > 0 },
+            };
+          }
           case 'GET_PROFILE':
             return { type: 'PROFILE_RESULT', payload: storage.profile ?? null };
           case 'SAVE_PROFILE':

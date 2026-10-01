@@ -550,7 +550,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
 
     // Verify we're on the feed by checking navigation is visible
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
     // Verify feed content exists — check for search input (always visible in feed)
     await expect(feedSearchInput(page)).toBeVisible();
 

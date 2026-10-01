@@ -1,13 +1,14 @@
 /**
  * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick } from 'svelte';
 import { installChromeStubs } from '../../../src/dev/chrome-stubs';
 import SettingsPage from '../../../src/ui/pages/SettingsPage.svelte';
 
 describe('SettingsPage with the connected surface disabled', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     const globalRecord = globalThis as unknown as Record<string, unknown>;
     delete globalRecord.chrome;
     window.localStorage.clear();
@@ -33,12 +34,39 @@ describe('SettingsPage with the connected surface disabled', () => {
     expect(target.textContent).not.toContain('synchronisation dashboard');
 
     const aiSectionButton = [...target.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Analyse locale')
+      button.textContent?.includes('Intelligence artificielle')
     );
     expect(aiSectionButton).toBeDefined();
     aiSectionButton?.click();
     await tick();
 
-    expect(target.textContent).toContain('IA locale');
+    expect(target.textContent).toContain('Dans votre navigateur');
+  });
+
+  it('keeps cloud off and exposes unknown verification after an unexpected key response', async () => {
+    const original = chrome.runtime.sendMessage.bind(chrome.runtime);
+    vi.spyOn(chrome.runtime, 'sendMessage').mockImplementation(async (message: unknown) => {
+      if (
+        typeof message === 'object' &&
+        message !== null &&
+        'type' in message &&
+        message.type === 'AI_GATEWAY_KEY_STATUS'
+      ) {
+        return { type: 'SETTINGS_RESULT', payload: null };
+      }
+      return original(message);
+    });
+    const target = await mountAndLoad();
+    [...target.querySelectorAll('button')]
+      .find((button) => button.textContent?.includes('Intelligence artificielle'))
+      ?.click();
+    await tick();
+    await vi.waitFor(() => expect(target.textContent).toContain('État inconnu — clé non vérifiée'));
+    const cloud = target.querySelector(
+      '[aria-label="Activer la classification des missions"]'
+    ) as HTMLButtonElement;
+    expect(cloud.getAttribute('aria-checked')).toBe('false');
+    expect(cloud.disabled).toBe(true);
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain('Impossible de vérifier');
   });
 });

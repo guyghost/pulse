@@ -315,13 +315,13 @@ describe('operational UI constraints', () => {
 
     expect(source).toContain('type AiTransparencyItem');
     expect(source).toContain("label: 'Mission'");
-    expect(source).toContain('Titre, description, stack, TJM, localisation et remote');
+    expect(source).toContain('Titre, technologies, TJM, localisation, mode de travail et durée');
     expect(source).toContain("label: 'Profil'");
-    expect(source).toContain('Stack cible, TJM cible, remote, localisation et mots-clés');
-    expect(source).toContain('Scores conservés 7 jours, vidés quand le profil change');
     expect(source).toContain(
-      'Sessions, cookies, identifiants et pages privées ne sont pas envoyés'
+      'Poste, technologies, TJM, localisation, mode de travail et séniorité'
     );
+    expect(source).toContain('Scores conservés 7 jours, vidés quand le profil change');
+    expect(source).toContain('Sessions, cookies et identifiants exclus du contexte analysé');
     expect(source).toContain("Données utilisées par l'IA locale");
   });
 
@@ -347,17 +347,6 @@ describe('operational UI constraints', () => {
     expect(exportSource).toContain('**Confidentialité:** rapport local généré depuis vos favoris');
   });
 
-  it('keeps Profile story CTAs aligned with edit/save state', () => {
-    const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
-
-    expect(source).toContain('primaryActionLabel: settings.isSavingProfile');
-    expect(source).toContain("? 'Sauvegarde…'");
-    expect(source).toContain("? 'Enregistrer'");
-    expect(source).toContain(": 'Modifier le profil'");
-    expect(source).toContain('if (settings.isSavingProfile)');
-    expect(source).not.toContain("primaryActionLabel: 'Enregistrer le profil'");
-  });
-
   it('keeps Profile completion prioritized by scoring impact', () => {
     const profileSource = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
     const impactSource = readFileSync('src/lib/core/profile/profile-impact.ts', 'utf8');
@@ -371,9 +360,9 @@ describe('operational UI constraints', () => {
     );
     expect(profileSource).toContain('buildProfileImpactItems');
     expect(profileSource).toContain('buildProfileImpactSimulation');
-    expect(profileSource).toContain('Priorités d’impact');
-    expect(profileSource).toContain('topProfilePriorities');
-    expect(profileSource).toContain('profileImpactSimulation.delta');
+    expect(profileSource).toContain('Suggestion prioritaire');
+    expect(profileSource).toContain('nextProfilePriority');
+    expect(profileSource).not.toContain('Gain estimé');
     expect(profileSource).toContain('onclick={openProfileEditing}');
   });
 
@@ -650,7 +639,7 @@ describe('operational UI constraints', () => {
     const tjmSource = readFileSync('src/ui/organisms/TJMDashboard.svelte', 'utf8');
 
     expect(profileSource).toContain('À compléter');
-    expect(profileSource).toContain('réduisent la précision des requêtes');
+    expect(profileSource).toContain('Consulter les critères du profil');
     expect(emptyStateSource).toContain('Décision');
     expect(drawerSource).toContain('eyebrow="Décision"');
     expect(sourceHealthSource).toContain('Vérification en cours');
