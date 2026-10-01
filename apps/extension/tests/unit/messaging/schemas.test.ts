@@ -69,6 +69,21 @@ const validSettings = {
 // ============================================================================
 
 describe('validateMessage — structure de base', () => {
+  it('validates the explicit catalogue read failure contract', () => {
+    expect(
+      validateMessage({
+        type: 'FEED_MISSIONS_FAILED',
+        payload: { code: 'READ_FAILED', message: 'Catalogue indisponible.' },
+      }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'FEED_MISSIONS_FAILED', payload: [] }).valid).toBe(false);
+    expect(
+      validateMessage({ type: 'FEED_MISSIONS_FAILED', payload: { code: 'UNKNOWN', message: '' } })
+        .valid
+    ).toBe(false);
+    expect(validateMessage({ type: 'FEED_MISSIONS_RESULT', payload: [] }).valid).toBe(true);
+  });
+
   it('accepts the committed TJM population invalidation', () => {
     expect(validateMessage({ type: 'TJM_DATA_UPDATED' }).valid).toBe(true);
   });

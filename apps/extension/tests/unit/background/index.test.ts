@@ -2702,6 +2702,27 @@ describe('background auto-scan notifications', () => {
     await expect(import('../../../src/background/index.ts?chrome-114')).resolves.toBeDefined();
   });
 
+  it('distinguishes a failed catalogue read from a legitimate empty catalogue', async () => {
+    const response = vi.fn();
+    getMissions.mockRejectedValueOnce(new Error('IndexedDB read failed'));
+    expect(messageListener?.({ type: 'GET_FEED_MISSIONS' }, {}, response)).toBe(true);
+    await vi.waitFor(() =>
+      expect(response).toHaveBeenCalledWith({
+        type: 'FEED_MISSIONS_FAILED',
+        payload: {
+          code: 'READ_FAILED',
+          message: 'Impossible de charger le catalogue local. Réessayez.',
+        },
+      })
+    );
+    response.mockClear();
+    getMissions.mockResolvedValueOnce([]);
+    messageListener?.({ type: 'GET_FEED_MISSIONS' }, {}, response);
+    await vi.waitFor(() =>
+      expect(response).toHaveBeenCalledWith({ type: 'FEED_MISSIONS_RESULT', payload: [] })
+    );
+  });
+
   it('routes feed local data through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const missionsResponse = vi.fn();

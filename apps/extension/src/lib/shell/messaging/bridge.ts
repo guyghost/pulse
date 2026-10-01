@@ -98,6 +98,7 @@ export type BridgeMessage =
     }
   | { type: 'GET_FEED_MISSIONS' }
   | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
+  | { type: 'FEED_MISSIONS_FAILED'; payload: { code: 'READ_FAILED'; message: string } }
   | { type: 'GET_FEED_MISSIONS_PAGE'; payload: { page: number; pageSize: number } }
   | {
       type: 'FEED_MISSIONS_PAGE_RESULT';

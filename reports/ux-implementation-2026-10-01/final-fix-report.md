@@ -76,3 +76,26 @@ Le tick peut refléter une échéance avec au plus 30 secondes de retard quand l
 ## Livraison
 
 Commit ciblé local, sans push. Aucun fichier du contrôleur ajouté. Le hook a exécuté ESLint et les deux passes Prettier avec succès, puis a échoué au restaging Git (`/tmp/final-fix-commit.log`). `git diff --exit-code` a confirmé l’absence de modifications non indexées et `git diff --cached --check` a réussi. Après ajout de cette note, le commit est repris avec `SKIP_SIMPLE_GIT_HOOKS=1`, conformément au brief. La sauvegarde automatique `7c7c7d192327ce9c59c9af8a9b5d5b860652b191` est préservée ; aucune restauration ou suppression de stash.
+
+## Complément I2 — Échec réel de lecture du catalogue
+
+La relecture ciblée a identifié un trou dans la preuve précédente : le handler réel `GET_FEED_MISSIONS` répondait `FEED_MISSIONS_RESULT` avec `[]` à une erreur IndexedDB. Le rejet simulé de la façade ne couvrait donc pas ce protocole ; la paire vide pouvait être publiée comme un succès. Lecture seule pendant la suite globale du contrôleur, puis modifications après son feu vert explicite, une fois sa suite terminée.
+
+Correction bornée à ce contrat : le worker renvoie désormais `FEED_MISSIONS_FAILED` avec le code `READ_FAILED` et un message français stable. Aucun détail interne de stockage n’est exposé. Le type bridge et le schéma valident cette réponse. La façade valide l’échec explicite et le rejette ; elle rejette aussi une réponse inattendue ou un échec mal formé, au lieu de les transformer en catalogue vide. Une réponse réussie `FEED_MISSIONS_RESULT` avec `[]` demeure un succès valide. Le mécanisme atomique de Suivi reçoit ainsi effectivement l’erreur du worker et conserve sa dernière paire utile. Aucun autre protocole, écran ou comportement métier modifié.
+
+Preuves supplémentaires :
+
+- Le test du handler installé dans le vrai module background simule le rejet de la lecture DB, vérifie la réponse d’échec exacte, puis une lecture vide réussie distincte.
+- La façade est testée avec échec explicite, réponse mal formée, type inattendu et succès vide. Les tests de schéma acceptent le contrat attendu et rejettent les formes incorrectes.
+- Le test Svelte supplémentaire utilise la **vraie façade** via `vi.importActual`, reliée au bridge simulant le protocole du worker. Après une première paire valide et une saisie non enregistrée, le catalogue échoue tandis que la lecture du suivi renvoie un statut plus récent. Le dossier demeure affiché avec son ancien statut, le champ reste connecté au DOM avec sa saisie, et l’alerte propose Réessayer. Le clic sur Réessayer publie ensuite la paire récente sans effacer la saisie. Une lecture vide réussie ultérieure affiche l’état vide normal sans alerte. Cela prouve à la fois la conservation de la paire et la distinction échec/vide.
+
+Commandes supplémentaires depuis `apps/extension`, avec le même PATH Node/pnpm :
+
+```sh
+pnpm exec vitest run --maxWorkers=2 tests/unit/background/index.test.ts tests/unit/facades/feed-data-facade.test.ts tests/unit/messaging/schemas.test.ts tests/unit/ui/ApplicationsPage.test.ts
+pnpm exec vitest run --maxWorkers=2 tests/unit/ui/ApplicationsPage.test.ts
+```
+
+Le premier passage donne 219 réussites et un échec du nouveau harness UI : son conteneur n’était pas ajouté au document, donc `isConnected` était faux indépendamment du produit. Après rattachement du conteneur au DOM, les 19 tests UI passent. Résultat dédupliqué : **220 tests ciblés réussis** (84 worker, 13 façade, 104 schémas, 19 UI). Logs `/tmp/final-fix-i2-unit.log` et `/tmp/final-fix-i2-ui.log`. Aucun autre test global ni E2E relancé pour ce complément.
+
+Format et ESLint ciblés sur les huit fichiers source/test changés : succès (`/tmp/final-fix-i2-format.log`, `/tmp/final-fix-i2-lint.log`). `pnpm typecheck` : succès (`/tmp/final-fix-i2-typecheck.log`). `git diff --check` : succès. Auto-relecture du handler, de la réponse publique, de la façade, des quatre cas de test et des consommateurs connexes ; l’export CV possède déjà son repli explicite en cas de lecture indisponible. Les cinq autres constats restent inchangés. Le hook complémentaire a réussi ESLint et Prettier, puis reproduit l’échec de restaging (`/tmp/final-fix-i2-commit.log`). Aucun changement hors index (`git diff --exit-code`) et index valide (`git diff --cached --check`) ; reprise autorisée avec `SKIP_SIMPLE_GIT_HOOKS=1`. Sauvegarde `a4a3126c488017c381e5d2e539e6d07f2cb60934` conservée, sans restauration ni suppression.

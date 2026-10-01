@@ -5,6 +5,7 @@
  * behind a clean API. UI pages import this instead of individual storage modules.
  */
 import { sendMessage } from '../messaging/bridge';
+import { validateMessage } from '../messaging/schemas';
 import type { UserProfile } from '../../core/types/profile';
 import type { Mission } from '../../core/types/mission';
 import type { PersistedConnectorStatus } from '../../core/types/connector-status';
@@ -24,7 +25,13 @@ export {
 
 export async function getMissions(): Promise<Mission[]> {
   const response = await sendMessage({ type: 'GET_FEED_MISSIONS' });
-  return response.type === 'FEED_MISSIONS_RESULT' ? response.payload : [];
+  if (response?.type === 'FEED_MISSIONS_RESULT' && Array.isArray(response.payload)) {
+    return response.payload;
+  }
+  if (response?.type === 'FEED_MISSIONS_FAILED' && validateMessage(response).valid) {
+    throw new Error(response.payload.message);
+  }
+  throw new Error('La réponse du catalogue local est invalide. Réessayez.');
 }
 
 export interface FeedMissionsPage {

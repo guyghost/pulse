@@ -155,6 +155,82 @@ describe('ApplicationsPage next-action toast', () => {
     await unmount(page);
   });
 
+  it('preserves the complete dossier through the real facade on a catalogue protocol failure and retry', async () => {
+    const facade = await vi.importActual<
+      typeof import('../../../src/lib/shell/facades/feed-data.facade')
+    >('../../../src/lib/shell/facades/feed-data.facade');
+    getMissions.mockImplementation(facade.getMissions);
+    let catalogueFails = false;
+    let emptyCatalogue = false;
+    let incomingTracking = tracking;
+    const originalBridge = sendMessage.getMockImplementation()!;
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_FEED_MISSIONS') {
+        return Promise.resolve(
+          catalogueFails
+            ? {
+                type: 'FEED_MISSIONS_FAILED',
+                payload: {
+                  code: 'READ_FAILED',
+                  message: 'Impossible de charger le catalogue local. Réessayez.',
+                },
+              }
+            : { type: 'FEED_MISSIONS_RESULT', payload: emptyCatalogue ? [] : [mission] }
+        );
+      }
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [incomingTracking] });
+      }
+      return originalBridge(message);
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const page = mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    const input = target.querySelector<HTMLInputElement>('[aria-label="Prochaine action"]')!;
+    input.value = '2026-12-12T10:00';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    const selectedDossier = () => target.querySelector('h3')?.closest('.section-card');
+    expect(selectedDossier()?.textContent).toContain('Préparée');
+    catalogueFails = true;
+    incomingTracking = {
+      ...tracking,
+      currentStatus: 'applied',
+      history: [
+        ...tracking.history,
+        { from: 'application_prepared', to: 'applied', timestamp: 4, note: null },
+      ],
+    };
+    const notify = subscribeMessages.mock.calls.at(-1)![0] as (message: { type: string }) => void;
+    notify({ type: 'MISSIONS_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain(
+      'Impossible de charger le catalogue local. Réessayez.'
+    );
+    expect(selectedDossier()?.textContent).toContain('Mission Svelte');
+    expect(selectedDossier()?.querySelector('.eyebrow')?.textContent).toContain('Préparée');
+    expect(input.isConnected).toBe(true);
+    expect(input.value).toBe('2026-12-12T10:00');
+    catalogueFails = false;
+    target.querySelector<HTMLButtonElement>('[role="alert"] button')!.click();
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')).toBeNull();
+    expect(selectedDossier()?.querySelector('.eyebrow')?.textContent).toContain('Envoyée');
+    expect(input.isConnected).toBe(true);
+    expect(input.value).toBe('2026-12-12T10:00');
+    emptyCatalogue = true;
+    notify({ type: 'MISSIONS_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')).toBeNull();
+    expect(target.textContent).toContain('Aucune mission ne peut encore devenir candidature');
+    await unmount(page);
+  });
+
   it('labels Gemini Nano as the free local kit without cloud transfer', async () => {
     const target = document.createElement('div');
     document.body.appendChild(target);

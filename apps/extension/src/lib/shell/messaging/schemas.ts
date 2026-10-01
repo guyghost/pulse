@@ -705,6 +705,10 @@ export const MessageSchemas = {
     type: z.literal('FEED_MISSIONS_RESULT'),
     payload: MissionsPayloadSchema,
   }),
+  FEED_MISSIONS_FAILED: z.object({
+    type: z.literal('FEED_MISSIONS_FAILED'),
+    payload: z.object({ code: z.literal('READ_FAILED'), message: z.string().min(1).max(500) }),
+  }),
   GET_FEED_MISSIONS_PAGE: z.object({
     type: z.literal('GET_FEED_MISSIONS_PAGE'),
     payload: z.object({
