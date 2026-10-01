@@ -2254,7 +2254,31 @@ describe('background auto-scan notifications', () => {
   it('merges and persists the LinkedIn profile on SYNC_LINKEDIN_PROFILE_IMPORT', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
-    getProfile.mockResolvedValueOnce(profile);
+    const manual = {
+      id: 'manual',
+      title: 'Consultant',
+      company: 'Local',
+      employmentType: 'Freelance',
+      location: 'Lyon',
+      startDate: '2020-01',
+      endDate: '2021-01',
+      isCurrent: false,
+      description: 'Manual notes',
+      skills: ['SQL'],
+      source: 'manual' as const,
+      sourceExternalId: null,
+      positionIndex: 1,
+      updatedAt: 123,
+    };
+    const unselected = {
+      ...manual,
+      id: 'unselected',
+      company: 'Untouched',
+      source: 'linkedin' as const,
+      sourceExternalId: 'urn:li:position:unselected',
+      positionIndex: 2,
+    };
+    getProfile.mockResolvedValueOnce({ ...profile, experiences: [manual, unselected] });
 
     const draft = {
       title: 'Lead Frontend Svelte',
@@ -2295,24 +2319,40 @@ describe('background auto-scan notifications', () => {
     expect(getProfile).toHaveBeenCalled();
     expect(saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({
-        jobTitle: 'Lead Frontend Svelte',
-        keywords: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
-        experiences: [
+        jobTitle: profile.jobTitle,
+        keywords: profile.keywords,
+        experiences: expect.arrayContaining([
           expect.objectContaining({
             title: 'Technical Lead',
             employmentType: 'Freelance',
             source: 'linkedin',
           }),
-        ],
+          manual,
+          unselected,
+        ]),
       })
     );
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
       type: 'PROFILE_UPDATED',
-      payload: expect.objectContaining({ jobTitle: 'Lead Frontend Svelte' }),
+      payload: expect.objectContaining({ jobTitle: profile.jobTitle }),
     });
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LINKEDIN_PROFILE_IMPORTED',
       payload: { imported: true, profile: draft, addedCount: 1 },
+    });
+    const committed = saveProfile.mock.calls.at(-1)?.[0] as UserProfile;
+    getProfile.mockResolvedValueOnce(committed);
+    const repeatedResponse = vi.fn();
+    messageListener?.(
+      { type: 'SYNC_LINKEDIN_PROFILE_IMPORT', payload: { profile: draft } },
+      {},
+      repeatedResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(saveProfile.mock.calls.at(-1)?.[0]).toEqual(committed);
+    expect(repeatedResponse).toHaveBeenCalledWith({
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: { imported: true, profile: draft, addedCount: 0 },
     });
   });
 
@@ -3051,6 +3091,7 @@ describe('background auto-scan notifications', () => {
           selectedCategory: null,
           selectedSeniority: null,
           selectedScoreBucket: null,
+          scoreFilterMode: 'exact' as const,
           decisionPreset: null,
           showNewOnly: false,
           showFavoritesOnly: false,

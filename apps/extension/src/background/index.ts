@@ -1969,7 +1969,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             current?.experiences ?? [],
             draft.experiences
           );
-          const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
+          const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now(), true);
           await saveProfile(merged);
           chrome.runtime.sendMessage({ type: 'PROFILE_UPDATED', payload: merged }).catch(() => {
             // Side panel not open, ignore

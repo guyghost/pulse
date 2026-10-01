@@ -135,8 +135,8 @@ describe('ApplicationsPage next-action toast', () => {
 
     expect(target.textContent).toContain('Kit local · Gemini Nano');
     expect(target.textContent).toContain('sans envoi cloud');
-    expect(target.textContent).toContain('Copilot Premium');
-    expect(target.textContent).toContain('Analyse contextualisée Premium');
+    expect(target.textContent).not.toContain('Copilot Premium');
+    expect(target.textContent).not.toContain('Analyse contextualisée Premium');
   });
 
   it('affiche uniquement la note alphabétique de la mission dans la liste', async () => {
@@ -225,7 +225,7 @@ describe('ApplicationsPage next-action toast', () => {
     expect(target.textContent).toContain('Le suivi des candidatures ne peut pas être chargé');
   });
 
-  it('shows a success toast when the next action is saved', async () => {
+  it('shows an inline confirmation when the next action is saved', async () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
     mount(ApplicationsPage, { target });
@@ -241,7 +241,47 @@ describe('ApplicationsPage next-action toast', () => {
     await flush();
     await tick();
 
-    expect(showToast).toHaveBeenCalledWith('Prochaine action mise à jour', 'success');
+    expect(target.querySelector('[role="status"]')?.textContent).toContain('Relance enregistrée.');
+  });
+
+  it('rejects an empty reminder without sending a persistence mutation', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    clickButton(target, 'Enregistrer');
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain('Choisissez une date');
+    expect(
+      sendMessage.mock.calls.filter(([message]) => message.type === 'UPDATE_TRACKING_DETAILS')
+    ).toHaveLength(0);
+  });
+
+  it('selects the overdue dossier before a more recent untracked mission and collapses activity', async () => {
+    getMissions.mockResolvedValue([{ ...mission, id: 'untracked', title: 'Untracked' }, mission]);
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({
+          type: 'TRACKINGS_RESULT',
+          payload: [{ ...tracking, nextActionAt: '2020-01-01T09:00:00.000Z' }],
+        });
+      }
+      return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    expect(target.querySelector('[aria-label="À relancer"]')?.textContent).toContain(
+      'Mission Svelte'
+    );
+    expect((target.querySelector('#application-next-action') as HTMLInputElement).value).toContain(
+      '2020-01-01'
+    );
+    expect(target.querySelector('details')?.open).toBe(false);
   });
 
   it('shows an ERROR toast (not success) when persistence fails', async () => {

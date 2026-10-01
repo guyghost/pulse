@@ -1068,7 +1068,7 @@ function createChromeStubs() {
               current?.experiences ?? [],
               draft.experiences
             );
-            const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
+            const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now(), true);
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, merged);
             storage.profile = merged;
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: merged });

@@ -80,8 +80,8 @@ export function recomputePositionIndex(experiences: readonly Experience[]): Expe
  * Merge imported draft experiences into the current persisted list.
  *
  * Dedup key: `(company, title, startDate)` case-insensitively. On match, the
- * local entry is kept (id, positionIndex, source, description when manual) and
- * its skills are unioned with the draft's. New drafts become `source: 'linkedin'`
+ * manual entry is preserved entirely. Imported entries retain identity and
+ * metadata, update approved facts and union skills. New drafts become `source: 'linkedin'`
  * entries with a `now`-seeded id. The result is position-indexed via
  * {@link recomputePositionIndex}.
  */
@@ -98,31 +98,37 @@ export function mergeExperiences(
     // when edited through the month input.
     const draftStart = normalizeDateToMonth(draft.startDate);
     const draftEnd = normalizeDateToMonth(draft.endDate);
-    const key = experienceKey(draft.company, draft.title, draftStart);
-    const existingIdx = result.findIndex(
-      (exp) => experienceKey(exp.company, exp.title, exp.startDate) === key
-    );
+    const existingIdx = result.findIndex((exp) => matchesExperience(exp, draft));
 
     if (existingIdx >= 0) {
       const existing = result[existingIdx];
-      const keepDescription = existing.source === 'manual' || draft.description.length === 0;
-      const refreshLinkedInLocation = existing.source === 'linkedin';
-      const mergedIsCurrent = existing.isCurrent || draft.isCurrent;
+      // Manual entries remain authoritative, including their metadata and skills.
+      if (existing.source === 'manual') {
+        return;
+      }
       result[existingIdx] = {
         ...existing,
+        title: draft.title,
+        company: draft.company,
+        startDate: draftStart,
         skills: unionSkills(existing.skills, draft.skills),
-        description: keepDescription ? existing.description : draft.description,
-        employmentType: existing.employmentType ?? draft.employmentType,
-        location: refreshLinkedInLocation ? draft.location : (existing.location ?? draft.location),
-        endDate: mergedIsCurrent ? null : (existing.endDate ?? draftEnd ?? null),
-        isCurrent: mergedIsCurrent,
+        description: draft.description || existing.description,
+        employmentType: draft.employmentType ?? existing.employmentType,
+        location:
+          existing.source === 'linkedin' ? draft.location : (draft.location ?? existing.location),
+        endDate: draft.isCurrent ? null : draftEnd,
+        isCurrent: draft.isCurrent,
         sourceExternalId: existing.sourceExternalId ?? draft.sourceExternalId,
       };
       return;
     }
 
+    let id = `exp-${now}-${importIndex}`;
+    while (result.some((exp) => exp.id === id)) {
+      id += '-new';
+    }
     result.push({
-      id: `exp-${now}-${importIndex}`,
+      id,
       title: draft.title,
       company: draft.company,
       employmentType: draft.employmentType,
@@ -177,27 +183,58 @@ export function countNewlyAddedExperiences(
   current: readonly Experience[],
   incoming: readonly CandidateExperienceDraft[]
 ): number {
-  // Seed with current-entry keys, then add each accepted draft's key as we go
-  // so duplicates *within* `incoming` are not double-counted — mirroring
-  // {@link mergeExperiences}, which dedups against its growing result array.
-  const seenKeys = new Set(
-    current.map((exp) => experienceKey(exp.company, exp.title, exp.startDate))
-  );
-  let added = 0;
-  for (const draft of incoming) {
-    const draftStart = normalizeDateToMonth(draft.startDate);
-    const key = experienceKey(draft.company, draft.title, draftStart);
-    if (seenKeys.has(key)) {
-      continue;
-    }
-    seenKeys.add(key);
-    added += 1;
-  }
-  return added;
+  return mergeExperiences(current, incoming, 0).length - current.length;
 }
 
 function experienceKey(company: string | null, title: string, startDate: string | null): string {
-  return `${(company ?? '').toLowerCase()}|${title.toLowerCase()}|${startDate ?? ''}`;
+  const normalize = (value: string) => value.trim().replace(/\s+/g, ' ').toLowerCase();
+  return JSON.stringify([
+    normalize(company ?? ''),
+    normalize(title),
+    normalizeDateToMonth(startDate),
+  ]);
+}
+
+export function matchesExperience(existing: Experience, draft: CandidateExperienceDraft): boolean {
+  const externalId = draft.sourceExternalId;
+  // LinkedIn extractors currently emit position-based IDs: never use them as identity.
+  const stable = externalId && !/^linkedin-experience-\d+$/.test(externalId);
+  return (
+    Boolean(
+      stable && existing.source === draft.source && existing.sourceExternalId === externalId
+    ) ||
+    experienceKey(existing.company, existing.title, existing.startDate) ===
+      experienceKey(draft.company, draft.title, draft.startDate)
+  );
+}
+
+export interface ExperienceImportPreview {
+  draft: CandidateExperienceDraft;
+  current: Experience | null;
+  proposed: Experience;
+  status: 'new' | 'modified' | 'identical';
+}
+
+/** Preview exactly the values the persistence merge will produce. */
+export function previewExperienceImport(
+  current: readonly Experience[],
+  incoming: readonly CandidateExperienceDraft[]
+): ExperienceImportPreview[] {
+  return incoming.map((draft) => {
+    const existing = current.find((exp) => matchesExperience(exp, draft)) ?? null;
+    const proposed = mergeExperiences(existing ? [existing] : [], [draft], 0)[0];
+    const comparable = (exp: Experience) => ({ ...exp, positionIndex: 0, updatedAt: 0 });
+    return {
+      draft,
+      current: existing,
+      proposed,
+      status: !existing
+        ? 'new'
+        : JSON.stringify(comparable(existing)) === JSON.stringify(comparable(proposed))
+          ? 'identical'
+          : 'modified',
+    };
+  });
 }
 
 function unionSkills(current: readonly string[], incoming: readonly string[]): string[] {
