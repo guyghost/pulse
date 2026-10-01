@@ -91,7 +91,6 @@ Couverture utile :
 
 Commit ciblé : `feat(cv): add controlled local imports exports and follow-ups`. Ce rapport est inclus dans le commit ; son hash est transmis au contrôleur après création. Aucun push.
 
-
 Le hook standard a bien exécuté ESLint et Prettier avec succès, puis a échoué
 sur « Staging changes from tasks », comme sur les lots précédents. Le backup
 `d1cdaffaabed2d13fc642422b8cd7ddf8069040f` a été laissé intact. Vérification de

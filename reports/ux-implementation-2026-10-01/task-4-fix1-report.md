@@ -51,10 +51,10 @@ Les deux annonces ont des sources et URL distinctes, mais la même signature suf
 pour que le feed en garde une seule. L’annonce Free-Work n’a pas de TJM, catégorie ni
 expérience. Le test compare la collecte commune à deux collectes distinctes :
 
-| Après correction | Annonces | Avec TJM | Sans TJM | Composition | Médiane |
-| --- | ---: | ---: | ---: | --- | ---: |
-| Scan commun | 2 | 1 | 1 | LeHibou 1, Free-Work 1 | 600 |
-| Deux scans | 2 | 1 | 1 | LeHibou 1, Free-Work 1 | 600 |
+| Après correction | Annonces | Avec TJM | Sans TJM | Composition            | Médiane |
+| ---------------- | -------: | -------: | -------: | ---------------------- | ------: |
+| Scan commun      |        2 |        1 |        1 | LeHibou 1, Free-Work 1 |     600 |
+| Deux scans       |        2 |        1 |        1 | LeHibou 1, Free-Work 1 |     600 |
 
 Il vérifie aussi l’égalité de l’analyse entière, les deux observations conservées à leur
 vraie date, les dimensions inconnues de Free-Work et l’absence de double comptage dans
