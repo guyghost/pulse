@@ -1,16 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, tick } from 'svelte';
+import { mount, tick, unmount } from 'svelte';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 
 const sendMessage = vi.hoisted(() => vi.fn());
+const subscribeMessages = vi.hoisted(() => vi.fn(() => () => {}));
 const getMissions = vi.hoisted(() => vi.fn());
 const showToast = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const showToastAction = vi.hoisted(() => vi.fn());
 
 vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
   sendMessage,
-  subscribeMessages: () => () => {},
+  subscribeMessages,
 }));
 vi.mock('../../../src/lib/shell/facades/feed-data.facade', () => ({ getMissions }));
 vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
@@ -126,6 +127,110 @@ describe('ApplicationsPage next-action toast', () => {
     vi.clearAllMocks();
   });
 
+  it('retains the selected dossier and dirty reminder while showing a refresh error', async () => {
+    const target = document.createElement('div');
+    const page = mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    const input = target.querySelector<HTMLInputElement>('[aria-label="Prochaine action"]')!;
+    input.value = '2026-12-12T10:00';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    getMissions.mockRejectedValueOnce(new Error('Catalogue momentanément indisponible'));
+    const notify = subscribeMessages.mock.calls.at(-1)![0] as (message: { type: string }) => void;
+    notify({ type: 'MISSIONS_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain(
+      'Catalogue momentanément indisponible'
+    );
+    expect(target.textContent).toContain('Mission Svelte');
+    expect(input.value).toBe('2026-12-12T10:00');
+    getMissions.mockResolvedValue([mission]);
+    notify({ type: 'TRACKING_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')).toBeNull();
+    expect(input.value).toBe('2026-12-12T10:00');
+    await unmount(page);
+  });
+
+  it('preserves the complete dossier through the real facade on a catalogue protocol failure and retry', async () => {
+    const facade = await vi.importActual<
+      typeof import('../../../src/lib/shell/facades/feed-data.facade')
+    >('../../../src/lib/shell/facades/feed-data.facade');
+    getMissions.mockImplementation(facade.getMissions);
+    let catalogueFails = false;
+    let emptyCatalogue = false;
+    let incomingTracking = tracking;
+    const originalBridge = sendMessage.getMockImplementation()!;
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_FEED_MISSIONS') {
+        return Promise.resolve(
+          catalogueFails
+            ? {
+                type: 'FEED_MISSIONS_FAILED',
+                payload: {
+                  code: 'READ_FAILED',
+                  message: 'Impossible de charger le catalogue local. Réessayez.',
+                },
+              }
+            : { type: 'FEED_MISSIONS_RESULT', payload: emptyCatalogue ? [] : [mission] }
+        );
+      }
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [incomingTracking] });
+      }
+      return originalBridge(message);
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const page = mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    const input = target.querySelector<HTMLInputElement>('[aria-label="Prochaine action"]')!;
+    input.value = '2026-12-12T10:00';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+    const selectedDossier = () => target.querySelector('h3')?.closest('.section-card');
+    expect(selectedDossier()?.textContent).toContain('Préparée');
+    catalogueFails = true;
+    incomingTracking = {
+      ...tracking,
+      currentStatus: 'applied',
+      history: [
+        ...tracking.history,
+        { from: 'application_prepared', to: 'applied', timestamp: 4, note: null },
+      ],
+    };
+    const notify = subscribeMessages.mock.calls.at(-1)![0] as (message: { type: string }) => void;
+    notify({ type: 'MISSIONS_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain(
+      'Impossible de charger le catalogue local. Réessayez.'
+    );
+    expect(selectedDossier()?.textContent).toContain('Mission Svelte');
+    expect(selectedDossier()?.querySelector('.eyebrow')?.textContent).toContain('Préparée');
+    expect(input.isConnected).toBe(true);
+    expect(input.value).toBe('2026-12-12T10:00');
+    catalogueFails = false;
+    target.querySelector<HTMLButtonElement>('[role="alert"] button')!.click();
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')).toBeNull();
+    expect(selectedDossier()?.querySelector('.eyebrow')?.textContent).toContain('Envoyée');
+    expect(input.isConnected).toBe(true);
+    expect(input.value).toBe('2026-12-12T10:00');
+    emptyCatalogue = true;
+    notify({ type: 'MISSIONS_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')).toBeNull();
+    expect(target.textContent).toContain('Aucune mission ne peut encore devenir candidature');
+    await unmount(page);
+  });
+
   it('labels Gemini Nano as the free local kit without cloud transfer', async () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
@@ -135,8 +240,8 @@ describe('ApplicationsPage next-action toast', () => {
 
     expect(target.textContent).toContain('Kit local · Gemini Nano');
     expect(target.textContent).toContain('sans envoi cloud');
-    expect(target.textContent).toContain('Copilot Premium');
-    expect(target.textContent).toContain('Analyse contextualisée Premium');
+    expect(target.textContent).not.toContain('Copilot Premium');
+    expect(target.textContent).not.toContain('Analyse contextualisée Premium');
   });
 
   it('affiche uniquement la note alphabétique de la mission dans la liste', async () => {
@@ -177,7 +282,7 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
     await flush();
 
-    expect(getMissions).not.toHaveBeenCalled();
+    expect(getMissions).toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledWith(
       'Impossible de charger le suivi des candidatures.',
       'error'
@@ -215,7 +320,7 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
 
     expect(sendMessage).toHaveBeenCalledTimes(2);
-    expect(getMissions).not.toHaveBeenCalled();
+    expect(getMissions).toHaveBeenCalled();
     expect(showToast).toHaveBeenCalledTimes(2);
     expect(showToast).toHaveBeenNthCalledWith(
       2,
@@ -225,7 +330,7 @@ describe('ApplicationsPage next-action toast', () => {
     expect(target.textContent).toContain('Le suivi des candidatures ne peut pas être chargé');
   });
 
-  it('shows a success toast when the next action is saved', async () => {
+  it('shows an inline confirmation when the next action is saved', async () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
     mount(ApplicationsPage, { target });
@@ -241,7 +346,47 @@ describe('ApplicationsPage next-action toast', () => {
     await flush();
     await tick();
 
-    expect(showToast).toHaveBeenCalledWith('Prochaine action mise à jour', 'success');
+    expect(target.querySelector('[role="status"]')?.textContent).toContain('Relance enregistrée.');
+  });
+
+  it('rejects an empty reminder without sending a persistence mutation', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    clickButton(target, 'Enregistrer');
+    await flush();
+    await tick();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain('Choisissez une date');
+    expect(
+      sendMessage.mock.calls.filter(([message]) => message.type === 'UPDATE_TRACKING_DETAILS')
+    ).toHaveLength(0);
+  });
+
+  it('selects the overdue dossier before a more recent untracked mission and collapses activity', async () => {
+    getMissions.mockResolvedValue([{ ...mission, id: 'untracked', title: 'Untracked' }, mission]);
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({
+          type: 'TRACKINGS_RESULT',
+          payload: [{ ...tracking, nextActionAt: '2020-01-01T09:00:00.000Z' }],
+        });
+      }
+      return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+    expect(target.querySelector('[aria-label="À relancer"]')?.textContent).toContain(
+      'Mission Svelte'
+    );
+    expect((target.querySelector('#application-next-action') as HTMLInputElement).value).toContain(
+      '2020-01-01'
+    );
+    expect(target.querySelector('details')?.open).toBe(false);
   });
 
   it('shows an ERROR toast (not success) when persistence fails', async () => {

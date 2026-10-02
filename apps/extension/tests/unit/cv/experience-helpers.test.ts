@@ -186,7 +186,7 @@ describe('mergeExperiences', () => {
     expect(result[0].id).toBe('local-1');
   });
 
-  it('unions skills on match and keeps local description when manual', () => {
+  it('preserves manual entries entirely on match', () => {
     const current = [
       baseExperience({
         id: 'local-1',
@@ -211,7 +211,7 @@ describe('mergeExperiences', () => {
     ];
 
     const result = mergeExperiences(current, incoming, NOW);
-    expect(result[0].skills).toEqual(['Svelte', 'React']);
+    expect(result[0].skills).toEqual(['Svelte']);
     expect(result[0].description).toBe('Local desc.');
     expect(result[0].location).toBe('Lyon');
   });
@@ -324,6 +324,7 @@ describe('mergeExperiences', () => {
     const current = [
       baseExperience({
         id: 'local-1',
+        source: 'linkedin',
         title: 'Lead',
         company: 'Acme',
         startDate: '2023-01',
@@ -340,13 +341,13 @@ describe('mergeExperiences', () => {
     expect(result[0].endDate).toBeNull();
   });
 
-  it('fills only an empty local employment type from an imported contract', () => {
+  it('preserves even an empty manual employment type', () => {
     const merged = mergeExperiences(
       [baseExperience({ employmentType: null })],
       [draft({ employmentType: 'Freelance' })],
       NOW
     );
-    expect(merged[0].employmentType).toBe('Freelance');
+    expect(merged[0].employmentType).toBeNull();
 
     const kept = mergeExperiences(
       [baseExperience({ employmentType: 'CDI' })],

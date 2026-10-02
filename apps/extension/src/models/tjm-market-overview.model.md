@@ -1,5 +1,10 @@
 # TJM Market Overview — Model
 
+> Mise à jour du 1er octobre 2026 : la page TJM utilise désormais le modèle
+> [échantillon local identifiable](tjm-local-sample.model.md). Les règles ci-dessous
+> décrivent le calcul historique agrégé conservé pour les anciens consommateurs ;
+> elles ne définissent plus les médianes ni les dénominateurs de la page TJM.
+
 > Source de vérité pour l'en-tête KPI du dashboard TJM (« Analyse TJM »).
 > Proposition Mobbin Cloudflare : cartes KPI big-number (médiane, plancher,
 > tendance) avec sparkline de la série agrégée.

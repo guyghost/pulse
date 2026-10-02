@@ -97,6 +97,9 @@
     userProfile = null as UserProfile | null,
     onCopyPitch,
     onFastApply,
+    onConfirmApplied,
+    feedback = {},
+    onFeedback,
     triageProgress = null as SessionTriageProgress | null,
     onReviewAll,
     onRetry,
@@ -116,7 +119,7 @@
     comparisonMissionIds?: string[];
     trackingByMissionId?: Map<string, MissionTracking>;
     statusPendingMissionIds?: Set<string>;
-    sortBy?: 'score' | 'date' | 'tjm';
+    sortBy?: 'score' | 'date' | 'tjm' | 'personalized';
     resetKey?: string;
     filterActive?: boolean;
     searchQuery?: string;
@@ -137,6 +140,9 @@
     userProfile?: UserProfile | null;
     onCopyPitch?: (mission: Mission) => void;
     onFastApply?: (mission: Mission) => void;
+    onConfirmApplied?: (mission: Mission) => void;
+    feedback?: Record<string, 'relevant' | 'off-target'>;
+    onFeedback?: (id: string, value: 'relevant' | 'off-target' | null) => void;
     /** Session triage progress and Inbox Zero state (DAO #212) */
     triageProgress?: SessionTriageProgress | null;
     onReviewAll?: () => void;
@@ -346,6 +352,9 @@
           onCopyPitch={() => void requestCopyPitch(mission)}
           copyPitchStatus={pitchCopyControllerFor(mission.id).status}
           onFastApply={onFastApply ? () => onFastApply(mission) : undefined}
+          onConfirmApplied={onConfirmApplied ? () => onConfirmApplied(mission) : undefined}
+          feedback={feedback[mission.id] ?? null}
+          onFeedback={onFeedback ? (value) => onFeedback(mission.id, value) : undefined}
           onInvestigate={() => onInvestigateMission?.(mission)}
           {onOpenLink}
         />

@@ -1,0 +1,218 @@
+import type { Page } from '@playwright/test';
+import { test, expect } from './fixtures';
+import { dismissFeedTour, missionCards } from './helpers';
+async function seedDailyMissions(page: Page, selected = false) {
+  await page.evaluate(async (isSelected) => {
+    const result = await chrome.runtime.sendMessage({ type: 'GET_FEED_MISSIONS' });
+    const base = result.payload[0];
+    if (!base) {
+      throw new Error('Demo runtime not ready');
+    }
+    const missions = [1, 2].map((index) => ({
+      ...base,
+      id: `daily-command-${index}`,
+      title: `Mission quotidienne ${index}`,
+      score: 95 - index,
+      stack: ['React', 'TypeScript'],
+    }));
+    localStorage.setItem('__missionpulse_dev_missions', JSON.stringify(missions));
+    localStorage.setItem(
+      '__missionpulse_dev_trackings',
+      JSON.stringify(
+        isSelected
+          ? [
+              {
+                missionId: missions[0].id,
+                currentStatus: 'selected',
+                history: [{ from: null, to: 'selected', timestamp: Date.now(), note: null }],
+                generatedAssetIds: [],
+                userRating: null,
+                notes: '',
+                nextActionAt: null,
+              },
+            ]
+          : []
+      )
+    );
+  }, selected);
+  await page.reload();
+  await dismissFeedTour(page);
+  await expect(missionCards(page).filter({ hasText: 'Mission quotidienne 1' })).toBeVisible();
+  const records = await page.evaluate(
+    async () => (await chrome.runtime.sendMessage({ type: 'GET_TRACKINGS' })).payload
+  );
+  expect(records.map((record: { currentStatus: string }) => record.currentStatus)).toEqual(
+    selected ? ['selected'] : []
+  );
+}
+
+async function expectSingleConfirmation(page: Page) {
+  const records = await page.evaluate(
+    async () => (await chrome.runtime.sendMessage({ type: 'GET_TRACKINGS' })).payload
+  );
+  const record = records.find(
+    (item: { missionId: string }) => item.missionId === 'daily-command-1'
+  );
+  expect(record.history.filter((entry: { to: string }) => entry.to === 'applied')).toHaveLength(1);
+}
+
+for (const width of [320, 400]) {
+  test(`daily feed commands, modal keyboard and application confirmation at ${width}px`, async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width, height: 800 });
+    await seedDailyMissions(page);
+    const card = missionCards(page).filter({ hasText: 'Mission quotidienne 1' });
+    await expect(card).toBeVisible();
+    await card.getByRole('button', { name: /Afficher les détails de la mission/ }).click();
+
+    await card.getByRole('button', { name: 'Pertinent', exact: true }).click();
+    await expect(card.getByRole('button', { name: 'Pertinent', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await card.getByRole('button', { name: 'Hors cible', exact: true }).click();
+    await expect(card.getByRole('button', { name: 'Hors cible', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    );
+    await card.getByRole('button', { name: 'Effacer le retour' }).click();
+    await expect(card.getByRole('button', { name: 'Pertinent', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    await card.getByRole('button', { name: 'Ouvrir pour postuler', exact: true }).click();
+    await expect(card.getByText('Sélectionnée', { exact: true })).toBeVisible();
+    await expect(card.getByText('Envoyée', { exact: true })).toHaveCount(0);
+    await card
+      .getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+      .click();
+    await expect(card.getByText('Envoyée', { exact: true })).toBeVisible();
+    await expectSingleConfirmation(page);
+    const trigger = page.getByRole('button', { name: 'Afficher les filtres', exact: true });
+    await trigger.click();
+    const dialog = page.getByRole('dialog', { name: 'Filtrer les missions' });
+    await expect(dialog).toBeVisible();
+    await page.keyboard.press('f');
+    await expect(dialog.getByRole('button', { name: 'Favoris', exact: true })).toHaveAttribute(
+      'aria-pressed',
+      'false'
+    );
+    for (let index = 0; index < 30; index++) {
+      await page.keyboard.press('Tab');
+      expect(await dialog.evaluate((element) => element.contains(document.activeElement))).toBe(
+        true
+      );
+    }
+    await dialog.getByLabel('Note minimale').selectOption('good');
+    await dialog.getByLabel('Trier les missions').selectOption('personalized');
+    await dialog.getByRole('button', { name: 'Enregistrer la recherche', exact: true }).click();
+    await expect(dialog.getByRole('alert')).toHaveText('Donnez un nom à la recherche.');
+    await dialog.getByLabel('Nom de la recherche').fill('Ma veille');
+    await dialog.getByRole('button', { name: 'Enregistrer la recherche', exact: true }).click();
+    await expect(dialog.getByRole('button', { name: 'Ma veille', exact: true })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    await trigger.click();
+    await dialog.getByRole('button', { name: 'Ma veille', exact: true }).click();
+    await expect(dialog).toHaveCount(0);
+    await trigger.click();
+    await dialog
+      .getByRole('button', { name: 'Supprimer la recherche Ma veille', exact: true })
+      .focus();
+    await page.keyboard.press('Enter');
+    await expect(dialog.getByRole('button', { name: 'Ma veille', exact: true })).toHaveCount(0);
+    await page.keyboard.press('Escape');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+      true
+    );
+    await missionCards(page)
+      .nth(0)
+      .getByRole('button', { name: 'Ajouter la mission à la comparaison', exact: true })
+      .click();
+    await missionCards(page)
+      .nth(1)
+      .getByRole('button', { name: 'Ajouter la mission à la comparaison', exact: true })
+      .click();
+    await expect(page.getByRole('button', { name: 'Comparer', exact: true })).toBeVisible();
+    const dock = page.getByTestId('feed-bottom-dock');
+    const scroll = page.getByTestId('feed-scroll-container');
+    const dockBox = await dock.boundingBox();
+    const scrollBox = await scroll.boundingBox();
+    expect(scrollBox!.y + scrollBox!.height).toBeLessThanOrEqual(dockBox!.y + 1);
+  });
+}
+
+test('failed opening and repeated clicks never record sending; failed confirmation stays recoverable', async ({
+  page,
+}) => {
+  await seedDailyMissions(page, true);
+  const card = missionCards(page).filter({ hasText: 'Mission quotidienne 1' });
+  await card.getByRole('button', { name: /Afficher les détails de la mission/ }).click();
+  await page.evaluate(() => {
+    const runtime = window.chrome.runtime;
+    const original = runtime.sendMessage.bind(runtime);
+    const counters = { open: 0, transition: 0 };
+    Object.assign(window, { __dailyApplicationCounters: counters });
+    runtime.sendMessage = async (request: unknown) => {
+      const message = request as { type: string; payload?: { missionId: string } };
+      if (message.type === 'OPEN_EXTERNAL_URL') {
+        counters.open++;
+        return { type: 'EXTERNAL_URL_OPENED', payload: { opened: false } };
+      }
+      if (message.type === 'CONFIRM_APPLICATION' && counters.transition === 0) {
+        counters.transition++;
+        return {
+          type: 'TRACKING_FAILED',
+          payload: {
+            version: 1,
+            code: 'PERSIST_FAILED',
+            intent: 'transition',
+            missionId: message.payload!.missionId,
+            mutationId: null,
+            message: 'Impossible d’enregistrer le nouveau statut.',
+            recoverable: true,
+          },
+        };
+      }
+      return original(request);
+    };
+  });
+  await card.getByTestId('fast-apply-btn').evaluate((button) => {
+    (button as HTMLButtonElement).click();
+    (button as HTMLButtonElement).click();
+  });
+  await expect(
+    page.getByText('Impossible d’ouvrir la plateforme source.', { exact: true })
+  ).toBeVisible();
+  const counters = await page.evaluate(
+    () =>
+      (window as unknown as { __dailyApplicationCounters: { open: number; transition: number } })
+        .__dailyApplicationCounters
+  );
+  expect(counters).toEqual({ open: 1, transition: 0 });
+  await card
+    .getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+    .click();
+  await expect(
+    page.getByText('Impossible d’enregistrer le nouveau statut.', { exact: true })
+  ).toBeVisible();
+  await expect(card.getByText('Envoyée', { exact: true })).toHaveCount(0);
+  const recordsAfterFailure = await page.evaluate(
+    async () => (await chrome.runtime.sendMessage({ type: 'GET_TRACKINGS' })).payload
+  );
+  const unchangedTracking = recordsAfterFailure.find(
+    (record: { missionId: string }) => record.missionId === 'daily-command-1'
+  );
+  expect(unchangedTracking.currentStatus).toBe('selected');
+  expect(unchangedTracking.history).toHaveLength(1);
+  await expect(
+    card.getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+  ).toBeEnabled();
+  await card
+    .getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
+    .click();
+  await expect(card.getByText('Envoyée', { exact: true })).toBeVisible();
+  await expectSingleConfirmation(page);
+});

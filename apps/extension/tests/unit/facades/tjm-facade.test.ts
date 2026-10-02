@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TJMAnalysis } from '../../../src/lib/core/types/tjm';
+import type { TJMSampleAnalysis } from '../../../src/lib/core/types/tjm';
 
 const bridgeMock = vi.hoisted(() => ({
   sendMessage: vi.fn(),
@@ -11,27 +11,28 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
 
 import { getTJMAnalysis } from '../../../src/lib/shell/facades/tjm.facade';
 
-const analysis: TJMAnalysis = {
-  trend: 'up',
-  confidence: 0.82,
-  dataPoints: 3,
-  junior: { min: 400, max: 500, median: 450 },
-  confirmed: { min: 600, max: 700, median: 650 },
-  senior: { min: 750, max: 900, median: 820 },
-  trendDetail: 'Le marché monte.',
-  recommendation: 'Visez le haut de fourchette.',
+const analysis: TJMSampleAnalysis = {
+  total: 3,
+  priced: 2,
+  withoutTjm: 1,
+  range: { min: 500, max: 700, median: 600 },
   lastUpdated: '2026-05-22',
-  topStacks: [
+  firstObservedAt: '2026-05-20',
+  unknown: { category: 1, seniority: 1, remote: 1, region: 0 },
+  sources: [{ source: 'free-work', count: 3 }],
+  levels: [
+    { seniority: 'junior', population: { total: 0, priced: 0, withoutTjm: 0, range: null } },
     {
-      stack: 'svelte',
-      average: 820,
-      trend: 'up',
-      sampleCount: 3,
-      lastUpdated: '2026-05-22',
+      seniority: 'senior',
+      population: {
+        total: 3,
+        priced: 2,
+        withoutTjm: 1,
+        range: { min: 500, max: 700, median: 600 },
+      },
     },
   ],
-  regionInsights: [],
-  series: [],
+  legacy: { recordCount: 0, series: [] },
 };
 
 describe('tjm facade', () => {
@@ -52,9 +53,32 @@ describe('tjm facade', () => {
     });
   });
 
+  it('forwards all intersected segments without replacing unknown dimensions', async () => {
+    bridgeMock.sendMessage.mockResolvedValue({
+      type: 'TJM_ANALYSIS_RESULT',
+      payload: { analysis },
+    });
+    await getTJMAnalysis(['React'], 'lyon', '7d', {
+      category: 'unknown',
+      seniority: 'senior',
+      remote: 'full',
+    });
+    expect(bridgeMock.sendMessage).toHaveBeenCalledWith({
+      type: 'GET_TJM_ANALYSIS',
+      payload: {
+        profileStacks: ['React'],
+        region: 'lyon',
+        period: '7d',
+        category: 'unknown',
+        seniority: 'senior',
+        remote: 'full',
+      },
+    });
+  });
+
   it('surfaces invalid bridge responses', async () => {
     bridgeMock.sendMessage.mockResolvedValue({ type: 'SCAN_COMPLETE', payload: [] });
 
-    await expect(getTJMAnalysis()).rejects.toThrow('TJM analysis load failed.');
+    await expect(getTJMAnalysis()).rejects.toThrow('Impossible de charger l’analyse TJM.');
   });
 });

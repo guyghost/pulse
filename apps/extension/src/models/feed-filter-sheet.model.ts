@@ -4,6 +4,7 @@ import type { SeniorityLevel } from '$lib/core/types/profile';
 import type { FeedDecisionPresetId, FeedScoreBucket } from '$lib/core/types/feed-view';
 
 export interface FeedFilterDraft {
+  scoreFilterMode?: 'minimum' | 'exact';
   decisionPreset: FeedDecisionPresetId | null;
   selectedScoreBucket: FeedScoreBucket | null;
   selectedTjmMin: number | null;
@@ -124,6 +125,7 @@ export function transitionFeedFilterSheet(
       return updateDraft(state, {
         ...state.filters,
         selectedScoreBucket: event.bucket,
+        scoreFilterMode: 'minimum',
         decisionPreset:
           event.bucket !== null && state.filters.decisionPreset === 'priority'
             ? null

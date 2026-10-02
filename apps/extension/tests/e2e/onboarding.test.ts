@@ -55,7 +55,7 @@ test.describe('Onboarding', () => {
     await expect(page.getByRole('heading', { name: 'Soyez alerté·e' })).toBeVisible();
     await submitOnboardingScan(page);
     await page.waitForFunction(() =>
-      window.localStorage.getItem('__missionpulse_e2e_saved_profile')
+      JSON.parse(window.localStorage.getItem('__missionpulse_dev_profile') ?? 'null')
     );
 
     await expectFeedReady(page);

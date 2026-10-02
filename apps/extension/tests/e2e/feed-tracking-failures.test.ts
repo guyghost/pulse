@@ -31,6 +31,7 @@ async function mockFeedTrackingBridge(
 ): Promise<void> {
   await page.addInitScript(
     ({ missionRow, failureScenario }) => {
+      localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([missionRow]));
       type BridgeRequest = { type: string; payload?: unknown };
       type MissionTracking = {
         missionId: string;
@@ -81,100 +82,93 @@ async function mockFeedTrackingBridge(
         },
       });
 
-      let chromeValue: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return chromeValue;
-        },
-        set(value: unknown) {
-          chromeValue = value;
-          const chromeApi = value as {
-            runtime?: {
-              sendMessage?: (message: BridgeRequest) => Promise<unknown>;
-            };
+      const installTimer = window.setInterval(() => {
+        const value: unknown = window.chrome;
+        const chromeApi = value as {
+          runtime?: {
+            sendMessage?: (message: BridgeRequest) => Promise<unknown>;
           };
-          const originalSendMessage = chromeApi.runtime?.sendMessage;
-          if (!originalSendMessage) {
-            return;
+        };
+        const originalSendMessage = chromeApi?.runtime?.sendMessage;
+        if (!originalSendMessage) {
+          return;
+        }
+
+        window.clearInterval(installTimer);
+        chromeApi.runtime!.sendMessage = async (message) => {
+          if (message.type === 'GET_FEED_MISSIONS') {
+            return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
+          }
+          if (message.type === 'GET_FEED_MISSIONS_PAGE') {
+            // Page mirror of the full-catalogue interception above: a
+            // single-mission catalogue fits in page 0, hasMore false.
+            const request = message as { payload?: { page: number; pageSize: number } };
+            const start = (request.payload?.page ?? 0) * (request.payload?.pageSize ?? 250);
+            const visible = start === 0 ? [missionRow] : [];
+            return {
+              type: 'FEED_MISSIONS_PAGE_RESULT',
+              payload: {
+                missions: visible,
+                total: 1,
+                hasMore: false,
+              },
+            };
+          }
+          if (message.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
+            const now = Date.now();
+            return {
+              type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+              payload: [
+                {
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  lastState: 'done',
+                  missionsCount: 1,
+                  error: null,
+                  lastSyncAt: now,
+                  lastSuccessAt: now,
+                },
+              ],
+            };
+          }
+          if (message.type === 'GET_TRACKINGS') {
+            trackingRequests.push(message.type);
+            if (failureScenario === 'load-failure') {
+              return trackingFailure('load', 'Impossible de charger le suivi des candidatures.');
+            }
+            return {
+              type: 'TRACKINGS_RESULT',
+              payload: confirmedTracking ? [confirmedTracking] : [],
+            };
+          }
+          if (message.type === 'UPDATE_TRACKING') {
+            trackingRequests.push(message.type);
+            if (failureScenario === 'transition-failure') {
+              return trackingFailure('transition', 'Impossible d’enregistrer le nouveau statut.');
+            }
+
+            confirmedTracking = {
+              missionId: missionRow.id,
+              currentStatus: 'selected',
+              history: [
+                { from: null, to: 'detected', timestamp: 1, note: null },
+                { from: 'detected', to: 'selected', timestamp: 2, note: null },
+              ],
+              generatedAssetIds: [],
+              userRating: null,
+              notes: '',
+              nextActionAt: null,
+            };
+            return { type: 'TRACKING_UPDATED', payload: confirmedTracking };
+          }
+          if (message.type === 'RESTORE_TRACKING') {
+            trackingRequests.push(message.type);
+            return trackingFailure('restore', 'Impossible d’annuler la modification.');
           }
 
-          chromeApi.runtime.sendMessage = async (message) => {
-            if (message.type === 'GET_FEED_MISSIONS') {
-              return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
-            }
-            if (message.type === 'GET_FEED_MISSIONS_PAGE') {
-              // Page mirror of the full-catalogue interception above: a
-              // single-mission catalogue fits in page 0, hasMore false.
-              const request = message as { payload?: { page: number; pageSize: number } };
-              const start = (request.payload?.page ?? 0) * (request.payload?.pageSize ?? 250);
-              const visible = start === 0 ? [missionRow] : [];
-              return {
-                type: 'FEED_MISSIONS_PAGE_RESULT',
-                payload: {
-                  missions: visible,
-                  total: 1,
-                  hasMore: false,
-                },
-              };
-            }
-            if (message.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
-              const now = Date.now();
-              return {
-                type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
-                payload: [
-                  {
-                    connectorId: 'free-work',
-                    connectorName: 'Free-Work',
-                    lastState: 'done',
-                    missionsCount: 1,
-                    error: null,
-                    lastSyncAt: now,
-                    lastSuccessAt: now,
-                  },
-                ],
-              };
-            }
-            if (message.type === 'GET_TRACKINGS') {
-              trackingRequests.push(message.type);
-              if (failureScenario === 'load-failure') {
-                return trackingFailure('load', 'Impossible de charger le suivi des candidatures.');
-              }
-              return {
-                type: 'TRACKINGS_RESULT',
-                payload: confirmedTracking ? [confirmedTracking] : [],
-              };
-            }
-            if (message.type === 'UPDATE_TRACKING') {
-              trackingRequests.push(message.type);
-              if (failureScenario === 'transition-failure') {
-                return trackingFailure('transition', 'Impossible d’enregistrer le nouveau statut.');
-              }
-
-              confirmedTracking = {
-                missionId: missionRow.id,
-                currentStatus: 'selected',
-                history: [
-                  { from: null, to: 'detected', timestamp: 1, note: null },
-                  { from: 'detected', to: 'selected', timestamp: 2, note: null },
-                ],
-                generatedAssetIds: [],
-                userRating: null,
-                notes: '',
-                nextActionAt: null,
-              };
-              return { type: 'TRACKING_UPDATED', payload: confirmedTracking };
-            }
-            if (message.type === 'RESTORE_TRACKING') {
-              trackingRequests.push(message.type);
-              return trackingFailure('restore', 'Impossible d’annuler la modification.');
-            }
-
-            return originalSendMessage.call(chromeApi.runtime, message);
-          };
-        },
-      });
+          return originalSendMessage.call(chromeApi.runtime, message);
+        };
+      }, 0);
     },
     { missionRow: mission, failureScenario: scenario }
   );
@@ -182,7 +176,7 @@ async function mockFeedTrackingBridge(
 
 async function openTrackingAction(page: Page): Promise<ReturnType<Page['getByRole']>> {
   await page.goto(SIDE_PANEL);
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible({
     timeout: 10_000,
   });
   await dismissFeedTour(page);

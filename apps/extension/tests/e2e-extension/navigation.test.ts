@@ -213,7 +213,7 @@ test(
     // seeding and rename the CTA to "Stopper le scan en cours"). The
     // first-run toast is suppressed by the kbd_cheatsheet_tip_seen seed.
     const opener = page
-      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('navigation', { name: 'Navigation principale' })
       .getByRole('button', { name: 'Profil' });
     await expect(opener).toBeVisible();
     await openShortcutsHelp(page, opener);

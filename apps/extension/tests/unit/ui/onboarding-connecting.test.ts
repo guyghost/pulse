@@ -39,6 +39,8 @@ function mountFlow(
   snapshot: OnboardingFlowSnapshot,
   handlers: {
     onEvent?: (event: OnboardingFlowEvent) => void;
+    notificationThreshold?: number | null;
+    sourceOpenErrors?: Record<string, string>;
     onVerifySource?: (sourceId: string) => void;
     onOpenSource?: (sourceId: string) => void;
     sourceVerifications?: Record<string, 'ready' | 'session-missing' | 'unavailable' | 'checking'>;
@@ -55,6 +57,8 @@ function mountFlow(
       onVerifySource: handlers.onVerifySource ?? vi.fn(),
       onOpenSource: handlers.onOpenSource ?? vi.fn(),
       sourceVerifications: handlers.sourceVerifications,
+      notificationThreshold: handlers.notificationThreshold,
+      sourceOpenErrors: handlers.sourceOpenErrors,
     },
   });
   return { target, instance };
@@ -176,4 +180,43 @@ describe('OnboardingFlow — connecting (P0-B)', () => {
     retry.click();
     expect(onVerifySource).toHaveBeenCalledWith('free-work');
   });
+});
+
+describe('OnboardingFlow — effective notification threshold', () => {
+  it('describes the stored numeric threshold without promising grade A', async () => {
+    const { target } = mountFlow(makeSnapshot({ phase: 'notifying', notifyEnabled: false }), {
+      notificationThreshold: 83,
+    });
+    await tick();
+    expect(target.textContent).toContain('83/100');
+    expect(target.textContent).not.toContain('notée A');
+    expect(target.querySelector('[role="switch"]')?.getAttribute('aria-checked')).toBe('false');
+  });
+
+  it('does not invent a threshold when the preference read failed', async () => {
+    const { target } = mountFlow(makeSnapshot({ phase: 'notifying' }), {
+      notificationThreshold: null,
+    });
+    await tick();
+    expect(target.textContent).toContain('Le seuil enregistré est indisponible');
+    expect(target.textContent).not.toContain('70/100');
+  });
+});
+
+it('keeps the onboarding opening error explicit while session verification remains available', async () => {
+  const { target } = mountFlow(makeSnapshot(), {
+    sourceVerifications: { lehibou: 'session-missing' },
+    sourceOpenErrors: {
+      lehibou: 'Impossible d’ouvrir LeHibou. Réessayez depuis Chrome, puis revérifiez la session.',
+    },
+  });
+  await tick();
+  expect(target.querySelector('[role="alert"]')?.textContent).toContain(
+    'Impossible d’ouvrir LeHibou'
+  );
+  expect(
+    [...target.querySelectorAll('button')].some((button) =>
+      button.textContent?.includes('Réessayer')
+    )
+  ).toBe(true);
 });

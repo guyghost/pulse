@@ -19,7 +19,7 @@ export const REGION_LABELS: Record<TJMRegion, string> = {
   grenoble: 'Grenoble',
   montpellier: 'Montpellier',
   nice: 'Nice',
-  remote: 'Full remote',
+  remote: 'Télétravail complet',
   other: 'Autre',
 };
 

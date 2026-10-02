@@ -28,10 +28,7 @@
     saveAlertPreferences,
     getAlertPreferences,
   } from '$lib/shell/facades/alert-preferences.facade';
-  import {
-    DEFAULT_CONNECTED_ALERT_PREFERENCES,
-    type ConnectedAlertPreferences,
-  } from '$lib/core/types/alert-preferences';
+  import { type ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import { createFeedStore } from '$lib/state/feed.svelte';
   import { createFeedController } from '$lib/shell/facades/feed-controller.svelte';
   import { ensureDurableProfileBeforeScan } from '$lib/shell/onboarding/ensure-durable-profile';
@@ -51,14 +48,25 @@
   const controller = createOnboardingFlowController({ attemptId, sources });
   let snapshot = $state(controller.getSnapshot());
 
-  let alertPreferences: ConnectedAlertPreferences = DEFAULT_CONNECTED_ALERT_PREFERENCES;
-  void (async () => {
+  let notificationThreshold = $state<number | null>(null);
+  let alertPreferences = $state<ConnectedAlertPreferences | null>(null);
+  let notificationChoiceHydrated = false;
+  const alertPreferencesLoaded = (async () => {
     try {
       alertPreferences = await getAlertPreferences();
+      notificationThreshold = alertPreferences.scoreThreshold;
     } catch {
-      // best-effort rehydration; defaults remain.
+      // A failed read must never become a write of default preferences.
+      alertPreferences = null;
     }
   })();
+
+  $effect(() => {
+    if (snapshot.phase === 'notifying' && alertPreferences && !notificationChoiceHydrated) {
+      notificationChoiceHydrated = true;
+      controller.send({ type: 'SET_NOTIFY', enabled: alertPreferences.enabled });
+    }
+  });
 
   // Best-effort: re-hydrate an existing profile so the wizard pre-fills.
   void (async () => {
@@ -120,6 +128,8 @@
   // states stay local (plan: "errors displayed locally").
   const sourceVerifications = $state<Record<string, SourceVerificationStatus | 'checking'>>({});
 
+  const sourceOpenErrors = $state<Record<string, string>>({});
+
   async function handleVerifySource(sourceId: string): Promise<void> {
     if (sourceVerifications[sourceId] === 'checking') {
       return;
@@ -155,10 +165,17 @@
     }
   }
 
-  function handleOpenSource(sourceId: string): void {
+  async function handleOpenSource(sourceId: string): Promise<void> {
     const source = sources.find((s) => s.id === sourceId);
-    if (source?.url) {
-      void openSourceInNewTab(source.url);
+    if (!source?.url) {
+      return;
+    }
+    delete sourceOpenErrors[sourceId];
+    try {
+      await openSourceInNewTab(source.url);
+    } catch {
+      sourceOpenErrors[sourceId] =
+        `Impossible d’ouvrir ${source.name}. Réessayez depuis Chrome, puis revérifiez la session.`;
     }
   }
 
@@ -184,6 +201,10 @@
         // a "disabled" choice was skipped, so global notifications silently
         // stayed at their enabled default.
         try {
+          await alertPreferencesLoaded;
+          if (alertPreferences === null) {
+            throw new Error('Alert preferences unavailable');
+          }
           const next: ConnectedAlertPreferences = {
             ...alertPreferences,
             enabled: effect.notifyEnabled,
@@ -290,6 +311,9 @@
   }
 
   function handleEvent(event: OnboardingFlowEvent) {
+    if (event.type === 'SET_NOTIFY') {
+      notificationChoiceHydrated = true;
+    }
     controller.send(event);
   }
 </script>
@@ -297,11 +321,13 @@
 {#snippet wizardContent()}
   <OnboardingFlow
     {snapshot}
+    {notificationThreshold}
     {sources}
     onEvent={handleEvent}
     onRetry={retryFinalize}
     {navFailed}
     {sourceVerifications}
+    {sourceOpenErrors}
     onVerifySource={handleVerifySource}
     onOpenSource={handleOpenSource}
   />

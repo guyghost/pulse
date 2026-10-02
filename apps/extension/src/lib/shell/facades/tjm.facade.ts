@@ -1,8 +1,8 @@
-import type { TJMAnalysis, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
+import type { TJMSampleAnalysis, TJMFilters, TJMPeriod } from '$lib/core/types/tjm';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 
 /**
- * Get TJM analysis, optionally filtered by stacks, region and/or period.
+ * Get the identifiable local sample, intersecting stacks, geography, period and segments.
  *
  * @param profileStacks - If provided, only include records matching these stacks
  * @param region - If provided, only include records from this region
@@ -10,10 +10,12 @@ import { sendMessage } from '$lib/shell/messaging/bridge';
  */
 export async function getTJMAnalysis(
   profileStacks?: string[],
-  region?: TJMRegion,
-  period?: TJMPeriod
-): Promise<TJMAnalysis | null> {
+  region?: TJMFilters['region'],
+  period?: TJMPeriod,
+  segments: Pick<TJMFilters, 'category' | 'seniority' | 'remote'> = {}
+): Promise<TJMSampleAnalysis | null> {
   const payload = {
+    ...segments,
     ...(profileStacks && profileStacks.length > 0 ? { profileStacks } : {}),
     ...(region ? { region } : {}),
     ...(period && period !== 'all' ? { period } : {}),
@@ -25,7 +27,7 @@ export async function getTJMAnalysis(
   );
 
   if (response.type !== 'TJM_ANALYSIS_RESULT') {
-    throw new Error('TJM analysis load failed.');
+    throw new Error('Impossible de charger l’analyse TJM.');
   }
 
   return response.payload.analysis;

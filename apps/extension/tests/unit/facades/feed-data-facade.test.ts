@@ -14,6 +14,7 @@ import {
   getConnectorStatuses,
   getFavorites,
   getFeedSortBy,
+  getFeedSavedViews,
   getHidden,
   getMissions,
   getProfile,
@@ -55,6 +56,28 @@ describe('feed data facade profile bridge', () => {
 
     await expect(getMissions()).resolves.toEqual(missions);
     expect(bridgeMock.sendMessage).toHaveBeenCalledWith({ type: 'GET_FEED_MISSIONS' });
+  });
+
+  it('rejects explicit or malformed catalogue failures while preserving an empty success', async () => {
+    bridgeMock.sendMessage.mockResolvedValueOnce({
+      type: 'FEED_MISSIONS_FAILED',
+      payload: {
+        code: 'READ_FAILED',
+        message: 'Impossible de charger le catalogue local. Réessayez.',
+      },
+    });
+    await expect(getMissions()).rejects.toThrow(
+      'Impossible de charger le catalogue local. Réessayez.'
+    );
+    bridgeMock.sendMessage.mockResolvedValueOnce({
+      type: 'FEED_MISSIONS_FAILED',
+      payload: { code: 'INVALID' },
+    });
+    await expect(getMissions()).rejects.toThrow('La réponse du catalogue local est invalide');
+    bridgeMock.sendMessage.mockResolvedValueOnce({ type: 'UNEXPECTED' });
+    await expect(getMissions()).rejects.toThrow('La réponse du catalogue local est invalide');
+    bridgeMock.sendMessage.mockResolvedValueOnce({ type: 'FEED_MISSIONS_RESULT', payload: [] });
+    await expect(getMissions()).resolves.toEqual([]);
   });
 
   it('loads persisted connector statuses through the service worker bridge', async () => {
@@ -186,4 +209,13 @@ describe('feed data facade profile bridge', () => {
       payload: { url: 'https://www.free-work.com/' },
     });
   });
+});
+
+it('distinguishes a failed saved-view read from a confirmed empty catalogue', async () => {
+  bridgeMock.sendMessage.mockResolvedValueOnce({ type: 'FEED_SAVED_VIEWS_FAILED' });
+  await expect(getFeedSavedViews()).rejects.toThrow('charger');
+  bridgeMock.sendMessage.mockRejectedValueOnce(new Error('transport'));
+  await expect(getFeedSavedViews()).rejects.toThrow('transport');
+  bridgeMock.sendMessage.mockResolvedValueOnce({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] });
+  await expect(getFeedSavedViews()).resolves.toEqual([]);
 });

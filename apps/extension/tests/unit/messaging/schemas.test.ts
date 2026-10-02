@@ -69,6 +69,25 @@ const validSettings = {
 // ============================================================================
 
 describe('validateMessage — structure de base', () => {
+  it('validates the explicit catalogue read failure contract', () => {
+    expect(
+      validateMessage({
+        type: 'FEED_MISSIONS_FAILED',
+        payload: { code: 'READ_FAILED', message: 'Catalogue indisponible.' },
+      }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'FEED_MISSIONS_FAILED', payload: [] }).valid).toBe(false);
+    expect(
+      validateMessage({ type: 'FEED_MISSIONS_FAILED', payload: { code: 'UNKNOWN', message: '' } })
+        .valid
+    ).toBe(false);
+    expect(validateMessage({ type: 'FEED_MISSIONS_RESULT', payload: [] }).valid).toBe(true);
+  });
+
+  it('accepts the committed TJM population invalidation', () => {
+    expect(validateMessage({ type: 'TJM_DATA_UPDATED' }).valid).toBe(true);
+  });
+
   it('rejette null', () => {
     const r = validateMessage(null);
     expect(r.valid).toBe(false);
@@ -1359,4 +1378,9 @@ describe('validateMessage — GENERATE_ASSET', () => {
     });
     expect(r.valid).toBe(false);
   });
+});
+
+it('accepts an explicit failed saved-search read separately from an empty catalogue', () => {
+  expect(validateMessage({ type: 'FEED_SAVED_VIEWS_FAILED' }).valid).toBe(true);
+  expect(validateMessage({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] }).valid).toBe(true);
 });

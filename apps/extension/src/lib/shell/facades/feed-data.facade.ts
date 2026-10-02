@@ -5,13 +5,14 @@
  * behind a clean API. UI pages import this instead of individual storage modules.
  */
 import { sendMessage } from '../messaging/bridge';
+import { validateMessage } from '../messaging/schemas';
 import type { UserProfile } from '../../core/types/profile';
 import type { Mission } from '../../core/types/mission';
 import type { PersistedConnectorStatus } from '../../core/types/connector-status';
 import type { SavedFeedView } from '../../core/types/feed-view';
 import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 
-export type FeedSortBy = 'score' | 'date' | 'tjm';
+export type FeedSortBy = 'score' | 'date' | 'tjm' | 'personalized';
 
 export { getConnectorsMeta } from '../connectors/meta';
 export { markAsSeen } from '../../core/seen/mark-seen';
@@ -24,7 +25,13 @@ export {
 
 export async function getMissions(): Promise<Mission[]> {
   const response = await sendMessage({ type: 'GET_FEED_MISSIONS' });
-  return response.type === 'FEED_MISSIONS_RESULT' ? response.payload : [];
+  if (response?.type === 'FEED_MISSIONS_RESULT' && Array.isArray(response.payload)) {
+    return response.payload;
+  }
+  if (response?.type === 'FEED_MISSIONS_FAILED' && validateMessage(response).valid) {
+    throw new Error(response.payload.message);
+  }
+  throw new Error('La réponse du catalogue local est invalide. Réessayez.');
 }
 
 export interface FeedMissionsPage {
@@ -95,7 +102,10 @@ export async function setFeedSortBy(sortBy: FeedSortBy): Promise<void> {
 
 export async function getFeedSavedViews(): Promise<SavedFeedView[]> {
   const response = await sendMessage({ type: 'GET_FEED_SAVED_VIEWS' });
-  return response.type === 'FEED_SAVED_VIEWS_RESULT' ? response.payload : [];
+  if (response.type !== 'FEED_SAVED_VIEWS_RESULT') {
+    throw new Error('Impossible de charger les recherches enregistrées.');
+  }
+  return response.payload;
 }
 
 export async function setFeedSavedViews(views: SavedFeedView[]): Promise<void> {
@@ -187,4 +197,23 @@ export function subscribeToNotificationClicked(handler: () => void): () => void 
   return () => {
     chrome.runtime.onMessage.removeListener(listener);
   };
+}
+
+export async function getMissionFeedback(): Promise<
+  import('../../core/feed/local-feedback').MissionFeedbackMap
+> {
+  const response = await sendMessage({ type: 'GET_MISSION_FEEDBACK' });
+  if (response.type !== 'MISSION_FEEDBACK_RESULT' || !validateMessage(response).valid) {
+    throw new Error('Impossible de charger les retours locaux.');
+  }
+  return response.payload;
+}
+
+export async function saveMissionFeedback(
+  feedback: import('../../core/feed/local-feedback').MissionFeedbackMap
+): Promise<void> {
+  const response = await sendMessage({ type: 'SAVE_MISSION_FEEDBACK', payload: feedback });
+  if (response.type !== 'MISSION_FEEDBACK_SAVED' || !response.payload.saved) {
+    throw new Error('Impossible d’enregistrer le retour local.');
+  }
 }

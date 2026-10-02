@@ -538,7 +538,8 @@ vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
   resetHealthSnapshot,
 }));
 
-vi.mock('../../../src/lib/shell/storage/tjm-history', () => ({
+vi.mock('../../../src/lib/shell/storage/tjm-history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/shell/storage/tjm-history')>()),
   loadTJMHistory,
   recordTJMFromMissions,
 }));
@@ -941,6 +942,38 @@ describe('background auto-scan notifications', () => {
     ]);
   });
 
+  it('projects all source announcements to TJM while keeping the feed winners as legacy inputs', async () => {
+    const winner = makeMission({
+      id: 'lh-a',
+      source: 'lehibou',
+      url: 'https://www.lehibou.com/annonce/a',
+      tjm: 600,
+    });
+    const discarded = makeMission({
+      id: 'fw-b',
+      source: 'free-work',
+      url: 'https://www.free-work.com/job/b',
+      tjm: null,
+    });
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions: [winner],
+        sourceMissions: [winner, discarded],
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
+
+    await alarmListener?.({ name: 'auto-scan', scheduledTime: 1779436800002 });
+    await vi.waitFor(() => {
+      expect(recordTJMFromMissions).toHaveBeenCalledWith([winner], expect.any(String), [
+        winner,
+        discarded,
+      ]);
+    });
+    expect(saveMissions.mock.calls[0]?.[0]).toEqual([winner]);
+  });
+
   it('badges only notifiable missions even when the unseen pool is large', async () => {
     const manyUnseen = Array.from({ length: 1000 }, (_, index) =>
       makeMission({ id: `bulk-${index}`, score: 40 })
@@ -1282,6 +1315,36 @@ describe('background auto-scan notifications', () => {
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
+  it('keeps the successful terminal when TJM persistence fails and emits no invalidation', async () => {
+    recordTJMFromMissions.mockRejectedValueOnce(new Error('Storage unavailable'));
+    const missions = [makeMission({ id: 'committed-with-failed-tjm' })];
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions,
+        sourceMissions: missions,
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
+    messageListener?.(
+      { type: 'SCAN_START', payload: { operationId: 'failed-tjm', trigger: 'manual' } },
+      {},
+      vi.fn()
+    );
+    await vi.waitFor(() => expect(clearScanCheckpoint).toHaveBeenCalledWith('failed-tjm'));
+    const messages = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message as { type: string });
+    expect(
+      messages
+        .filter((message) =>
+          ['SCAN_COMPLETE', 'SCAN_ERROR', 'SCAN_CANCELLED'].includes(message.type)
+        )
+        .map((message) => message.type)
+    ).toEqual(['SCAN_COMPLETE']);
+    expect(messages.some((message) => message.type === 'TJM_DATA_UPDATED')).toBe(false);
+  });
+
   it('publishes committed completion before deferred projections and makes late cancel a no-op', async () => {
     expect(messageListener).toBeTypeOf('function');
     let releaseProjection: (() => void) | undefined;
@@ -1315,6 +1378,7 @@ describe('background auto-scan notifications', () => {
       expect(recordTJMFromMissions).toHaveBeenCalledTimes(1);
     });
 
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith({ type: 'TJM_DATA_UPDATED' });
     const terminalsBeforeProjection = vi
       .mocked(chrome.runtime.sendMessage)
       .mock.calls.map(([message]) => message)
@@ -1351,6 +1415,7 @@ describe('background auto-scan notifications', () => {
       });
       expect(runScan).toHaveBeenCalledTimes(2);
     });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({ type: 'TJM_DATA_UPDATED' });
     expect(saveConnectorStatuses).toHaveBeenCalled();
     await vi.waitFor(() => {
       expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-after-projections');
@@ -2254,7 +2319,31 @@ describe('background auto-scan notifications', () => {
   it('merges and persists the LinkedIn profile on SYNC_LINKEDIN_PROFILE_IMPORT', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
-    getProfile.mockResolvedValueOnce(profile);
+    const manual = {
+      id: 'manual',
+      title: 'Consultant',
+      company: 'Local',
+      employmentType: 'Freelance',
+      location: 'Lyon',
+      startDate: '2020-01',
+      endDate: '2021-01',
+      isCurrent: false,
+      description: 'Manual notes',
+      skills: ['SQL'],
+      source: 'manual' as const,
+      sourceExternalId: null,
+      positionIndex: 1,
+      updatedAt: 123,
+    };
+    const unselected = {
+      ...manual,
+      id: 'unselected',
+      company: 'Untouched',
+      source: 'linkedin' as const,
+      sourceExternalId: 'urn:li:position:unselected',
+      positionIndex: 2,
+    };
+    getProfile.mockResolvedValueOnce({ ...profile, experiences: [manual, unselected] });
 
     const draft = {
       title: 'Lead Frontend Svelte',
@@ -2295,24 +2384,40 @@ describe('background auto-scan notifications', () => {
     expect(getProfile).toHaveBeenCalled();
     expect(saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({
-        jobTitle: 'Lead Frontend Svelte',
-        keywords: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
-        experiences: [
+        jobTitle: profile.jobTitle,
+        keywords: profile.keywords,
+        experiences: expect.arrayContaining([
           expect.objectContaining({
             title: 'Technical Lead',
             employmentType: 'Freelance',
             source: 'linkedin',
           }),
-        ],
+          manual,
+          unselected,
+        ]),
       })
     );
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
       type: 'PROFILE_UPDATED',
-      payload: expect.objectContaining({ jobTitle: 'Lead Frontend Svelte' }),
+      payload: expect.objectContaining({ jobTitle: profile.jobTitle }),
     });
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LINKEDIN_PROFILE_IMPORTED',
       payload: { imported: true, profile: draft, addedCount: 1 },
+    });
+    const committed = saveProfile.mock.calls.at(-1)?.[0] as UserProfile;
+    getProfile.mockResolvedValueOnce(committed);
+    const repeatedResponse = vi.fn();
+    messageListener?.(
+      { type: 'SYNC_LINKEDIN_PROFILE_IMPORT', payload: { profile: draft } },
+      {},
+      repeatedResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(saveProfile.mock.calls.at(-1)?.[0]).toEqual(committed);
+    expect(repeatedResponse).toHaveBeenCalledWith({
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: { imported: true, profile: draft, addedCount: 0 },
     });
   });
 
@@ -2598,6 +2703,27 @@ describe('background auto-scan notifications', () => {
     await expect(import('../../../src/background/index.ts?chrome-114')).resolves.toBeDefined();
   });
 
+  it('distinguishes a failed catalogue read from a legitimate empty catalogue', async () => {
+    const response = vi.fn();
+    getMissions.mockRejectedValueOnce(new Error('IndexedDB read failed'));
+    expect(messageListener?.({ type: 'GET_FEED_MISSIONS' }, {}, response)).toBe(true);
+    await vi.waitFor(() =>
+      expect(response).toHaveBeenCalledWith({
+        type: 'FEED_MISSIONS_FAILED',
+        payload: {
+          code: 'READ_FAILED',
+          message: 'Impossible de charger le catalogue local. Réessayez.',
+        },
+      })
+    );
+    response.mockClear();
+    getMissions.mockResolvedValueOnce([]);
+    messageListener?.({ type: 'GET_FEED_MISSIONS' }, {}, response);
+    await vi.waitFor(() =>
+      expect(response).toHaveBeenCalledWith({ type: 'FEED_MISSIONS_RESULT', payload: [] })
+    );
+  });
+
   it('routes feed local data through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const missionsResponse = vi.fn();
@@ -2694,11 +2820,20 @@ describe('background auto-scan notifications', () => {
   it('routes TJM analysis through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const response = vi.fn();
+    getMissions.mockResolvedValueOnce([
+      makeMission({
+        stack: ['Svelte', 'TypeScript'],
+        location: 'Lyon',
+        remote: 'full',
+        seniority: 'senior',
+        scrapedAt: new Date('2026-09-29T10:00:00Z'),
+      }),
+    ]);
     loadTJMHistory.mockResolvedValueOnce({
       records: [
         {
           stack: 'svelte',
-          date: '2026-05-21',
+          date: '2026-09-30',
           min: 700,
           max: 800,
           average: 750,
@@ -2708,7 +2843,7 @@ describe('background auto-scan notifications', () => {
         },
         {
           stack: 'react',
-          date: '2026-05-21',
+          date: '2026-09-30',
           min: 500,
           max: 600,
           average: 550,
@@ -2723,7 +2858,12 @@ describe('background auto-scan notifications', () => {
       messageListener?.(
         {
           type: 'GET_TJM_ANALYSIS',
-          payload: { profileStacks: ['Svelte'], region: 'remote' },
+          payload: {
+            profileStacks: ['Svelte'],
+            region: 'lyon',
+            seniority: 'senior',
+            remote: 'full',
+          },
         },
         {},
         response
@@ -2736,8 +2876,12 @@ describe('background auto-scan notifications', () => {
       type: 'TJM_ANALYSIS_RESULT',
       payload: {
         analysis: expect.objectContaining({
-          dataPoints: 1,
-          topStacks: [expect.objectContaining({ stack: 'svelte' })],
+          total: 1,
+          priced: 1,
+          withoutTjm: 0,
+          range: { min: 700, max: 700, median: 700 },
+          lastUpdated: '2026-09-29T10:00:00.000Z',
+          legacy: expect.objectContaining({ recordCount: 2 }),
         }),
       },
     });
@@ -3051,6 +3195,7 @@ describe('background auto-scan notifications', () => {
           selectedCategory: null,
           selectedSeniority: null,
           selectedScoreBucket: null,
+          scoreFilterMode: 'exact' as const,
           decisionPreset: null,
           showNewOnly: false,
           showFavoritesOnly: false,
@@ -3215,6 +3360,39 @@ describe('background auto-scan notifications', () => {
       targetConsent: true,
     }));
     expect(restored).toMatchObject({ status: 'settled', outcome: { status: 'committed' } });
+  });
+
+  it('confirms an untracked application with one complete write and one committed broadcast', async () => {
+    getTracking.mockResolvedValueOnce(null);
+    const response = await dispatchBackgroundMessage<{ type: string; payload: MissionTracking }>({
+      type: 'CONFIRM_APPLICATION',
+      payload: { missionId: 'atomic-mission' },
+    });
+    expect(response.type).toBe('TRACKING_UPDATED');
+    expect(response.payload.currentStatus).toBe('applied');
+    expect(response.payload.history.map((event) => event.to)).toEqual([
+      'detected',
+      'selected',
+      'application_prepared',
+      'applied',
+    ]);
+    expect(saveTracking).toHaveBeenCalledTimes(1);
+    expect(saveTracking).toHaveBeenCalledWith(response.payload);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(response);
+  });
+  it('does not persist intermediate confirmation states when the single commit fails', async () => {
+    getTracking.mockResolvedValueOnce(null);
+    saveTracking.mockRejectedValueOnce(new Error('quota'));
+    const response = await dispatchBackgroundMessage<{ type: string }>({
+      type: 'CONFIRM_APPLICATION',
+      payload: { missionId: 'failed-atomic-mission' },
+    });
+    expect(response.type).toBe('TRACKING_FAILED');
+    expect(saveTracking).toHaveBeenCalledTimes(1);
+    expect(saveTracking.mock.calls[0][0].currentStatus).toBe('applied');
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'TRACKING_UPDATED' })
+    );
   });
 
   it('reports a truthful release non-admission when canonical storage rejects', async () => {

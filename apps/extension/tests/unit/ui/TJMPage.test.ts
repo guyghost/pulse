@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, tick } from 'svelte';
-import type { TJMAnalysis } from '../../../src/lib/core/types/tjm';
+import { mount, tick, unmount } from 'svelte';
+import type { TJMSampleAnalysis } from '../../../src/lib/core/types/tjm';
 
 const getTJMAnalysis = vi.hoisted(() => vi.fn());
 const getProfile = vi.hoisted(() => vi.fn());
@@ -16,41 +16,28 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
 import TJMPage from '../../../src/ui/pages/TJMPage.svelte';
 import TJMPageActivationStub from './TJMPageActivationStub.svelte';
 
-const analysis: TJMAnalysis = {
-  trend: 'up',
-  confidence: 0.8,
-  dataPoints: 20,
-  junior: { min: 400, max: 500, median: 450 },
-  confirmed: { min: 600, max: 700, median: 650 },
-  senior: { min: 750, max: 900, median: 820 },
-  trendDetail: null,
-  recommendation: null,
+const analysis: TJMSampleAnalysis = {
+  total: 3,
+  priced: 2,
+  withoutTjm: 1,
+  range: { min: 500, max: 700, median: 600 },
   lastUpdated: '2026-05-22',
-  topStacks: [],
-  regionInsights: [
+  firstObservedAt: '2026-05-20',
+  unknown: { category: 1, seniority: 1, remote: 1, region: 0 },
+  sources: [{ source: 'free-work', count: 3 }],
+  levels: [
+    { seniority: 'junior', population: { total: 0, priced: 0, withoutTjm: 0, range: null } },
     {
-      region: 'ile-de-france',
-      label: 'Île-de-France',
-      average: 700,
-      min: 600,
-      max: 800,
-      sampleCount: 5,
-      trend: 'up',
-    },
-    {
-      region: 'lyon',
-      label: 'Lyon',
-      average: 620,
-      min: 550,
-      max: 700,
-      sampleCount: 3,
-      trend: 'stable',
+      seniority: 'senior',
+      population: {
+        total: 3,
+        priced: 2,
+        withoutTjm: 1,
+        range: { min: 500, max: 700, median: 600 },
+      },
     },
   ],
-  series: [
-    { date: '2026-05-20', average: 640 },
-    { date: '2026-05-22', average: 655 },
-  ],
+  legacy: { recordCount: 0, series: [] },
 };
 
 function flush() {
@@ -82,14 +69,14 @@ describe('TJMPage region filter (TJM-01)', () => {
     expect([...select.options].map((o) => o.value)).toContain('lyon');
 
     // Initial (unfiltered) load has no region and the default period 'all'.
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all');
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all', {});
 
     select.value = 'lyon';
     select.dispatchEvent(new Event('change', { bubbles: true }));
     await flush();
     await tick();
 
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, 'lyon', 'all');
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, 'lyon', 'all', {});
   });
 
   it('passes the selected period to getTJMAnalysis when a preset is chosen', async () => {
@@ -113,7 +100,7 @@ describe('TJMPage region filter (TJM-01)', () => {
     await flush();
     await tick();
 
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d');
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d', {});
     expect(
       group.querySelector('[data-period-option="7d"]')?.getAttribute('aria-checked'),
       'aria-checked follows the selection'
@@ -180,7 +167,7 @@ describe('TJMPage region filter (TJM-01)', () => {
     group.querySelector('[data-period-option="7d"]')?.click();
     await flush();
     await tick();
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d');
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, '7d', {});
 
     // Pages stay mounted under `inert`; leaving and coming back must restore
     // the default period (models/tjm-analysis-period.model.md).
@@ -190,10 +177,127 @@ describe('TJMPage region filter (TJM-01)', () => {
     await tick();
     await flush();
 
-    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all');
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all', {});
     expect(
       group.querySelector('[data-period-option="all"]')?.getAttribute('aria-checked'),
       'period resets to "Tout" on re-activation'
     ).toBe('true');
+  });
+});
+
+describe('TJM sample states', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    document.body.innerHTML = '';
+    getProfile.mockResolvedValue(null);
+    subscribeMessages.mockReturnValue(() => {});
+  });
+
+  it('keeps absent groups empty and rounds fractional medians to whole euros', async () => {
+    getTJMAnalysis.mockResolvedValue({ ...analysis, range: { min: 400, max: 601, median: 500.5 } });
+    const target = document.createElement('div');
+    const page = mount(TJMPage, { target });
+    await tick();
+    await flush();
+    expect(target.querySelector('[data-testid="tjm-sample-median"]')?.textContent).toContain(
+      '501 €/j'
+    );
+    expect(target.textContent).toContain('Aucun tarif renseigné');
+    expect(target.textContent).not.toMatch(/(?:^|\s)0 €\/j/);
+    await unmount(page);
+  });
+
+  it('renders an explicit read error and permits a successful retry', async () => {
+    getTJMAnalysis.mockResolvedValueOnce(null).mockResolvedValue(analysis);
+    const target = document.createElement('div');
+    const page = mount(TJMPage, { target });
+    await tick();
+    await flush();
+    expect(target.querySelector('[role="alert"]')?.textContent).toContain('Impossible de lire');
+    target.querySelector<HTMLButtonElement>('[role="alert"] button')?.click();
+    await flush();
+    await tick();
+    expect(target.querySelector('[data-testid="tjm-sample-total"]')?.textContent).toBe('3');
+    await unmount(page);
+  });
+
+  it('refreshes default filters on activation and only invalidates after TJM persistence', async () => {
+    getTJMAnalysis.mockResolvedValue(analysis);
+    const target = document.createElement('div');
+    const page = mount(TJMPageActivationStub, { target });
+    await tick();
+    await flush();
+    const initialCalls = getTJMAnalysis.mock.calls.length;
+    page.setActive(false);
+    await tick();
+    page.setActive(true);
+    await tick();
+    await flush();
+    expect(getTJMAnalysis).toHaveBeenCalledTimes(initialCalls + 1);
+    const notify = subscribeMessages.mock.calls.at(-1)![0];
+    notify({ type: 'SCAN_COMPLETE', payload: { missions: [] } });
+    expect(getTJMAnalysis).toHaveBeenCalledTimes(initialCalls + 1);
+    let resolveEarlier!: (value: TJMSampleAnalysis) => void;
+    getTJMAnalysis.mockImplementationOnce(
+      () =>
+        new Promise<TJMSampleAnalysis>((resolve) => {
+          resolveEarlier = resolve;
+        })
+    );
+    notify({ type: 'TJM_DATA_UPDATED' });
+    getTJMAnalysis.mockResolvedValueOnce({ ...analysis, total: 4, withoutTjm: 2 });
+    notify({ type: 'TJM_DATA_UPDATED' });
+    await flush();
+    await tick();
+    expect(target.querySelector('[data-testid="tjm-sample-total"]')?.textContent).toBe('4');
+    resolveEarlier(analysis);
+    await flush();
+    await tick();
+    expect(target.querySelector('[data-testid="tjm-sample-total"]')?.textContent).toBe('4');
+    await unmount(page);
+  });
+
+  it('discards late responses when filters change quickly and carries every segment', async () => {
+    getTJMAnalysis.mockResolvedValue(analysis);
+    const target = document.createElement('div');
+    const page = mount(TJMPage, { target });
+    await tick();
+    await flush();
+    let resolveEarlier: ((value: TJMSampleAnalysis) => void) | undefined;
+    getTJMAnalysis.mockImplementationOnce(
+      () =>
+        new Promise<TJMSampleAnalysis>((resolve) => {
+          resolveEarlier = resolve;
+        })
+    );
+    const category = target.querySelector<HTMLSelectElement>('#tjm-category-filter')!;
+    category.value = 'frontend';
+    category.dispatchEvent(new Event('change', { bubbles: true }));
+    const empty = {
+      ...analysis,
+      total: 0,
+      priced: 0,
+      withoutTjm: 0,
+      range: null,
+      sources: [],
+      levels: [],
+    };
+    getTJMAnalysis.mockResolvedValueOnce(empty);
+    const seniority = target.querySelector<HTMLSelectElement>('#tjm-seniority-filter')!;
+    seniority.value = 'junior';
+    seniority.dispatchEvent(new Event('change', { bubbles: true }));
+    await flush();
+    await tick();
+    expect(getTJMAnalysis).toHaveBeenLastCalledWith(undefined, undefined, 'all', {
+      category: 'frontend',
+      seniority: 'junior',
+    });
+    expect(target.textContent).toContain('Aucune annonce pour ce segment');
+    resolveEarlier?.(analysis);
+    await flush();
+    await tick();
+    expect(target.textContent).toContain('Aucune annonce pour ce segment');
+    expect(target.querySelector('[data-testid="tjm-sample-median"]')).toBeNull();
+    await unmount(page);
   });
 });

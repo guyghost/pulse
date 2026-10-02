@@ -1,6 +1,9 @@
+import { extractMissionObservations } from '$lib/shell/storage/tjm-history';
+import { getConnectorsMeta } from '$lib/shell/connectors/meta';
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
-import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '$lib/core/tjm-history';
-import type { TJMHistory, TJMPeriod, TJMRegion } from '$lib/core/types/tjm';
+import { parseTJMHistory } from '$lib/shell/storage/tjm-schemas';
+import { addObservations, analyzeTJMObservations } from '$lib/core/tjm-history/observations';
+import type { TJMFilters } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
 import {
@@ -23,6 +26,7 @@ import type {
   CopilotJobSnapshot,
 } from '$lib/shell/copilot/contracts';
 import { copilotCreditCost, renderCopilotDraft, type CopilotOperationKind } from '@pulse/domain';
+import { confirmApplicationTracking } from '$lib/core/tracking/application-intent';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
 import {
   createSerializedApplicationTrackingError,
@@ -40,6 +44,7 @@ import type { SettingsReleaseMutationIntent } from '$lib/shell/settings-release/
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
+const DEV_MISSION_FEEDBACK_KEY = '__missionpulse_dev_local_feedback';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
 const DEV_PROFILE_STORAGE_KEY = '__missionpulse_dev_profile';
@@ -474,6 +479,7 @@ const storage: Record<string, unknown> = {
   favoriteMissions: readDevStorage<Record<string, number>>(DEV_FAVORITES_STORAGE_KEY, {}),
   hiddenMissions: readDevStorage<Record<string, number>>(DEV_HIDDEN_STORAGE_KEY, {}),
   seenMissions: readDevStorage<string[]>(DEV_SEEN_STORAGE_KEY, []),
+  missionLocalFeedback: readDevStorage<Record<string, string>>(DEV_MISSION_FEEDBACK_KEY, {}),
   feedSavedViews: readDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, []),
   connectedAlertPreferences: readDevStorage<ConnectedAlertPreferences>(
     DEV_ALERT_PREFERENCES_STORAGE_KEY,
@@ -674,6 +680,13 @@ function createChromeStubs() {
           case 'SAVE_SETTINGS':
             storage.settings = message.payload;
             return { type: 'SETTINGS_SAVED', payload: { saved: true, settings: message.payload } };
+          case 'AI_GATEWAY_KEY_STATUS': {
+            const key = storage.aiGatewayApiKey;
+            return {
+              type: 'AI_GATEWAY_KEY_STATUS_RESULT',
+              payload: { configured: typeof key === 'string' && key.trim().length > 0 },
+            };
+          }
           case 'GET_PROFILE':
             return { type: 'PROFILE_RESULT', payload: storage.profile ?? null };
           case 'SAVE_PROFILE':
@@ -1059,7 +1072,7 @@ function createChromeStubs() {
               current?.experiences ?? [],
               draft.experiences
             );
-            const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
+            const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now(), true);
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, merged);
             storage.profile = merged;
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: merged });
@@ -1150,35 +1163,14 @@ function createChromeStubs() {
               payload: getDevConnectorHealthSnapshots(),
             };
           case 'GET_TJM_ANALYSIS': {
-            const history = storage.tjm_history as TJMHistory | undefined;
-            const payload = message.payload as
-              { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod } | undefined;
-            const normalizedStacks =
-              payload?.profileStacks && payload.profileStacks.length > 0
-                ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))
-                : null;
-            const records = history?.records ?? [];
-            const filteredByStackAndRegion = records.filter((record) => {
-              if (normalizedStacks && !normalizedStacks.has(record.stack.toLowerCase().trim())) {
-                return false;
-              }
-              if (payload?.region && record.region !== payload.region) {
-                return false;
-              }
-              return true;
-            });
-
+            const history = parseTJMHistory(storage.tjm_history);
+            const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
             return {
               type: 'TJM_ANALYSIS_RESULT',
               payload: {
-                analysis: analyzeTJMHistory(
-                  {
-                    records: filterTJMHistoryByPeriod(
-                      { records: filteredByStackAndRegion },
-                      payload?.period ?? 'all',
-                      new Date()
-                    ).records,
-                  },
+                analysis: analyzeTJMObservations(
+                  addObservations(history, extractMissionObservations(missions), Date.now()),
+                  (message.payload ?? {}) as TJMFilters,
                   new Date()
                 ),
               },
@@ -1306,6 +1298,7 @@ function createChromeStubs() {
                       detail: runtimeMissions,
                     })
                   );
+                  emitRuntimeMessage({ type: 'TJM_DATA_UPDATED' });
                 },
                 Math.max(800, 500 + groupedBySource.length * 250)
               )
@@ -1353,6 +1346,41 @@ function createChromeStubs() {
             }, 0);
             return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
           }
+          case 'VERIFY_SOURCE_SESSION': {
+            const payload = message.payload as { sourceId: string };
+            return {
+              type: 'SOURCE_SESSION_RESULT',
+              payload: {
+                sourceId: payload.sourceId,
+                status: getConnectorsMeta().some((source) => source.id === payload.sourceId)
+                  ? 'ready'
+                  : 'unavailable',
+              },
+            };
+          }
+          case 'GET_MISSION_FEEDBACK':
+            return {
+              type: 'MISSION_FEEDBACK_RESULT',
+              payload: readDevStorage('missionLocalFeedback', {}),
+            };
+          case 'SAVE_MISSION_FEEDBACK':
+            writeDevStorage('missionLocalFeedback', message.payload);
+            return { type: 'MISSION_FEEDBACK_SAVED', payload: { saved: true } };
+          case 'CONFIRM_APPLICATION': {
+            const payload = message.payload as { missionId: string };
+            const now = Date.now();
+            const all = readDevTrackings(now);
+            const existing =
+              all.find((tracking) => tracking.missionId === payload.missionId) ??
+              createTracking(payload.missionId, now);
+            const updated = confirmApplicationTracking(existing, now);
+            writeDevTrackings([
+              ...all.filter((tracking) => tracking.missionId !== updated.missionId),
+              updated,
+            ]);
+            emitRuntimeMessage({ type: 'TRACKING_UPDATED', payload: updated });
+            return { type: 'TRACKING_UPDATED', payload: updated };
+          }
           case 'GET_TRACKINGS': {
             const now = Date.now();
             const all = readDevTrackings(now);
@@ -1376,6 +1404,7 @@ function createChromeStubs() {
             }
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
+            emitRuntimeMessage({ type: 'TRACKING_UPDATED', payload: updated });
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'UPDATE_TRACKING_DETAILS': {
@@ -1394,6 +1423,7 @@ function createChromeStubs() {
             const updated: MissionTracking = { ...existing, nextActionAt };
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
+            emitRuntimeMessage({ type: 'TRACKING_UPDATED', payload: updated });
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'RESTORE_TRACKING': {
@@ -1406,12 +1436,20 @@ function createChromeStubs() {
                 return devTrackingFailure('restore', p.missionId, 'INVALID_RESTORE');
               }
               writeDevTrackings([...without, p.tracking]);
+              emitRuntimeMessage({
+                type: 'TRACKING_RESTORED',
+                payload: { missionId: p.missionId, tracking: p.tracking },
+              });
               return {
                 type: 'TRACKING_RESTORED',
                 payload: { missionId: p.missionId, tracking: p.tracking },
               };
             }
             writeDevTrackings(without);
+            emitRuntimeMessage({
+              type: 'TRACKING_RESTORED',
+              payload: { missionId: p.missionId, tracking: null },
+            });
             return {
               type: 'TRACKING_RESTORED',
               payload: { missionId: p.missionId, tracking: null },
@@ -1451,8 +1489,14 @@ function createChromeStubs() {
           case 'SHOW_TOAST':
             console.log('[Chrome Stub] Toast:', message.payload);
             return { type: 'TOAST_SHOWN' };
+          // Mirror worker broadcasts through the existing runtime for dev/test drivers.
+          case 'MISSIONS_UPDATED':
+          case 'TRACKING_UPDATED':
+          case 'TRACKING_RESTORED':
+          case 'SCAN_PARTIAL_RESULT':
+          case 'SCAN_COMPLETE':
+          case 'TJM_DATA_UPDATED':
           case 'PROFILE_UPDATED':
-            console.log('[Chrome Stub] Profile updated notification', message.payload);
             emitRuntimeMessage(message);
             return null;
           case 'RESET_LOCAL_DATA':
@@ -1487,7 +1531,13 @@ function createChromeStubs() {
           return result;
         },
         set: async (items: Record<string, unknown>) => {
+          if ('missionLocalFeedback' in items) {
+            writeDevStorage(DEV_MISSION_FEEDBACK_KEY, items.missionLocalFeedback);
+          }
           Object.assign(storage, items);
+          if ('tjm_history' in items) {
+            emitRuntimeMessage({ type: 'TJM_DATA_UPDATED' });
+          }
         },
         remove: async (keys: string | string[]) => {
           const keyArr = typeof keys === 'string' ? [keys] : keys;

@@ -36,7 +36,7 @@ export function feedSearchInput(page: Page): Locator {
 }
 
 export function mainNavigation(page: Page): Locator {
-  return page.getByRole('navigation', { name: 'Main navigation' });
+  return page.getByRole('navigation', { name: 'Navigation principale' });
 }
 
 export function navButton(page: Page, name: string): Locator {
@@ -296,47 +296,12 @@ export async function clearAndInjectMissions(page: Page, count: number) {
  */
 export async function mockNoProfile(page: Page) {
   await page.addInitScript(() => {
-    let _chrome: unknown = undefined;
-    const profileStorageKey = '__missionpulse_e2e_saved_profile';
-    const writeSavedProfile = (profile: unknown) => {
-      window.localStorage.setItem(profileStorageKey, JSON.stringify(profile));
-    };
-    if (window.localStorage.getItem(profileStorageKey) === null) {
+    const storedProfile = window.localStorage.getItem('__missionpulse_dev_profile');
+    if (storedProfile === null || storedProfile === 'null') {
       window.localStorage.setItem('__missionpulse_dev_profile', 'null');
       window.localStorage.setItem('__missionpulse_dev_first_scan_done', 'false');
       window.localStorage.setItem('__missionpulse_dev_onboarding_completed', 'false');
     }
-    Object.defineProperty(window, 'chrome', {
-      configurable: true,
-      enumerable: true,
-      get() {
-        return _chrome;
-      },
-      set(val) {
-        _chrome = val;
-        if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-          const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown
-          ) => Promise<unknown>;
-          (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-            type: string;
-            payload?: unknown;
-          }) => {
-            if (msg?.type === 'SAVE_PROFILE') {
-              const response = (await origSend.call(
-                (val as Record<string, unknown>).runtime,
-                msg
-              )) as { type?: string; payload?: unknown };
-              if (response.type === 'PROFILE_RESULT' && response.payload !== null) {
-                writeSavedProfile(response.payload);
-              }
-              return response;
-            }
-            return origSend.call((val as Record<string, unknown>).runtime, msg);
-          };
-        }
-      },
-    });
   });
 }
 

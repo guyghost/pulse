@@ -176,7 +176,7 @@ export const addRecords = (history: TJMHistory, newRecords: TJMRecord[]): TJMHis
   const merged = Array.from(existingByKey.values());
   merged.sort((a, b) => a.date.localeCompare(b.date) || a.stack.localeCompare(b.stack));
 
-  return { records: merged };
+  return { ...history, records: merged };
 };
 
 /**
@@ -219,6 +219,7 @@ export const filterTJMHistoryByPeriod = (
   const cutoff = toDateOnlyISO(new Date(cutoffMs));
 
   return {
+    ...history,
     records: history.records.filter((record) => record.date >= cutoff),
   };
 };

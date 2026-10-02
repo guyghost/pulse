@@ -1,3 +1,4 @@
+import { extractMissionObservations } from '../lib/shell/storage/tjm-history';
 import {
   getProfile,
   saveProfile,
@@ -19,8 +20,7 @@ import type {
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
-import { analyzeTJMHistory, filterTJMHistoryByPeriod } from '../lib/core/tjm-history';
-import type { TJMHistory, TJMPeriod, TJMRegion } from '../lib/core/types/tjm';
+import { addObservations, analyzeTJMObservations } from '../lib/core/tjm-history/observations';
 import {
   getFeedSavedViews,
   getFeedSortBy,
@@ -109,6 +109,9 @@ import {
   getAllTrackings,
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
+import { checkSourceSession } from '../lib/shell/connectors/verify-source-session';
+import { getMissionFeedback, saveMissionFeedback } from '../lib/shell/storage/mission-feedback';
+import { confirmApplicationTracking } from '../lib/core/tracking/application-intent';
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
 import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
 import {
@@ -184,42 +187,6 @@ function trackingFailureMessage(
     type: 'TRACKING_FAILED',
     payload: createSerializedApplicationTrackingError(intent, missionId, code),
   };
-}
-
-function buildTJMAnalysis(
-  history: TJMHistory,
-  profileStacks: string[] | undefined,
-  region: TJMRegion | undefined,
-  period: TJMPeriod | undefined,
-  now: Date
-) {
-  const hasStackFilter = profileStacks !== undefined && profileStacks.length > 0;
-  const hasRegionFilter = region !== undefined;
-  const normalizedStacks = hasStackFilter
-    ? new Set(profileStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean))
-    : null;
-
-  const filteredByStackAndRegion =
-    !hasStackFilter && !hasRegionFilter
-      ? history
-      : {
-          records: history.records.filter((record) => {
-            if (normalizedStacks && !normalizedStacks.has(record.stack)) {
-              return false;
-            }
-            if (hasRegionFilter && record.region !== region) {
-              return false;
-            }
-            return true;
-          }),
-        };
-
-  // Period windowing is applied last so dataPoints reflects the window
-  // (see models/tjm-analysis-period.model.md).
-  return analyzeTJMHistory(
-    filterTJMHistoryByPeriod(filteredByStackAndRegion, period ?? 'all', now),
-    now
-  );
 }
 
 function getBridgeErrorCode(error: import('../lib/core/errors/app-error').AppError): string {
@@ -1265,9 +1232,16 @@ async function persistPostCommitEffects(
     }
   })();
 
-  if (missions.length > 0) {
+  if (missions.length > 0 || result.sourceMissions.length > 0) {
     try {
-      await recordTJMFromMissions(missions, new Date(now).toISOString().slice(0, 10));
+      await recordTJMFromMissions(
+        missions,
+        new Date(now).toISOString().slice(0, 10),
+        result.sourceMissions
+      );
+      await chrome.runtime.sendMessage({ type: 'TJM_DATA_UPDATED' }).catch(() => {
+        // No panel is listening; the next activation reads the committed population.
+      });
     } catch {
       // TJM history is non-critical.
     }
@@ -1561,7 +1535,13 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         })
         .catch((err) => {
           console.warn('[MissionPulse] GET_FEED_MISSIONS error:', err);
-          sendResponse({ type: 'FEED_MISSIONS_RESULT', payload: [] });
+          sendResponse({
+            type: 'FEED_MISSIONS_FAILED',
+            payload: {
+              code: 'READ_FAILED',
+              message: 'Impossible de charger le catalogue local. Réessayez.',
+            },
+          });
         });
       return true;
     }
@@ -1583,16 +1563,14 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'GET_TJM_ANALYSIS') {
-      loadTJMHistory()
-        .then((history) => {
+      Promise.all([loadTJMHistory(), getMissions()])
+        .then(([history, missions]) => {
           sendResponse({
             type: 'TJM_ANALYSIS_RESULT',
             payload: {
-              analysis: buildTJMAnalysis(
-                history,
-                message.payload?.profileStacks,
-                message.payload?.region,
-                message.payload?.period,
+              analysis: analyzeTJMObservations(
+                addObservations(history, extractMissionObservations(missions), Date.now()),
+                message.payload ?? {},
                 new Date()
               ),
             },
@@ -1696,7 +1674,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         })
         .catch((err) => {
           console.warn('[MissionPulse] GET_FEED_SAVED_VIEWS error:', err);
-          sendResponse({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] });
+          sendResponse({ type: 'FEED_SAVED_VIEWS_FAILED' });
         });
       return true;
     }
@@ -1969,7 +1947,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             current?.experiences ?? [],
             draft.experiences
           );
-          const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
+          const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now(), true);
           await saveProfile(merged);
           chrome.runtime.sendMessage({ type: 'PROFILE_UPDATED', payload: merged }).catch(() => {
             // Side panel not open, ignore
@@ -2229,6 +2207,48 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'VERIFY_SOURCE_SESSION') {
+      checkSourceSession(message.payload.sourceId).then((result) => {
+        sendResponse({ type: 'SOURCE_SESSION_RESULT', payload: result });
+      });
+      return true;
+    }
+    if (message.type === 'GET_MISSION_FEEDBACK') {
+      getMissionFeedback()
+        .then((payload) => sendResponse({ type: 'MISSION_FEEDBACK_RESULT', payload }))
+        .catch(() => sendResponse({ type: 'MISSION_FEEDBACK_FAILED' }));
+      return true;
+    }
+    if (message.type === 'SAVE_MISSION_FEEDBACK') {
+      saveMissionFeedback(message.payload)
+        .then(() => sendResponse({ type: 'MISSION_FEEDBACK_SAVED', payload: { saved: true } }))
+        .catch(() => sendResponse({ type: 'MISSION_FEEDBACK_SAVED', payload: { saved: false } }));
+      return true;
+    }
+    if (message.type === 'CONFIRM_APPLICATION') {
+      const { missionId } = message.payload;
+      (async () => {
+        try {
+          const now = Date.now();
+          const previous = await getTracking(missionId);
+          const updated = confirmApplicationTracking(
+            previous ?? createTracking(missionId, now),
+            now
+          );
+          if (updated !== previous) {
+            await saveTracking(updated);
+          }
+          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_UPDATED', payload: updated })
+            .catch(() => {});
+        } catch {
+          sendResponse(trackingFailureMessage('transition', missionId, 'PERSIST_FAILED'));
+        }
+      })();
+      return true;
+    }
+
     // ── Tracking handlers ──
 
     if (message.type === 'UPDATE_TRACKING') {
@@ -2255,6 +2275,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
           await saveTracking(persisted);
           sendResponse({ type: 'TRACKING_UPDATED', payload: persisted });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_UPDATED', payload: persisted })
+            .catch(() => {});
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
           sendResponse(trackingFailureMessage('transition', missionId, 'PERSIST_FAILED'));
@@ -2291,6 +2314,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           const updated: MissionTracking = { ...tracking, nextActionAt: normalizedNextActionAt };
           await saveTracking(updated);
           sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_UPDATED', payload: updated })
+            .catch(() => {});
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
           sendResponse(trackingFailureMessage('details', missionId, 'PERSIST_FAILED'));
@@ -2314,6 +2340,12 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               type: 'TRACKING_RESTORED',
               payload: { missionId, tracking },
             });
+            chrome.runtime
+              .sendMessage({
+                type: 'TRACKING_RESTORED',
+                payload: { missionId, tracking: tracking },
+              })
+              .catch(() => {});
             return;
           }
 
@@ -2322,6 +2354,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             type: 'TRACKING_RESTORED',
             payload: { missionId, tracking: null },
           });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_RESTORED', payload: { missionId, tracking: null } })
+            .catch(() => {});
         } catch (err) {
           console.error('[MissionPulse] RESTORE_TRACKING error:', err);
           sendResponse(trackingFailureMessage('restore', missionId, 'PERSIST_FAILED'));

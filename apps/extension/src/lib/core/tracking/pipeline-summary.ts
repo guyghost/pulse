@@ -20,6 +20,7 @@ export interface ApplicationPipelineSummary {
 }
 
 const PIPELINE_STATUSES: ApplicationStatus[] = [
+  'detected',
   'selected',
   'application_prepared',
   'applied',
@@ -30,6 +31,7 @@ const PIPELINE_STATUSES: ApplicationStatus[] = [
 ];
 
 const ACTIVE_STATUSES = new Set<ApplicationStatus>([
+  'detected',
   'selected',
   'application_prepared',
   'applied',
@@ -48,6 +50,18 @@ export function isTerminalStatus(status: ApplicationStatus): boolean {
   return TERMINAL_STATUSES.has(status);
 }
 
+/** Explicit scheduling makes a detected mission a dossier without changing its status. */
+export function isTrackedDossier(tracking: MissionTracking): boolean {
+  return (
+    tracking.currentStatus !== 'detected' ||
+    Boolean(tracking.nextActionAt && Number.isFinite(Date.parse(tracking.nextActionAt)))
+  );
+}
+
+export function isActiveDossier(tracking: MissionTracking): boolean {
+  return isTrackedDossier(tracking) && !isTerminalStatus(tracking.currentStatus);
+}
+
 function isDue(nextActionAt: string | null | undefined, now: number): boolean {
   if (!nextActionAt) {
     return false;
@@ -64,7 +78,7 @@ function isDue(nextActionAt: string | null | undefined, now: number): boolean {
  * page recommended-dossier logic, so the two can never diverge.
  */
 export function isDueFollowUp(tracking: MissionTracking, now: number): boolean {
-  return ACTIVE_STATUSES.has(tracking.currentStatus) && isDue(tracking.nextActionAt, now);
+  return isActiveDossier(tracking) && isDue(tracking.nextActionAt, now);
 }
 
 export function summarizeApplicationPipeline(
@@ -81,7 +95,7 @@ export function summarizeApplicationPipeline(
   let dueFollowUps = 0;
 
   for (const tracking of trackings) {
-    if (tracking.currentStatus === 'detected' || tracking.currentStatus === 'archived') {
+    if (!isTrackedDossier(tracking) || tracking.currentStatus === 'archived') {
       continue;
     }
 
@@ -96,7 +110,9 @@ export function summarizeApplicationPipeline(
     }
   }
 
-  const stages = PIPELINE_STATUSES.map((status) => ({
+  const stages = PIPELINE_STATUSES.filter(
+    (status) => status !== 'detected' || (counts.get(status) ?? 0) > 0
+  ).map((status) => ({
     status,
     label: STATUS_LABELS[status],
     count: counts.get(status) ?? 0,

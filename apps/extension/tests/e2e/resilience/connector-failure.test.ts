@@ -244,7 +244,7 @@ async function mockScanProtocol(page: Page, scenario: ScanProtocolScenario): Pro
   // The fixture navigates before each test. Reload so this init script actually
   // installs before the dev Chrome stub and intercepts the next scan.
   await page.reload();
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible({
     timeout: 10000,
   });
 }

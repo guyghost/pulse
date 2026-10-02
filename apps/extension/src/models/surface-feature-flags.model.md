@@ -33,7 +33,7 @@ EXTENSION_SURFACE_FLAGS = {
   feed: true,
   profile: true,
   cv: true,
-  applications: false, // suivi de candidatures — désactivé au lancement
+  applications: true, // suivi local de candidatures activé
   tjm: true,
   settings: true,
   connected: false, // dashboard connecté / sync — désactivé au lancement

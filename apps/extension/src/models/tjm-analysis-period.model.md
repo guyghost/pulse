@@ -1,5 +1,10 @@
 # TJM Analysis Period — Model
 
+> Mise à jour du 1er octobre 2026 : la page TJM utilise désormais le modèle
+> [échantillon local identifiable](tjm-local-sample.model.md). Les règles ci-dessous
+> décrivent le calcul historique agrégé conservé pour les anciens consommateurs ;
+> elles ne définissent plus les médianes ni les dénominateurs de la page TJM.
+
 > Source de vérité pour la sélection de période de l'analyse TJM (page « Analyse TJM »).
 > Proposition Mobbin Navattic : presets de période au-dessus des métriques du dashboard.
 

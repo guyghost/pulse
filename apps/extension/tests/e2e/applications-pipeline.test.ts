@@ -1,5 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import { SIDE_PANEL, enableAllSurfaceFlags } from './helpers';
+import { SIDE_PANEL } from './helpers';
 
 const mission = {
   id: 'mission-pipeline-1',
@@ -24,7 +24,9 @@ const mission = {
 };
 
 async function mockApplicationsPipelineBridge(page: Page) {
-  await page.addInitScript(
+  await page.goto(SIDE_PANEL);
+  await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
+  await page.evaluate(
     ({ missionRow }) => {
       const generatedAsset = {
         id: 'asset-pipeline-1',
@@ -54,67 +56,51 @@ async function mockApplicationsPipelineBridge(page: Page) {
         value: bridgeMessages,
       });
 
-      let chromeValue: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return chromeValue;
-        },
-        set(value: unknown) {
-          chromeValue = value;
-          const chromeApi = value as {
-            runtime?: {
-              sendMessage?: (message: { type: string; payload?: unknown }) => Promise<unknown>;
-            };
+      const chromeApi = window.chrome;
+      const originalSendMessage = chromeApi.runtime?.sendMessage;
+      if (!originalSendMessage) {
+        return;
+      }
+
+      chromeApi.runtime.sendMessage = async (message) => {
+        bridgeMessages.push(message.type);
+
+        if (message.type === 'GET_FEED_MISSIONS') {
+          return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
+        }
+
+        if (message.type === 'GET_TRACKINGS') {
+          return { type: 'TRACKINGS_RESULT', payload: [tracking] };
+        }
+
+        if (message.type === 'GET_GENERATED_ASSETS') {
+          return { type: 'GENERATED_ASSETS_RESULT', payload: generatedAssets };
+        }
+
+        if (message.type === 'GENERATE_ASSET') {
+          generatedAssets = [generatedAsset];
+          tracking = {
+            ...tracking,
+            currentStatus: 'application_prepared',
+            generatedAssetIds: [generatedAsset.id],
+            history: [
+              ...tracking.history,
+              {
+                from: 'selected',
+                to: 'application_prepared',
+                timestamp: generatedAsset.createdAt,
+                note: 'Candidature préparée par assistant.',
+              },
+            ],
           };
-
-          const originalSendMessage = chromeApi.runtime?.sendMessage;
-          if (!originalSendMessage) {
-            return;
-          }
-
-          chromeApi.runtime.sendMessage = async (message) => {
-            bridgeMessages.push(message.type);
-
-            if (message.type === 'GET_FEED_MISSIONS') {
-              return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
-            }
-
-            if (message.type === 'GET_TRACKINGS') {
-              return { type: 'TRACKINGS_RESULT', payload: [tracking] };
-            }
-
-            if (message.type === 'GET_GENERATED_ASSETS') {
-              return { type: 'GENERATED_ASSETS_RESULT', payload: generatedAssets };
-            }
-
-            if (message.type === 'GENERATE_ASSET') {
-              generatedAssets = [generatedAsset];
-              tracking = {
-                ...tracking,
-                currentStatus: 'application_prepared',
-                generatedAssetIds: [generatedAsset.id],
-                history: [
-                  ...tracking.history,
-                  {
-                    from: 'selected',
-                    to: 'application_prepared',
-                    timestamp: generatedAsset.createdAt,
-                    note: 'Candidature préparée par assistant.',
-                  },
-                ],
-              };
-              return {
-                type: 'GENERATION_RESULT',
-                payload: { asset: generatedAsset, creditBalance: 9, creditsConsumed: 1 },
-              };
-            }
-
-            return originalSendMessage.call(chromeApi.runtime, message);
+          return {
+            type: 'GENERATION_RESULT',
+            payload: { asset: generatedAsset, creditBalance: 9, creditsConsumed: 1 },
           };
-        },
-      });
+        }
+
+        return originalSendMessage.call(chromeApi.runtime, message);
+      };
     },
     { missionRow: mission }
   );
@@ -125,10 +111,13 @@ test.describe('applications pipeline', () => {
     page,
   }) => {
     await mockApplicationsPipelineBridge(page);
-    await enableAllSurfaceFlags(page);
-    await page.goto(SIDE_PANEL);
+    const seeded = await page.evaluate(async () => {
+      const result = await chrome.runtime.sendMessage({ type: 'GET_FEED_MISSIONS' });
+      return result.payload.map((item: { id: string }) => item.id);
+    });
+    expect(seeded).toEqual([mission.id]);
 
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     await expect(nav).toBeVisible();
     await nav.getByRole('button', { name: 'Suivi' }).click();
 
@@ -155,4 +144,43 @@ test.describe('applications pipeline', () => {
       )
     ).resolves.toContain('GENERATE_ASSET');
   });
+});
+
+test('updates the already mounted Feed after a status change and undo in Applications', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    ({ missionRow }) => {
+      localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([missionRow]));
+      localStorage.setItem(
+        '__missionpulse_dev_trackings',
+        JSON.stringify([
+          {
+            missionId: missionRow.id,
+            currentStatus: 'selected',
+            history: [
+              { from: null, to: 'detected', timestamp: 1779433200000, note: null },
+              { from: 'detected', to: 'selected', timestamp: 1779435000000, note: null },
+            ],
+            generatedAssetIds: [],
+            userRating: null,
+            notes: '',
+            nextActionAt: null,
+          },
+        ])
+      );
+    },
+    { missionRow: mission }
+  );
+  await page.goto(SIDE_PANEL);
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+  const card = page.getByRole('article', { name: /Mission Mission Svelte dashboard/ });
+  await expect(card.getByText('Sélectionnée', { exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Suivi', exact: true }).click();
+  await page.getByRole('button', { name: 'Préparée', exact: true }).click();
+  await expect(page.getByText('Statut: Préparée', { exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Missions', exact: true }).click();
+  await expect(card.getByText('Préparée', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Annuler', exact: true }).click();
+  await expect(card.getByText('Sélectionnée', { exact: true })).toBeVisible();
 });

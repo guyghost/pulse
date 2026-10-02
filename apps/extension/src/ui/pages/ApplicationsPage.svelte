@@ -1,5 +1,9 @@
 <script lang="ts">
+  import { untrack } from 'svelte';
+  import { createClock } from '$lib/state/clock.svelte';
+  import { createApplicationsDataState } from '$lib/state/applications-data.svelte';
   import { Icon, type IconName } from '@pulse/ui';
+  import { features } from '$lib/state/features.svelte';
   import type { Mission } from '$lib/core/types/mission';
   import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
@@ -11,12 +15,10 @@
   } from '$lib/core/types/tracking';
   import { STATUS_LABELS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { formatTJM } from '$lib/core/utils/format';
-  import { getMissions } from '$lib/shell/facades/feed-data.facade';
   import {
     createAvailabilityDeps,
     getAvailabilityPushTargets,
   } from '$lib/shell/facades/availability.facade';
-  import { createTrackingStore } from '$lib/state/tracking.svelte';
   import { createAvailabilityStore } from '$lib/state/availability.svelte';
   import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
@@ -24,14 +26,12 @@
     summarizeApplicationPipeline,
     isDueFollowUp,
     isTerminalStatus,
+    isTrackedDossier,
   } from '$lib/core/tracking/pipeline-summary';
   import { buildKanbanBoard, getTrackingLastActivity } from '$lib/core/tracking/kanban-projection';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import AvailabilityPanel from '../organisms/AvailabilityPanel.svelte';
   import CopilotPanel from '../organisms/CopilotPanel.svelte';
-  import OperationalStoryCard, {
-    type OperationalEvidence,
-  } from '../molecules/OperationalStoryCard.svelte';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
@@ -39,11 +39,14 @@
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import FormAssistPanel from '../organisms/FormAssistPanel.svelte';
 
-  const { onNavigateToFeed }: { onNavigateToFeed?: () => void } = $props();
+  const { active = true, onNavigateToFeed }: { active?: boolean; onNavigateToFeed?: () => void } =
+    $props();
   const connection = getConnectionStore();
   const isOffline = $derived(connection.status === 'offline');
 
-  const tracking = createTrackingStore();
+  const clock = createClock();
+  const data = createApplicationsDataState();
+  const tracking = $derived(data.tracking);
   const availabilityStore = createAvailabilityStore(createAvailabilityDeps());
   const availabilityPlatforms = getAvailabilityPushTargets();
 
@@ -51,6 +54,13 @@
 
   $effect(() => {
     const unsubscribe = subscribeMessages((message) => {
+      if (
+        ['MISSIONS_UPDATED', 'SCAN_COMPLETE', 'TRACKING_UPDATED', 'TRACKING_RESTORED'].includes(
+          message.type
+        )
+      ) {
+        void loadApplications();
+      }
       if (message.type === 'PROFILE_UPDATED') {
         availabilityStore.applyProfileUpdate(message.payload.availability ?? null);
       }
@@ -58,16 +68,17 @@
     return unsubscribe;
   });
 
-  let missions = $state<Mission[]>([]);
-  let isLoading = $state(true);
+  const missions = $derived(data.missions);
+  const isLoading = $derived(data.isLoading);
   let selectedMissionId = $state<string | null>(null);
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
   // nextActionInput is intentionally writable: bound to a text input and reset on save.
   // Cannot be a read-only $derived because the user edits it; the $effect resets it on selection/tracking change.
-  // eslint-disable-next-line svelte/prefer-writable-derived
+
   let nextActionInput = $state('');
-  let loadError = $state<string | null>(null);
+  const loadError = $derived(data.error);
+  let reminderDirty = $state(false);
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
   const generationTypeIcons = GENERATION_TYPE_ICONS as Record<GenerationType, IconName>;
@@ -115,15 +126,14 @@
         record: tracking.getTrackingForMission(mission.id) ?? null,
       }))
       .filter(
-        (item): item is TrackedMission =>
-          item.record !== null && item.record.currentStatus !== 'detected'
+        (item): item is TrackedMission => item.record !== null && isTrackedDossier(item.record)
       )
       .sort((a, b) => getLastActivity(b.record) - getLastActivity(a.record));
   });
 
   const overviewActivities = $derived.by<ActivityOverviewItem[]>(() => {
     const trackingActivities = [...tracking.trackings.values()]
-      .filter((record) => record.currentStatus !== 'detected')
+      .filter(isTrackedDossier)
       .map((record) => ({
         mission: missions.find((mission) => mission.id === record.missionId) ?? null,
         missionId: record.missionId,
@@ -149,12 +159,12 @@
   });
 
   const todayActivities = $derived.by(() => {
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    const oneDayAgo = clock.now - 24 * 60 * 60 * 1000;
     return overviewActivities.filter(({ timestamp }) => timestamp >= oneDayAgo).slice(0, 3);
   });
 
   const weekActivities = $derived.by(() => {
-    const now = Date.now();
+    const now = clock.now;
     const oneDayAgo = now - 24 * 60 * 60 * 1000;
     const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
     return overviewActivities
@@ -178,11 +188,14 @@
   );
 
   $effect(() => {
-    nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
+    const savedValue = selectedTracking?.nextActionAt ?? null;
+    if (!reminderDirty) {
+      nextActionInput = isoToDateTimeLocal(savedValue);
+    }
   });
 
   const pipelineSummary = $derived.by(() =>
-    summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
+    summarizeApplicationPipeline([...tracking.trackings.values()], clock.now)
   );
 
   const kanbanColumns = $derived(buildKanbanBoard(missions, [...tracking.trackings.values()]));
@@ -191,7 +204,7 @@
   );
 
   const recommendedTrackedMission = $derived.by(() => {
-    const now = Date.now();
+    const now = clock.now;
     // Terminal missions (accepted/rejected/archived) are outcomes, not actionable
     // dossiers — never recommend them, even when a stale nextActionAt survives.
     const actionable = trackedMissions.filter(
@@ -213,92 +226,14 @@
     return preparedMission ?? actionable[0] ?? null;
   });
 
-  const applicationStory = $derived.by(() => {
-    const evidence: OperationalEvidence[] = [
-      {
-        label: 'Actives',
-        value: pipelineSummary.activeCount,
-        icon: 'activity',
-        severity: pipelineSummary.activeCount > 0 ? 'success' : 'neutral',
-      },
-      {
-        label: 'Relances',
-        value: pipelineSummary.dueFollowUps,
-        icon: 'calendar-clock',
-        severity: pipelineSummary.dueFollowUps > 0 ? 'attention' : 'neutral',
-      },
-      {
-        label: 'Prêtes',
-        value: pipelineSummary.preparedNotApplied,
-        icon: 'send',
-        severity: pipelineSummary.preparedNotApplied > 0 ? 'attention' : 'neutral',
-      },
-    ];
-
-    if (loadError) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'Indisponible',
-        title: 'Le suivi des candidatures ne peut pas être chargé',
-        description: loadError,
-        evidence,
-        primaryActionLabel: 'Réessayer',
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (pipelineSummary.dueFollowUps > 0) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'Relance à faire',
-        title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} à traiter maintenant`,
-        description:
-          'La prochaine décision n’est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une échéance.',
-        evidence,
-        primaryActionLabel: 'Voir la relance',
-        primaryActionIcon: 'calendar-clock',
-      };
-    }
-
-    if (pipelineSummary.preparedNotApplied > 0) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'Prêt à envoyer',
-        title: `${pipelineSummary.preparedNotApplied} candidature${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} préparée${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} mais pas encore envoyée${pipelineSummary.preparedNotApplied > 1 ? 's' : ''}`,
-        description:
-          'Le contenu existe déjà. La prochaine action utile est de finaliser l’envoi ou de changer le statut.',
-        evidence,
-        primaryActionLabel: 'Continuer le dossier',
-        primaryActionIcon: 'arrow-right',
-      };
-    }
-
-    if (pipelineSummary.activeCount === 0) {
-      return {
-        severity: 'neutral' as const,
-        statusLabel: 'Aucun suivi',
-        title: 'Aucune candidature active pour le moment',
-        description:
-          'Qualifiez une mission depuis le Feed pour transformer la veille en candidatures suivies.',
-        evidence,
-        primaryActionLabel: 'Préparer une mission',
-        primaryActionIcon: 'briefcase',
-      };
-    }
-
-    return {
-      severity: 'success' as const,
-      statusLabel: 'Suivi à jour',
-      title: `${pipelineSummary.activeCount} dossier${pipelineSummary.activeCount > 1 ? 's' : ''} actif${pipelineSummary.activeCount > 1 ? 's' : ''}, aucune relance en retard`,
-      description:
-        pipelineSummary.bottleneck !== null
-          ? `L’étape la plus chargée est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
-          : 'Le suivi est à jour. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
-      evidence,
-      primaryActionLabel: 'Ouvrir le dossier',
-      primaryActionIcon: 'arrow-right',
-    };
-  });
+  const dueMissions = $derived(
+    trackedMissions
+      .filter(({ record }) => isDueFollowUp(record, clock.now))
+      .sort((a, b) => getNextActionTimestamp(a.record) - getNextActionTimestamp(b.record))
+  );
+  let reminderBusy = $state(false);
+  let reminderStatus = $state('');
+  let reminderError = $state('');
 
   function getLastActivity(record: MissionTracking | null): number {
     return getTrackingLastActivity(record);
@@ -416,20 +351,29 @@
     return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
   }
 
+  let assetsRequest = 0;
   async function loadAssets(missionId: string): Promise<void> {
+    const request = ++assetsRequest;
     try {
       const response = await sendMessage({
         type: 'GET_GENERATED_ASSETS',
         payload: { missionId },
       });
-      assets = response.type === 'GENERATED_ASSETS_RESULT' ? response.payload : [];
+      if (request === assetsRequest && selectedMissionId === missionId) {
+        assets = response.type === 'GENERATED_ASSETS_RESULT' ? response.payload : [];
+      }
     } catch {
-      assets = [];
+      if (request === assetsRequest && selectedMissionId === missionId) {
+        assets = [];
+      }
     }
   }
 
   async function selectMission(missionId: string): Promise<void> {
     selectedMissionId = missionId;
+    reminderDirty = false;
+    reminderStatus = '';
+    reminderError = '';
     await loadAssets(missionId);
   }
 
@@ -437,40 +381,6 @@
     if (item.mission) {
       void selectMission(item.mission.id);
     }
-  }
-
-  function handleApplicationStoryAction(): void {
-    if (loadError) {
-      void loadApplications();
-      return;
-    }
-    if (recommendedTrackedMission) {
-      void selectMission(recommendedTrackedMission.mission.id);
-      return;
-    }
-
-    onNavigateToFeed?.();
-  }
-
-  function openRecommendedDossier(): void {
-    if (!recommendedTrackedMission) {
-      onNavigateToFeed?.();
-      return;
-    }
-
-    void selectMission(recommendedTrackedMission.mission.id);
-  }
-
-  function getRecommendedDossierReason(item: TrackedMission): string {
-    if (isDueFollowUp(item.record, Date.now())) {
-      return 'Relance échue : reprenez ce dossier avant de parcourir les autres dossiers.';
-    }
-
-    if (item.record.currentStatus === 'application_prepared') {
-      return 'Kit prêt : finalisez l’envoi ou changez le statut pour garder le suivi à jour.';
-    }
-
-    return 'Dossier actif: continuez par la dernière mission suivie avant de créer un nouveau dossier.';
   }
 
   function trackingFailureMessage(cause: unknown): string {
@@ -490,7 +400,7 @@
         }
       : null;
     try {
-      await tracking.transitionStatus(missionId, status);
+      await data.mutate((store) => store.transitionStatus(missionId, status));
     } catch (cause) {
       await showToast(trackingFailureMessage(cause), 'error');
       return;
@@ -500,7 +410,7 @@
       onClick: () => {
         void (async () => {
           try {
-            await tracking.restoreTracking(missionId, previousTracking);
+            await data.mutate((store) => store.restoreTracking(missionId, previousTracking));
           } catch (cause) {
             await showToast(trackingFailureMessage(cause), 'error');
           }
@@ -522,33 +432,43 @@
     return trimmed ? trimmed : null;
   }
 
-  async function saveNextAction(): Promise<void> {
-    if (!selectedMission || selectedFollowUpTerminal) {
+  async function persistNextAction(clear: boolean): Promise<void> {
+    if (!selectedMission || selectedFollowUpTerminal || reminderBusy) {
       return;
     }
-
+    const missionId = selectedMission.id;
+    const value = clear ? null : dateTimeLocalToIso(nextActionInput);
+    reminderError = '';
+    reminderStatus = '';
+    if (!clear && !value) {
+      reminderError = 'Choisissez une date et une heure valides.';
+      return;
+    }
+    reminderBusy = true;
     try {
-      await tracking.updateNextActionAt(selectedMission.id, dateTimeLocalToIso(nextActionInput));
+      await data.mutate((store) => store.updateNextActionAt(missionId, value));
+      if (selectedMissionId === missionId) {
+        reminderDirty = false;
+        if (clear) {
+          nextActionInput = '';
+        }
+        reminderStatus = clear ? 'Relance effacée.' : 'Relance enregistrée.';
+      }
     } catch (cause) {
+      if (selectedMissionId === missionId) {
+        reminderError = trackingFailureMessage(cause);
+      }
       await showToast(trackingFailureMessage(cause), 'error');
-      return;
+    } finally {
+      reminderBusy = false;
     }
-    await showToast('Prochaine action mise à jour', 'success');
   }
 
+  async function saveNextAction(): Promise<void> {
+    await persistNextAction(false);
+  }
   async function clearNextAction(): Promise<void> {
-    if (!selectedMission || selectedFollowUpTerminal) {
-      return;
-    }
-
-    try {
-      await tracking.updateNextActionAt(selectedMission.id, null);
-      nextActionInput = '';
-    } catch (cause) {
-      await showToast(trackingFailureMessage(cause), 'error');
-      return;
-    }
-    await showToast('Prochaine action effacée', 'success');
+    await persistNextAction(true);
   }
 
   async function generate(type: GenerationType): Promise<void> {
@@ -557,11 +477,14 @@
     }
 
     generatingType = type;
+    const missionId = selectedMission.id;
     try {
-      const response = await sendMessage({
-        type: 'GENERATE_ASSET',
-        payload: { missionId: selectedMission.id, generationType: type },
-      });
+      const response = await data.mutate(() =>
+        sendMessage({
+          type: 'GENERATE_ASSET',
+          payload: { missionId, generationType: type },
+        })
+      );
 
       if (response.type !== 'GENERATION_RESULT' || !response.payload.asset) {
         const error = response.type === 'GENERATION_RESULT' ? response.payload.error : null;
@@ -575,13 +498,15 @@
         return;
       }
 
-      assets = [
-        response.payload.asset,
-        ...assets.filter((asset) => asset.id !== response.payload.asset?.id),
-      ];
+      if (selectedMissionId === missionId) {
+        assets = [
+          response.payload.asset,
+          ...assets.filter((asset) => asset.id !== response.payload.asset?.id),
+        ];
+      }
       await showToast('Contenu généré', 'success');
       try {
-        await tracking.loadTrackings();
+        await loadApplications();
       } catch (cause) {
         await showToast(trackingFailureMessage(cause), 'error');
       }
@@ -602,24 +527,38 @@
   }
 
   async function loadApplications(): Promise<void> {
-    isLoading = true;
-    loadError = null;
-    try {
-      await tracking.loadTrackings();
-      missions = await getMissions();
-      selectedMissionId = missions[0]?.id ?? null;
-      if (selectedMissionId) {
-        await loadAssets(selectedMissionId);
+    const committed = await data.refresh();
+    if (!committed) {
+      if (data.error) {
+        await showToast(data.error, 'error');
       }
-    } catch (cause) {
-      loadError = trackingFailureMessage(cause);
-      await showToast(loadError, 'error');
-    } finally {
-      isLoading = false;
+      return;
     }
   }
 
-  void loadApplications();
+  $effect(() => {
+    if (data.hasSnapshot && !missions.some((mission) => mission.id === selectedMissionId)) {
+      const id = recommendedTrackedMission?.mission.id ?? missions[0]?.id ?? null;
+      if (id) {
+        untrack(() => {
+          void selectMission(id);
+        });
+      }
+    }
+  });
+
+  $effect(() => {
+    if (active) {
+      untrack(() => {
+        clock.refresh();
+        void loadApplications();
+      });
+    }
+  });
+  $effect(() => () => {
+    data.dispose();
+    assetsRequest++;
+  });
 </script>
 
 <PageShell>
@@ -628,20 +567,8 @@
     title="Candidatures"
     icon="mail"
     badge="Local uniquement"
-    description="Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier. Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté."
+    description="Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier. Ces statuts et relances sont enregistrés localement. Ouvrir une plateforme ne confirme jamais un envoi."
   >
-    <OperationalStoryCard
-      eyebrow="Priorité"
-      variant="compact"
-      title={applicationStory.title}
-      description={applicationStory.description}
-      severity={applicationStory.severity}
-      statusLabel={applicationStory.statusLabel}
-      evidence={applicationStory.evidence}
-      primaryActionLabel={applicationStory.primaryActionLabel}
-      primaryActionIcon={applicationStory.primaryActionIcon as IconName}
-      onPrimaryAction={handleApplicationStoryAction}
-    />
     {#snippet footer()}
       {#if isOffline}
         <OfflineNotice
@@ -652,173 +579,30 @@
     {/snippet}
   </PageHeader>
 
-  {#if !isLoading}
-    <section class="rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="eyebrow eyebrow--caption eyebrow--strong eyebrow--blue">Dossier recommandé</p>
-          {#if recommendedTrackedMission}
-            <h2 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
-              {recommendedTrackedMission.mission.title}
-            </h2>
-            <p class="mt-1 text-meta leading-5 text-text-subtle">
-              {getRecommendedDossierReason(recommendedTrackedMission)}
-            </p>
-            <div class="mt-2 flex flex-wrap items-center gap-2">
-              <span
-                class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
-              >
-                {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
-              </span>
-              {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                <span class="text-caption text-text-subtle">
-                  Prochaine action : {formatNextAction(
-                    recommendedTrackedMission.record.nextActionAt
-                  )}
-                </span>
-              {/if}
-            </div>
-          {:else}
-            <h2 class="mt-1 text-body-lg font-semibold text-text-primary">
-              Aucun dossier suivi pour l’instant
-            </h2>
-            <p class="mt-1 text-meta leading-5 text-text-subtle">
-              Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
-            </p>
-          {/if}
-        </div>
+  {#if loadError && data.hasSnapshot}
+    <div role="alert" class="section-card rounded-xl p-4 text-meta">
+      <p>{loadError} Les dernières données chargées restent affichées.</p>
+      <button class="mt-2 rounded-lg border p-2" onclick={() => loadApplications()}
+        >Réessayer</button
+      >
+    </div>
+  {/if}
+  {#if !isLoading && data.hasSnapshot}
+    <section class="section-card space-y-2 rounded-xl p-4" aria-label="À relancer">
+      <h2 class="text-body-lg font-semibold">À relancer ({dueMissions.length})</h2>
+      {#each dueMissions as item (item.mission.id)}
         <button
-          type="button"
-          class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
-          onclick={openRecommendedDossier}
+          class="block w-full rounded-lg border border-border-light p-3 text-left text-meta"
+          onclick={() => selectMission(item.mission.id)}
+          >{item.mission.title}<span class="mt-1 block text-caption text-text-subtle"
+            >{formatNextAction(item.record.nextActionAt)}</span
+          ></button
         >
-          <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
-          {recommendedTrackedMission ? 'Ouvrir le dossier' : 'Aller au feed'}
-        </button>
-      </div>
+      {:else}<p class="text-meta text-text-subtle">
+          Aucune relance échue. Planifiez la prochaine action dans un dossier.
+        </p>{/each}
     </section>
   {/if}
-
-  <ApplicationPipelineSummary summary={pipelineSummary} />
-
-  <section data-testid="application-activity-overview" aria-labelledby="application-activity-title">
-    <div class="flex items-start gap-3 px-1">
-      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
-        <Icon name="activity" size={14} class="text-blueprint-blue" />
-      </div>
-      <div class="min-w-0">
-        <p class="eyebrow">Journal</p>
-        <h2
-          id="application-activity-title"
-          class="mt-1 text-body-lg font-semibold text-text-primary"
-        >
-          Activité de suivi
-        </h2>
-        <p class="mt-1 text-meta leading-5 text-text-subtle">
-          Les décisions récentes sur vos dossiers, de la qualification à la relance.
-        </p>
-      </div>
-    </div>
-
-    <div class="mt-3 space-y-4">
-      <div>
-        <h3 class="px-1 text-body-lg font-medium text-text-primary">Aujourd’hui</h3>
-        <div class="mt-2 overflow-hidden rounded-xl border border-border-light bg-surface-white">
-          {#if todayActivities.length > 0}
-            {#each todayActivities as item (item.missionId)}
-              <button
-                type="button"
-                class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
-                onclick={() => openActivity(item)}
-                disabled={!item.mission}
-              >
-                <span
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
-                >
-                  <Icon name={getActivityIcon(item.status)} size={14} />
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-body-lg font-medium text-text-primary">
-                    {STATUS_LABELS[item.status]}
-                  </span>
-                  <span class="mt-0.5 block truncate text-meta text-text-muted">
-                    {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
-                  </span>
-                </span>
-                <span
-                  class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
-                  aria-hidden="true"
-                ></span>
-              </button>
-            {/each}
-          {:else}
-            <div class="flex items-center gap-3 px-1 py-4 text-text-muted">
-              <span
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray"
-              >
-                <Icon name="activity" size={14} />
-              </span>
-              <p class="text-meta">Aucune nouvelle activité aujourd’hui.</p>
-            </div>
-          {/if}
-        </div>
-      </div>
-
-      <div>
-        <div class="flex items-center justify-between gap-3 px-1">
-          <h3 class="text-body-lg font-medium text-text-primary">Cette semaine</h3>
-          <span class="text-meta text-text-muted">
-            {tracking.trackings.size > 0
-              ? `${tracking.trackings.size} suivies`
-              : `${missions.length} à qualifier`}
-          </span>
-        </div>
-        <div class="mt-2 overflow-hidden rounded-xl border border-border-light bg-surface-white">
-          {#if weekActivities.length > 0}
-            {#each weekActivities as item (item.missionId)}
-              <button
-                type="button"
-                class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
-                onclick={() => openActivity(item)}
-                disabled={!item.mission}
-              >
-                <span
-                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
-                >
-                  <Icon name={getActivityIcon(item.status)} size={14} />
-                </span>
-                <span class="min-w-0 flex-1">
-                  <span class="block truncate text-body-lg font-medium text-text-primary">
-                    {STATUS_LABELS[item.status]}
-                  </span>
-                  <span class="mt-0.5 block truncate text-meta text-text-muted">
-                    {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
-                  </span>
-                </span>
-                <span
-                  class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
-                  aria-hidden="true"
-                ></span>
-              </button>
-            {/each}
-          {:else}
-            <div class="flex items-center justify-between gap-3 px-1 py-4">
-              <p class="text-meta text-text-muted">Le reste de votre suivi apparaîtra ici.</p>
-              <button
-                type="button"
-                class="shrink-0 rounded-lg bg-subtle-gray px-3 py-2 text-meta font-medium text-text-primary"
-                onclick={() => onNavigateToFeed?.()}
-              >
-                Voir les missions
-              </button>
-            </div>
-          {/if}
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
 
   {#if isLoading}
     <div class="section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
@@ -861,7 +645,7 @@
         <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
       </div>
     </div>
-  {:else if loadError}
+  {:else if loadError && !data.hasSnapshot}
     <div>
       <OperationalEmptyState
         title="Le suivi des candidatures ne peut pas être chargé"
@@ -894,136 +678,7 @@
       />
     </div>
   {:else}
-    {#if kanbanActiveCount > 0}
-      <section
-        data-testid="application-kanban"
-        class="section-card rounded-xl p-4"
-        aria-label="Candidatures par étape"
-      >
-        <div class="flex items-center justify-between gap-3 pb-3">
-          <div>
-            <h3 class="text-body-lg font-medium text-text-primary">Candidatures</h3>
-            <p class="mt-0.5 text-meta text-text-subtle">
-              {kanbanActiveCount} dossiers actifs, de la sélection à l’offre.
-            </p>
-          </div>
-        </div>
-        <div class="flex gap-3 overflow-x-auto pb-1">
-          {#each kanbanColumns as column (column.status)}
-            <div class="flex w-44 shrink-0 flex-col gap-2">
-              <div class="flex items-center justify-between gap-2 px-1">
-                <span class="truncate text-caption font-medium text-text-subtle">
-                  {column.label}
-                </span>
-                <span
-                  class="shrink-0 rounded-md bg-subtle-gray px-1.5 py-0.5 text-micro font-semibold text-text-subtle"
-                >
-                  {column.cards.length}
-                </span>
-              </div>
-              <div class="flex flex-col gap-2">
-                {#each column.cards.slice(0, 4) as card (card.missionId)}
-                  <button
-                    type="button"
-                    class="w-full rounded-lg border border-border-light bg-surface-white px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/30 hover:bg-blueprint-blue/4 {selectedMissionId ===
-                    card.missionId
-                      ? 'border-blueprint-blue/40 bg-blueprint-blue/6'
-                      : ''} {card.missionMissing
-                      ? 'cursor-default opacity-60 hover:border-border-light hover:bg-surface-white'
-                      : ''}"
-                    onclick={() => {
-                      if (!card.missionMissing) {
-                        selectMission(card.missionId);
-                      }
-                    }}
-                    disabled={card.missionMissing}
-                    title={card.missionMissing
-                      ? 'Mission source introuvable dans le feed local'
-                      : undefined}
-                  >
-                    <span
-                      class="block truncate text-body font-medium {card.missionMissing
-                        ? 'text-text-subtle italic'
-                        : 'text-text-primary'}"
-                    >
-                      {card.title}
-                    </span>
-                    {#if card.client}
-                      <span class="mt-0.5 block truncate text-caption text-text-muted">
-                        {card.client}
-                      </span>
-                    {/if}
-                    <span class="mt-1.5 block text-caption text-text-subtle">
-                      {card.lastActivityAt > 0 ? formatDate(card.lastActivityAt) : '—'}
-                    </span>
-                  </button>
-                {/each}
-                {#if column.cards.length > 4}
-                  <p class="px-1 text-caption text-text-muted">
-                    +{column.cards.length - 4} autres dossiers
-                  </p>
-                {/if}
-                {#if column.cards.length === 0}
-                  <p
-                    class="rounded-lg border border-dashed border-border-light px-3 py-2.5 text-caption text-text-muted"
-                  >
-                    Aucun dossier
-                  </p>
-                {/if}
-              </div>
-            </div>
-          {/each}
-        </div>
-      </section>
-    {/if}
-
-    <div class="grid items-start gap-4 lg:grid-cols-[0.85fr_1.15fr]">
-      <section class="section-card rounded-xl p-3">
-        <div class="flex items-center justify-between px-2 pb-2">
-          <h3 class="text-body-lg font-medium text-text-primary">Missions</h3>
-          <span class="text-meta text-text-muted">{trackedMissions.length} suivies</span>
-        </div>
-        <div class="max-h-[min(50vh,28rem)] space-y-2 overflow-y-auto pr-1">
-          {#each trackedMissions.length > 0 ? trackedMissions : missions
-                .slice(0, 20)
-                .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item (item.mission.id)}
-            <button
-              data-testid="tracked-mission-row"
-              class="w-full rounded-lg border px-3 py-3 text-left transition-colors {selectedMissionId ===
-              item.mission.id
-                ? 'border-blueprint-blue/30 bg-blueprint-blue/6'
-                : 'border-border-light bg-page-canvas hover:bg-subtle-gray'}"
-              onclick={() => selectMission(item.mission.id)}
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="min-w-0">
-                  <p class="truncate text-body-lg font-medium text-text-primary">
-                    {item.mission.title}
-                  </p>
-                  <p class="mt-1 truncate text-meta text-text-subtle">
-                    {formatMissionMeta(item.mission)}
-                  </p>
-                </div>
-                <span class="shrink-0 text-meta font-semibold text-blueprint-blue">
-                  {formatMissionGrade(item.mission)}
-                </span>
-              </div>
-              <div class="mt-2 flex items-center justify-between gap-2">
-                <span
-                  class="rounded-md bg-surface-white px-2 py-0.5 text-caption font-medium text-text-subtle"
-                >
-                  {STATUS_LABELS[item.record?.currentStatus ?? 'detected']}
-                </span>
-                <span class="text-caption text-text-subtle">
-                  {formatNextAction(item.record?.nextActionAt) ??
-                    formatDate(getLastActivity(item.record))}
-                </span>
-              </div>
-            </button>
-          {/each}
-        </div>
-      </section>
-
+    <div class="grid items-start gap-4 lg:grid-cols-[1.15fr_0.85fr]">
       <section class="space-y-4">
         {#if selectedMission}
           <div class="section-card rounded-xl p-5">
@@ -1082,30 +737,42 @@
                 >
                   Prochaine action
                 </label>
-                <div class="mt-2 flex flex-wrap gap-2">
+                <div class="mt-2 space-y-2">
                   <input
                     id="application-next-action"
                     type="datetime-local"
-                    class="min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+                    class="block w-full min-w-0 max-w-full rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
                     bind:value={nextActionInput}
+                    oninput={() => {
+                      reminderDirty = true;
+                    }}
                     aria-label="Prochaine action"
+                    disabled={reminderBusy}
                   />
-                  <button
-                    class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
-                    onclick={saveNextAction}
-                  >
-                    <Icon name="save" size={12} />
-                    Enregistrer
-                  </button>
-                  {#if selectedTracking?.nextActionAt}
+                  <div class="flex flex-wrap gap-2">
                     <button
-                      class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
-                      onclick={clearNextAction}
+                      disabled={reminderBusy}
+                      class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+                      onclick={saveNextAction}
                     >
-                      <Icon name="x" size={12} />
-                      Effacer
+                      <Icon name="save" size={12} />
+                      {reminderBusy ? 'Enregistrement…' : 'Enregistrer'}
                     </button>
-                  {/if}
+                    {#if selectedTracking?.nextActionAt}
+                      <button
+                        class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                        disabled={reminderBusy}
+                        onclick={clearNextAction}
+                      >
+                        <Icon name="x" size={12} />
+                        Effacer
+                      </button>
+                    {/if}
+                  </div>
+                  {#if reminderStatus}<p role="status" class="text-meta">{reminderStatus}</p>{/if}
+                  {#if reminderError}<p role="alert" class="text-meta text-status-red">
+                      {reminderError}
+                    </p>{/if}
                 </div>
               {/if}
             </div>
@@ -1176,7 +843,10 @@
             </div>
           </div>
 
-          <CopilotPanel missionId={selectedMission.id} onCopy={copyAsset} />
+          {#if features.isFeatureEnabled('connected')}<CopilotPanel
+              missionId={selectedMission.id}
+              onCopy={copyAsset}
+            />{/if}
 
           <FormAssistPanel />
 
@@ -1227,6 +897,271 @@
           {/each}
         {/if}
       </section>
+      <section class="section-card rounded-xl p-3">
+        <div class="flex items-center justify-between px-2 pb-2">
+          <h3 class="text-body-lg font-medium text-text-primary">Missions</h3>
+          <span class="text-meta text-text-muted">{trackedMissions.length} suivies</span>
+        </div>
+        <div class="max-h-[min(50vh,28rem)] space-y-2 overflow-y-auto pr-1">
+          {#each trackedMissions.length > 0 ? trackedMissions : missions
+                .slice(0, 20)
+                .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item (item.mission.id)}
+            <button
+              data-testid="tracked-mission-row"
+              class="w-full rounded-lg border px-3 py-3 text-left transition-colors {selectedMissionId ===
+              item.mission.id
+                ? 'border-blueprint-blue/30 bg-blueprint-blue/6'
+                : 'border-border-light bg-page-canvas hover:bg-subtle-gray'}"
+              onclick={() => selectMission(item.mission.id)}
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-body-lg font-medium text-text-primary">
+                    {item.mission.title}
+                  </p>
+                  <p class="mt-1 truncate text-meta text-text-subtle">
+                    {formatMissionMeta(item.mission)}
+                  </p>
+                </div>
+                <span class="shrink-0 text-meta font-semibold text-blueprint-blue">
+                  {formatMissionGrade(item.mission)}
+                </span>
+              </div>
+              <div class="mt-2 flex items-center justify-between gap-2">
+                <span
+                  class="rounded-md bg-surface-white px-2 py-0.5 text-caption font-medium text-text-subtle"
+                >
+                  {STATUS_LABELS[item.record?.currentStatus ?? 'detected']}
+                </span>
+                <span class="text-caption text-text-subtle">
+                  {formatNextAction(item.record?.nextActionAt) ??
+                    formatDate(getLastActivity(item.record))}
+                </span>
+              </div>
+            </button>
+          {/each}
+        </div>
+      </section>
     </div>
   {/if}
+  <details class="section-card rounded-xl p-4">
+    <summary class="cursor-pointer text-meta font-semibold">Activité et étapes du suivi</summary>
+    <div class="mt-4 space-y-4">
+      <ApplicationPipelineSummary summary={pipelineSummary} />
+      {#if kanbanActiveCount > 0}
+        <section
+          data-testid="application-kanban"
+          class="section-card rounded-xl p-4"
+          aria-label="Candidatures par étape"
+        >
+          <div class="flex items-center justify-between gap-3 pb-3">
+            <div>
+              <h3 class="text-body-lg font-medium text-text-primary">Candidatures</h3>
+              <p class="mt-0.5 text-meta text-text-subtle">
+                {kanbanActiveCount} dossiers actifs, de la relance planifiée à l’offre.
+              </p>
+            </div>
+          </div>
+          <div class="flex gap-3 overflow-x-auto pb-1">
+            {#each kanbanColumns as column (column.status)}
+              <div class="flex w-44 shrink-0 flex-col gap-2">
+                <div class="flex items-center justify-between gap-2 px-1">
+                  <span class="truncate text-caption font-medium text-text-subtle">
+                    {column.label}
+                  </span>
+                  <span
+                    class="shrink-0 rounded-md bg-subtle-gray px-1.5 py-0.5 text-micro font-semibold text-text-subtle"
+                  >
+                    {column.cards.length}
+                  </span>
+                </div>
+                <div class="flex flex-col gap-2">
+                  {#each column.cards.slice(0, 4) as card (card.missionId)}
+                    <button
+                      type="button"
+                      class="w-full rounded-lg border border-border-light bg-surface-white px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/30 hover:bg-blueprint-blue/4 {selectedMissionId ===
+                      card.missionId
+                        ? 'border-blueprint-blue/40 bg-blueprint-blue/6'
+                        : ''} {card.missionMissing
+                        ? 'cursor-default opacity-60 hover:border-border-light hover:bg-surface-white'
+                        : ''}"
+                      onclick={() => {
+                        if (!card.missionMissing) {
+                          selectMission(card.missionId);
+                        }
+                      }}
+                      disabled={card.missionMissing}
+                      title={card.missionMissing
+                        ? 'Mission source introuvable dans le feed local'
+                        : undefined}
+                    >
+                      <span
+                        class="block truncate text-body font-medium {card.missionMissing
+                          ? 'text-text-subtle italic'
+                          : 'text-text-primary'}"
+                      >
+                        {card.title}
+                      </span>
+                      {#if card.client}
+                        <span class="mt-0.5 block truncate text-caption text-text-muted">
+                          {card.client}
+                        </span>
+                      {/if}
+                      <span class="mt-1.5 block text-caption text-text-subtle">
+                        {card.lastActivityAt > 0 ? formatDate(card.lastActivityAt) : '—'}
+                      </span>
+                    </button>
+                  {/each}
+                  {#if column.cards.length > 4}
+                    <p class="px-1 text-caption text-text-muted">
+                      +{column.cards.length - 4} autres dossiers
+                    </p>
+                  {/if}
+                  {#if column.cards.length === 0}
+                    <p
+                      class="rounded-lg border border-dashed border-border-light px-3 py-2.5 text-caption text-text-muted"
+                    >
+                      Aucun dossier
+                    </p>
+                  {/if}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
+
+      <section
+        data-testid="application-activity-overview"
+        aria-labelledby="application-activity-title"
+      >
+        <div class="flex items-start gap-3 px-1">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
+          >
+            <Icon name="activity" size={14} class="text-blueprint-blue" />
+          </div>
+          <div class="min-w-0">
+            <p class="eyebrow">Journal</p>
+            <h2
+              id="application-activity-title"
+              class="mt-1 text-body-lg font-semibold text-text-primary"
+            >
+              Activité de suivi
+            </h2>
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
+              Les décisions récentes sur vos dossiers, de la qualification à la relance.
+            </p>
+          </div>
+        </div>
+
+        <div class="mt-3 space-y-4">
+          <div>
+            <h3 class="px-1 text-body-lg font-medium text-text-primary">Aujourd’hui</h3>
+            <div
+              class="mt-2 overflow-hidden rounded-xl border border-border-light bg-surface-white"
+            >
+              {#if todayActivities.length > 0}
+                {#each todayActivities as item (item.missionId)}
+                  <button
+                    type="button"
+                    class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
+                    onclick={() => openActivity(item)}
+                    disabled={!item.mission}
+                  >
+                    <span
+                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+                    >
+                      <Icon name={getActivityIcon(item.status)} size={14} />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-body-lg font-medium text-text-primary">
+                        {STATUS_LABELS[item.status]}
+                      </span>
+                      <span class="mt-0.5 block truncate text-meta text-text-muted">
+                        {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
+                      </span>
+                    </span>
+                    <span
+                      class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
+                      aria-hidden="true"
+                    ></span>
+                  </button>
+                {/each}
+              {:else}
+                <div class="flex items-center gap-3 px-1 py-4 text-text-muted">
+                  <span
+                    class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray"
+                  >
+                    <Icon name="activity" size={14} />
+                  </span>
+                  <p class="text-meta">Aucune nouvelle activité aujourd’hui.</p>
+                </div>
+              {/if}
+            </div>
+          </div>
+
+          <div>
+            <div class="flex items-center justify-between gap-3 px-1">
+              <h3 class="text-body-lg font-medium text-text-primary">Cette semaine</h3>
+              <span class="text-meta text-text-muted">
+                {tracking.trackings.size > 0
+                  ? `${tracking.trackings.size} suivies`
+                  : `${missions.length} à qualifier`}
+              </span>
+            </div>
+            <div
+              class="mt-2 overflow-hidden rounded-xl border border-border-light bg-surface-white"
+            >
+              {#if weekActivities.length > 0}
+                {#each weekActivities as item (item.missionId)}
+                  <button
+                    type="button"
+                    class="flex w-full items-center gap-3 border-b border-border-light px-1 py-3 text-left last:border-b-0 hover:bg-subtle-gray/45 disabled:cursor-default"
+                    onclick={() => openActivity(item)}
+                    disabled={!item.mission}
+                  >
+                    <span
+                      class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-subtle-gray text-text-subtle"
+                    >
+                      <Icon name={getActivityIcon(item.status)} size={14} />
+                    </span>
+                    <span class="min-w-0 flex-1">
+                      <span class="block truncate text-body-lg font-medium text-text-primary">
+                        {STATUS_LABELS[item.status]}
+                      </span>
+                      <span class="mt-0.5 block truncate text-meta text-text-muted">
+                        {item.mission?.title ?? 'Dossier suivi'} · {formatDate(item.timestamp)}
+                      </span>
+                    </span>
+                    <span
+                      class="h-2 w-2 shrink-0 rounded-full {getActivityDotClass(item.status)}"
+                      aria-hidden="true"
+                    ></span>
+                  </button>
+                {/each}
+              {:else}
+                <div class="flex items-center justify-between gap-3 px-1 py-4">
+                  <p class="text-meta text-text-muted">Le reste de votre suivi apparaîtra ici.</p>
+                  <button
+                    type="button"
+                    class="shrink-0 rounded-lg bg-subtle-gray px-3 py-2 text-meta font-medium text-text-primary"
+                    onclick={() => onNavigateToFeed?.()}
+                  >
+                    Voir les missions
+                  </button>
+                </div>
+              {/if}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  </details>
+  <details class="section-card rounded-xl p-4">
+    <summary class="cursor-pointer text-meta font-semibold">Disponibilité</summary>
+    <div class="mt-4">
+      <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
+    </div>
+  </details>
 </PageShell>

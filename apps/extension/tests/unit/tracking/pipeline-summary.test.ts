@@ -50,6 +50,28 @@ describe('summarizeApplicationPipeline', () => {
     });
   });
 
+  it('counts explicitly scheduled detected dossiers without inferring a status transition', () => {
+    const now = Date.parse('2026-06-18T12:00:00.000Z');
+    const due = tracking({ currentStatus: 'detected', nextActionAt: '2020-01-01T09:00:00Z' });
+    const future = tracking({ currentStatus: 'detected', nextActionAt: '2030-01-01T09:00:00Z' });
+    const invalid = tracking({ currentStatus: 'detected', nextActionAt: 'invalid' });
+    const summary = summarizeApplicationPipeline(
+      [due, future, invalid, tracking({ currentStatus: 'detected' })],
+      now
+    );
+    expect(summary.activeCount).toBe(2);
+    expect(summary.trackedCount).toBe(2);
+    expect(summary.dueFollowUps).toBe(1);
+    expect(summary.stages.find((stage) => stage.status === 'detected')?.count).toBe(2);
+    expect(summary.stages.find((stage) => stage.status === 'applied')?.count).toBe(0);
+    expect(isDueFollowUp(due, now)).toBe(true);
+    expect(isDueFollowUp(future, now)).toBe(false);
+    expect(due.currentStatus).toBe('detected');
+    expect(summarizeApplicationPipeline([{ ...due, nextActionAt: null }], now).trackedCount).toBe(
+      0
+    );
+  });
+
   it('returns null acceptance rate when there are no terminal outcomes', () => {
     const summary = summarizeApplicationPipeline(
       [tracking({ missionId: 'applied-1', currentStatus: 'applied' })],

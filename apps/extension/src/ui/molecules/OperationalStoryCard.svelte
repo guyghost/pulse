@@ -108,17 +108,17 @@
 </script>
 
 {#if resolvedVariant === 'inline'}
-  <!-- Quiet single-line attention row: icon + one-line title + quiet action. -->
+  <!-- Keep the title readable before the action in narrow side panels. -->
   <section
     data-testid="operational-story-inline"
     aria-label={`${eyebrow ? `${eyebrow} : ` : ''}${title}${statusLabel ? ` (${statusLabel})` : ''}`}
-    class="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-1 transition-colors hover:bg-subtle-gray/60"
+    class="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-2 rounded-lg px-1 transition-colors hover:bg-subtle-gray/60"
   >
     <Icon name={iconName} size={14} class="shrink-0 {inlineIconClass}" />
-    <p class="min-w-0 truncate text-caption font-medium text-text-secondary">{title}</p>
+    <p class="min-w-0 text-caption font-medium leading-5 text-text-secondary">{title}</p>
     {#if primaryActionLabel}
       <button
-        class="inline-flex min-w-0 shrink-0 items-center gap-1.5 rounded-md px-2 py-1.5 text-meta font-medium text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/8"
+        class="col-start-2 inline-flex min-w-0 items-center justify-self-start gap-1.5 rounded-md px-2 py-1.5 text-meta font-medium text-blueprint-blue-on-tint transition-colors hover:bg-blueprint-blue/8"
         onclick={onPrimaryAction}
         type="button"
       >

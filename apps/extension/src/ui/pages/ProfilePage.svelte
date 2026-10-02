@@ -1,13 +1,10 @@
 <script lang="ts">
-  import { onDestroy } from 'svelte';
-  import { Icon, type IconName } from '@pulse/ui';
+  import { onDestroy, tick } from 'svelte';
+  import { Icon } from '@pulse/ui';
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import { formatTJMRange } from '$lib/core/utils/format';
   import { showToast } from '$lib/shell/notifications/toast-service';
-  import OperationalStoryCard, {
-    type OperationalEvidence,
-  } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import PageHeader from '../molecules/PageHeader.svelte';
   import PageShell from '../templates/PageShell.svelte';
@@ -15,7 +12,6 @@
   import {
     buildProfileImpactItems,
     buildProfileImpactSimulation,
-    type ProfileImpactItem,
   } from '$lib/core/profile/profile-impact';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
@@ -26,7 +22,7 @@
     onNavigateToOnboarding: () => onNavigateToOnboarding?.(),
   });
 
-  settings.load();
+  void settings.loadProfile();
   onDestroy(() => settings.destroy());
 
   const profileCompletionItems = $derived.by(() => {
@@ -47,7 +43,9 @@
 
   const profileImpactSimulation = $derived(buildProfileImpactSimulation(profileCompletionItems));
   const profileCompleteness = $derived(profileImpactSimulation.currentCompletion);
-  const topProfilePriorities = $derived(profileImpactSimulation.prioritizedItems);
+  const nextProfilePriority = $derived(profileImpactSimulation.prioritizedItems[0]);
+  let profileEditor: HTMLElement | undefined = $state();
+  let focusFieldLabel = $state('Prénom');
 
   const completionExplanation = $derived.by(() => {
     if (missingProfileItems.length === 0) {
@@ -74,66 +72,6 @@
     ].join(' · ')
   );
 
-  const profileStory = $derived.by(() => {
-    const evidence: OperationalEvidence[] = [
-      {
-        label: 'Complétude',
-        value: `${profileCompleteness}%`,
-        icon: 'gauge',
-        severity:
-          profileCompleteness >= 85
-            ? 'success'
-            : profileCompleteness >= 55
-              ? 'attention'
-              : 'incident',
-      },
-      {
-        label: 'Gain estimé',
-        value: profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0',
-        icon: 'list-checks',
-        severity: missingProfileItems.length === 0 ? 'success' : 'attention',
-      },
-      {
-        label: 'Mots-clés',
-        value: settings.profileKeywords.length,
-        icon: 'layers',
-        severity: settings.profileKeywords.length > 0 ? 'success' : 'incident',
-      },
-    ];
-
-    if (missingProfileItems.length === 0) {
-      return {
-        severity: 'success' as const,
-        statusLabel: 'Prêt',
-        title: 'Le profil peut mieux classer vos missions',
-        description:
-          'Les critères essentiels sont renseignés. Gardez ce profil de référence à jour avant de comparer les missions prioritaires.',
-        evidence,
-        primaryActionLabel: settings.isSavingProfile
-          ? 'Sauvegarde…'
-          : settings.editingProfile
-            ? 'Enregistrer'
-            : 'Modifier le profil',
-        primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
-      };
-    }
-
-    return {
-      severity: profileCompleteness < 55 ? ('incident' as const) : ('attention' as const),
-      statusLabel: 'À compléter',
-      title: `${missingProfileItems.length} champ${missingProfileItems.length > 1 ? 's' : ''} manque${missingProfileItems.length > 1 ? 'nt' : ''} pour mieux classer vos missions`,
-      description:
-        'Les champs manquants réduisent la précision des requêtes et des suggestions de candidature.',
-      evidence,
-      primaryActionLabel: settings.isSavingProfile
-        ? 'Sauvegarde…'
-        : settings.editingProfile
-          ? 'Enregistrer'
-          : 'Modifier le profil',
-      primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
-    };
-  });
-
   async function handleSave() {
     if (settings.isSavingProfile) {
       return;
@@ -144,26 +82,24 @@
     }
   }
 
-  function profileImpactIcon(item: ProfileImpactItem): IconName {
-    if (item.id === 'tjm-min' || item.id === 'tjm-max') {
-      return 'badge-euro';
-    }
-    if (item.id === 'remote') {
-      return 'wifi';
-    }
-    if (item.id === 'location') {
-      return 'target';
-    }
-    if (item.id === 'job-title') {
-      return 'briefcase';
-    }
-    return 'user';
-  }
-
-  function openProfileEditing(): void {
+  async function openProfileEditing(): Promise<void> {
+    const labels: Record<string, string> = {
+      keywords: 'Mots-clés',
+      'tjm-min': 'TJM minimum',
+      remote: 'Mode de travail',
+      location: 'Localisation',
+      'job-title': 'Poste recherché',
+      'first-name': 'Prénom',
+    };
+    const label = labels[nextProfilePriority?.id ?? 'first-name'];
+    focusFieldLabel = label;
     if (!settings.editingProfile) {
       settings.toggleProfileEditing();
     }
+    await tick();
+    const input = profileEditor?.querySelector<HTMLElement>(`[aria-label="${label}"]`);
+    input?.focus();
+    input?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }
 </script>
 
@@ -217,108 +153,71 @@
     {/snippet}
   </PageHeader>
 
-  <ProfileSection
-    bind:firstName={settings.firstName}
-    bind:jobTitle={settings.jobTitle}
-    bind:profileLocation={settings.profileLocation}
-    bind:profileRemote={settings.profileRemote}
-    bind:seniority={settings.seniority}
-    bind:tjmMin={settings.tjmMin}
-    bind:profileKeywords={settings.profileKeywords}
-    bind:keywordInput={settings.keywordInput}
-    editing={settings.editingProfile}
-    isSaving={settings.isSavingProfile}
-    profileSaved={settings.profileSaved}
-    profileError={settings.profileError}
-    onToggleEdit={() => settings.toggleProfileEditing()}
-    onSave={handleSave}
-    onAddKeyword={() => settings.addKeyword()}
-    onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
-  />
+  {#if settings.profileLoadError}
+    <p role="alert" class="text-meta text-status-red-text">
+      {settings.profileLoadError}
+      <button type="button" class="underline" onclick={() => settings.loadProfile()}
+        >Réessayer</button
+      >
+    </p>
+  {:else if !settings.profileLoaded}
+    <p role="status" class="text-meta text-text-subtle">Chargement du profil…</p>
+  {:else if nextProfilePriority}
+    <section class="section-card rounded-xl p-4" aria-label="Suggestion prioritaire">
+      <p class="eyebrow">Prochaine étape</p>
+      <h2 class="mt-1 text-body-lg font-semibold">Compléter : {nextProfilePriority.label}</h2>
+      <p class="mt-2 text-meta text-text-subtle">{nextProfilePriority.action}</p>
+      <button
+        type="button"
+        class="soft-ring mt-3 min-h-11 rounded-lg bg-blueprint-blue px-4 text-caption font-semibold text-white"
+        disabled={settings.isSavingProfile}
+        onclick={openProfileEditing}
+      >
+        Compléter {nextProfilePriority.label.toLowerCase()}
+      </button>
+    </section>
+  {:else}
+    <p class="rounded-xl bg-accent-green/8 px-4 py-3 text-meta font-medium" role="status">
+      Profil prêt · Vos critères sont renseignés.
+    </p>
+  {/if}
 
-  <div class="space-y-3">
-    <OperationalStoryCard
-      eyebrow="Impact du profil"
-      variant="compact"
-      title={profileStory.title}
-      description={profileStory.description}
-      severity={profileStory.severity}
-      statusLabel={profileStory.statusLabel}
-      evidence={profileStory.evidence}
-      primaryActionLabel={profileStory.primaryActionLabel}
-      primaryActionIcon={profileStory.primaryActionIcon as IconName}
-      onPrimaryAction={() => {
-        if (settings.isSavingProfile) {
-          return;
-        }
-        if (settings.editingProfile) {
-          handleSave();
-          return;
-        }
+  <div bind:this={profileEditor}>
+    <ProfileSection
+      bind:firstName={settings.firstName}
+      bind:jobTitle={settings.jobTitle}
+      bind:profileLocation={settings.profileLocation}
+      bind:profileRemote={settings.profileRemote}
+      bind:seniority={settings.seniority}
+      bind:tjmMin={settings.tjmMin}
+      bind:profileKeywords={settings.profileKeywords}
+      bind:keywordInput={settings.keywordInput}
+      {focusFieldLabel}
+      editing={settings.editingProfile}
+      isSaving={settings.isSavingProfile}
+      profileSaved={settings.profileSaved}
+      profileError={settings.profileError}
+      onToggleEdit={() => {
+        focusFieldLabel = 'Prénom';
         settings.toggleProfileEditing();
       }}
+      onSave={handleSave}
+      onAddKeyword={() => settings.addKeyword()}
+      onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
     />
-
-    <section class="section-card rounded-xl p-5" aria-label="Priorités d’impact profil">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="eyebrow">Priorités d’impact</p>
-          <h3 class="mt-1 text-body-lg font-semibold leading-5 text-text-primary">
-            {profileImpactSimulation.title}
-          </h3>
-          <p class="mt-1 text-meta leading-5 text-text-subtle">
-            {profileImpactSimulation.description}
-          </p>
-        </div>
-        <div
-          class="shrink-0 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2.5 py-1.5 text-right"
-        >
-          <p class="eyebrow">Gain</p>
-          <p class="font-mono text-body-lg font-semibold text-blueprint-blue">
-            {profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0'}
-          </p>
-        </div>
-      </div>
-
-      {#if topProfilePriorities.length > 0}
-        <div class="mt-3 space-y-2">
-          {#each topProfilePriorities as item (item.id)}
-            <button
-              type="button"
-              class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-surface-white/65 px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white"
-              onclick={openProfileEditing}
-            >
-              <span
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
-              >
-                <Icon name={profileImpactIcon(item)} size={14} />
-              </span>
-              <span class="min-w-0 flex-1">
-                <span class="flex items-center justify-between gap-2">
-                  <span class="text-meta font-semibold text-text-primary">{item.label}</span>
-                  <span class="font-mono text-caption text-text-muted">{item.weight}%</span>
-                </span>
-                <span class="mt-0.5 block text-caption leading-4 text-text-subtle">
-                  {item.action}
-                </span>
-                <span class="mt-1 block text-micro leading-4 text-text-muted">
-                  Impact : {item.impact}
-                </span>
-              </span>
-              <Icon
-                name="chevron-right"
-                size={13}
-                class="mt-2 shrink-0 text-text-muted transition-colors group-hover:text-blueprint-blue"
-              />
-            </button>
-          {/each}
-        </div>
-      {:else}
-        <div class="mt-3 flex items-center gap-2 text-meta text-text-subtle">
-          <Icon name="check-circle" size={14} class="text-blueprint-blue" />
-          <span>Stack, TJM, remote, localisation et mots-clés sont prêts pour le scoring.</span>
-        </div>
-      {/if}
-    </section>
   </div>
+
+  <details class="section-card rounded-xl p-4">
+    <summary class="cursor-pointer text-meta font-semibold"
+      >Consulter les critères du profil</summary
+    >
+    <ul class="mt-3 space-y-3">
+      {#each profileCompletionItems as item (item.id)}
+        <li class="text-caption">
+          <p class="font-medium">{item.label} · {item.complete ? 'Renseigné' : 'À compléter'}</p>
+          <p class="mt-1 text-text-subtle">{item.impact}</p>
+        </li>
+      {/each}
+    </ul>
+  </details>
 </PageShell>

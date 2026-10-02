@@ -14,8 +14,8 @@ import {
 } from '../../../src/lib/core/features/flags';
 
 describe('EXTENSION_SURFACE_FLAGS (launch defaults)', () => {
-  it('ships tracking and connected surfaces disabled at launch', () => {
-    expect(EXTENSION_SURFACE_FLAGS.applications).toBe(false);
+  it('ships local tracking while keeping connected surfaces disabled', () => {
+    expect(EXTENSION_SURFACE_FLAGS.applications).toBe(true);
     expect(EXTENSION_SURFACE_FLAGS.connected).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe('resolveSurfaceFlags', () => {
 
 describe('isTabEnabled', () => {
   it('reflects the flag value for the tab', () => {
-    expect(isTabEnabled(EXTENSION_SURFACE_FLAGS, 'applications')).toBe(false);
+    expect(isTabEnabled(EXTENSION_SURFACE_FLAGS, 'applications')).toBe(true);
     expect(isTabEnabled(EXTENSION_SURFACE_FLAGS, 'feed')).toBe(true);
   });
 });

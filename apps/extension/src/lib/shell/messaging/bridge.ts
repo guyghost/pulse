@@ -1,3 +1,5 @@
+import type { MissionFeedbackMap } from '../../core/feed/local-feedback';
+import type { SourceVerificationResult } from '../connectors/verify-source-session';
 import type { Mission } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
@@ -14,7 +16,7 @@ import type { CanonicalCandidateProfileDraft } from '../../core/profile-extracto
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AppError } from '../../core/errors/app-error';
-import type { TJMAnalysis, TJMPeriod, TJMRegion } from '../../core/types/tjm';
+import type { TJMSampleAnalysis, TJMFilters } from '../../core/types/tjm';
 import type { SavedFeedView } from '../../core/types/feed-view';
 import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
@@ -98,11 +100,20 @@ export type BridgeMessage =
     }
   | { type: 'GET_FEED_MISSIONS' }
   | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
+  | { type: 'FEED_MISSIONS_FAILED'; payload: { code: 'READ_FAILED'; message: string } }
   | { type: 'GET_FEED_MISSIONS_PAGE'; payload: { page: number; pageSize: number } }
   | {
       type: 'FEED_MISSIONS_PAGE_RESULT';
       payload: { missions: Mission[]; total: number; hasMore: boolean };
     }
+  | { type: 'GET_MISSION_FEEDBACK' }
+  | { type: 'MISSION_FEEDBACK_RESULT'; payload: MissionFeedbackMap }
+  | { type: 'MISSION_FEEDBACK_FAILED' }
+  | { type: 'SAVE_MISSION_FEEDBACK'; payload: MissionFeedbackMap }
+  | { type: 'MISSION_FEEDBACK_SAVED'; payload: { saved: boolean } }
+  | { type: 'VERIFY_SOURCE_SESSION'; payload: { sourceId: string } }
+  | { type: 'SOURCE_SESSION_RESULT'; payload: SourceVerificationResult }
+  | { type: 'CONFIRM_APPLICATION'; payload: { missionId: string } }
   | { type: 'GET_FEED_FAVORITES' }
   | { type: 'FEED_FAVORITES_RESULT'; payload: Record<string, number> }
   | { type: 'SAVE_FEED_FAVORITES'; payload: Record<string, number> }
@@ -112,11 +123,12 @@ export type BridgeMessage =
   | { type: 'SAVE_FEED_HIDDEN'; payload: Record<string, number> }
   | { type: 'FEED_HIDDEN_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_FEED_SORT' }
-  | { type: 'FEED_SORT_RESULT'; payload: 'score' | 'date' | 'tjm' }
-  | { type: 'SAVE_FEED_SORT'; payload: 'score' | 'date' | 'tjm' }
+  | { type: 'FEED_SORT_RESULT'; payload: 'score' | 'date' | 'tjm' | 'personalized' }
+  | { type: 'SAVE_FEED_SORT'; payload: 'score' | 'date' | 'tjm' | 'personalized' }
   | { type: 'FEED_SORT_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_FEED_SAVED_VIEWS' }
   | { type: 'FEED_SAVED_VIEWS_RESULT'; payload: SavedFeedView[] }
+  | { type: 'FEED_SAVED_VIEWS_FAILED' }
   | { type: 'SAVE_FEED_SAVED_VIEWS'; payload: SavedFeedView[] }
   | { type: 'FEED_SAVED_VIEWS_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_CONNECTED_ALERT_PREFERENCES' }
@@ -127,9 +139,10 @@ export type BridgeMessage =
   | { type: 'ALERT_HISTORY_RESULT'; payload: AlertHistoryEntry[] }
   | {
       type: 'GET_TJM_ANALYSIS';
-      payload?: { profileStacks?: string[]; region?: TJMRegion; period?: TJMPeriod };
+      payload?: TJMFilters;
     }
-  | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMAnalysis | null } }
+  | { type: 'TJM_DATA_UPDATED' }
+  | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMSampleAnalysis | null } }
   | { type: 'GET_SEEN_MISSIONS' }
   | { type: 'SEEN_MISSIONS_RESULT'; payload: string[] }
   | { type: 'SAVE_SEEN_MISSIONS'; payload: string[] }

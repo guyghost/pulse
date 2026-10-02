@@ -34,7 +34,7 @@ baseTest.describe('Full User Journey', () => {
       jobTitle: 'Développeur React Senior',
     });
     await page.waitForFunction(
-      () => window.localStorage.getItem('__missionpulse_e2e_saved_profile') !== null,
+      () => !['null', null].includes(window.localStorage.getItem('__missionpulse_dev_profile')),
       undefined,
       { timeout: 10000 }
     );

@@ -11,6 +11,7 @@
  */
 
 import { z } from 'zod';
+import { TJMFiltersSchema, TJMSampleAnalysisSchema } from '../storage/tjm-schemas';
 import type { MissionTracking } from '../../core/types/tracking';
 import {
   TASK5_APPLICATION_TRACKING_ERROR_CODES,
@@ -137,7 +138,7 @@ const SeenMissionIdsSchema = z
   .max(10_000)
   .refine(maxBytes(160_000), { message: 'Seen mission ids payload exceeds 160KB limit' });
 
-const FeedSortSchema = z.enum(['score', 'date', 'tjm']);
+const FeedSortSchema = z.enum(['score', 'date', 'tjm', 'personalized']);
 
 const FeedSavedViewSchema = z
   .object({
@@ -145,6 +146,8 @@ const FeedSavedViewSchema = z
     name: z.string().min(1).max(48),
     filters: z
       .object({
+        scoreFilterMode: z.enum(['minimum', 'exact']).default('exact'),
+        selectedTjmMin: z.number().positive().nullable().optional(),
         searchQuery: z.string().max(120),
         selectedStacks: z.array(z.string().min(1).max(48)).max(24),
         selectedSource: z
@@ -219,81 +222,6 @@ const AlertHistorySchema = z
   .array(AlertHistoryEntrySchema)
   .max(20)
   .refine(maxBytes(30_000), { message: 'Alert history payload exceeds 30KB limit' });
-
-const TJMRegionSchema = z.enum([
-  'ile-de-france',
-  'lyon',
-  'marseille',
-  'toulouse',
-  'bordeaux',
-  'nantes',
-  'lille',
-  'strasbourg',
-  'rennes',
-  'grenoble',
-  'montpellier',
-  'nice',
-  'remote',
-  'other',
-]);
-
-const TJMTrendSchema = z.enum(['up', 'stable', 'down']);
-
-const TJMRangeSchema = z
-  .object({
-    min: z.number(),
-    max: z.number(),
-    median: z.number(),
-  })
-  .strict();
-
-const TJMAnalysisSchema = z
-  .object({
-    trend: TJMTrendSchema,
-    confidence: z.number().min(0).max(1),
-    dataPoints: z.number().int().min(0),
-    junior: TJMRangeSchema,
-    confirmed: TJMRangeSchema,
-    senior: TJMRangeSchema,
-    trendDetail: z.string().nullable(),
-    recommendation: z.string().nullable(),
-    lastUpdated: z.string().nullable(),
-    topStacks: z.array(
-      z
-        .object({
-          stack: z.string().min(1).max(120),
-          average: z.number(),
-          trend: TJMTrendSchema,
-          sampleCount: z.number().int().min(0),
-          lastUpdated: z.string().nullable(),
-        })
-        .strict()
-    ),
-    regionInsights: z.array(
-      z
-        .object({
-          region: TJMRegionSchema,
-          label: z.string().min(1).max(120),
-          average: z.number(),
-          min: z.number(),
-          max: z.number(),
-          sampleCount: z.number().int().min(0),
-          trend: TJMTrendSchema,
-        })
-        .strict()
-    ),
-  })
-  .strict();
-
-const TJMPeriodSchema = z.enum(['7d', '30d', 'all']);
-
-const TJMAnalysisRequestSchema = z
-  .object({
-    profileStacks: z.array(z.string().min(1).max(120)).max(50).optional(),
-    region: TJMRegionSchema.optional(),
-    period: TJMPeriodSchema.optional(),
-  })
-  .strict();
 
 const PersistedConnectorStatusSchema = z
   .object({
@@ -771,11 +699,48 @@ const PlatformAccountOperationResultSchema = z.union([
  * Messages without payload use z.undefined() or z.unknown().
  */
 export const MessageSchemas = {
+  VERIFY_SOURCE_SESSION: z.object({
+    type: z.literal('VERIFY_SOURCE_SESSION'),
+    payload: z.object({ sourceId: z.string().min(1).max(128) }),
+  }),
+  SOURCE_SESSION_RESULT: z.object({
+    type: z.literal('SOURCE_SESSION_RESULT'),
+    payload: z.object({
+      sourceId: z.string().min(1).max(128),
+      status: z.enum(['ready', 'session-missing', 'unavailable']),
+    }),
+  }),
+  GET_MISSION_FEEDBACK: z.object({ type: z.literal('GET_MISSION_FEEDBACK') }),
+  MISSION_FEEDBACK_RESULT: z.object({
+    type: z.literal('MISSION_FEEDBACK_RESULT'),
+    payload: z
+      .record(z.string().min(1).max(256), z.enum(['relevant', 'off-target']))
+      .refine(maxBytes(120_000)),
+  }),
+  MISSION_FEEDBACK_FAILED: z.object({ type: z.literal('MISSION_FEEDBACK_FAILED') }),
+  SAVE_MISSION_FEEDBACK: z.object({
+    type: z.literal('SAVE_MISSION_FEEDBACK'),
+    payload: z
+      .record(z.string().min(1).max(256), z.enum(['relevant', 'off-target']))
+      .refine(maxBytes(120_000)),
+  }),
+  MISSION_FEEDBACK_SAVED: z.object({
+    type: z.literal('MISSION_FEEDBACK_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  CONFIRM_APPLICATION: z.object({
+    type: z.literal('CONFIRM_APPLICATION'),
+    payload: z.object({ missionId: z.string().min(1).max(256) }),
+  }),
   // Feed local data
   GET_FEED_MISSIONS: z.object({ type: z.literal('GET_FEED_MISSIONS') }),
   FEED_MISSIONS_RESULT: z.object({
     type: z.literal('FEED_MISSIONS_RESULT'),
     payload: MissionsPayloadSchema,
+  }),
+  FEED_MISSIONS_FAILED: z.object({
+    type: z.literal('FEED_MISSIONS_FAILED'),
+    payload: z.object({ code: z.literal('READ_FAILED'), message: z.string().min(1).max(500) }),
   }),
   GET_FEED_MISSIONS_PAGE: z.object({
     type: z.literal('GET_FEED_MISSIONS_PAGE'),
@@ -831,6 +796,7 @@ export const MessageSchemas = {
     type: z.literal('FEED_SORT_SAVED'),
     payload: z.object({ saved: z.boolean() }),
   }),
+  FEED_SAVED_VIEWS_FAILED: z.object({ type: z.literal('FEED_SAVED_VIEWS_FAILED') }),
   GET_FEED_SAVED_VIEWS: z.object({ type: z.literal('GET_FEED_SAVED_VIEWS') }),
   FEED_SAVED_VIEWS_RESULT: z.object({
     type: z.literal('FEED_SAVED_VIEWS_RESULT'),
@@ -868,11 +834,12 @@ export const MessageSchemas = {
   }),
   GET_TJM_ANALYSIS: z.object({
     type: z.literal('GET_TJM_ANALYSIS'),
-    payload: TJMAnalysisRequestSchema.optional(),
+    payload: TJMFiltersSchema.optional(),
   }),
+  TJM_DATA_UPDATED: z.object({ type: z.literal('TJM_DATA_UPDATED') }),
   TJM_ANALYSIS_RESULT: z.object({
     type: z.literal('TJM_ANALYSIS_RESULT'),
-    payload: z.object({ analysis: TJMAnalysisSchema.nullable() }).strict(),
+    payload: z.object({ analysis: TJMSampleAnalysisSchema.nullable() }).strict(),
   }),
   GET_SEEN_MISSIONS: z.object({ type: z.literal('GET_SEEN_MISSIONS') }),
   SEEN_MISSIONS_RESULT: z.object({

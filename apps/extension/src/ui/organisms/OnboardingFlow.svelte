@@ -15,7 +15,6 @@
   } from '../../models/onboarding-flow.machine';
   import type { RemoteType } from '$lib/core/types/mission';
   import { previewOnboardingMatch, REFERENCE_MISSION } from '$lib/core/scoring/onboarding-preview';
-  import { scoreToGrade } from '$lib/core/types/score';
 
   const {
     snapshot,
@@ -24,16 +23,20 @@
     onRetry,
     navFailed = false,
     sourceVerifications = {},
+    sourceOpenErrors = {},
     onVerifySource = null,
     onOpenSource = null,
+    notificationThreshold = 70,
   }: {
     snapshot: OnboardingFlowSnapshot;
     sources: { id: string; name: string }[];
     onEvent: (event: OnboardingFlowEvent) => void;
     onRetry?: () => void;
     navFailed?: boolean;
+    notificationThreshold?: number | null;
     /** P0-B — per-source session verification state (absent = idle). */
     sourceVerifications?: Record<string, 'ready' | 'session-missing' | 'unavailable' | 'checking'>;
+    sourceOpenErrors?: Record<string, string>;
     onVerifySource?: ((sourceId: string) => void) | null;
     onOpenSource?: ((sourceId: string) => void) | null;
   } = $props();
@@ -147,8 +150,8 @@
     onSkip={() => onEvent({ type: 'SKIP' })}
   />
 {:else if snapshot.phase === 'connecting'}
-  <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
-    <div class="flex-1">
+  <section class="flex h-full min-h-0 flex-col" transition:fade={{ duration: 120 }}>
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total}
       </p>
@@ -166,7 +169,7 @@
           {@const verification = sourceVerifications[s.id]}
           <li>
             <div
-              class="flex w-full items-center justify-between gap-3 rounded-lg border px-4 py-3 {ready
+              class="flex w-full flex-wrap items-center justify-between gap-2 rounded-lg border px-3 py-3 {ready
                 ? 'border-blueprint-blue/40 bg-blueprint-blue/8'
                 : 'border-border-light bg-surface-white'}"
             >
@@ -209,7 +212,7 @@
                     Ouvrir {s.name}
                   </button>
                 {/if}
-                {#if !ready && (verification === 'unavailable' || verification === undefined) && onVerifySource}
+                {#if !ready && (verification === 'unavailable' || verification === 'session-missing' || verification === undefined) && onVerifySource}
                   <button
                     type="button"
                     class="inline-flex items-center gap-1.5 rounded-lg border border-border-light px-3 py-1.5 text-caption font-medium text-text-secondary transition-colors hover:bg-page-canvas hover:text-text-primary {verification ===
@@ -218,7 +221,7 @@
                       : 'border-blueprint-blue/25 bg-blueprint-blue/10 text-blueprint-blue-on-tint hover:bg-blueprint-blue/20'}"
                     onclick={() => onVerifySource(s.id)}
                   >
-                    {#if verification === 'unavailable'}
+                    {#if verification === 'unavailable' || verification === 'session-missing'}
                       <Icon name="refresh-cw" size={12} />
                       Réessayer
                     {:else}
@@ -237,62 +240,67 @@
                 {/if}
               </span>
             </div>
+            {#if sourceOpenErrors[s.id]}
+              <p role="alert" class="mt-2 text-caption text-status-orange-text">
+                {sourceOpenErrors[s.id]}
+              </p>
+            {/if}
           </li>
         {/each}
       </ul>
     </div>
 
-    <div
-      class="sticky bottom-0 -mx-4 mt-6 flex gap-2 border-t border-border-light bg-page-canvas px-4 pb-4 pt-3"
-    >
-      <button
-        type="button"
-        onclick={() => onEvent({ type: 'BACK' })}
-        class="h-12 flex-1 rounded-lg border border-border-light bg-surface-white text-sm font-medium text-text-secondary transition-colors hover:bg-subtle-gray"
-      >
-        Retour
-      </button>
-      <button
-        type="button"
-        disabled={snapshot.connectedSources.length === 0}
-        onclick={() => onEvent({ type: 'NEXT' })}
-        class="h-12 flex-[2] rounded-lg bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        Continuer
-      </button>
+    <div class="shrink-0 border-t border-border-light pt-3">
+      <div class="flex gap-2">
+        <button
+          type="button"
+          onclick={() => onEvent({ type: 'BACK' })}
+          class="h-12 flex-1 rounded-lg border border-border-light bg-surface-white text-sm font-medium text-text-secondary transition-colors hover:bg-subtle-gray"
+        >
+          Retour
+        </button>
+        <button
+          type="button"
+          disabled={snapshot.connectedSources.length === 0}
+          onclick={() => onEvent({ type: 'NEXT' })}
+          class="h-12 flex-[2] rounded-lg bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          Continuer
+        </button>
+      </div>
+      {#if snapshot.connectedSources.length === 0}
+        <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
+          <button
+            type="button"
+            onclick={() => onEvent({ type: 'SKIP' })}
+            class="min-h-11 cursor-pointer text-caption font-medium text-text-subtle underline decoration-border-light underline-offset-4 transition-colors hover:text-text-primary"
+          >
+            Continuer sans source
+          </button>
+          <p class="text-center text-micro leading-4 text-text-muted">
+            Vous pourrez connecter une plateforme plus tard. Le premier scan risque de ne rien
+            remonter.
+          </p>
+        </div>
+      {:else}
+        <!-- B-opt: value first — scan as soon as a session is verified, wizard after. -->
+        <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
+          <button
+            type="button"
+            onclick={() => onEvent({ type: 'SKIP' })}
+            class="min-h-11 cursor-pointer text-caption font-medium text-blueprint-blue-on-tint underline decoration-blueprint-blue/30 underline-offset-4 transition-colors hover:text-blueprint-blue"
+          >
+            Scanner maintenant
+          </button>
+          <p class="text-center text-micro leading-4 text-text-muted">
+            Scan partiel avec vos sources connectées. Complétez vos critères dans Profil ensuite.
+          </p>
+        </div>
+      {/if}
     </div>
-    {#if snapshot.connectedSources.length === 0}
-      <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
-        <button
-          type="button"
-          onclick={() => onEvent({ type: 'SKIP' })}
-          class="cursor-pointer text-caption font-medium text-text-subtle underline decoration-border-light underline-offset-4 transition-colors hover:text-text-primary"
-        >
-          Continuer sans source
-        </button>
-        <p class="text-center text-micro leading-4 text-text-muted">
-          Vous pourrez connecter une plateforme plus tard. Le premier scan risque de ne rien
-          remonter.
-        </p>
-      </div>
-    {:else}
-      <!-- B-opt: value first — scan as soon as a session is verified, wizard after. -->
-      <div class="-mx-4 flex flex-col items-center gap-1 px-4 pb-4">
-        <button
-          type="button"
-          onclick={() => onEvent({ type: 'SKIP' })}
-          class="cursor-pointer text-caption font-medium text-blueprint-blue-on-tint underline decoration-blueprint-blue/30 underline-offset-4 transition-colors hover:text-blueprint-blue"
-        >
-          Scanner maintenant
-        </button>
-        <p class="text-center text-micro leading-4 text-text-muted">
-          Scan partiel avec vos sources connectées — affinez le profil ensuite.
-        </p>
-      </div>
-    {/if}
   </section>
 {:else if snapshot.phase === 'wizard'}
-  <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
+  <section class="flex h-full min-h-0 flex-col overflow-y-auto" transition:fade={{ duration: 120 }}>
     <div
       class="h-0.5 w-full overflow-hidden rounded-full bg-subtle-gray"
       role="progressbar"
@@ -490,8 +498,8 @@
   </section>
 {:else if snapshot.phase === 'notifying'}
   <!-- Bottom-sheet style notify step: benefit-first, native Toggle. -->
-  <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
-    <div class="flex-1">
+  <section class="flex h-full min-h-0 flex-col" transition:fade={{ duration: 120 }}>
+    <div class="min-h-0 flex-1 overflow-y-auto">
       <p class="eyebrow eyebrow--caption">
         Étape {snapshot.progress.current}/{snapshot.progress.total}
       </p>
@@ -499,7 +507,12 @@
         Soyez alerté·e
       </h2>
       <p class="mt-2 text-sm text-text-secondary">
-        Recevez une notification Chrome quand une mission notée A correspond à votre profil.
+        {#if notificationThreshold === null}
+          Le seuil enregistré est indisponible. Vérifiez les alertes dans les réglages.
+        {:else}
+          Recevez une notification Chrome pour les missions à partir de {notificationThreshold}/100,
+          selon vos critères d’alerte.
+        {/if}
       </p>
 
       <div class="mt-5 rounded-lg border border-border-light bg-surface-white p-4">

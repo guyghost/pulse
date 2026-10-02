@@ -25,65 +25,39 @@ import {
  */
 async function mockUserWithProfile(page: Page) {
   await page.addInitScript(() => {
-    let _chrome: unknown = undefined;
-    Object.defineProperty(window, 'chrome', {
-      configurable: true,
-      enumerable: true,
-      get() {
-        return _chrome;
-      },
-      set(val) {
-        _chrome = val;
-        if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-          const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown
-          ) => Promise<unknown>;
-          (val as Record<string, unknown>).runtime.sendMessage = async (msg: { type: string }) => {
-            if (msg?.type === 'GET_PROFILE') {
-              // Return a mock profile so onboarding is skipped
-              return {
-                type: 'PROFILE_RESULT',
-                payload: {
-                  firstName: 'Test',
-                  jobTitle: 'Developer',
-                  location: 'Paris',
-                  stacks: ['React', 'TypeScript'],
-                  tjm: 600,
-                },
-              };
-            }
-            return origSend.call((val as Record<string, unknown>).runtime, msg);
-          };
-        }
-        // Mock chrome.storage.local
-        if ((val as Record<string, unknown>)?.storage) {
-          const storage: Record<string, unknown> = {};
-          (val as Record<string, unknown>).storage = {
-            local: {
-              get: async (key: string) => {
-                return (storage as Record<string, unknown>)[key]
-                  ? { [key]: (storage as Record<string, unknown>)[key] }
-                  : {};
-              },
-              set: async (items: Record<string, unknown>) => {
-                Object.assign(storage, items);
-              },
-            },
-          };
-        }
-      },
-    });
+    localStorage.setItem('__missionpulse_dev_onboarding_completed', 'true');
+    localStorage.setItem('__missionpulse_dev_first_scan_done', 'true');
+    localStorage.setItem(
+      '__missionpulse_dev_profile',
+      JSON.stringify({
+        firstName: 'Test',
+        jobTitle: 'Developer',
+        location: 'Paris',
+        keywords: ['React', 'TypeScript'],
+        tjmMin: 600,
+        tjmMax: null,
+        seniority: 'senior',
+        remote: 'any',
+        experiences: [],
+        availability: null,
+      })
+    );
   });
 }
 
 async function mockUserWithProfileAndSlowPartialScan(page: Page) {
-  await page.addInitScript(() => {
-    let _chrome: unknown = undefined;
-    const runtimeListeners: Array<
-      (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
-    > = [];
+  await mockUserWithProfile(page);
+  await page.goto(SIDE_PANEL);
+  await expect(feedSearchInput(page)).toBeVisible();
+  await expect(missionCards(page)).toHaveCount(10);
+  await expect(page.getByText('Collecte...', { exact: true })).toBeHidden();
+  await page.evaluate(() => {
+    const runtime = chrome.runtime;
+    const original = runtime.sendMessage.bind(runtime);
+    const fixture = { installed: true, partialPublished: false, terminalPublished: false };
+    Object.assign(window, { __partialScanFixture: fixture });
     const now = new Date().toISOString();
-    const partialMission = {
+    const mission = {
       id: 'partial-scan-action-test',
       title: 'Partial Scan Action Test',
       client: 'Test Client',
@@ -104,135 +78,39 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
       semanticScore: null,
       semanticReason: null,
     };
-
-    function emitRuntimeMessage(message: unknown): void {
-      for (const listener of runtimeListeners) {
-        listener(message, { id: 'dev-mode' }, () => {});
+    runtime.sendMessage = async (request: unknown) => {
+      const message = request as { type: string; payload?: { operationId: string } };
+      if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
+        return original(request);
       }
-    }
-
-    Object.defineProperty(window, 'chrome', {
-      configurable: true,
-      enumerable: true,
-      get() {
-        return _chrome;
-      },
-      set(val) {
-        _chrome = val;
-        const chromeStub = val as {
-          runtime?: {
-            sendMessage?: (msg: unknown) => Promise<unknown>;
-            onMessage?: {
-              addListener?: (
-                listener: (
-                  message: unknown,
-                  sender: unknown,
-                  sendResponse: (response?: unknown) => void
-                ) => void
-              ) => void;
-              removeListener?: (
-                listener: (
-                  message: unknown,
-                  sender: unknown,
-                  sendResponse: (response?: unknown) => void
-                ) => void
-              ) => void;
-            };
-          };
-        };
-        if (!chromeStub.runtime?.sendMessage) {
-          return;
-        }
-
-        const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
-        const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
-          chromeStub.runtime.onMessage
-        );
-        const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
-          chromeStub.runtime.onMessage
-        );
-
-        if (chromeStub.runtime.onMessage) {
-          chromeStub.runtime.onMessage.addListener = (listener) => {
-            runtimeListeners.push(listener);
-            originalAddListener?.(listener);
-          };
-          chromeStub.runtime.onMessage.removeListener = (listener) => {
-            const index = runtimeListeners.indexOf(listener);
-            if (index >= 0) {
-              runtimeListeners.splice(index, 1);
-            }
-            originalRemoveListener?.(listener);
-          };
-        }
-
-        chromeStub.runtime.sendMessage = async (msg: unknown) => {
-          const message = msg as { type?: string; payload?: { operationId?: string } };
-
-          if (message?.type === 'GET_PROFILE') {
-            return {
-              type: 'PROFILE_RESULT',
-              payload: {
-                firstName: 'Test',
-                jobTitle: 'Developer',
-                location: 'Paris',
-                stacks: ['Svelte', 'TypeScript'],
-                tjm: 650,
-              },
-            };
-          }
-
-          if (message?.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
-            const syncedAt = Date.now();
-            return {
-              type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
-              payload: [
-                {
-                  connectorId: 'free-work',
-                  connectorName: 'Free-Work',
-                  lastState: 'done',
-                  missionsCount: 10,
-                  error: null,
-                  lastSyncAt: syncedAt,
-                  lastSuccessAt: syncedAt,
-                },
-              ],
-            };
-          }
-
-          if (message?.type === 'SCAN_START') {
-            const operationId = message.payload?.operationId;
-            if (!operationId) {
-              return originalSendMessage(msg);
-            }
-
-            window.setTimeout(() => {
-              emitRuntimeMessage({
-                type: 'SCAN_PARTIAL_RESULT',
-                payload: {
-                  operationId,
-                  connectorId: 'free-work',
-                  connectorName: 'Free-Work',
-                  missions: [partialMission],
-                },
-              });
-            }, 150);
-
-            window.setTimeout(() => {
-              emitRuntimeMessage({
-                type: 'SCAN_COMPLETE',
-                payload: { operationId, missions: [partialMission] },
-              });
-            }, 2500);
-
-            return { type: 'SCAN_STARTED', payload: { operationId } };
-          }
-
-          return originalSendMessage(msg);
-        };
-      },
-    });
+      const operationId = message.payload.operationId;
+      setTimeout(() => {
+        fixture.partialPublished = true;
+        void original({
+          type: 'SCAN_PARTIAL_RESULT',
+          payload: {
+            operationId,
+            connectorId: 'free-work',
+            connectorName: 'Free-Work',
+            missions: [mission],
+          },
+        });
+      }, 150);
+      setTimeout(() => {
+        fixture.terminalPublished = true;
+        localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([mission]));
+        void original({ type: 'SCAN_COMPLETE', payload: { operationId, missions: [mission] } });
+      }, 2500);
+      return { type: 'SCAN_STARTED', payload: { operationId } };
+    };
   });
+  expect(
+    await page.evaluate(
+      () =>
+        (window as unknown as { __partialScanFixture: { installed: boolean } }).__partialScanFixture
+          .installed
+    )
+  ).toBe(true);
 }
 
 test.describe('Feed', () => {
@@ -478,7 +356,6 @@ test.describe('Feed', () => {
     page,
   }) => {
     await mockUserWithProfileAndSlowPartialScan(page);
-    await page.goto(SIDE_PANEL);
 
     await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
     await expect(missionCards(page)).toHaveCount(10, { timeout: 5000 });
@@ -487,6 +364,18 @@ test.describe('Feed', () => {
     // (or any retry CTA) is the manual trigger.
     await triggerScan(page);
 
+    await page.waitForFunction(
+      () =>
+        (window as unknown as { __partialScanFixture: { partialPublished: boolean } })
+          .__partialScanFixture.partialPublished
+    );
+    expect(
+      await page.evaluate(
+        () =>
+          (window as unknown as { __partialScanFixture: { terminalPublished: boolean } })
+            .__partialScanFixture.terminalPublished
+      )
+    ).toBe(false);
     const arrivalStack = page.getByTestId('mission-arrival-stack');
     await expect(arrivalStack).not.toBeVisible();
     await expect(page.getByText('Partial Scan Action Test')).not.toBeVisible();
@@ -550,7 +439,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
 
     // Verify we're on the feed by checking navigation is visible
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Navigation principale' })).toBeVisible();
     // Verify feed content exists — check for search input (always visible in feed)
     await expect(feedSearchInput(page)).toBeVisible();
 
@@ -588,7 +477,7 @@ test.describe('Feed', () => {
     });
     expect(panelIsTopmost).toBe(true);
 
-    const remoteFilter = filterPanel.getByRole('button', { name: 'Remote', exact: true });
+    const remoteFilter = filterPanel.getByRole('button', { name: 'Télétravail', exact: true });
     await remoteFilter.click();
     await expect(remoteFilter).toHaveAttribute('aria-pressed', 'true');
   });

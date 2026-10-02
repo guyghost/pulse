@@ -1,3 +1,34 @@
+## Évolution du 1er octobre 2026 — import contrôlé
+
+Le flux livré dans `CvPage` est désormais : permission → extraction sans écriture →
+prévisualisation → sélection → confirmation explicite → fusion locale. Les règles
+ci-dessous remplacent la fusion immédiate décrite dans le modèle historique.
+
+- `createCvImportStore` affiche les expériences nouvelles, modifiées et identiques ;
+  la proposition provient du même calcul pur que la fusion persistée.
+- L’annulation ne déclenche aucun message d’écriture. Une confirmation ne transmet
+  que les expériences sélectionnées ; le worker relit le profil courant et conserve
+  toutes les autres entrées.
+- `SYNC_LINKEDIN_PROFILE_IMPORT` appelle la fusion avec `experiencesOnly: true`
+  (quatrième argument booléen) : titre, mots-clés, localisation et autres champs
+  du profil ne sont pas remplacés par l’extraction.
+- Une expérience manuelle correspondante est intégralement conservée. Pour une
+  expérience importée, les faits confirmés peuvent évoluer, notamment `isCurrent`
+  et `endDate`. L’identité canonique, la provenance et les métadonnées existantes
+  restent conservées ; `positionIndex` est recalculé.
+- L’identité compare un identifiant externe hors forme positionnelle, puis
+  entreprise/titre/mois normalisés. `linkedin-experience-N` n’est jamais une preuve
+  d’identité. Un nouvel import identique n’ajoute aucun doublon.
+- La prévisualisation affiche les valeurs proposées et rend la version actuelle
+  consultable pour chaque modification ; les entrées identiques sont décochées.
+- Une édition manuelle active bloque le démarrage de l’import. Le formulaire
+  d’expérience est masqué pendant la récupération et la confirmation.
+
+Le bouton bloque les appels concurrents ; les erreurs et confirmations restent
+lisibles en ligne. Aucun profil LinkedIn réel n’a été extrait lors des tests locaux.
+
+---
+
 # LinkedIn Import Model
 
 Source of truth for the LinkedIn profile import flow: extracting the active

@@ -21,6 +21,7 @@
     profileKeywords = $bindable([]),
     keywordInput = $bindable(''),
     editing,
+    focusFieldLabel = 'Prénom',
     isSaving = false,
     profileSaved,
     profileError,
@@ -35,10 +36,10 @@
     profileRemote: RemoteType | 'any';
     seniority: SeniorityLevel;
     tjmMin: number;
-    tjmMax: number;
     profileKeywords: string[];
     keywordInput: string;
     editing: boolean;
+    focusFieldLabel?: string;
     isSaving?: boolean;
     profileSaved: boolean;
     profileError: string | null;
@@ -63,8 +64,12 @@
     wasEditing = editing;
     if (enteredEditing) {
       void tick().then(() => {
-        firstNameInput?.focus({ preventScroll: true });
-        firstNameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        const input =
+          firstNameInput
+            ?.closest('.section-card')
+            ?.querySelector<HTMLElement>(`[aria-label="${focusFieldLabel}"]`) ?? firstNameInput;
+        input?.focus({ preventScroll: true });
+        input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
       });
     }
   });
@@ -133,6 +138,7 @@
           <span class="eyebrow">Remote</span>
           <select
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+            aria-label="Mode de travail"
             bind:value={profileRemote}
           >
             {#each remoteOptions as option, i (i)}

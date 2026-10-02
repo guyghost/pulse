@@ -35,7 +35,7 @@ test.describe('Settings Flow', () => {
   test('profile tab edit mode shows form fields', async ({ page }) => {
     await navButton(page, 'Profil').click();
 
-    const editBtn = page.getByRole('button', { name: 'Modifier le profil' }).first();
+    const editBtn = page.getByRole('button', { name: 'Modifier mes critères' }).first();
     await expect(editBtn).toBeVisible({ timeout: 3000 });
     await editBtn.click();
 
@@ -51,7 +51,7 @@ test.describe('Settings Flow', () => {
   test('canceling profile edit returns to read-only mode', async ({ page }) => {
     await navButton(page, 'Profil').click();
 
-    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
+    await page.getByRole('button', { name: 'Modifier mes critères' }).first().click();
     await expect(page.locator('input[placeholder="Prénom"]')).toBeVisible();
 
     await page.getByRole('button', { name: 'Annuler la modification du profil' }).click();
@@ -60,7 +60,7 @@ test.describe('Settings Flow', () => {
 
   test('profile tab saves partial profile edits', async ({ page }) => {
     await navButton(page, 'Profil').click();
-    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
+    await page.getByRole('button', { name: 'Modifier mes critères' }).first().click();
 
     const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
     await profileSection.locator('input[placeholder="Prénom"]').fill('');
@@ -95,7 +95,7 @@ test.describe('Settings Flow', () => {
 
   test('profile keywords editor adds and removes technologies', async ({ page }) => {
     await navButton(page, 'Profil').click();
-    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
+    await page.getByRole('button', { name: 'Modifier mes critères' }).first().click();
 
     const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
     const keywordInput = page.locator('#profile-keywords-input');
@@ -110,7 +110,7 @@ test.describe('Settings Flow', () => {
 
   test('adding keyword item via Enter key works', async ({ page }) => {
     await navButton(page, 'Profil').click();
-    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
+    await page.getByRole('button', { name: 'Modifier mes critères' }).first().click();
 
     const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
     const keywordInput = page.locator('#profile-keywords-input');
@@ -169,13 +169,13 @@ test.describe('Settings Flow', () => {
     await page.getByRole('button', { name: 'Réglages' }).click();
 
     await openSettingsSection(page, 'account');
-    await expect(page.getByRole('heading', { name: 'IA locale' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Dans votre navigateur' })).toBeVisible();
     await expect(
       page.getByText(
         'L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.'
       )
     ).toBeVisible();
-    await expect(page.getByText('Missions / scan')).toBeVisible();
+    await expect(page.getByText('Missions / scan').last()).toBeVisible();
   });
 
   test('does not advertise reset while the safe runtime capability is unavailable', async ({
@@ -192,7 +192,7 @@ test.describe('Settings Flow', () => {
     await page.getByRole('button', { name: 'Réglages' }).click();
     await expect(page.getByRole('heading', { name: 'Réglages' })).toBeVisible();
 
-    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     await nav.getByRole('button', { name: 'Missions', exact: true }).click();
     await expect(nav.getByRole('button', { name: 'Missions', exact: true })).toHaveAttribute(
       'aria-current',

@@ -26,14 +26,13 @@ export type ExtensionSurfaceFlags = Record<ExtensionSurfaceFeature, boolean>;
 /**
  * Launch configuration.
  *
- * `applications` (application tracking) and `connected` (connected dashboard
- * + sync) are DISABLED at launch. Flip to `true` to ship them.
+ * Local application tracking ships enabled. Connected dashboard and sync remain disabled.
  */
 export const EXTENSION_SURFACE_FLAGS: ExtensionSurfaceFlags = {
   feed: true,
   profile: true,
   cv: true,
-  applications: false,
+  applications: true,
   tjm: true,
   settings: true,
   connected: false,

@@ -7,10 +7,13 @@ import {
   needsTjmNegotiation,
 } from '../../../src/lib/state/feed-page.svelte';
 import type { Mission, MissionSource } from '../../../src/lib/core/types/mission';
+import type { SavedFeedView } from '../../../src/lib/core/types/feed-view';
 import type { FeedController } from '../../../src/lib/shell/facades/feed-controller.svelte';
 import type { FeedFilterDraft } from '../../../src/models/feed-filter-sheet.model';
 
 const feedDataMock = vi.hoisted(() => ({
+  getMissionFeedback: vi.fn(async () => ({})),
+  saveMissionFeedback: vi.fn(async () => {}),
   getSeenIds: vi.fn(),
   saveSeenIds: vi.fn(),
   getFavorites: vi.fn(),
@@ -30,6 +33,7 @@ const feedDataMock = vi.hoisted(() => ({
   syncFavoriteMission: vi.fn(),
 }));
 const toastMock = vi.hoisted(() => ({
+  showToast: vi.fn(),
   showToastAction: vi.fn(),
 }));
 
@@ -204,9 +208,54 @@ function makeController(
   };
 }
 
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  let reject!: (cause: Error) => void;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+function makeSavedView(id: string): SavedFeedView {
+  return {
+    id,
+    name: id,
+    createdAt: 1,
+    updatedAt: 1,
+    filters: {
+      searchQuery: '',
+      selectedStacks: [],
+      selectedSource: null,
+      selectedRemote: null,
+      selectedCategory: null,
+      selectedSeniority: null,
+      selectedScoreBucket: null,
+      decisionPreset: null,
+      showNewOnly: false,
+      showFavoritesOnly: false,
+      showHidden: false,
+      sortBy: 'score',
+    },
+  };
+}
+function persistedViewFixture(initial: SavedFeedView[] = []) {
+  let persisted = [...initial];
+  feedDataMock.getFeedSavedViews.mockImplementation(async () => [...persisted]);
+  feedDataMock.setFeedSavedViews.mockImplementation(async (views: SavedFeedView[]) => {
+    persisted = [...views];
+  });
+  return {
+    get persisted() {
+      return persisted;
+    },
+  };
+}
 describe('feed page state', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    feedDataMock.getMissionFeedback.mockResolvedValue({});
+    feedDataMock.saveMissionFeedback.mockResolvedValue(undefined);
     feedDataMock.getFeedSortBy.mockResolvedValue('score');
     feedDataMock.setFeedSortBy.mockResolvedValue(undefined);
     feedDataMock.saveSeenIds.mockResolvedValue(undefined);
@@ -602,7 +651,7 @@ describe('feed page state', () => {
       expect(feedDataMock.setFeedSavedViews.mock.calls.length).toBe(callsBeforeDelete);
 
       // Commit fires when the window times out (DEFAULT_UNDO_WINDOW_MS = 5000).
-      vi.advanceTimersByTime(5000);
+      await vi.advanceTimersByTimeAsync(5000);
 
       expect(feedDataMock.setFeedSavedViews).toHaveBeenLastCalledWith([]);
     } finally {
@@ -787,5 +836,228 @@ describe('feed page state', () => {
     // Visible set is exactly the 2 high-score, still-unseen missions.
     expect(page.dashboardSummary.newCount).toBe(2);
     expect(page.dashboardSummary.highScoreCount).toBe(2);
+  });
+  it('minimum B and C keep the A missions while the distribution remains exact', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'a', score: 80 }),
+      makeMission({ id: 'b', score: 60 }),
+      makeMission({ id: 'c', score: 40 }),
+      makeMission({ id: 'below', score: 39 }),
+    ]);
+    page.setSelectedScoreBucket('good');
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['a', 'b']);
+    page.setSelectedScoreBucket('weak');
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['a', 'b', 'c']);
+    expect(page.scoreDistribution.map((bucket) => bucket.count)).toEqual([1, 1, 2]);
+  });
+  it('rejects empty names, quota overflow and persistence failure without losing saved views', async () => {
+    const page = createFeedPageState(createFeedStore(), makeController());
+    await expect(page.saveCurrentView('  ')).rejects.toThrow('nom');
+    feedDataMock.setFeedSavedViews.mockRejectedValueOnce(new Error('quota'));
+    await expect(page.saveCurrentView('Ma recherche')).rejects.toThrow('quota');
+    expect(page.savedViews).toHaveLength(0);
+    for (let index = 0; index < 12; index++) {
+      await page.saveCurrentView(`Recherche ${index}`);
+    }
+    await expect(page.saveCurrentView('Treizième')).rejects.toThrow('12');
+    expect(page.savedViews).toHaveLength(12);
+  });
+  it('saves minimum semantics and TJM, and applies legacy exact groups explicitly', async () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([makeMission({ id: 'a', score: 90 }), makeMission({ id: 'b', score: 65 })]);
+    page.openFilterSheet();
+    page.editFilterSheet({ type: 'SET_SCORE_BUCKET', bucket: 'good' });
+    page.editFilterSheet({ type: 'SET_TJM_MIN', tjmMin: 650 });
+    await page.saveCurrentView('Minimum B');
+    const view = page.savedViews[0];
+    expect(view.filters).toMatchObject({ scoreFilterMode: 'minimum', selectedTjmMin: 650 });
+    page.clearAllFilters();
+    page.applySavedView(view.id);
+    expect(page.visibleCount).toBe(2);
+    const legacy = { ...view, filters: { ...view.filters, scoreFilterMode: undefined } };
+    page.savedViews[0] = legacy;
+    page.applySavedView(legacy.id);
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['b']);
+    page.openFilterSheet();
+    page.editFilterSheet({ type: 'SET_REMOTE', remote: 'hybrid' });
+    expect(page.visibleCount).toBe(1);
+    page.editFilterSheet({ type: 'SET_SCORE_BUCKET', bucket: 'good' });
+    expect(page.visibleCount).toBe(2);
+  });
+  it('serializes concurrent feedback writes and preserves the canonical score', async () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([makeMission({ id: 'a', score: 90 }), makeMission({ id: 'b', score: 60 })]);
+    await Promise.all([page.setFeedback('a', 'off-target'), page.setFeedback('b', 'relevant')]);
+    page.sortBy = 'personalized';
+    expect(page.displayMissions.map((row) => row.id)).toEqual(['b', 'a']);
+    expect(feed.missions.map((row) => row.score)).toEqual([90, 60]);
+    await page.setFeedback('a', null);
+    expect(page.feedback).toEqual({ b: 'relevant' });
+    feedDataMock.saveMissionFeedback.mockRejectedValueOnce(new Error('quota'));
+    await page.setFeedback('b', 'off-target');
+    expect(page.feedback.b).toBe('relevant');
+  });
+  it('restores only the failed deleted search and keeps sibling searches', async () => {
+    vi.useFakeTimers();
+    try {
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.saveCurrentView('Première');
+      await page.saveCurrentView('Deuxième');
+      const id = page.savedViews[1].id;
+      page.deleteSavedView(id);
+      feedDataMock.setFeedSavedViews.mockRejectedValueOnce(new Error('quota'));
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(page.savedViews.map((view) => view.name).sort()).toEqual(['Deuxième', 'Première']);
+      expect(toastMock.showToast).toHaveBeenCalledWith(
+        'Suppression impossible : recherche restaurée.',
+        'error'
+      );
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('keeps an undoable search persisted when creating another search, then undo survives reload', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      page.deleteSavedView('A');
+      const undo = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
+      await page.saveCurrentView('B');
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'A']);
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B']);
+      undo();
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B', 'A']);
+      await vi.advanceTimersByTimeAsync(5000);
+      const reloaded = createFeedPageState(createFeedStore(), makeController());
+      await reloaded.loadSavedViews();
+      expect(reloaded.savedViews.map((view) => view.name)).toEqual(['B', 'A']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('closing during an undo window after creation preserves the temporarily removed search', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      page.deleteSavedView('A');
+      await page.saveCurrentView('B');
+      page.dispose();
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'A']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a deletion during delayed creation stays hidden and commits after that creation', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      const write = deferred<void>();
+      const started = deferred<void>();
+      const persist = feedDataMock.setFeedSavedViews.getMockImplementation()!;
+      feedDataMock.setFeedSavedViews.mockImplementationOnce(async (views: SavedFeedView[]) => {
+        started.resolve();
+        await write.promise;
+        await persist(views);
+      });
+      const creation = page.saveCurrentView('B');
+      await started.promise;
+      expect(feedDataMock.setFeedSavedViews).toHaveBeenCalledTimes(1);
+      page.deleteSavedView('A');
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(feedDataMock.setFeedSavedViews).toHaveBeenCalledTimes(1);
+      write.resolve();
+      await creation;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B']);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('commits one expired deletion while preserving another search still undoable during creation', async () => {
+    vi.useFakeTimers();
+    try {
+      const disk = persistedViewFixture([makeSavedView('A'), makeSavedView('C')]);
+      const page = createFeedPageState(createFeedStore(), makeController());
+      await page.loadSavedViews();
+      page.deleteSavedView('A');
+      await vi.advanceTimersByTimeAsync(1000);
+      page.deleteSavedView('C');
+      const undoC = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
+      await page.saveCurrentView('B');
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'C']);
+      undoC();
+      expect(page.savedViews.map((view) => view.name)).toEqual(['B', 'C']);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'C']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('a failed search load never writes an empty replacement, and retry preserves existing searches', async () => {
+    feedDataMock.getFeedSavedViews.mockRejectedValue(new Error('read failed'));
+    const page = createFeedPageState(createFeedStore(), makeController());
+    await expect(page.loadSavedViews()).rejects.toThrow('read failed');
+    await expect(page.saveCurrentView('B')).rejects.toThrow('read failed');
+    expect(feedDataMock.setFeedSavedViews).not.toHaveBeenCalled();
+    const disk = persistedViewFixture([makeSavedView('A')]);
+    await page.saveCurrentView('B');
+    expect(disk.persisted.map((view) => view.name)).toEqual(['B', 'A']);
+  });
+  it('delayed search loading completes before creation and cannot overwrite the new projection', async () => {
+    const read = deferred<SavedFeedView[]>();
+    feedDataMock.getFeedSavedViews.mockReturnValueOnce(read.promise);
+    const page = createFeedPageState(createFeedStore(), makeController());
+    const loading = page.loadSavedViews();
+    const creation = page.saveCurrentView('B');
+    await Promise.resolve();
+    expect(feedDataMock.setFeedSavedViews).not.toHaveBeenCalled();
+    read.resolve([makeSavedView('A')]);
+    await Promise.all([loading, creation]);
+    expect(
+      feedDataMock.setFeedSavedViews.mock.calls[0][0].map((view: SavedFeedView) => view.name)
+    ).toEqual(['B', 'A']);
+    expect(page.savedViews.map((view) => view.name)).toEqual(['B', 'A']);
+  });
+  it('failed feedback loading never writes a replacement, and retry retains other missions', async () => {
+    feedDataMock.getMissionFeedback.mockRejectedValue(new Error('read failed'));
+    const page = createFeedPageState(createFeedStore(), makeController());
+    await expect(page.loadFeedback()).rejects.toThrow('read failed');
+    await page.setFeedback('new', 'relevant');
+    expect(feedDataMock.saveMissionFeedback).not.toHaveBeenCalled();
+    feedDataMock.getMissionFeedback.mockResolvedValue({ existing: 'off-target' });
+    await page.setFeedback('new', 'relevant');
+    expect(feedDataMock.saveMissionFeedback).toHaveBeenLastCalledWith({
+      existing: 'off-target',
+      new: 'relevant',
+    });
+  });
+  it('delayed feedback loading completes before mutation and cannot overwrite that decision', async () => {
+    const read = deferred<Record<string, 'relevant' | 'off-target'>>();
+    feedDataMock.getMissionFeedback.mockReturnValueOnce(read.promise);
+    const page = createFeedPageState(createFeedStore(), makeController());
+    const loading = page.loadFeedback();
+    const mutation = page.setFeedback('new', 'relevant');
+    await Promise.resolve();
+    expect(feedDataMock.saveMissionFeedback).not.toHaveBeenCalled();
+    read.resolve({ existing: 'off-target' });
+    await Promise.all([loading, mutation]);
+    expect(page.feedback).toEqual({ existing: 'off-target', new: 'relevant' });
+    expect(feedDataMock.saveMissionFeedback).toHaveBeenLastCalledWith({
+      existing: 'off-target',
+      new: 'relevant',
+    });
   });
 });

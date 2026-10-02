@@ -29,13 +29,13 @@
     {
       icon: 'check',
       title: 'Local',
-      detail: '100% sur votre navigateur.',
+      detail: 'Données locales par défaut, cloud facultatif.',
     },
   ];
 </script>
 
-<section class="flex h-full flex-col">
-  <div class="flex-1">
+<section class="flex h-full min-h-0 flex-col">
+  <div class="min-h-0 flex-1 overflow-y-auto">
     <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
 
     <h1 class="mt-4 text-[28px] font-semibold leading-[1.1] tracking-tight text-text-primary">

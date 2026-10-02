@@ -572,7 +572,8 @@ describe('MissionCard', () => {
     const spotlight = target.querySelector('[data-testid="spotlight-highlights"]');
     expect(spotlight).not.toBeNull();
     expect(spotlight?.textContent).toContain('Top Match');
-    expect(spotlight?.textContent).toContain('100% télétravail');
+    expect(spotlight?.textContent).toContain('Stack');
+    expect(spotlight?.textContent).not.toContain('100% télétravail');
     expect(spotlight?.textContent).toContain('+40% vs plancher');
     expect(spotlight?.textContent).toContain('700');
   });
@@ -868,7 +869,7 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
 
     const applyBtn = target.querySelector('[data-testid="fast-apply-btn"]') as HTMLButtonElement;
     expect(applyBtn).not.toBeNull();
-    expect(applyBtn.textContent).toContain('Postuler');
+    expect(applyBtn.textContent).toContain('Ouvrir pour postuler');
     applyBtn.click();
     expect(onFastApply).toHaveBeenCalledTimes(1);
   });
@@ -881,5 +882,52 @@ describe('MissionCard — accessibilité clavier (couche 3)', () => {
       Number(element.getAttribute('tabindex'))
     );
     expect(tabindexes.every((value) => value <= 0)).toBe(true);
+  });
+  it.each(['selected', 'application_prepared'] as const)(
+    'keeps a single explicit sending confirmation for %s inside details',
+    async (trackingStatus) => {
+      const onConfirmApplied = vi.fn();
+      const onStatusTransition = vi.fn();
+      const target = mountCard({
+        trackingStatus,
+        onConfirmApplied,
+        onStatusTransition,
+        onFeedback: vi.fn(),
+      });
+      await tick();
+      expect(target.textContent).not.toContain('J’ai envoyé ma candidature');
+      expect(target.textContent).not.toContain('Hors cible');
+      (
+        target.querySelector('button[aria-label^="Afficher les détails"]') as HTMLButtonElement
+      ).click();
+      await tick();
+      const confirmation = Array.from(target.querySelectorAll('button')).filter(
+        (button) => button.textContent?.trim() === 'J’ai envoyé ma candidature'
+      );
+      expect(confirmation).toHaveLength(1);
+      confirmation[0].click();
+      expect(onConfirmApplied).toHaveBeenCalledTimes(1);
+      expect(onStatusTransition).not.toHaveBeenCalled();
+    }
+  );
+  it('disables source opening and confirmation while tracking is pending', async () => {
+    const onFastApply = vi.fn();
+    const onConfirmApplied = vi.fn();
+    const target = mountCard({ onFastApply, onConfirmApplied, isStatusTransitionPending: true });
+    await tick();
+    (
+      target.querySelector('button[aria-label^="Afficher les détails"]') as HTMLButtonElement
+    ).click();
+    await tick();
+    const open = target.querySelector('[data-testid="fast-apply-btn"]') as HTMLButtonElement;
+    expect(open.disabled).toBe(true);
+    open.click();
+    expect(onFastApply).not.toHaveBeenCalled();
+    const confirm = Array.from(target.querySelectorAll('button')).find(
+      (button) => button.textContent?.trim() === 'J’ai envoyé ma candidature'
+    )!;
+    expect(confirm.disabled).toBe(true);
+    confirm.click();
+    expect(onConfirmApplied).not.toHaveBeenCalled();
   });
 });

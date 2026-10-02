@@ -78,10 +78,10 @@
     {
       id: 'account',
       label: features.isFeatureEnabled('connected') ? 'Compte & IA' : 'IA',
-      title: features.isFeatureEnabled('connected') ? 'Synchronisation' : 'Analyse locale',
+      title: 'Intelligence artificielle',
       description: features.isFeatureEnabled('connected')
         ? 'Dashboard connecté et analyse locale.'
-        : 'Scoring et assistant de candidature exécutés localement.',
+        : 'Analyse dans le navigateur et service cloud facultatif.',
       icon: 'cpu',
     },
     {
@@ -96,12 +96,12 @@
   const aiTransparencyItems: AiTransparencyItem[] = [
     {
       label: 'Mission',
-      value: 'Titre, description, stack, TJM, localisation et remote',
+      value: 'Titre, technologies, TJM, localisation, mode de travail et durée',
       icon: 'file-text',
     },
     {
       label: 'Profil',
-      value: 'Stack cible, TJM cible, remote, localisation et mots-clés',
+      value: 'Poste, technologies, TJM, localisation, mode de travail et séniorité',
       icon: 'user',
     },
     {
@@ -111,7 +111,7 @@
     },
     {
       label: 'Exclus',
-      value: 'Sessions, cookies, identifiants et pages privées ne sont pas envoyés',
+      value: 'Sessions, cookies et identifiants exclus du contexte analysé',
       icon: 'shield-check',
     },
   ];
@@ -120,6 +120,7 @@
   onDestroy(() => settings.destroy());
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let isSavingAlertPreferences = $state(false);
+  let alertPreferencesReady = $state(false);
   let favoriteExportCount = $state(0);
   let alertPreviewMissions = $state<Mission[]>([]);
   let alertPreviewSeenIds = $state<string[]>([]);
@@ -146,6 +147,7 @@
             getAlertHistory(),
           ]);
         alertPreferences = storedAlertPreferences;
+        alertPreferencesReady = true;
         favoriteExportCount = Object.keys(favorites).length;
         alertPreviewMissions = missions;
         alertPreviewSeenIds = seenIds;
@@ -201,10 +203,20 @@
   }
 
   async function handleSaveAlertPreferences(nextPreferences: ConnectedAlertPreferences) {
-    const previousPreferences = alertPreferences;
+    if (!alertPreferencesReady || isSavingAlertPreferences) {
+      await showToast(
+        'Les alertes enregistrées sont indisponibles. Réessayez avant de les modifier.',
+        'error'
+      );
+      return;
+    }
     isSavingAlertPreferences = true;
     try {
-      alertPreferences = await saveAlertPreferences(nextPreferences);
+      const previousPreferences = await getAlertPreferences();
+      alertPreferences = await saveAlertPreferences({
+        ...nextPreferences,
+        revision: previousPreferences.revision,
+      });
       showToastAction('Alerte prioritaire mise à jour', 'success', {
         label: 'Annuler',
         onClick: () => {
@@ -226,6 +238,27 @@
   }
 
   let openSettingsSection = $state<SettingsSectionId | null>('sources');
+
+  $effect(() => {
+    if (active && openSettingsSection === 'sources') {
+      void settings.refreshSources();
+    }
+  });
+
+  $effect(() => {
+    if (!active || openSettingsSection !== 'sources') {
+      return;
+    }
+    const recheck = () => {
+      for (const source of settings.connectorSources) {
+        if (source.enabled && source.state === 'reconnect') {
+          void settings.verifySource(source.id);
+        }
+      }
+    };
+    window.addEventListener('focus', recheck);
+    return () => window.removeEventListener('focus', recheck);
+  });
 
   function toggleSettingsSection(sectionId: SettingsSectionId) {
     openSettingsSection = openSettingsSection === sectionId ? null : sectionId;
@@ -347,37 +380,6 @@
   });
 
   const aiStory = $derived.by(() => {
-    const evidence: OperationalEvidence[] = [
-      {
-        label: 'Statut',
-        value:
-          settings.aiAvailability === 'available'
-            ? 'OK'
-            : settings.aiAvailability === 'after-download'
-              ? 'À télécharger'
-              : 'Inactive',
-        icon: 'cpu',
-        severity:
-          settings.aiAvailability === 'available'
-            ? 'success'
-            : settings.aiAvailability === 'after-download'
-              ? 'attention'
-              : 'incident',
-      },
-      {
-        label: 'Couverture',
-        value: settings.maxSemanticPerScan,
-        icon: 'scan-line',
-        severity: settings.maxSemanticPerScan > 0 ? 'success' : 'attention',
-      },
-      {
-        label: 'Fallback',
-        value: 'Score base',
-        icon: 'shield-check',
-        severity: 'success',
-      },
-    ];
-
     if (settings.aiAvailability === 'available') {
       return {
         severity: 'success' as const,
@@ -385,7 +387,6 @@
         title: 'L’analyse locale peut préciser le classement',
         description:
           'Pulse analysera les premières missions du scan, puis réutilisera ces analyses pour éviter les recalculs inutiles.',
-        evidence,
         primaryActionLabel: null,
         primaryActionIcon: 'play',
       };
@@ -401,7 +402,6 @@
       title: 'Pulse utilise le score de base pour l’instant',
       description:
         'Les missions restent classées. Activez l’analyse locale pour enrichir les explications.',
-      evidence,
       primaryActionLabel: 'Ouvrir l’aide IA Chrome',
       primaryActionIcon: 'external-link',
     };
@@ -584,34 +584,73 @@
         class="divide-y divide-border-light rounded-lg border border-border-light bg-surface-white"
       >
         {#each settings.connectorSources as source (source.id)}
-          <div class="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
-            <div class="flex min-w-0 items-center gap-2.5">
-              <span
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
-              >
-                <Icon name="database" size={13} />
-              </span>
-              <span class="min-w-0">
-                <span class="block truncate text-meta font-medium text-text-primary">
-                  {source.name}
+          <div class="px-3 py-3">
+            <div class="flex min-h-14 items-center justify-between gap-3">
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+                >
+                  <Icon name="database" size={13} />
                 </span>
-                <span class="mt-0.5 block text-micro text-text-muted">
-                  {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
+                <span class="min-w-0">
+                  <span class="block truncate text-meta font-medium text-text-primary">
+                    {source.name}
+                  </span>
+                  <span class="mt-0.5 block text-micro text-text-muted">
+                    {settings.settingsLoaded
+                      ? source.statusLabel
+                      : 'État inconnu — réglages indisponibles'}
+                  </span>
                 </span>
-              </span>
-            </div>
+              </div>
 
-            <Toggle
-              checked={source.enabled}
-              disabled={settings.isSavingSettings}
-              aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
-              onclick={() => settings.toggleConnector(source.id)}
-            />
+              <Toggle
+                checked={source.enabled}
+                disabled={settings.isSavingSettings || !settings.settingsLoaded}
+                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
+                onclick={() => settings.toggleConnector(source.id)}
+              />
+            </div>
+            {#if source.lastSuccessLabel}
+              <p class="mt-1 text-micro text-text-subtle">{source.lastSuccessLabel}</p>
+            {/if}
+            {#if source.errorDetail && source.enabled}
+              <p
+                class="mt-2 text-caption text-status-orange-text"
+                role={source.state === 'error' ? 'alert' : 'status'}
+              >
+                {source.errorDetail}
+              </p>
+            {/if}
+            {#if source.enabled}
+              <div class="mt-2 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  class="soft-ring min-h-10 rounded-lg border border-border-light px-3 text-caption"
+                  onclick={() => settings.openSource(source.id)}
+                  aria-label={`${source.state === 'reconnect' ? 'Reconnecter' : 'Ouvrir'} ${source.name}`}
+                >
+                  {source.state === 'reconnect' ? 'Reconnecter' : 'Ouvrir la plateforme'}
+                </button>
+                <button
+                  type="button"
+                  class="soft-ring min-h-10 rounded-lg border border-border-light px-3 text-caption"
+                  disabled={source.state === 'checking'}
+                  onclick={() => settings.verifySource(source.id)}
+                  aria-label={`Revérifier ${source.name}`}
+                >
+                  Revérifier
+                </button>
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
     </div>
 
+    {#if settings.sourcesError}
+      <p role="alert" class="text-meta text-status-orange-text">{settings.sourcesError}</p>
+    {/if}
     {#if settings.settingsError}
       <p
         class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red-text"
@@ -625,13 +664,22 @@
   {/snippet}
 
   {#snippet alertsPanel()}
+    {#if !alertPreferencesReady}
+      <p role="alert" class="text-meta text-status-red-text">
+        Les alertes enregistrées sont indisponibles. <button
+          type="button"
+          class="underline"
+          onclick={() => void refreshPageData().catch(() => {})}>Réessayer</button
+        >
+      </p>
+    {/if}
     <AlertBuilderCard
       preferences={alertPreferences}
       availableStacks={settings.profileKeywords}
       previewMissions={alertPreviewMissions}
       seenMissionIds={alertPreviewSeenIds}
       history={alertHistory}
-      isSaving={isSavingAlertPreferences}
+      isSaving={isSavingAlertPreferences || !alertPreferencesReady}
       onSave={handleSaveAlertPreferences}
     />
   {/snippet}
@@ -751,7 +799,7 @@
           <Icon name="cpu" size={14} class="text-blueprint-blue" />
         </div>
         <div>
-          <h3 class="text-body-lg font-medium text-text-primary">IA locale</h3>
+          <h3 class="text-body-lg font-medium text-text-primary">Dans votre navigateur</h3>
           <p class="mt-1 text-meta text-text-subtle">
             L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.
           </p>
@@ -764,12 +812,11 @@
         description={aiStory.description}
         severity={aiStory.severity}
         statusLabel={aiStory.statusLabel}
-        evidence={aiStory.evidence}
         primaryActionLabel={aiStory.primaryActionLabel}
         primaryActionIcon={aiStory.primaryActionIcon as IconName}
         onPrimaryAction={() => settings.openAiHelp()}
       />
-      <div class="grid grid-cols-2 gap-2">
+      <div class="grid gap-2 min-[400px]:grid-cols-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
           <p class="eyebrow">Statut</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
@@ -827,18 +874,30 @@
               <Icon name="scan-line" size={14} class="text-blueprint-blue" />
             </div>
             <div>
-              <p class="text-body-lg font-medium text-text-primary">Classification cloud (Jev)</p>
-              <p class="mt-0.5 text-meta text-text-subtle">
-                Catégorise chaque mission via Vercel AI Gateway. Votre profil n'est jamais envoyé.
-              </p>
+              <p class="text-body-lg font-medium text-text-primary">Service cloud facultatif</p>
             </div>
           </div>
           <Toggle
             checked={settings.classificationEnabled}
+            disabled={settings.isSavingSettings || !settings.settingsLoaded}
             aria-label="Activer la classification des missions"
             onclick={() => settings.toggleClassification()}
           />
         </div>
+
+        <p class="mt-3 text-meta text-text-subtle">
+          Catégorise les missions via Vercel AI Gateway avec une clé personnelle. Titre,
+          technologies, mode de travail et description sont transmis (texte limité). Votre profil
+          utilisateur et les champs structurés TJM/localisation ne sont pas ajoutés. Le titre et la
+          description peuvent contenir un tarif, un lieu ou d’autres données de l’annonce. Les
+          sessions et cookies ne sont pas ajoutés à l’envoi. La conservation des données est
+          désactivée dans la requête.
+        </p>
+
+        <p class="mt-2 text-caption text-text-subtle">
+          L’interrupteur enregistre votre autorisation. Sans clé configurée, le service reste
+          inactif.
+        </p>
 
         <div class="mt-2 flex items-center justify-between gap-2">
           <span class="text-micro font-medium text-text-subtle">État du service</span>
@@ -848,10 +907,16 @@
               ? 'text-accent-green'
               : 'text-text-subtle'}"
           >
-            {#if !settings.classificationEnabled}
+            {#if !settings.settingsLoaded}
+              État inconnu — réglages indisponibles
+            {:else if !settings.aiGatewayKeyStatusKnown}
+              État inconnu — clé non vérifiée
+            {:else if !settings.classificationEnabled}
               Désactivée
-            {:else if settings.aiGatewayKeyConfigured}
-              Active — clé configurée
+            {:else if settings.maxClassificationPerScan === 0}
+              Inactive — aucune mission autorisée
+            {:else if settings.cloudClassificationActive}
+              Activée — clé configurée
             {:else}
               Inactive — clé manquante
             {/if}
@@ -859,7 +924,7 @@
         </div>
 
         {#if settings.classificationEnabled}
-          <div class="mt-3 grid grid-cols-2 gap-2">
+          <div class="mt-3 grid gap-2 min-[400px]:grid-cols-2">
             <label class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
               <span class="eyebrow">Classifiées / scan</span>
               <select
@@ -907,10 +972,14 @@
                 ? 'text-accent-green'
                 : 'text-text-subtle'}"
             >
-              {settings.aiGatewayKeyConfigured ? 'Configurée' : 'Absente'}
+              {!settings.aiGatewayKeyStatusKnown
+                ? 'État inconnu'
+                : settings.aiGatewayKeyConfigured
+                  ? 'Configurée'
+                  : 'Absente'}
             </span>
           </div>
-          <div class="mt-2 flex items-center gap-2">
+          <div class="mt-2 flex flex-wrap items-center gap-2">
             <input
               type="password"
               class="soft-ring h-9 min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 text-caption text-text-primary placeholder:text-text-subtle"
@@ -944,6 +1013,13 @@
           {#if settings.aiGatewayKeyError}
             <p class="mt-1.5 text-micro font-medium text-status-red" role="alert">
               {settings.aiGatewayKeyError}
+              <button
+                type="button"
+                class="mt-1 block min-h-10 underline"
+                disabled={settings.aiGatewayKeySaving}
+                onclick={() => settings.loadAiGatewayKeyStatus()}
+                >Vérifier la clé enregistrée</button
+              >
             </p>
           {/if}
           <p class="mt-2 text-micro leading-4 text-text-subtle">
@@ -1149,14 +1225,16 @@
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="eyebrow">Classification Jev</p>
+          <p class="eyebrow">Service cloud</p>
           <p class="mt-1 text-meta font-medium text-text-primary">
-            {#if !settings.classificationEnabled}
+            {#if !settings.settingsLoaded || !settings.aiGatewayKeyStatusKnown}
+              État inconnu
+            {:else if !settings.classificationEnabled}
               Désactivée
-            {:else if settings.aiGatewayKeyConfigured}
-              Active
+            {:else if settings.cloudClassificationActive}
+              Activée
             {:else}
-              Clé manquante
+              Inactif — clé ou quota manquant
             {/if}
           </p>
         </div>
@@ -1194,13 +1272,13 @@
               </p>
             </div>
             <div class="rounded-md bg-surface-white px-2.5 py-2">
-              <p class="eyebrow">Échecs gateway</p>
+              <p class="eyebrow">Échecs du service cloud</p>
               <p class="mt-1 text-caption font-semibold text-text-primary">
                 {settings.aiDiagnosticsSummary.failures}
               </p>
             </div>
             <div class="rounded-md bg-surface-white px-2.5 py-2">
-              <p class="eyebrow">Confiance moy.</p>
+              <p class="eyebrow">Confiance moyenne</p>
               <p class="mt-1 text-caption font-semibold text-text-primary">
                 {settings.aiDiagnosticsSummary.averageConfidence === null
                   ? '—'

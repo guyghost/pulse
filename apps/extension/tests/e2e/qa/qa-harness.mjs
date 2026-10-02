@@ -87,7 +87,7 @@ export async function gotoApp(page) {
 export async function navigate(page, name) {
   const label = NAV_LABEL[name] ?? name;
   // Prefer aria-label match, fall back to visible text.
-  const sel = `nav[aria-label="Main navigation"] button`;
+  const sel = `nav[aria-label="Navigation principale"] button`;
   const candidates = page.locator(sel);
   const count = await candidates.count();
   for (let i = 0; i < count; i++) {
@@ -211,7 +211,9 @@ export async function injectSendMessageFailure(page, failTypes, errMsg = 'qa-inj
 export async function currentPage(page) {
   return await page.evaluate(() => {
     // There is no global hook; infer from the active nav button aria-pressed.
-    const btns = Array.from(document.querySelectorAll('nav[aria-label="Main navigation"] button'));
+    const btns = Array.from(
+      document.querySelectorAll('nav[aria-label="Navigation principale"] button')
+    );
     const active = btns.find(
       (b) => b.getAttribute('aria-current') === 'page' || b.getAttribute('aria-pressed') === 'true'
     );
