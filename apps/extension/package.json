@@ -46,7 +46,7 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "1.61.1",
     "@pulse/tsconfig": "workspace:*",
-    "@sveltejs/vite-plugin-svelte": "^5.1.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/chrome": "^0.2.7",
     "@types/node": "^26.4.0",
