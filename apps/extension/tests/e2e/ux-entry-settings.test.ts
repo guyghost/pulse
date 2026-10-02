@@ -15,9 +15,14 @@ for (const width of [320, 400]) {
     await ensureFeedVisible(page);
     const nav = page.getByRole('navigation', { name: 'Navigation principale' });
     for (const label of ['Profil', 'Missions', 'CV', 'TJM', 'Réglages']) {
-      await expect(
-        nav.getByRole('button', { name: label, exact: true }).locator('span')
-      ).toBeVisible();
+      const button = nav.getByRole('button', { name: label, exact: true });
+      await expect(button).toBeVisible();
+      const visibleLabel = button.locator('span[aria-hidden="true"]');
+      if (label === 'Missions') {
+        await expect(visibleLabel).toBeVisible();
+      } else {
+        await expect(visibleLabel).toBeHidden();
+      }
     }
     await navButton(page, 'Profil').focus();
     await page.keyboard.press('Enter');

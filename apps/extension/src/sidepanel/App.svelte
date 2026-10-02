@@ -363,20 +363,33 @@
         <nav
           aria-label="Navigation principale"
           data-testid="expandable-navigation"
-          class="grid w-full grid-cols-3 gap-1.5"
+          class="flex min-h-10 w-full items-center gap-[clamp(0.25rem,1.5vw,0.5rem)]"
         >
           {#each visibleNavItems as item}
             <button
-              class="soft-ring flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg px-1 text-caption font-medium transition-colors
+              class="soft-ring relative flex h-10 min-w-0 items-center justify-center overflow-hidden rounded-full text-caption font-medium transition-[flex-basis,flex-grow,padding,gap,background-color,color,transform] duration-[180ms] ease-out active:scale-[0.985] motion-reduce:duration-0
               {nav.currentPage === item.page
-                ? 'bg-blueprint-blue/10 text-blueprint-blue-on-tint'
-                : 'bg-subtle-gray text-text-subtle hover:bg-disabled-gray/35 hover:text-text-primary'}"
+                ? 'flex-1 basis-0 gap-2 bg-disabled-gray/45 px-3 text-text-primary'
+                : 'w-[clamp(2.25rem,10vw,2.75rem)] basis-auto flex-none gap-0 bg-subtle-gray px-0 text-text-subtle hover:bg-disabled-gray/35 hover:text-text-primary'}"
               aria-current={nav.currentPage === item.page ? 'page' : undefined}
               aria-label={item.ariaLabel ?? item.label}
+              title={item.label}
               onclick={() => nav.navigate(item.page)}
             >
-              <Icon name={item.icon as IconName} size={14} filled={nav.currentPage === item.page} />
-              <span>{item.label}</span>
+              <span class="shrink-0 transition-transform duration-200 ease-out">
+                <Icon
+                  name={item.icon as IconName}
+                  size={16}
+                  filled={nav.currentPage === item.page}
+                />
+              </span>
+              <span
+                aria-hidden="true"
+                class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-[180ms] ease-out motion-reduce:duration-0 {nav.currentPage ===
+                item.page
+                  ? 'max-w-36 translate-x-0 opacity-100'
+                  : 'max-w-0 -translate-x-1 opacity-0'}">{item.label}</span
+              >
             </button>
           {/each}
         </nav>

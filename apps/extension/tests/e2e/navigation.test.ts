@@ -35,6 +35,29 @@ test.describe('Navigation', () => {
     await expect(feedTab).not.toHaveAttribute('aria-current', 'page');
   });
 
+  test('selected pill expands and reveals its label while inactive tabs stay compact', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 400, height: 760 });
+    const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+    const feedTab = nav.getByRole('button', { name: 'Missions', exact: true });
+    const profileTab = nav.getByRole('button', { name: 'Profil', exact: true });
+    const feedLabel = feedTab.locator('span[aria-hidden="true"]');
+    const profileLabel = profileTab.locator('span[aria-hidden="true"]');
+
+    await expect(feedLabel).toBeVisible();
+    await expect(profileLabel).toBeHidden();
+    await expect(feedTab).toHaveCSS('transition-duration', '0.18s');
+    await expect
+      .poll(async () => feedTab.evaluate((el) => el.getBoundingClientRect().width))
+      .toBeGreaterThan(await profileTab.evaluate((el) => el.getBoundingClientRect().width));
+
+    await profileTab.click();
+    await expect(profileTab).toHaveAttribute('aria-current', 'page');
+    await expect(profileLabel).toBeVisible();
+    await expect(feedLabel).toBeHidden();
+  });
+
   test('page transitions are smooth (content changes on nav)', async ({ page }) => {
     const nav = page.getByRole('navigation', { name: 'Navigation principale' });
 

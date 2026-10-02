@@ -12,7 +12,7 @@ Livraison locale issue de l’audit du 1er octobre 2026. Le [plan de réalisatio
 
 ## Navigation, première utilisation et réglages
 
-- Les onglets gardent leur nom visible. Les contrôles sont adaptés aux panneaux de 320 et 400 px.
+- La navigation conserve la rangée de pastilles animées : l’onglet sélectionné s’élargit et affiche son nom, les autres restent en icônes avec un nom accessible et une infobulle. Les contrôles sont adaptés aux panneaux de 320 et 400 px et respectent la réduction des animations.
 - Les actions « Continuer sans source » et « Scanner maintenant » restent visibles sous la liste des sources. Le profil peut être enrichi ensuite.
 - Un profil complet affiche « Profil prêt ». Un profil incomplet présente une suggestion prioritaire avec accès au champ à compléter.
 - Les alertes expliquent le seuil effectivement configuré, sans modifier les préférences pour obtenir une lettre de note donnée.
@@ -56,5 +56,7 @@ Les quatre lots et leurs interactions ont été relus indépendamment. Tous les 
 | Prettier sur les fichiers modifiés                                               | Format contrôlé, y compris documentation et rapports.                                                                                                                           |
 
 Les commandes utilisent Node 22.23.1 et pnpm 10.32.1. Les logs finaux et captures sont conservés dans `/workspace/artifacts/missionpulse-ux-implementation-2026-10-01/`. La [relecture finale des correctifs](../reports/ux-implementation-2026-10-01/final-fix-review.md) détaille les six constats levés.
+
+La QA du 2 octobre confirme **65 parcours E2E ciblés**. Après le rétablissement de la navigation compacte, **8 parcours de navigation et d’entrée UX**, le typecheck de l’extension et son build passent. Les [captures finales de navigation](qa/extension-ux-2026-10-02/README.md) montrent les états à 320 et 400 px.
 
 Les contrôles du navigateur en mode développement utilisent les API Chrome et les plateformes simulées. Ils ne prouvent pas les sessions réelles des plateformes ou de LinkedIn, le fonctionnement d’une installation MV3, Gemini Nano, un service cloud, les notifications système ou l’impression PDF native. Le document HTML exporté est testé ; l’impression relève du navigateur. Aucun service connecté ou connecteur exclu du build standard n’est activé par cette livraison.
