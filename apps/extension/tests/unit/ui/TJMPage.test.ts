@@ -193,14 +193,14 @@ describe('TJM sample states', () => {
     subscribeMessages.mockReturnValue(() => {});
   });
 
-  it('keeps absent groups empty and formats fractional medians in French', async () => {
+  it('keeps absent groups empty and rounds fractional medians to whole euros', async () => {
     getTJMAnalysis.mockResolvedValue({ ...analysis, range: { min: 400, max: 601, median: 500.5 } });
     const target = document.createElement('div');
     const page = mount(TJMPage, { target });
     await tick();
     await flush();
     expect(target.querySelector('[data-testid="tjm-sample-median"]')?.textContent).toContain(
-      '500,5'
+      '501 €/j'
     );
     expect(target.textContent).toContain('Aucun tarif renseigné');
     expect(target.textContent).not.toMatch(/(?:^|\s)0 €\/j/);
