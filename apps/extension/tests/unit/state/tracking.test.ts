@@ -420,3 +420,40 @@ describe('tracking store', () => {
     }
   );
 });
+
+it('consumes committed broadcasts for external status changes, reminders and undo', () => {
+  const store = createTrackingStore();
+  const record = makeTracking({ nextActionAt: '2026-10-04T12:00:00.000Z' });
+  store.applyCommittedMessage({ type: 'TRACKING_UPDATED', payload: record });
+  expect(store.getTrackingForMission(record.missionId)).toEqual(record);
+  const updated = makeTracking({
+    currentStatus: 'application_prepared',
+    history: [
+      ...record.history,
+      { from: 'selected', to: 'application_prepared', timestamp: 1779436801000, note: null },
+    ],
+  });
+  store.applyCommittedMessage({ type: 'TRACKING_UPDATED', payload: updated });
+  expect(store.getTrackingForMission(record.missionId)?.currentStatus).toBe('application_prepared');
+  store.applyCommittedMessage({
+    type: 'TRACKING_RESTORED',
+    payload: { missionId: record.missionId, tracking: null },
+  });
+  expect(store.getTrackingForMission(record.missionId)).toBeUndefined();
+});
+
+it('preserves a committed reminder arriving during a slow canonical load', async () => {
+  let resolve!: (value: unknown) => void;
+  bridgeMock.sendMessage.mockReturnValueOnce(
+    new Promise((done) => {
+      resolve = done;
+    })
+  );
+  const store = createTrackingStore();
+  const loading = store.loadTrackings();
+  const updated = makeTracking({ nextActionAt: '2026-10-06T12:00:00.000Z' });
+  store.applyCommittedMessage({ type: 'TRACKING_UPDATED', payload: updated });
+  resolve({ type: 'TRACKINGS_RESULT', payload: [makeTracking()] });
+  await loading;
+  expect(store.getTrackingForMission(updated.missionId)).toEqual(updated);
+});

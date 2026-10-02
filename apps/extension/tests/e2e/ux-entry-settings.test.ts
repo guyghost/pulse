@@ -32,9 +32,12 @@ for (const width of [320, 400]) {
     await openSettingsSection(page, 'account');
     await expect(page.getByRole('heading', { name: 'Dans votre navigateur' })).toBeVisible();
     const cloud = page.getByRole('switch', { name: 'Activer la classification des missions' });
-    await expect(cloud).toHaveAttribute('aria-checked', 'false');
-    await expect(cloud).toBeDisabled();
+    await expect(cloud).toHaveAttribute('aria-checked', 'true');
+    await expect(cloud).toBeEnabled();
     await expect(page.getByText('Inactive — clé manquante')).toBeVisible();
+    await cloud.click();
+    await expect(cloud).toHaveAttribute('aria-checked', 'false');
+    await expect(page.getByText('Désactivée', { exact: true })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
       true
     );

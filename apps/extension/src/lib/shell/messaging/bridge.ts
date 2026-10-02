@@ -1,3 +1,5 @@
+import type { MissionFeedbackMap } from '../../core/feed/local-feedback';
+import type { SourceVerificationResult } from '../connectors/verify-source-session';
 import type { Mission } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
@@ -104,6 +106,14 @@ export type BridgeMessage =
       type: 'FEED_MISSIONS_PAGE_RESULT';
       payload: { missions: Mission[]; total: number; hasMore: boolean };
     }
+  | { type: 'GET_MISSION_FEEDBACK' }
+  | { type: 'MISSION_FEEDBACK_RESULT'; payload: MissionFeedbackMap }
+  | { type: 'MISSION_FEEDBACK_FAILED' }
+  | { type: 'SAVE_MISSION_FEEDBACK'; payload: MissionFeedbackMap }
+  | { type: 'MISSION_FEEDBACK_SAVED'; payload: { saved: boolean } }
+  | { type: 'VERIFY_SOURCE_SESSION'; payload: { sourceId: string } }
+  | { type: 'SOURCE_SESSION_RESULT'; payload: SourceVerificationResult }
+  | { type: 'CONFIRM_APPLICATION'; payload: { missionId: string } }
   | { type: 'GET_FEED_FAVORITES' }
   | { type: 'FEED_FAVORITES_RESULT'; payload: Record<string, number> }
   | { type: 'SAVE_FEED_FAVORITES'; payload: Record<string, number> }

@@ -11,6 +11,15 @@ import { addRecords, extractRecords } from '../../core/tjm-history/index';
 import { addObservations, extractObservations } from '../../core/tjm-history/observations';
 import { parseTJMHistory } from './tjm-schemas';
 
+/** Normalize external scrape timestamps in the shell before entering Core. */
+export function extractMissionObservations(missions: Mission[]) {
+  const dates = missions.map((mission) => {
+    const date = new Date(mission.scrapedAt);
+    return Number.isFinite(date.getTime()) ? date.toISOString() : null;
+  });
+  return extractObservations(missions, dates);
+}
+
 const STORAGE_KEY = 'tjm_history';
 
 /**
@@ -51,7 +60,8 @@ export const recordTJMFromMissions = (
     const history = await loadTJMHistory();
     const updated = addObservations(
       addRecords(history, extractRecords(missions, date)),
-      extractObservations(sourceMissions)
+      extractMissionObservations(sourceMissions),
+      Date.now()
     );
     await saveTJMHistory(updated);
     return updated;

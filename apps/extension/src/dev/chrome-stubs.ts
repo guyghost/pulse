@@ -1,10 +1,8 @@
+import { extractMissionObservations } from '$lib/shell/storage/tjm-history';
+import { getConnectorsMeta } from '$lib/shell/connectors/meta';
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 import { parseTJMHistory } from '$lib/shell/storage/tjm-schemas';
-import {
-  addObservations,
-  extractObservations,
-  analyzeTJMObservations,
-} from '$lib/core/tjm-history/observations';
+import { addObservations, analyzeTJMObservations } from '$lib/core/tjm-history/observations';
 import type { TJMFilters } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
@@ -28,6 +26,7 @@ import type {
   CopilotJobSnapshot,
 } from '$lib/shell/copilot/contracts';
 import { copilotCreditCost, renderCopilotDraft, type CopilotOperationKind } from '@pulse/domain';
+import { confirmApplicationTracking } from '$lib/core/tracking/application-intent';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
 import {
   createSerializedApplicationTrackingError,
@@ -1170,7 +1169,7 @@ function createChromeStubs() {
               type: 'TJM_ANALYSIS_RESULT',
               payload: {
                 analysis: analyzeTJMObservations(
-                  addObservations(history, extractObservations(missions)),
+                  addObservations(history, extractMissionObservations(missions), Date.now()),
                   (message.payload ?? {}) as TJMFilters,
                   new Date()
                 ),
@@ -1347,6 +1346,41 @@ function createChromeStubs() {
             }, 0);
             return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
           }
+          case 'VERIFY_SOURCE_SESSION': {
+            const payload = message.payload as { sourceId: string };
+            return {
+              type: 'SOURCE_SESSION_RESULT',
+              payload: {
+                sourceId: payload.sourceId,
+                status: getConnectorsMeta().some((source) => source.id === payload.sourceId)
+                  ? 'ready'
+                  : 'unavailable',
+              },
+            };
+          }
+          case 'GET_MISSION_FEEDBACK':
+            return {
+              type: 'MISSION_FEEDBACK_RESULT',
+              payload: readDevStorage('missionLocalFeedback', {}),
+            };
+          case 'SAVE_MISSION_FEEDBACK':
+            writeDevStorage('missionLocalFeedback', message.payload);
+            return { type: 'MISSION_FEEDBACK_SAVED', payload: { saved: true } };
+          case 'CONFIRM_APPLICATION': {
+            const payload = message.payload as { missionId: string };
+            const now = Date.now();
+            const all = readDevTrackings(now);
+            const existing =
+              all.find((tracking) => tracking.missionId === payload.missionId) ??
+              createTracking(payload.missionId, now);
+            const updated = confirmApplicationTracking(existing, now);
+            writeDevTrackings([
+              ...all.filter((tracking) => tracking.missionId !== updated.missionId),
+              updated,
+            ]);
+            emitRuntimeMessage({ type: 'TRACKING_UPDATED', payload: updated });
+            return { type: 'TRACKING_UPDATED', payload: updated };
+          }
           case 'GET_TRACKINGS': {
             const now = Date.now();
             const all = readDevTrackings(now);
@@ -1370,6 +1404,7 @@ function createChromeStubs() {
             }
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
+            emitRuntimeMessage({ type: 'TRACKING_UPDATED', payload: updated });
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'UPDATE_TRACKING_DETAILS': {
@@ -1388,6 +1423,7 @@ function createChromeStubs() {
             const updated: MissionTracking = { ...existing, nextActionAt };
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
+            emitRuntimeMessage({ type: 'TRACKING_UPDATED', payload: updated });
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'RESTORE_TRACKING': {
@@ -1400,12 +1436,20 @@ function createChromeStubs() {
                 return devTrackingFailure('restore', p.missionId, 'INVALID_RESTORE');
               }
               writeDevTrackings([...without, p.tracking]);
+              emitRuntimeMessage({
+                type: 'TRACKING_RESTORED',
+                payload: { missionId: p.missionId, tracking: p.tracking },
+              });
               return {
                 type: 'TRACKING_RESTORED',
                 payload: { missionId: p.missionId, tracking: p.tracking },
               };
             }
             writeDevTrackings(without);
+            emitRuntimeMessage({
+              type: 'TRACKING_RESTORED',
+              payload: { missionId: p.missionId, tracking: null },
+            });
             return {
               type: 'TRACKING_RESTORED',
               payload: { missionId: p.missionId, tracking: null },

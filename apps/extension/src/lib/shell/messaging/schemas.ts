@@ -699,6 +699,39 @@ const PlatformAccountOperationResultSchema = z.union([
  * Messages without payload use z.undefined() or z.unknown().
  */
 export const MessageSchemas = {
+  VERIFY_SOURCE_SESSION: z.object({
+    type: z.literal('VERIFY_SOURCE_SESSION'),
+    payload: z.object({ sourceId: z.string().min(1).max(128) }),
+  }),
+  SOURCE_SESSION_RESULT: z.object({
+    type: z.literal('SOURCE_SESSION_RESULT'),
+    payload: z.object({
+      sourceId: z.string().min(1).max(128),
+      status: z.enum(['ready', 'session-missing', 'unavailable']),
+    }),
+  }),
+  GET_MISSION_FEEDBACK: z.object({ type: z.literal('GET_MISSION_FEEDBACK') }),
+  MISSION_FEEDBACK_RESULT: z.object({
+    type: z.literal('MISSION_FEEDBACK_RESULT'),
+    payload: z
+      .record(z.string().min(1).max(256), z.enum(['relevant', 'off-target']))
+      .refine(maxBytes(120_000)),
+  }),
+  MISSION_FEEDBACK_FAILED: z.object({ type: z.literal('MISSION_FEEDBACK_FAILED') }),
+  SAVE_MISSION_FEEDBACK: z.object({
+    type: z.literal('SAVE_MISSION_FEEDBACK'),
+    payload: z
+      .record(z.string().min(1).max(256), z.enum(['relevant', 'off-target']))
+      .refine(maxBytes(120_000)),
+  }),
+  MISSION_FEEDBACK_SAVED: z.object({
+    type: z.literal('MISSION_FEEDBACK_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  CONFIRM_APPLICATION: z.object({
+    type: z.literal('CONFIRM_APPLICATION'),
+    payload: z.object({ missionId: z.string().min(1).max(256) }),
+  }),
   // Feed local data
   GET_FEED_MISSIONS: z.object({ type: z.literal('GET_FEED_MISSIONS') }),
   FEED_MISSIONS_RESULT: z.object({

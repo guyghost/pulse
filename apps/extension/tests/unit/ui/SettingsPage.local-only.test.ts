@@ -52,7 +52,7 @@ describe('SettingsPage with the connected surface disabled', () => {
     expect(copy).not.toContain('TJM, localisation et sessions ne sont pas transmis');
   });
 
-  it('keeps cloud off and exposes unknown verification after an unexpected key response', async () => {
+  it('keeps the persisted consent visible and editable after an unexpected key response', async () => {
     const original = chrome.runtime.sendMessage.bind(chrome.runtime);
     vi.spyOn(chrome.runtime, 'sendMessage').mockImplementation(async (message: unknown) => {
       if (
@@ -74,8 +74,10 @@ describe('SettingsPage with the connected surface disabled', () => {
     const cloud = target.querySelector(
       '[aria-label="Activer la classification des missions"]'
     ) as HTMLButtonElement;
-    expect(cloud.getAttribute('aria-checked')).toBe('false');
-    expect(cloud.disabled).toBe(true);
+    expect(cloud.getAttribute('aria-checked')).toBe('true');
+    cloud.click();
+    await vi.waitFor(() => expect(cloud.getAttribute('aria-checked')).toBe('false'));
+    expect(cloud.disabled).toBe(false);
     expect(target.querySelector('[role="alert"]')?.textContent).toContain('Impossible de vérifier');
   });
 });

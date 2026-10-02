@@ -52,7 +52,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   facade.ensureLinkedInHostPermission.mockResolvedValue(true);
   facade.importLinkedInProfile.mockResolvedValue({ imported: true, profile });
-  facade.getProfile.mockResolvedValue(null);
+  facade.getProfile.mockResolvedValue({ experiences: [] });
   facade.syncLinkedInProfileImport.mockResolvedValue({ imported: true, profile, addedCount: 1 });
 });
 
@@ -79,4 +79,30 @@ describe('grouped LinkedIn selection', () => {
     ]);
     expect(store.status).toBe('1 expérience validée et enregistrée.');
   });
+});
+
+it('keeps a successful import completed when profile refresh fails and prevents duplicate retry', async () => {
+  const store = createCvImportStore(vi.fn());
+  await store.extract();
+  facade.getProfile.mockRejectedValueOnce(new Error('read failed'));
+  await store.confirm();
+  expect(store.error).toBe('');
+  expect(store.status).toContain('1 expérience validée et enregistrée.');
+  expect(store.status).toContain('n’a pas pu être actualisé');
+  expect(store.draft).toBeNull();
+  expect(store.selected).toEqual([]);
+  await store.confirm();
+  expect(facade.syncLinkedInProfileImport).toHaveBeenCalledOnce();
+});
+it('keeps the draft retryable when the commit itself fails', async () => {
+  const store = createCvImportStore(vi.fn());
+  await store.extract();
+  facade.syncLinkedInProfileImport.mockResolvedValueOnce({
+    imported: false,
+    errorMessage: 'Save failed',
+  });
+  await store.confirm();
+  expect(store.error).toBe('Save failed');
+  expect(store.draft).not.toBeNull();
+  expect(store.selected).toEqual([0]);
 });

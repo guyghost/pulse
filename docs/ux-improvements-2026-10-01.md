@@ -60,3 +60,19 @@ Les commandes utilisent Node 22.23.1 et pnpm 10.32.1. Les logs finaux et capture
 La QA du 2 octobre confirme **65 parcours E2E ciblés**. Après le rétablissement de la navigation compacte, **8 parcours de navigation et d’entrée UX**, le typecheck de l’extension et son build passent. Les [captures finales de navigation](qa/extension-ux-2026-10-02/README.md) montrent les états à 320 et 400 px.
 
 Les contrôles du navigateur en mode développement utilisent les API Chrome et les plateformes simulées. Ils ne prouvent pas les sessions réelles des plateformes ou de LinkedIn, le fonctionnement d’une installation MV3, Gemini Nano, un service cloud, les notifications système ou l’impression PDF native. Le document HTML exporté est testé ; l’impression relève du navigateur. Aucun service connecté ou connecteur exclu du build standard n’est activé par cette livraison.
+
+## Retours de la PR #435 — 2 octobre 2026
+
+Les dix remarques de review ont été vérifiées et traitées :
+
+- Le consentement au service cloud reste visible et modifiable sans clé. L’état opérationnel demeure séparé ; une clé manquante ou non vérifiable n’est plus présentée comme un consentement désactivé.
+- Une préférence de notification choisie pendant l’onboarding prime sur une lecture tardive des réglages enregistrés.
+- Un import LinkedIn enregistré reste confirmé si la relecture du profil échoue. Le brouillon est clôturé et un avertissement invite à recharger le CV, sans proposer de réenregistrer l’import.
+- La confirmation d’une candidature prépare toutes les transitions en mémoire dans le worker et effectue une seule écriture finale. Un échec d’écriture ne laisse aucun statut intermédiaire enregistré.
+- Les statuts, relances et annulations enregistrés sont diffusés aux pages ouvertes. Le feed consomme ces mises à jour, y compris pendant un chargement initial lent.
+- Les retours locaux de pertinence et les vérifications de session passent par des messages typés. Les accès au stockage et aux connecteurs demeurent dans le service worker.
+- Le shell normalise les dates de collecte avant de les injecter dans le Core.
+- L’historique TJM conserve la dernière observation quotidienne de chaque annonce, jusqu’à 90 jours et 5 000 observations. Le budget UTF-8 de 2 Mo inclut les observations et les anciens agrégats ; les données anciennes sont retirées en priorité.
+- L’affichage TJM utilise les formateurs partagés : médianes, bornes et moyennes sont arrondies à l’euro.
+
+Les tests de régression couvrent les écritures échouées, les réponses tardives, la clôture de l’import, la synchronisation du suivi et les limites du stockage. La vérification Chromium couvre treize parcours ciblés à 320 et 400 px, dont Suivi → Missions → annulation. Les [captures de review](qa/extension-ux-2026-10-02/README.md) montrent le consentement cloud sans clé et l’affichage TJM actualisé.

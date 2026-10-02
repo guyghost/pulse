@@ -29,16 +29,19 @@ function announcementIdentity(mission: Mission): string {
 }
 
 /** The stored scrape date is the observation date, including on initial bootstrap. */
-export function extractObservations(missions: Mission[]): TJMObservation[] {
-  return missions.flatMap((mission) => {
-    const observedAt = new Date(mission.scrapedAt).getTime();
-    if (!Number.isFinite(observedAt)) {
+export function extractObservations(
+  missions: Mission[],
+  observationDates: readonly (string | null)[]
+): TJMObservation[] {
+  return missions.flatMap((mission, index) => {
+    const observedAt = observationDates[index];
+    if (!observedAt) {
       return [];
     }
     return [
       {
         identity: announcementIdentity(mission),
-        observedAt: new Date(observedAt).toISOString(),
+        observedAt,
         source: mission.source,
         stacks: [
           ...new Set(mission.stack.map((stack) => stack.trim().toLowerCase()).filter(Boolean)),
@@ -57,12 +60,61 @@ export function extractObservations(missions: Mission[]): TJMObservation[] {
   });
 }
 
-export function addObservations(history: TJMHistory, observations: TJMObservation[]): TJMHistory {
+export const TJM_RETENTION_DAYS = 90;
+export const TJM_MAX_OBSERVATIONS = 5_000;
+export const TJM_MAX_HISTORY_BYTES = 2_000_000;
+
+/** Retain recent daily snapshots within a fixed byte budget shared with legacy records. */
+export function addObservations(
+  history: TJMHistory,
+  observations: TJMObservation[],
+  nowMs: number
+): TJMHistory {
+  const cutoff = nowMs - TJM_RETENTION_DAYS * 86_400_000;
   const snapshots = new Map<string, TJMObservation>();
   for (const observation of [...(history.observations ?? []), ...observations]) {
-    snapshots.set(`${observation.identity}\n${observation.observedAt}`, observation);
+    const timestamp = Date.parse(observation.observedAt);
+    if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > nowMs) {
+      continue;
+    }
+    const key = `${observation.identity}\n${observation.observedAt.slice(0, 10)}`;
+    const previous = snapshots.get(key);
+    if (!previous || timestamp >= Date.parse(previous.observedAt)) {
+      snapshots.set(key, observation);
+    }
   }
-  return { ...history, observations: [...snapshots.values()] };
+  const encoder = new TextEncoder();
+  let remaining = TJM_MAX_HISTORY_BYTES - 64;
+  const retained = [...snapshots.values()]
+    .sort(
+      (a, b) => b.observedAt.localeCompare(a.observedAt) || b.identity.localeCompare(a.identity)
+    )
+    .slice(0, TJM_MAX_OBSERVATIONS)
+    .filter((observation) => {
+      const bytes = encoder.encode(JSON.stringify(observation)).byteLength + 1;
+      if (bytes > remaining) {
+        return false;
+      }
+      remaining -= bytes;
+      return true;
+    })
+    .reverse();
+  const records = [...history.records]
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .filter((record) => {
+      const timestamp = Date.parse(record.date);
+      if (!Number.isFinite(timestamp) || timestamp < cutoff || timestamp > nowMs) {
+        return false;
+      }
+      const bytes = encoder.encode(JSON.stringify(record)).byteLength + 1;
+      if (bytes > remaining) {
+        return false;
+      }
+      remaining -= bytes;
+      return true;
+    })
+    .reverse();
+  return { ...history, records, observations: retained };
 }
 
 function population(observations: TJMObservation[]): TJMPopulation {

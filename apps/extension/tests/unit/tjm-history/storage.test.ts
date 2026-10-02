@@ -2,11 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import { addRecords } from '../../../src/lib/core/tjm-history';
 import { deduplicateMissionsDetailed } from '../../../src/lib/core/scoring/dedup';
+import { analyzeTJMObservations } from '../../../src/lib/core/tjm-history/observations';
 import {
-  analyzeTJMObservations,
-  extractObservations,
-} from '../../../src/lib/core/tjm-history/observations';
-import {
+  extractMissionObservations as extractObservations,
   clearTJMHistory,
   loadTJMHistory,
   recordTJMFromMissions,
@@ -36,6 +34,7 @@ const mission: Mission = {
 };
 let stored: Record<string, unknown>;
 beforeEach(() => {
+  vi.spyOn(Date, 'now').mockReturnValue(new Date('2026-10-01T12:00:00Z').getTime());
   stored = {};
   vi.stubGlobal('chrome', {
     storage: {
@@ -134,8 +133,8 @@ describe('TJM history persistence', () => {
       range: { median: 600 },
       unknown: { category: 1, seniority: 1, remote: 0, region: 0 },
       sources: [
-        { source: 'lehibou', count: 1 },
         { source: 'free-work', count: 1 },
+        { source: 'lehibou', count: 1 },
       ],
     });
     expect(separate).toEqual(combined);

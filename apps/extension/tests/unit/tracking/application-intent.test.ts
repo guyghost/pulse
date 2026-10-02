@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import { applicationIntentPath } from '../../../src/lib/core/tracking/application-intent';
+import {
+  applicationIntentPath,
+  confirmApplicationTracking,
+} from '../../../src/lib/core/tracking/application-intent';
 import { createTracking, transitionStatus } from '../../../src/lib/core/tracking/transitions';
 import { executeApplicationIntent } from '../../../src/lib/shell/facades/application-intent';
 import type { ApplicationStatus, MissionTracking } from '../../../src/lib/core/types/tracking';
@@ -19,6 +22,10 @@ describe('explicit application intent', () => {
       }
       const store = {
         getTrackingForMission: () => record,
+        confirmApplication: vi.fn(async () => {
+          record = confirmApplicationTracking(record ?? createTracking('m', 1), 3);
+          return record;
+        }),
         transitionStatus: vi.fn(async (_id: string, target: ApplicationStatus) => {
           const next = transitionStatus(record ?? createTracking('m', 1), target, 3);
           if (!next) {
@@ -47,7 +54,11 @@ describe('explicit application intent', () => {
     }
   );
   it('does not change tracking after an opening failure', async () => {
-    const store = { getTrackingForMission: () => undefined, transitionStatus: vi.fn() };
+    const store = {
+      getTrackingForMission: () => undefined,
+      transitionStatus: vi.fn(),
+      confirmApplication: vi.fn(),
+    };
     await expect(
       executeApplicationIntent({
         missionId: 'm',
@@ -63,13 +74,15 @@ describe('explicit application intent', () => {
   it('stops and exposes a failed transition without claiming applied', async () => {
     const store = {
       getTrackingForMission: () => undefined,
-      transitionStatus: vi.fn(async () => {
+      transitionStatus: vi.fn(),
+      confirmApplication: vi.fn(async () => {
         throw new Error('persist failed');
       }),
     };
     await expect(
       executeApplicationIntent({ missionId: 'm', intent: 'confirm', store, openSource: vi.fn() })
     ).rejects.toThrow('persist failed');
-    expect(store.transitionStatus).toHaveBeenCalledTimes(1);
+    expect(store.confirmApplication).toHaveBeenCalledTimes(1);
+    expect(store.transitionStatus).not.toHaveBeenCalled();
   });
 });

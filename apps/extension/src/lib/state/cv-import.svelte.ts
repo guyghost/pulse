@@ -99,14 +99,20 @@ export function createCvImportStore(onSaved: (experiences: Experience[]) => void
         if (!result.imported) {
           throw new Error(result.errorMessage);
         }
-        // Read back the committed profile, including all unselected and manual entries.
-        const profile = await getProfile();
-        if (profile) {
-          onSaved(profile.experiences);
-        }
         status = `${selected.length} expérience${selected.length > 1 ? 's' : ''} validée${selected.length > 1 ? 's' : ''} et enregistrée${selected.length > 1 ? 's' : ''}.`;
         draft = null;
         selected = [];
+        // A refresh failure cannot turn a committed import into a failed save.
+        try {
+          const profile = await getProfile();
+          if (!profile) {
+            throw new Error('Missing committed profile');
+          }
+          onSaved(profile.experiences);
+        } catch {
+          status +=
+            ' L’affichage du profil n’a pas pu être actualisé. Rouvrez l’onglet CV pour le recharger.';
+        }
       } catch (cause) {
         error = cause instanceof Error ? cause.message : 'Impossible d’enregistrer l’import.';
       } finally {

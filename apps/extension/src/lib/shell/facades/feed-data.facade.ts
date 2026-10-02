@@ -199,4 +199,21 @@ export function subscribeToNotificationClicked(handler: () => void): () => void 
   };
 }
 
-export { getMissionFeedback, saveMissionFeedback } from '../storage/mission-feedback';
+export async function getMissionFeedback(): Promise<
+  import('../../core/feed/local-feedback').MissionFeedbackMap
+> {
+  const response = await sendMessage({ type: 'GET_MISSION_FEEDBACK' });
+  if (response.type !== 'MISSION_FEEDBACK_RESULT' || !validateMessage(response).valid) {
+    throw new Error('Impossible de charger les retours locaux.');
+  }
+  return response.payload;
+}
+
+export async function saveMissionFeedback(
+  feedback: import('../../core/feed/local-feedback').MissionFeedbackMap
+): Promise<void> {
+  const response = await sendMessage({ type: 'SAVE_MISSION_FEEDBACK', payload: feedback });
+  if (response.type !== 'MISSION_FEEDBACK_SAVED' || !response.payload.saved) {
+    throw new Error('Impossible d’enregistrer le retour local.');
+  }
+}

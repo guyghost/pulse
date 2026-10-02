@@ -311,6 +311,9 @@
   }
 
   function handleEvent(event: OnboardingFlowEvent) {
+    if (event.type === 'SET_NOTIFY') {
+      notificationChoiceHydrated = true;
+    }
     controller.send(event);
   }
 </script>

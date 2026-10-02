@@ -538,7 +538,8 @@ vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
   resetHealthSnapshot,
 }));
 
-vi.mock('../../../src/lib/shell/storage/tjm-history', () => ({
+vi.mock('../../../src/lib/shell/storage/tjm-history', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../../../src/lib/shell/storage/tjm-history')>()),
   loadTJMHistory,
   recordTJMFromMissions,
 }));
@@ -2825,14 +2826,14 @@ describe('background auto-scan notifications', () => {
         location: 'Lyon',
         remote: 'full',
         seniority: 'senior',
-        scrapedAt: new Date('2026-05-20T10:00:00Z'),
+        scrapedAt: new Date('2026-09-29T10:00:00Z'),
       }),
     ]);
     loadTJMHistory.mockResolvedValueOnce({
       records: [
         {
           stack: 'svelte',
-          date: '2026-05-21',
+          date: '2026-09-30',
           min: 700,
           max: 800,
           average: 750,
@@ -2842,7 +2843,7 @@ describe('background auto-scan notifications', () => {
         },
         {
           stack: 'react',
-          date: '2026-05-21',
+          date: '2026-09-30',
           min: 500,
           max: 600,
           average: 550,
@@ -2879,7 +2880,7 @@ describe('background auto-scan notifications', () => {
           priced: 1,
           withoutTjm: 0,
           range: { min: 700, max: 700, median: 700 },
-          lastUpdated: '2026-05-20T10:00:00.000Z',
+          lastUpdated: '2026-09-29T10:00:00.000Z',
           legacy: expect.objectContaining({ recordCount: 2 }),
         }),
       },
@@ -3359,6 +3360,39 @@ describe('background auto-scan notifications', () => {
       targetConsent: true,
     }));
     expect(restored).toMatchObject({ status: 'settled', outcome: { status: 'committed' } });
+  });
+
+  it('confirms an untracked application with one complete write and one committed broadcast', async () => {
+    getTracking.mockResolvedValueOnce(null);
+    const response = await dispatchBackgroundMessage<{ type: string; payload: MissionTracking }>({
+      type: 'CONFIRM_APPLICATION',
+      payload: { missionId: 'atomic-mission' },
+    });
+    expect(response.type).toBe('TRACKING_UPDATED');
+    expect(response.payload.currentStatus).toBe('applied');
+    expect(response.payload.history.map((event) => event.to)).toEqual([
+      'detected',
+      'selected',
+      'application_prepared',
+      'applied',
+    ]);
+    expect(saveTracking).toHaveBeenCalledTimes(1);
+    expect(saveTracking).toHaveBeenCalledWith(response.payload);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(response);
+  });
+  it('does not persist intermediate confirmation states when the single commit fails', async () => {
+    getTracking.mockResolvedValueOnce(null);
+    saveTracking.mockRejectedValueOnce(new Error('quota'));
+    const response = await dispatchBackgroundMessage<{ type: string }>({
+      type: 'CONFIRM_APPLICATION',
+      payload: { missionId: 'failed-atomic-mission' },
+    });
+    expect(response.type).toBe('TRACKING_FAILED');
+    expect(saveTracking).toHaveBeenCalledTimes(1);
+    expect(saveTracking.mock.calls[0][0].currentStatus).toBe('applied');
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'TRACKING_UPDATED' })
+    );
   });
 
   it('reports a truthful release non-admission when canonical storage rejects', async () => {

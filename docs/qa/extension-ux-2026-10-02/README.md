@@ -17,3 +17,11 @@ Les captures utilisent Chromium système, le serveur de développement et des do
 ## TJM sélectionné — 400 px
 
 ![Navigation avec TJM sélectionné à 400 px](navigation-tjm-400.png)
+
+## Vérification après les reviews de la PR #435
+
+Treize parcours Playwright ciblés passent après les correctifs : navigation, réglages cloud, onboarding, export CV, relances et suivi. Le changement de statut dans Suivi est immédiatement visible au retour dans Missions ; son annulation restaure aussi le badge. Le consentement cloud affiché reste modifiable sans clé.
+
+![Consentement cloud conservé avec service inactif sans clé — 400 px](review-cloud-consent-400.png)
+
+![Médiane arrondie et règles de conservation de l’échantillon TJM — 400 px](review-tjm-400.png)

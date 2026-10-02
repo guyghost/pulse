@@ -1,3 +1,4 @@
+import { extractMissionObservations } from '../lib/shell/storage/tjm-history';
 import {
   getProfile,
   saveProfile,
@@ -19,11 +20,7 @@ import type {
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
-import {
-  addObservations,
-  extractObservations,
-  analyzeTJMObservations,
-} from '../lib/core/tjm-history/observations';
+import { addObservations, analyzeTJMObservations } from '../lib/core/tjm-history/observations';
 import {
   getFeedSavedViews,
   getFeedSortBy,
@@ -112,6 +109,9 @@ import {
   getAllTrackings,
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
+import { checkSourceSession } from '../lib/shell/connectors/verify-source-session';
+import { getMissionFeedback, saveMissionFeedback } from '../lib/shell/storage/mission-feedback';
+import { confirmApplicationTracking } from '../lib/core/tracking/application-intent';
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
 import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
 import {
@@ -1569,7 +1569,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             type: 'TJM_ANALYSIS_RESULT',
             payload: {
               analysis: analyzeTJMObservations(
-                addObservations(history, extractObservations(missions)),
+                addObservations(history, extractMissionObservations(missions), Date.now()),
                 message.payload ?? {},
                 new Date()
               ),
@@ -2207,6 +2207,48 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'VERIFY_SOURCE_SESSION') {
+      checkSourceSession(message.payload.sourceId).then((result) => {
+        sendResponse({ type: 'SOURCE_SESSION_RESULT', payload: result });
+      });
+      return true;
+    }
+    if (message.type === 'GET_MISSION_FEEDBACK') {
+      getMissionFeedback()
+        .then((payload) => sendResponse({ type: 'MISSION_FEEDBACK_RESULT', payload }))
+        .catch(() => sendResponse({ type: 'MISSION_FEEDBACK_FAILED' }));
+      return true;
+    }
+    if (message.type === 'SAVE_MISSION_FEEDBACK') {
+      saveMissionFeedback(message.payload)
+        .then(() => sendResponse({ type: 'MISSION_FEEDBACK_SAVED', payload: { saved: true } }))
+        .catch(() => sendResponse({ type: 'MISSION_FEEDBACK_SAVED', payload: { saved: false } }));
+      return true;
+    }
+    if (message.type === 'CONFIRM_APPLICATION') {
+      const { missionId } = message.payload;
+      (async () => {
+        try {
+          const now = Date.now();
+          const previous = await getTracking(missionId);
+          const updated = confirmApplicationTracking(
+            previous ?? createTracking(missionId, now),
+            now
+          );
+          if (updated !== previous) {
+            await saveTracking(updated);
+          }
+          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_UPDATED', payload: updated })
+            .catch(() => {});
+        } catch {
+          sendResponse(trackingFailureMessage('transition', missionId, 'PERSIST_FAILED'));
+        }
+      })();
+      return true;
+    }
+
     // ── Tracking handlers ──
 
     if (message.type === 'UPDATE_TRACKING') {
@@ -2233,6 +2275,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
           await saveTracking(persisted);
           sendResponse({ type: 'TRACKING_UPDATED', payload: persisted });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_UPDATED', payload: persisted })
+            .catch(() => {});
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
           sendResponse(trackingFailureMessage('transition', missionId, 'PERSIST_FAILED'));
@@ -2269,6 +2314,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           const updated: MissionTracking = { ...tracking, nextActionAt: normalizedNextActionAt };
           await saveTracking(updated);
           sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_UPDATED', payload: updated })
+            .catch(() => {});
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
           sendResponse(trackingFailureMessage('details', missionId, 'PERSIST_FAILED'));
@@ -2292,6 +2340,12 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               type: 'TRACKING_RESTORED',
               payload: { missionId, tracking },
             });
+            chrome.runtime
+              .sendMessage({
+                type: 'TRACKING_RESTORED',
+                payload: { missionId, tracking: tracking },
+              })
+              .catch(() => {});
             return;
           }
 
@@ -2300,6 +2354,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             type: 'TRACKING_RESTORED',
             payload: { missionId, tracking: null },
           });
+          chrome.runtime
+            .sendMessage({ type: 'TRACKING_RESTORED', payload: { missionId, tracking: null } })
+            .catch(() => {});
         } catch (err) {
           console.error('[MissionPulse] RESTORE_TRACKING error:', err);
           sendResponse(trackingFailureMessage('restore', missionId, 'PERSIST_FAILED'));

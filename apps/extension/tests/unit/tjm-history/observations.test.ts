@@ -4,11 +4,18 @@ import type { TJMHistory, TJMObservation } from '../../../src/lib/core/types/tjm
 import {
   addObservations,
   analyzeTJMObservations,
-  extractObservations,
+  extractObservations as extractNormalizedObservations,
 } from '../../../src/lib/core/tjm-history/observations';
 import { addRecords } from '../../../src/lib/core/tjm-history';
 import { validateMessage } from '../../../src/lib/shell/messaging/schemas';
 
+const extractObservations = (missions: Mission[]) =>
+  extractNormalizedObservations(
+    missions,
+    missions.map((mission) =>
+      Number.isFinite(mission.scrapedAt.getTime()) ? mission.scrapedAt.toISOString() : null
+    )
+  );
 const now = new Date('2026-10-01T12:00:00Z');
 const observation = (
   identity: string,
@@ -222,7 +229,11 @@ describe('identifiable TJM observations', () => {
       legacy: { recordCount: 1, series: [{ date: '2026-09-30', average: 800 }] },
     });
     expect(empty.levels.every((level) => level.population.range === null)).toBe(true);
-    const inputWithUnknown = addObservations(input, [observation('unknown', { seniority: null })]);
+    const inputWithUnknown = addObservations(
+      input,
+      [observation('unknown', { seniority: null })],
+      now.getTime()
+    );
     expect(addRecords(inputWithUnknown, []).observations).toEqual(inputWithUnknown.observations);
     const result = analyzeTJMObservations(inputWithUnknown, {}, now);
     expect(
@@ -234,10 +245,11 @@ describe('identifiable TJM observations', () => {
   });
 
   it('upserts exact snapshots without losing legacy records or previous observations', () => {
-    const updated = addObservations(history(observation('a')), [
-      observation('a', { tjm: 900 }),
-      observation('b'),
-    ]);
+    const updated = addObservations(
+      history(observation('a')),
+      [observation('a', { tjm: 900 }), observation('b')],
+      now.getTime()
+    );
     expect(updated.observations).toHaveLength(2);
     expect(updated.observations?.[0].tjm).toBe(900);
   });
@@ -272,5 +284,37 @@ describe('identifiable TJM observations', () => {
         payload: { analysis: { ...analysis, range: { median: 0, min: 0, max: 0 } } },
       }).valid
     ).toBe(false);
+  });
+});
+
+describe('TJM retention', () => {
+  it('keeps only the latest daily snapshot and drops expired or future observations', () => {
+    const input = history(
+      observation('a', { observedAt: '2026-09-30T01:00:00.000Z', tjm: 400 }),
+      observation('a', { observedAt: '2026-09-30T18:00:00.000Z', tjm: 800 }),
+      observation('old', { observedAt: '2026-01-01T00:00:00.000Z' }),
+      observation('future', { observedAt: '2027-01-01T00:00:00.000Z' })
+    );
+    const result = addObservations(input, [], now.getTime());
+    expect(result.observations).toHaveLength(1);
+    expect(result.observations?.[0].tjm).toBe(800);
+    expect(input.observations).toHaveLength(4);
+  });
+  it('caps observation count and total UTF-8 bytes, including legacy records', () => {
+    const lots = Array.from({ length: 6_000 }, (_, i) => observation(String(i)));
+    const result = addObservations(history(), lots, now.getTime());
+    expect(result.observations?.length).toBeLessThanOrEqual(5_000);
+    const huge = lots.map((item) => ({ ...item, stacks: ['é'.repeat(10_000)] }));
+    const budgeted = addObservations(history(), huge, now.getTime());
+    expect(new TextEncoder().encode(JSON.stringify(budgeted)).byteLength).toBeLessThanOrEqual(
+      2_000_000
+    );
+    expect(budgeted.observations?.length).toBeGreaterThan(0);
+  });
+  it('takes the observation date exclusively from the injected normalized value', () => {
+    expect(
+      extractNormalizedObservations([mission()], ['2026-01-01T00:00:00.000Z'])[0].observedAt
+    ).toBe('2026-01-01T00:00:00.000Z');
+    expect(extractNormalizedObservations([mission()], [null])).toEqual([]);
   });
 });

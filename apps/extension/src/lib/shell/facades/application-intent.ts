@@ -7,6 +7,7 @@ export async function executeApplicationIntent(options: {
   store: {
     getTrackingForMission: (id: string) => MissionTracking | undefined;
     transitionStatus: (id: string, status: ApplicationStatus) => Promise<MissionTracking>;
+    confirmApplication: (id: string) => Promise<MissionTracking>;
   };
 }): Promise<boolean> {
   if (options.intent === 'open') {
@@ -16,8 +17,12 @@ export async function executeApplicationIntent(options: {
     options.store.getTrackingForMission(options.missionId)?.currentStatus ?? null,
     options.intent
   );
-  for (const status of path) {
-    await options.store.transitionStatus(options.missionId, status);
+  if (options.intent === 'confirm' && path.length) {
+    await options.store.confirmApplication(options.missionId);
+  } else {
+    for (const status of path) {
+      await options.store.transitionStatus(options.missionId, status);
+    }
   }
   return path.length > 0;
 }

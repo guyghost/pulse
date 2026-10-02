@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  verifySourceSession,
-  openSourceInNewTab,
+  checkSourceSession as verifySourceSession,
   type VerifySourceSessionDeps,
-} from '../../../src/lib/shell/onboarding/verify-source-session';
+} from '../../../src/lib/shell/connectors/verify-source-session';
+import { openSourceInNewTab } from '../../../src/lib/shell/onboarding/verify-source-session';
 import { createNetworkError } from '../../../src/lib/core/errors/app-error';
 
 function fakeConnector(

@@ -145,3 +145,42 @@ test.describe('applications pipeline', () => {
     ).resolves.toContain('GENERATE_ASSET');
   });
 });
+
+test('updates the already mounted Feed after a status change and undo in Applications', async ({
+  page,
+}) => {
+  await page.addInitScript(
+    ({ missionRow }) => {
+      localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([missionRow]));
+      localStorage.setItem(
+        '__missionpulse_dev_trackings',
+        JSON.stringify([
+          {
+            missionId: missionRow.id,
+            currentStatus: 'selected',
+            history: [
+              { from: null, to: 'detected', timestamp: 1779433200000, note: null },
+              { from: 'detected', to: 'selected', timestamp: 1779435000000, note: null },
+            ],
+            generatedAssetIds: [],
+            userRating: null,
+            notes: '',
+            nextActionAt: null,
+          },
+        ])
+      );
+    },
+    { missionRow: mission }
+  );
+  await page.goto(SIDE_PANEL);
+  const nav = page.getByRole('navigation', { name: 'Navigation principale' });
+  const card = page.getByRole('article', { name: /Mission Mission Svelte dashboard/ });
+  await expect(card.getByText('Sélectionnée', { exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Suivi', exact: true }).click();
+  await page.getByRole('button', { name: 'Préparée', exact: true }).click();
+  await expect(page.getByText('Statut: Préparée', { exact: true })).toBeVisible();
+  await nav.getByRole('button', { name: 'Missions', exact: true }).click();
+  await expect(card.getByText('Préparée', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Annuler', exact: true }).click();
+  await expect(card.getByText('Sélectionnée', { exact: true })).toBeVisible();
+});

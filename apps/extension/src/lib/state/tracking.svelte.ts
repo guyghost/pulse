@@ -25,6 +25,7 @@ export function createTrackingStore() {
   const trackings = new SvelteMap<string, MissionTracking>();
   let error = $state<ApplicationTrackingError | null>(null);
   let requiresCanonicalLoad = $state(false);
+  let pendingCommittedMessages: BridgeMessage[] = [];
 
   function protocolError(
     intent: ApplicationTrackingIntent,
@@ -95,6 +96,7 @@ export function createTrackingStore() {
    */
   async function loadTrackings(): Promise<readonly MissionTracking[]> {
     state = 'loading';
+    pendingCommittedMessages = [];
     error = null;
 
     try {
@@ -117,7 +119,11 @@ export function createTrackingStore() {
       }
       requiresCanonicalLoad = false;
       state = 'loaded';
-      return confirmed;
+      for (const message of pendingCommittedMessages) {
+        applyCommittedMessage(message);
+      }
+      pendingCommittedMessages = [];
+      return [...trackings.values()];
     } catch (cause) {
       const failure = normalizeFailure(cause, 'load', null);
       rememberFailure(failure);
@@ -155,6 +161,48 @@ export function createTrackingStore() {
       const failure = normalizeFailure(cause, 'transition', missionId);
       rememberFailure(failure);
       throw failure;
+    }
+  }
+
+  async function confirmApplication(missionId: string): Promise<MissionTracking> {
+    error = null;
+    try {
+      assertMutationCanStart('transition', missionId);
+      const response = await requestTracking(
+        { type: 'CONFIRM_APPLICATION', payload: { missionId } },
+        'transition',
+        missionId
+      );
+      if (response.type !== 'TRACKING_UPDATED' || response.payload.missionId !== missionId) {
+        throw protocolError('transition', missionId);
+      }
+      trackings.set(missionId, response.payload);
+      return response.payload;
+    } catch (cause) {
+      const failure = normalizeFailure(cause, 'transition', missionId);
+      rememberFailure(failure);
+      throw failure;
+    }
+  }
+
+  function applyCommittedMessage(message: BridgeMessage): void {
+    if (!validateMessage(message).valid) {
+      return;
+    }
+    if (
+      state === 'loading' &&
+      (message.type === 'TRACKING_UPDATED' || message.type === 'TRACKING_RESTORED')
+    ) {
+      pendingCommittedMessages.push(message);
+    }
+    if (message.type === 'TRACKING_UPDATED') {
+      trackings.set(message.payload.missionId, message.payload);
+    } else if (message.type === 'TRACKING_RESTORED') {
+      if (message.payload.tracking) {
+        trackings.set(message.payload.missionId, message.payload.tracking);
+      } else {
+        trackings.delete(message.payload.missionId);
+      }
     }
   }
 
@@ -255,6 +303,8 @@ export function createTrackingStore() {
     },
     loadTrackings,
     transitionStatus,
+    confirmApplication,
+    applyCommittedMessage,
     updateNextActionAt,
     restoreTracking,
     getTrackingForMission,

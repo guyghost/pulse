@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { TJMSampleAnalysis } from '$lib/core/types/tjm';
-  import { formatAbsoluteDate } from '$lib/core/utils/format';
+  import { formatAbsoluteDate, formatTJM, formatTJMRange } from '$lib/core/utils/format';
   const { analysis }: { analysis: TJMSampleAnalysis } = $props();
   const labels = {
     junior: 'Junior',
@@ -8,8 +8,6 @@
     senior: 'Senior',
     unknown: 'Expérience non renseignée',
   };
-  const price = (value: number) =>
-    new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 20 }).format(value);
   const dateLabel = (date: string) => formatAbsoluteDate(Date.parse(date), { style: 'medium' });
 </script>
 
@@ -27,7 +25,7 @@
         <div>
           <p class="text-caption text-text-muted">Médiane des TJM renseignés</p>
           <p class="mt-1 font-mono text-heading-lg" data-testid="tjm-sample-median">
-            {analysis.range ? `${price(analysis.range.median)} €/j` : '—'}
+            {analysis.range ? formatTJM(analysis.range.median) : '—'}
           </p>
           {#if !analysis.range}<p class="text-caption">Aucun tarif renseigné</p>{/if}
         </div>
@@ -44,13 +42,15 @@
     </p>
     {#if analysis.range}
       <p class="mt-1 text-caption text-text-muted">
-        Valeurs observées : {price(analysis.range.min)}–{price(analysis.range.max)} €/j.
+        Valeurs observées : {formatTJMRange(analysis.range.min, analysis.range.max)}.
       </p>
     {/if}
     <p class="mt-3 text-caption leading-5 text-text-muted">
       Une annonce compte une fois, même si elle est rescannée ou cite plusieurs technologies. Le TJM
       observé peut être le minimum de la fourchette annoncée ; ce n’est pas un tarif négocié. Cet
-      échantillon local ne représente pas tout le marché.
+      échantillon local ne représente pas tout le marché. L’historique conserve au maximum 90 jours
+      et 5 000 observations quotidiennes, dans la limite de stockage local (2 Mo). Les plus
+      anciennes observations sont retirées en premier.
     </p>
     {#if analysis.firstObservedAt && analysis.lastUpdated}
       <p class="mt-2 text-caption text-text-muted">
@@ -94,7 +94,7 @@
           </p>
           <p class="mt-2 font-mono text-meta">
             {level.population.range
-              ? `Médiane : ${price(level.population.range.median)} €/j`
+              ? `Médiane : ${formatTJM(level.population.range.median)}`
               : 'Aucun tarif renseigné'}
           </p>
         </div>
@@ -114,7 +114,7 @@
       </p>
       <ul class="mt-3 space-y-1 text-caption" aria-label="Moyennes historiques agrégées">
         {#each analysis.legacy.series as point (point.date)}
-          <li>{dateLabel(point.date)} : moyenne agrégée {price(point.average)} €/j</li>
+          <li>{dateLabel(point.date)} : moyenne agrégée {formatTJM(point.average)}</li>
         {/each}
       </ul>
     </details>

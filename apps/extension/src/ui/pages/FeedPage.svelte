@@ -1079,6 +1079,9 @@
     }
 
     const unsubscribe = subscribeMessages((message) => {
+      if (message.type === 'TRACKING_UPDATED' || message.type === 'TRACKING_RESTORED') {
+        tracking?.applyCommittedMessage(message);
+      }
       if (message.type === 'PROFILE_UPDATED') {
         showRefinementBanner = false;
       }

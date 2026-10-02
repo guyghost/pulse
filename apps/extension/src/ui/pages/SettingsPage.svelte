@@ -878,10 +878,8 @@
             </div>
           </div>
           <Toggle
-            checked={settings.cloudClassificationActive}
-            disabled={settings.isSavingSettings ||
-              !settings.settingsLoaded ||
-              !settings.aiGatewayKeyConfigured}
+            checked={settings.classificationEnabled}
+            disabled={settings.isSavingSettings || !settings.settingsLoaded}
             aria-label="Activer la classification des missions"
             onclick={() => settings.toggleClassification()}
           />
@@ -894,6 +892,11 @@
           description peuvent contenir un tarif, un lieu ou d’autres données de l’annonce. Les
           sessions et cookies ne sont pas ajoutés à l’envoi. La conservation des données est
           désactivée dans la requête.
+        </p>
+
+        <p class="mt-2 text-caption text-text-subtle">
+          L’interrupteur enregistre votre autorisation. Sans clé configurée, le service reste
+          inactif.
         </p>
 
         <div class="mt-2 flex items-center justify-between gap-2">
