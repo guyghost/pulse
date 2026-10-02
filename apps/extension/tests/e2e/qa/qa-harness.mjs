@@ -211,7 +211,9 @@ export async function injectSendMessageFailure(page, failTypes, errMsg = 'qa-inj
 export async function currentPage(page) {
   return await page.evaluate(() => {
     // There is no global hook; infer from the active nav button aria-pressed.
-    const btns = Array.from(document.querySelectorAll('nav[aria-label="Navigation principale"] button'));
+    const btns = Array.from(
+      document.querySelectorAll('nav[aria-label="Navigation principale"] button')
+    );
     const active = btns.find(
       (b) => b.getAttribute('aria-current') === 'page' || b.getAttribute('aria-pressed') === 'true'
     );
