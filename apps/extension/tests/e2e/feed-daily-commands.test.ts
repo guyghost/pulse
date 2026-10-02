@@ -161,7 +161,7 @@ test('failed opening and repeated clicks never record sending; failed confirmati
         counters.open++;
         return { type: 'EXTERNAL_URL_OPENED', payload: { opened: false } };
       }
-      if (message.type === 'UPDATE_TRACKING' && counters.transition === 0) {
+      if (message.type === 'CONFIRM_APPLICATION' && counters.transition === 0) {
         counters.transition++;
         return {
           type: 'TRACKING_FAILED',
@@ -199,6 +199,14 @@ test('failed opening and repeated clicks never record sending; failed confirmati
     page.getByText('Impossible d’enregistrer le nouveau statut.', { exact: true })
   ).toBeVisible();
   await expect(card.getByText('Envoyée', { exact: true })).toHaveCount(0);
+  const recordsAfterFailure = await page.evaluate(
+    async () => (await chrome.runtime.sendMessage({ type: 'GET_TRACKINGS' })).payload
+  );
+  const unchangedTracking = recordsAfterFailure.find(
+    (record: { missionId: string }) => record.missionId === 'daily-command-1'
+  );
+  expect(unchangedTracking.currentStatus).toBe('selected');
+  expect(unchangedTracking.history).toHaveLength(1);
   await expect(
     card.getByRole('button', { name: 'Passer le statut à J’ai envoyé ma candidature', exact: true })
   ).toBeEnabled();
