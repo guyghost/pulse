@@ -118,9 +118,12 @@
         </li>
         <li>
           <strong>Classification de missions (optionnelle)</strong> — uniquement si vous enregistrez
-          votre propre clé Vercel AI Gateway dans les paramètres, le titre, les technologies, le
-          mode de travail et la description (tronqués) des nouvelles missions sont envoyés à Vercel
-          AI Gateway pour être catégorisés. Votre profil n'est pas envoyé. La clé reste dans
+          votre propre clé Vercel AI Gateway dans les paramètres, le titre (200 caractères max), les
+          technologies, le mode de travail et la description (1 500 caractères max) des missions
+          enregistrées pas encore classées sont envoyés à Vercel AI Gateway pour être catégorisés,
+          jusqu'à 25 missions par scan par défaut (réglable de 0 à 100) ; cela peut inclure des
+          missions récupérées lors de scans précédents. Votre profil n'est pas envoyé. La clé reste
+          dans
           <code>chrome.storage.local</code>.
         </li>
       </ul>
@@ -216,9 +219,13 @@
 
       <ul>
         <li>
-          <strong>LeHibou</strong> — l'extension vérifie la présence de votre cookie de session LeHibou
-          et joint vos cookies LeHibou aux seules requêtes qu'elle envoie à l'API LeHibou, pour lire les
-          missions qui vous sont accessibles.
+          <strong>LeHibou</strong> — l'extension vérifie la présence de votre cookie de session
+          LeHibou puis joint les cookies du domaine lehibou.com (tous sous-domaines confondus) aux
+          seules requêtes qu'elle envoie à l'API LeHibou (<code>api.lehibou.com</code>), pour lire
+          les missions qui vous sont accessibles. Pour cela, l'en-tête Cookie est placé
+          temporairement dans une règle réseau dynamique (<code>declarativeNetRequest</code>)
+          supprimée après la requête et au redémarrage de l'extension ; si le navigateur
+          s'interrompt pendant un scan, cette règle peut subsister jusqu'au redémarrage suivant.
         </li>
         <li>
           <strong>LinkedIn</strong> (import déclenché par vous) — l'extension vérifie seulement la présence
@@ -228,12 +235,16 @@
           <strong>Cherry Pick</strong> — l'extension ne lit pas vos cookies ; comme lors d'une visite
           normale, le navigateur peut joindre vos cookies Cherry Pick aux requêtes envoyées à Cherry Pick.
         </li>
-        <li><strong>Free-Work</strong> et <strong>Hiway</strong> sont interrogés sans cookies.</li>
+        <li>
+          <strong>Hiway</strong> — aucune session n'est requise et l'extension ne lit pas de cookies ;
+          le navigateur peut joindre d'éventuels cookies existants du domaine Supabase de Hiway.
+        </li>
+        <li><strong>Free-Work</strong> — requêtes envoyées sans cookies.</li>
       </ul>
 
       <p>
-        Aucun cookie n'est envoyé à MissionPulse ni à un domaine autre que celui auquel il
-        appartient.
+        Aucun cookie n'est envoyé à MissionPulse ni à un service extérieur à la plateforme
+        concernée.
       </p>
 
       <p>
@@ -296,9 +307,12 @@
           transmis.
         </li>
         <li>
-          <strong>Pas de serveur MissionPulse</strong> — <code>copilot.missionpulse.app</code> est déclaré
-          dans le manifest mais n'est jamais contacté par la version 0.2.4. Aucun outil d'analytics ni
-          de télémétrie n'est intégré.
+          <strong>Pas de serveur MissionPulse</strong> — <code>copilot.missionpulse.app</code> est
+          déclaré dans le manifest. L'interface de la version 0.2.4 n'émet aucune requête vers ce
+          domaine ; le code de reprise ou de suppression du Copilot ne peut le contacter qu'avec une
+          session Copilot déjà ouverte (conservée dans <code>chrome.storage.session</code>, effacée
+          à la fermeture du navigateur), qui ne peut pas être créée dans la version 0.2.4. Aucun
+          outil d'analytics ni de télémétrie n'est intégré.
         </li>
       </ul>
 

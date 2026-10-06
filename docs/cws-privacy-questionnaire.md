@@ -42,11 +42,9 @@ revoir ce document avant soumission.
 ### `cookies`
 
 > Pour LeHibou, l'extension vérifie la présence du cookie de session LeHibou afin de savoir si
-> l'utilisateur est connecté, puis joint les cookies LeHibou aux seules requêtes qu'elle envoie
-> à l'API LeHibou pour lire les missions visibles par l'utilisateur. Pour l'import LinkedIn
+> l'utilisateur est connecté, puis joint les cookies du domaine lehibou.com aux seules requêtes qu'elle envoie à l'API LeHibou (api.lehibou.com) pour lire les missions visibles par l'utilisateur. Pour l'import LinkedIn
 > déclenché par l'utilisateur, elle vérifie uniquement la présence du cookie de session
-> LinkedIn. Les cookies ne sont jamais modifiés, stockés par l'extension, ni envoyés à un autre
-> domaine que celui auquel ils appartiennent.
+> LinkedIn. Les cookies ne sont jamais modifiés ni envoyés en dehors de la plateforme concernée. Pour LeHibou, l'en-tête Cookie est conservé temporairement dans une règle declarativeNetRequest dynamique, supprimée après la requête et au démarrage du service worker.
 
 ### `alarms`
 
@@ -67,13 +65,13 @@ revoir ce document avant soumission.
 
 ### `scripting`
 
-> Utilisé uniquement après un clic de l'utilisateur sur « Importer depuis LinkedIn » : exécute
-> un script d'extraction dans l'onglet LinkedIn actif pour lire les champs du profil (poste,
-> expériences, compétences) et pré-remplir le profil local de l'extension.
+> Utilisé après un clic de l'utilisateur sur « Importer depuis LinkedIn » : exécute un script d'extraction dans les onglets LinkedIn du profil (y compris un onglet de détail des expériences ouvert par l'extension) pour lire les champs du profil (poste, expériences, compétences) et pré-remplir le profil local de l'extension. Le code contient aussi une aide au remplissage de formulaires de candidature qui lit puis remplit, après validation, les champs du formulaire de l'onglet actif ; elle exige un compte MissionPulse et n'est pas accessible dans la version 0.2.4.
 
 ### `activeTab`
 
-> Limite l'import LinkedIn à l'onglet actif que l'utilisateur a choisi au moment de son clic.
+> Vérifiée par le flux d'import LinkedIn avant toute extraction, déclenchée par un clic de l'utilisateur. L'accès effectif aux pages LinkedIn repose sur la permission optionnelle https://www.linkedin.com/* accordée pendant ce geste.
+
+⚠️ `activeTab` est aujourd'hui seulement vérifiée (`ensureExtractionPermission()` dans `src/lib/shell/profile-extractors/linkedin.extractor.ts`). Elle ne limite pas réellement l'extraction à l'onglet actif, d'où un risque de permission jugée superflue. Voir § 7.
 
 ### `identity`
 
@@ -94,11 +92,9 @@ de rejet. Voir § 7.
 > lui-même charge ses missions ; l'extension l'interroge avec la clé anonyme publique de Hiway.
 > Ce n'est pas un serveur MissionPulse.
 > ai-gateway.vercel.sh : utilisé seulement si l'utilisateur enregistre sa propre clé Vercel AI
-> Gateway pour classer les missions (titre, technologies, mode de travail, description
-> tronquée ; profil jamais envoyé ; conservation désactivée).
+> Gateway pour classer les missions (titre limité à 200 caractères, technologies, mode de travail, description limitée à 1 500 caractères, pour les missions enregistrées pas encore classées, 25 par scan par défaut ; profil jamais envoyé ; conservation désactivée).
 > ai-gateway.vercel.app : domaine alternatif du même service, non appelé par la version 0.2.4.
-> copilot.missionpulse.app : API du module Copilot, désactivé dans la version 0.2.4 ; aucune
-> requête n'y est envoyée.
+> copilot.missionpulse.app : API du module Copilot, désactivé dans la version 0.2.4. L'interface n'y envoie aucune requête ; seul le code de reprise ou de suppression pourrait l'appeler avec une session Copilot déjà ouverte, qu'il est impossible de créer dans cette version.
 > www.linkedin.com (permission optionnelle) : demandée uniquement au moment où l'utilisateur
 > lance l'import de son profil LinkedIn.
 
@@ -118,7 +114,7 @@ de rejet. Voir § 7.
 
 Au sens du CWS, une donnée est « collectée » lorsqu'elle quitte l'appareil vers le développeur
 ou un tiers. Le profil, le CV, les missions et l'historique TJM restent dans les stockages
-locaux de l'extension. Aucun serveur MissionPulse n'est contacté, et il n'y a ni analytics ni
+locaux de l'extension. L'extension n'envoie aucune donnée à un serveur MissionPulse (voir la nuance Copilot au § 2), et il n'y a ni analytics ni
 télémétrie (`configureErrorHandler`/`monitoringUrl` n'est jamais configuré dans le build).
 
 | Catégorie CWS                           | Cocher             | Raison                                                                                                                                                                                                                            |
@@ -140,9 +136,7 @@ Si le dashboard demande une précision sur l'usage : « Fonctionnalité de l'app
 ## 5. Certifications (les trois cases à cocher)
 
 - [x] Je ne vends pas et ne transfère pas les données utilisateur à des tiers, en dehors des cas
-      d'utilisation approuvés. (Le seul transfert est l'envoi du contenu des annonces à Vercel
-      AI Gateway, sur action de l'utilisateur et avec sa propre clé, pour fournir la
-      classification.)
+      d'utilisation approuvés. (Transferts, tous nécessaires à la fonctionnalité : critères de recherche envoyés aux plateformes de missions ; cookies LeHibou renvoyés à l'API LeHibou ; noms de domaine des plateformes demandés au service de favicons Google ; et, uniquement avec la clé de l'utilisateur, contenu des annonces envoyé à Vercel AI Gateway pour la classification. Aucune donnée n'est vendue ni envoyée à MissionPulse.)
 - [x] Je n'utilise pas et ne transfère pas les données utilisateur à des fins sans rapport avec
       l'objectif unique de mon article.
 - [x] Je n'utilise pas et ne transfère pas les données utilisateur pour déterminer la solvabilité
@@ -172,5 +166,6 @@ Avant de coller cette URL, vérifier que la version publiée de la page correspo
    mais peut surprendre un réviseur.
 3. **Lecture de cookies tiers** (LeHibou) : à justifier comme ci-dessus. La politique de
    confidentialité doit le mentionner, ce qui est fait depuis la mise à jour du 2026-10-06.
-4. **Transfert à Vercel AI Gateway** : la description, la politique et la catégorie « Contenu
+4. **`activeTab` seulement vérifiée** : l'import LinkedIn repose en réalité sur la permission optionnelle `https://www.linkedin.com/*` ; `activeTab` peut être jugée superflue. Correctif : la retirer, ainsi que sa vérification, dans la prochaine version.
+5. **Transfert à Vercel AI Gateway** : la description, la politique et la catégorie « Contenu
    des sites Web » doivent rester cohérentes entre elles.
