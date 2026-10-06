@@ -18,8 +18,6 @@ export const EXPECTED_PERMISSIONS = [
   'notifications',
   'declarativeNetRequest',
   'scripting',
-  'activeTab',
-  'identity',
 ] as const;
 
 export const EXPECTED_INFRA_HOST_PERMISSIONS: readonly string[] =

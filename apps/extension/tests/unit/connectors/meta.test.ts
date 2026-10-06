@@ -3,6 +3,7 @@ import {
   getConnectorsMeta,
   getAllConnectorsMeta,
   filterConnectorsByIncluded,
+  getFormAssistMatches,
   ALL_CONNECTOR_IDS,
   type ConnectorMeta,
 } from '../../../src/lib/shell/connectors/meta';
@@ -89,5 +90,38 @@ describe('getConnectorsMeta', () => {
   it('returns the full catalog in test environment', () => {
     const meta = getConnectorsMeta();
     expect(meta.map((c) => c.id)).toEqual([...ALL_CONNECTOR_IDS]);
+  });
+});
+
+describe('getFormAssistMatches', () => {
+  it('never injects the Form Assistant on the Hiway Supabase API host', () => {
+    const hiway = getAllConnectorsMeta().find((c) => c.id === 'hiway');
+    expect(hiway?.hostPermissions).toContain('https://jhgjtlkfewuiiofxfrvh.supabase.co/*');
+    expect(getFormAssistMatches(hiway as ConnectorMeta)).toEqual(['https://hiway-missions.fr/*']);
+  });
+
+  it('only matches patterns the connector already holds as host permissions', () => {
+    for (const connector of getAllConnectorsMeta()) {
+      for (const pattern of getFormAssistMatches(connector)) {
+        expect(connector.hostPermissions).toContain(pattern);
+      }
+    }
+  });
+
+  it('defaults to hostPermissions and returns nothing without formAssist', () => {
+    const base: ConnectorMeta = {
+      id: 'free-work',
+      name: 'X',
+      icon: 'x',
+      url: 'https://x.test',
+      hostPermissions: ['https://x.test/*'],
+    };
+    expect(getFormAssistMatches(base)).toEqual([]);
+    expect(getFormAssistMatches({ ...base, formAssist: true })).toEqual(['https://x.test/*']);
+  });
+
+  it('keeps no API-only host in any Form Assistant match list', () => {
+    const matches = getAllConnectorsMeta().flatMap((c) => getFormAssistMatches(c));
+    expect(matches.some((m) => m.includes('supabase.co'))).toBe(false);
   });
 });

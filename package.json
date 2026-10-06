@@ -1,6 +1,6 @@
 {
   "name": "pulse",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "MissionPulse monorepo: Chrome extension, landing page, dashboard, and shared packages.",
   "private": true,
   "license": "MIT",

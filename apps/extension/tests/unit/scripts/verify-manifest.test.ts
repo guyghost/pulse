@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import {
+  ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS,
   parseArgs,
   validateLinkedInProfileImportPermissions,
   validateSchema,
@@ -49,7 +50,6 @@ const FULL_REAL_MANIFEST = {
     'notifications',
     'declarativeNetRequest',
     'scripting',
-    'activeTab',
   ],
   host_permissions: [
     'https://www.free-work.com/*',
@@ -443,7 +443,7 @@ describe('validateLinkedInProfileImportPermissions', () => {
     }
   });
 
-  it('should reject manifests missing activeTab, scripting, or optional LinkedIn access', () => {
+  it('should reject manifests missing scripting or optional LinkedIn access', () => {
     const result = validateLinkedInProfileImportPermissions({
       permissions: ['storage'],
       optional_host_permissions: [],
@@ -454,10 +454,24 @@ describe('validateLinkedInProfileImportPermissions', () => {
       expect(result.errors).toEqual(
         expect.arrayContaining([
           expect.stringContaining('"scripting"'),
-          expect.stringContaining('"activeTab"'),
           expect.stringContaining('https://www.linkedin.com/*'),
         ])
       );
+    }
+  });
+
+  it('should reject unused activeTab and identity permissions (0.2.5 Store cleanup)', () => {
+    const result = validateLinkedInProfileImportPermissions({
+      permissions: ['scripting', 'activeTab', 'identity'],
+      optional_host_permissions: ['https://www.linkedin.com/*'],
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toEqual([
+        expect.stringContaining('"identity"'),
+        expect.stringContaining('"activeTab"'),
+      ]);
     }
   });
 
@@ -531,7 +545,6 @@ describe('production release surfaces', () => {
     const storeListing = readFileSync(resolve(repoRoot, 'docs/store-listing.md'), 'utf-8');
 
     expect(storeListing).toContain('`scripting`');
-    expect(storeListing).toContain('`activeTab`');
     expect(storeListing).toContain('`optional_host_permissions`');
     expect(storeListing).toContain('`https://www.linkedin.com/*`');
     expect(storeListing).toMatch(/LinkedIn.*geste utilisateur/i);
@@ -675,29 +688,34 @@ describe('validateNoExcludedConnectorPatterns', () => {
     }
   });
 
-  it('keeps the owned Hiway Supabase host and the explicit MissionPulse API origin', () => {
+  it('keeps the owned Hiway Supabase host and the explicit AI Gateway origin', () => {
     const hiway = ALL.find(({ id }) => id === 'hiway');
     expect(hiway).toBeDefined();
 
     const result = validateNoExcludedConnectorPatterns(
       {
-        host_permissions: [...(hiway?.hostPermissions ?? []), 'https://copilot.missionpulse.app/*'],
+        host_permissions: [...(hiway?.hostPermissions ?? []), 'https://ai-gateway.vercel.sh/*'],
       },
       ALL,
       hiway ? [hiway] : [],
-      ['https://copilot.missionpulse.app/*']
+      ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS
     );
 
     expect(result.valid).toBe(true);
   });
 
-  it('declares the MissionPulse Copilot API origin in the source manifest', () => {
+  it('declares no unused Copilot, identity or alternate gateway surface in the source manifest', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
-    ) as { host_permissions?: string[] };
+    ) as { host_permissions?: string[]; permissions?: string[] };
 
-    expect(manifest.host_permissions ?? []).toContain('https://copilot.missionpulse.app/*');
+    expect(ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS).toEqual(['https://ai-gateway.vercel.sh/*']);
+    expect(manifest.host_permissions ?? []).toContain('https://ai-gateway.vercel.sh/*');
+    expect(manifest.host_permissions ?? []).not.toContain('https://copilot.missionpulse.app/*');
+    expect(manifest.host_permissions ?? []).not.toContain('https://ai-gateway.vercel.app/*');
     expect(manifest.host_permissions ?? []).not.toContain('https://missionpulse.app/*');
+    expect(manifest.permissions ?? []).not.toContain('identity');
+    expect(manifest.permissions ?? []).not.toContain('activeTab');
   });
 
   it('rejects a mandatory host pattern claimed by more than one connector', () => {
