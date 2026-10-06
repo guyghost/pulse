@@ -8,7 +8,7 @@
 
 MissionPulse collecte et traite les donnees suivantes pour faire fonctionner l'extension locale et, si vous connectez un compte MissionPulse, le dashboard connecte optionnel.
 
-> **Version 0.2.4 de l'extension (Chrome Web Store)** : elle ne propose pas la connexion d'un compte MissionPulse et n'envoie aucune donnee a un serveur MissionPulse. Les elements marques « compte connecte » ci-dessous ne s'appliquent qu'au site missionpulse.app et a une future version de l'extension.
+> **Version 0.2.5 de l'extension (Chrome Web Store)** : elle ne propose pas la connexion d'un compte MissionPulse et n'envoie aucune donnee a un serveur MissionPulse. Les elements marques « compte connecte » ci-dessous ne s'appliquent qu'au site missionpulse.app et a une future version de l'extension.
 
 - **Profil utilisateur** : prenom, intitule de poste, competences, TJM cible, preferences de remote et seniorite — renseignes lors de l'onboarding et dans les parametres.
 - **Missions** : titre, description, TJM, localisation, source, date de publication et metadonnees de scoring — extraites depuis les plateformes connectees.
@@ -35,7 +35,7 @@ Les donnees sont stockees via plusieurs mecanismes du navigateur :
 - **chrome.storage.local** : parametres, favoris, missions masquees, cache semantique local, cle Vercel AI Gateway facultative et autres donnees legeres.
 - **IndexedDB** : profil, missions scrapees, historique TJM, etats de connecteurs et donnees plus volumineuses.
 - **Stockage de session** : certains etats temporaires de scan ou d'interface peuvent etre gardes localement pendant l'execution.
-- **Supabase** (compte connecte, indisponible dans l'extension 0.2.4) : si vous connectez un compte MissionPulse, le dashboard peut synchroniser des snapshots normalisés via Supabase pour vos missions, candidatures, assets generes, CV canonique, conflits et statuts de synchronisation.
+- **Supabase** (compte connecte, indisponible dans l'extension 0.2.5) : si vous connectez un compte MissionPulse, le dashboard peut synchroniser des snapshots normalisés via Supabase pour vos missions, candidatures, assets generes, CV canonique, conflits et statuts de synchronisation.
 
 La suppression de l'extension entraine la suppression des donnees associees a son stockage local.
 Le dashboard fournit aussi des controles d'export et de suppression des donnees connectees.
@@ -76,9 +76,9 @@ Plateformes actuellement supportees :
 - **Hiway** (`hiway-missions.fr`)
 - **Cherry Pick** (`app.cherry-pick.io`)
 
-MissionPulse **ne modifie, ne cree et ne supprime aucun cookie utilisateur**. Dans la version 0.2.4 :
+MissionPulse **ne modifie, ne cree et ne supprime aucun cookie utilisateur**. Dans la version 0.2.5 :
 
-- **LeHibou** : l'extension verifie la presence de votre cookie de session LeHibou, puis joint les cookies du domaine lehibou.com (tous sous-domaines confondus) aux seules requetes qu'elle envoie a l'API LeHibou (`api.lehibou.com`), pour lire les missions qui vous sont accessibles. Pour cela, l'en-tete Cookie est place temporairement dans une regle reseau dynamique (`declarativeNetRequest`) supprimee apres la requete et au redemarrage de l'extension ; si le navigateur s'interrompt pendant un scan, cette regle peut subsister jusqu'au redemarrage suivant.
+- **LeHibou** : l'extension verifie la presence de votre cookie de session LeHibou, puis joint a la seule requete qui liste les missions (`https://api.lehibou.com/api/search/mission/list`) les cookies que votre navigateur enverrait lui-meme a cette adresse (portee de domaine, de chemin et attribut Secure respectes), pour lire les missions qui vous sont accessibles. Les autres cookies lehibou.com ne sont pas transmis. Pour cela, l'en-tete Cookie est place temporairement dans une regle reseau dynamique (`declarativeNetRequest`), limitee a cette adresse et supprimee apres la requete et au redemarrage de l'extension ; si le navigateur s'interrompt pendant un scan, cette regle peut subsister jusqu'au redemarrage suivant.
 - **LinkedIn** (import declenche par vous) : l'extension verifie seulement la presence du cookie de session LinkedIn.
 - **Cherry Pick** : l'extension ne lit pas vos cookies ; comme lors d'une visite normale, le navigateur peut joindre vos cookies Cherry Pick aux requetes envoyees a Cherry Pick.
 - **Hiway** : aucune session n'est requise et l'extension ne lit pas de cookies ; le navigateur peut joindre d'eventuels cookies existants du domaine Supabase de Hiway.
@@ -92,28 +92,27 @@ Nous ne synchronisons pas les mots de passe, cookies, jetons de session des plat
 
 ## 5. Permissions
 
-| Permission                | Utilisation                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `sidePanel`               | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres.       |
-| `storage`                 | Sauvegarde locale des preferences, caches et donnees de fonctionnement.                 |
-| `cookies`                 | Detection de session sur les plateformes supportees lorsque c'est necessaire.           |
-| `scripting` / `activeTab` | Import LinkedIn et assistance de formulaire declenches explicitement par l'utilisateur. |
-| `alarms`                  | Planification des cycles de scan automatiques a intervalles reguliers.                  |
-| `notifications`           | Alertes lors de la detection de nouvelles missions pertinentes.                         |
-| `declarativeNetRequest`   | Application de regles reseau temporaires necessaires a certains connecteurs.            |
-| `identity`                | Connexion future du Copilot au compte MissionPulse ; inutilisee dans l'extension 0.2.4. |
+| Permission              | Utilisation                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `sidePanel`             | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres.       |
+| `storage`               | Sauvegarde locale des preferences, caches et donnees de fonctionnement.                 |
+| `cookies`               | Detection de session sur les plateformes supportees lorsque c'est necessaire.           |
+| `scripting`             | Import LinkedIn et assistance de formulaire declenches explicitement par l'utilisateur. |
+| `alarms`                | Planification des cycles de scan automatiques a intervalles reguliers.                  |
+| `notifications`         | Alertes lors de la detection de nouvelles missions pertinentes.                         |
+| `declarativeNetRequest` | Application de regles reseau temporaires necessaires a certains connecteurs.            |
 
 ---
 
 ## 6. Services externes contactes
 
-MissionPulse peut communiquer directement depuis votre navigateur avec les domaines des plateformes supportees pour recuperer les missions, ainsi qu'avec les services strictement necessaires a leur fonctionnement selon les permissions declarees. Dans la version 0.2.4 :
+MissionPulse peut communiquer directement depuis votre navigateur avec les domaines des plateformes supportees pour recuperer les missions, ainsi qu'avec les services strictement necessaires a leur fonctionnement selon les permissions declarees. Dans la version 0.2.5 :
 
 - **Plateformes** : `www.free-work.com`, `*.lehibou.com`, `hiway-missions.fr`, `app.cherry-pick.io`, avec vos mots-cles de recherche.
 - **Supabase de Hiway** (`jhgjtlkfewuiiofxfrvh.supabase.co`) : API publique appartenant a Hiway, d'ou proviennent les missions Hiway. Ce n'est pas un serveur MissionPulse.
 - **Vercel AI Gateway** (`ai-gateway.vercel.sh`) : uniquement avec votre propre cle (section 3).
 - **Service de favicons Google** (`www.google.com/s2/favicons`) : affichage des icones des plateformes ; seul le nom de domaine de la plateforme est transmis.
-- **Pas de serveur MissionPulse** : `copilot.missionpulse.app` est declare dans le manifest. L'interface de la version 0.2.4 n'emet aucune requete vers ce domaine ; le code de reprise ou de suppression du Copilot ne peut le contacter qu'avec une session Copilot deja ouverte (conservee dans `chrome.storage.session`, effacee a la fermeture du navigateur), qui ne peut pas etre creee dans la version 0.2.4. Aucun outil d'analytics ni de telemetrie n'est integre.
+- **Pas de serveur MissionPulse** : l'extension 0.2.5 ne declare aucun domaine MissionPulse dans son manifest et n'envoie aucune requete a un serveur MissionPulse. Aucun outil d'analytics ni de telemetrie n'est integre.
 
 Aucun backend MissionPulse ne scrape les plateformes a votre place. Le dashboard connecte utilise Supabase uniquement pour stocker et synchroniser les donnees produit de votre compte.
 

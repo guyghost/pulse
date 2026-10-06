@@ -6,7 +6,11 @@ import manifest from './src/manifest.json';
 import { resolve } from 'path';
 import { readFileSync } from 'node:fs';
 import { resolveIncludedConnectors } from './scripts/resolve-connectors';
-import { getAllConnectorsMeta, ALL_CONNECTOR_IDS } from './src/lib/shell/connectors/meta';
+import {
+  getAllConnectorsMeta,
+  getFormAssistMatches,
+  ALL_CONNECTOR_IDS,
+} from './src/lib/shell/connectors/meta';
 
 /**
  * Build-time connector resolution.
@@ -62,9 +66,9 @@ function filterHostPermissions(
  * Build the Form Assistant content_scripts entries.
  *
  * The content script is injected ONLY on connectors flagged `formAssist: true`
- * (and included). Matches reuse the connector `hostPermissions` so the Form
- * Assistant host surface stays in sync with least-privilege filtering above —
- * there is no second hand-maintained match list.
+ * (and included). Matches come from getFormAssistMatches(): the connector
+ * `hostPermissions` by default, minus API-only hosts (e.g. Hiway's Supabase
+ * REST endpoint) declared through `formAssistMatches`.
  *
  * Returns an empty array when no Form-Assist connector ships, so the manifest
  * stays minimal. Source de vérité : src/models/form-assistant.model.md.
@@ -81,13 +85,10 @@ function buildFormAssistContentScripts(includedIds: readonly string[]): Array<{
   const includedSet = new Set(includedIds);
   const matches = new Set<string>();
   for (const connector of catalog) {
-    if (!connector.formAssist) {
-      continue;
-    }
     if (!includedSet.has(connector.id)) {
       continue;
     }
-    for (const pattern of connector.hostPermissions) {
+    for (const pattern of getFormAssistMatches(connector)) {
       matches.add(pattern);
     }
   }

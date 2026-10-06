@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MissionPulse",
-  "version": "0.2.4",
+  "version": "0.2.5",
   "description": "Agent freelance : feed de missions centralisé avec scoring et analyse TJM",
   "minimum_chrome_version": "114",
   "permissions": [
@@ -11,9 +11,7 @@
     "alarms",
     "notifications",
     "declarativeNetRequest",
-    "scripting",
-    "activeTab",
-    "identity"
+    "scripting"
   ],
   "host_permissions": [
     "https://www.free-work.com/*",
@@ -24,9 +22,7 @@
     "https://app.cherry-pick.io/*",
     "https://*.malt.fr/*",
     "https://*.malt.io/*",
-    "https://copilot.missionpulse.app/*",
-    "https://ai-gateway.vercel.sh/*",
-    "https://ai-gateway.vercel.app/*"
+    "https://ai-gateway.vercel.sh/*"
   ],
   "optional_host_permissions": ["https://www.linkedin.com/*"],
   "background": {

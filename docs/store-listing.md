@@ -1,7 +1,7 @@
 # Chrome Web Store — Fiche de publication
 
-Version de référence : **0.2.4**, build scellé au commit `fff1872c9d1544abc5e3c6d2957fd17ef8a0f028`
-(GitHub Release `v0.2.4`). Toute affirmation ci-dessous décrit le `manifest.json` et le bundle
+Version de référence : **0.2.5**, build scellé au commit `5eb7ab830a75a459aba8f02b1b22208706a5998e`
+(GitHub Release `v0.2.5`, `missionpulse.zip` SHA-256 `5e2c5321f9c799444851d5a90869ebda4814fd55823b543ada6c1a54767754f3`). Toute affirmation ci-dessous décrit le `manifest.json` et le bundle
 réellement livrés dans `missionpulse.zip`, pas le manifest source complet. Le brouillon des
 réponses au questionnaire de confidentialité du dashboard CWS est dans
 [`cws-privacy-questionnaire.md`](./cws-privacy-questionnaire.md).
@@ -82,7 +82,7 @@ serveur MissionPulse. Votre profil, votre CV, les missions et l'historique TJM
 restent dans les stockages locaux de l'extension.
 
 L'extension contacte directement depuis votre navigateur les 4 plateformes
-ci-dessus pour lire leurs missions, avec vos mots-clés de recherche. Pour LeHibou, elle lit vos cookies du domaine lehibou.com et les joint uniquement aux requêtes envoyées à l'API LeHibou, via une règle réseau temporaire supprimée après la requête (pour Cherry Pick, le navigateur joint vos cookies
+ci-dessus pour lire leurs missions, avec vos mots-clés de recherche. Pour LeHibou, elle ne lit que les cookies que votre navigateur enverrait lui-même à l'adresse de l'API LeHibou qui liste les missions (domaine, chemin et attribut Secure respectés) et les joint à cette seule requête, via une règle réseau temporaire supprimée après la requête (pour Cherry Pick, le navigateur joint vos cookies
 Cherry Pick aux seules requêtes vers Cherry Pick) ; aucun mot de passe, cookie ou jeton de session
 n'est transmis à MissionPulse ni à un autre service. MissionPulse ne stocke
 jamais vos identifiants de plateformes.
@@ -99,13 +99,13 @@ source ouvert sur GitHub.
 ## Éléments de langage (comms)
 
 À utiliser tels quels sur la landing, les réseaux et le support, pour rester
-aligné avec le build 0.2.4 :
+aligné avec le build 0.2.5 :
 
 - « 4 plateformes : Free-Work, LeHibou, Hiway, Cherry Pick. »
 - « Exécution dans votre navigateur, sans compte MissionPulse. »
 - « Aucune donnée envoyée à MissionPulse. Classification cloud uniquement avec votre propre clé Vercel AI Gateway. »
 - « Gemini Nano local quand Chrome le propose ; sinon scoring déterministe. »
-- À ne pas promettre pour 0.2.4 : compte, synchronisation, Copilot, génération de candidature
+- À ne pas promettre pour 0.2.5 : compte, synchronisation, Copilot, génération de candidature
   côté serveur, autres plateformes que les 4 ci-dessus, « 100 % hors ligne ».
 
 ---
@@ -125,47 +125,52 @@ aligné avec le build 0.2.4 :
 ## Permissions justifiées
 
 Statut : **défaut** = utilisé sans action particulière de l'utilisateur ; **opt-in** = seulement
-après une action ou un réglage explicite ; **inactif** = déclaré dans le manifest 0.2.4 mais
-aucun chemin du build ne l'atteint (voir « Risques de revue » plus bas).
+après une action ou un réglage explicite. Le manifest 0.2.5 ne déclare plus `activeTab` ni
+`identity`, ni les hosts `copilot.missionpulse.app` et `ai-gateway.vercel.app` (présents, sans
+usage, dans 0.2.4).
 
-| Permission              | Statut  | Justification                                                                                                                                                                                                                                                                                                                                                       |
-| ----------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `sidePanel`             | défaut  | Toute l'interface (feed, profil, CV, candidatures, TJM, paramètres) vit dans le panneau latéral Chrome.                                                                                                                                                                                                                                                             |
-| `storage`               | défaut  | Stockage local (`chrome.storage.local`) des paramètres, favoris, caches et de la clé AI Gateway facultative ; jamais synchronisé.                                                                                                                                                                                                                                   |
-| `cookies`               | défaut  | LeHibou : détecter la présence du cookie de session `rt` et joindre les cookies du domaine `lehibou.com` aux seules requêtes vers `api.lehibou.com` (en-tête placé temporairement dans une règle DNR dynamique, supprimée après la requête et au démarrage du service worker). LinkedIn (opt-in) : vérifier la présence du cookie `li_at` avant l'import du profil. |
-| `alarms`                | défaut  | Scan automatique périodique, digest quotidien et sondes de santé des connecteurs.                                                                                                                                                                                                                                                                                   |
-| `notifications`         | défaut  | Alertes pour les missions à haut score, digest quotidien et suggestion d'activer le scan automatique.                                                                                                                                                                                                                                                               |
-| `declarativeNetRequest` | défaut  | Règles dynamiques limitées aux domaines des plateformes : en-têtes `Origin`/`Referer` pour Free-Work et LeHibou, en-tête `Cookie` LeHibou pour les requêtes XHR de l'extension vers LeHibou. Aucune règle sur d'autres sites.                                                                                                                                       |
-| `scripting`             | opt-in  | Extraction DOM du profil LinkedIn dans l'onglet actif, après autorisation explicite et geste utilisateur.                                                                                                                                                                                                                                                           |
-| `activeTab`             | opt-in  | Vérifiée par l'import LinkedIn (`ensureExtractionPermission`). L'accès effectif repose sur la permission optionnelle LinkedIn : `activeTab` ne restreint pas réellement l'extraction (voir risques).                                                                                                                                                                |
-| `identity`              | inactif | Prévu pour la connexion du Copilot au compte MissionPulse via `chrome.identity.launchWebAuthFlow`. Le Copilot est désactivé à la compilation dans 0.2.4 et son panneau n'est pas affiché : aucun appel n'est possible.                                                                                                                                              |
+| Permission              | Statut | Justification                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| ----------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sidePanel`             | défaut | Toute l'interface (feed, profil, CV, candidatures, TJM, paramètres) vit dans le panneau latéral Chrome.                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `storage`               | défaut | Stockage local (`chrome.storage.local`) des paramètres, favoris, caches et de la clé AI Gateway facultative ; jamais synchronisé.                                                                                                                                                                                                                                                                                                                                                                                                |
+| `cookies`               | défaut | LeHibou : détecter la présence du cookie de session `rt`, puis joindre à la seule requête de liste des missions (`https://api.lehibou.com/api/search/mission/list`) les cookies que le navigateur enverrait lui-même à cette URL (portée domaine, chemin et `Secure` respectée, RFC 6265) ; en-tête placé temporairement dans une règle DNR dynamique limitée à cet endpoint, supprimée après la requête et au démarrage du service worker. LinkedIn (opt-in) : vérifier la présence du cookie `li_at` avant l'import du profil. |
+| `alarms`                | défaut | Scan automatique périodique, digest quotidien et sondes de santé des connecteurs.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| `notifications`         | défaut | Alertes pour les missions à haut score, digest quotidien et suggestion d'activer le scan automatique.                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `declarativeNetRequest` | défaut | Règles dynamiques limitées aux domaines des plateformes : en-têtes `Origin`/`Referer` pour Free-Work et LeHibou, en-tête `Cookie` LeHibou pour la seule requête de liste des missions vers `api.lehibou.com`. Aucune règle sur d'autres sites.                                                                                                                                                                                                                                                                                   |
+| `scripting`             | opt-in | Extraction DOM du profil LinkedIn dans les onglets LinkedIn du profil, après autorisation explicite (permission optionnelle LinkedIn) et geste utilisateur.                                                                                                                                                                                                                                                                                                                                                                      |
 
 ### Hosts (`host_permissions`, manifest livré)
 
-| Host                                         | Statut  | Justification                                                                                                                                                                                                                                                       |
-| -------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `https://www.free-work.com/*`                | défaut  | Lecture des missions Free-Work (API publique, sans cookies) ; script de contenu de l'assistant de formulaire.                                                                                                                                                       |
-| `https://*.lehibou.com/*`                    | défaut  | Lecture des missions LeHibou avec la session LeHibou de l'utilisateur ; script de contenu de l'assistant de formulaire.                                                                                                                                             |
-| `https://hiway-missions.fr/*`                | défaut  | Plateforme Hiway ; script de contenu de l'assistant de formulaire.                                                                                                                                                                                                  |
-| `https://jhgjtlkfewuiiofxfrvh.supabase.co/*` | défaut  | API REST Supabase **appartenant à Hiway** (clé anonyme publique du site Hiway) d'où proviennent les missions Hiway. Ce n'est pas un backend MissionPulse.                                                                                                           |
-| `https://app.cherry-pick.io/*`               | défaut  | Lecture des missions Cherry Pick ; script de contenu de l'assistant de formulaire.                                                                                                                                                                                  |
-| `https://ai-gateway.vercel.sh/*`             | opt-in  | Classification des missions par Vercel AI Gateway, uniquement si l'utilisateur enregistre sa propre clé.                                                                                                                                                            |
-| `https://ai-gateway.vercel.app/*`            | inactif | Domaine alternatif de Vercel AI Gateway ; le bundle 0.2.4 ne l'appelle jamais (le SDK utilise `ai-gateway.vercel.sh`).                                                                                                                                              |
-| `https://copilot.missionpulse.app/*`         | inactif | API du Copilot (domaine sans cookie). Désactivé à la compilation dans 0.2.4 : l'interface n'émet aucun appel. La reprise ou la suppression ne peut l'appeler qu'avec une session Copilot préexistante (`chrome.storage.session`), impossible à créer dans ce build. |
+| Host                                         | Statut | Justification                                                                                                                                                                                      |
+| -------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `https://www.free-work.com/*`                | défaut | Lecture des missions Free-Work (API publique, sans cookies) ; script de contenu de l'assistant de formulaire.                                                                                      |
+| `https://*.lehibou.com/*`                    | défaut | Lecture des missions LeHibou avec la session LeHibou de l'utilisateur ; script de contenu de l'assistant de formulaire.                                                                            |
+| `https://hiway-missions.fr/*`                | défaut | Plateforme Hiway ; script de contenu de l'assistant de formulaire.                                                                                                                                 |
+| `https://jhgjtlkfewuiiofxfrvh.supabase.co/*` | défaut | API REST Supabase **appartenant à Hiway** (clé anonyme publique du site Hiway) d'où proviennent les missions Hiway. Ce n'est pas un backend MissionPulse. Aucun script de contenu n'y est injecté. |
+| `https://app.cherry-pick.io/*`               | défaut | Lecture des missions Cherry Pick ; script de contenu de l'assistant de formulaire.                                                                                                                 |
+| `https://ai-gateway.vercel.sh/*`             | opt-in | Classification des missions par Vercel AI Gateway, uniquement si l'utilisateur enregistre sa propre clé.                                                                                           |
 
 | Permission optionnelle      | Statut | Justification                                                                                          |
 | --------------------------- | ------ | ------------------------------------------------------------------------------------------------------ |
 | `optional_host_permissions` | opt-in | `https://www.linkedin.com/*`, demandé uniquement pendant le geste utilisateur d'import du profil actif |
 
-Le script de contenu (`content_scripts`) est injecté sur les 4 plateformes (et, par construction,
-sur le host Supabase de Hiway). Il reste inerte tant que l'assistant de formulaire n'est pas activé
-dans les paramètres (désactivé par défaut).
+Le script de contenu (`content_scripts`) de l'assistant de formulaire est injecté uniquement sur
+les pages des 4 plateformes (`www.free-work.com`, `*.lehibou.com`, `hiway-missions.fr`,
+`app.cherry-pick.io`) ; depuis 0.2.5, le host d'API Supabase de Hiway n'en reçoit plus
+(`formAssistMatches` dans `apps/extension/src/lib/shell/connectors/meta.ts`). Il reste inerte tant
+que l'assistant de formulaire n'est pas activé dans les paramètres (désactivé par défaut).
 
-### Risques de revue identifiés pour 0.2.4
+### Risques de revue pour 0.2.5
 
-- `identity`, `https://copilot.missionpulse.app/*` et `https://ai-gateway.vercel.app/*` sont
-  déclarés mais inatteignables dans ce build. La politique CWS demande les permissions les plus
-  étroites possibles : la revue peut les refuser. Les retirer exige un changement du manifest,
-  donc une nouvelle version, un nouveau seal et un nouveau package.
-- Le script de contenu correspond aussi à `https://jhgjtlkfewuiiofxfrvh.supabase.co/*`, un host d'API sans formulaire.
-- `activeTab` est seulement vérifiée par l'import LinkedIn, qui fonctionne grâce à la permission optionnelle `https://www.linkedin.com/*` : la permission peut être jugée superflue.
+- Corrigés dans 0.2.5 (par rapport à 0.2.4) : `identity`, `activeTab`,
+  `https://copilot.missionpulse.app/*` et `https://ai-gateway.vercel.app/*` retirés du manifest
+  (Copilot fermé au build : le service worker n'instancie qu'un coordinateur désactivé) ; plus de
+  script de contenu sur le host d'API Supabase de Hiway ; cookies LeHibou limités à ceux en portée
+  de l'endpoint de liste des missions. `apps/extension/scripts/verify-manifest.ts` refuse désormais
+  `identity` et `activeTab` dans un build de release.
+- Risque résiduel : lecture de cookies tiers (LeHibou). Elle est nécessaire à la fonctionnalité,
+  limitée à la portée de l'API et transmise uniquement à LeHibou ; la justification doit rester
+  identique entre la fiche, le questionnaire et la politique de confidentialité.
+- Risque résiduel : transfert du contenu des annonces à Vercel AI Gateway (opt-in, clé
+  personnelle) ; la description, la politique et la catégorie « Contenu des sites Web » du
+  questionnaire doivent rester cohérentes.

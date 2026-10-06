@@ -25,23 +25,13 @@ describe('packaged MV3 manifest permission contract', () => {
         config: { include: ['free-work'] },
         env: {},
       })
-    ).toEqual([
-      'https://www.free-work.com/*',
-      'https://copilot.missionpulse.app/*',
-      'https://ai-gateway.vercel.sh/*',
-      'https://ai-gateway.vercel.app/*',
-    ]);
+    ).toEqual(['https://www.free-work.com/*', 'https://ai-gateway.vercel.sh/*']);
     expect(
       getExpectedHostPermissions({
         config: { include: ['free-work'] },
         env: { CONNECTORS_INCLUDE: 'lehibou' },
       })
-    ).toEqual([
-      'https://*.lehibou.com/*',
-      'https://copilot.missionpulse.app/*',
-      'https://ai-gateway.vercel.sh/*',
-      'https://ai-gateway.vercel.app/*',
-    ]);
+    ).toEqual(['https://*.lehibou.com/*', 'https://ai-gateway.vercel.sh/*']);
     expect(
       getExpectedHostPermissions({
         config: {},

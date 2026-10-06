@@ -162,6 +162,7 @@ import { createCopilotCheckpointRepository } from '../lib/shell/copilot/checkpoi
 import { createCopilotTransport } from '../lib/shell/copilot/transport';
 import { getCopilotOrigins, isCopilotRolloutEnabled } from '../lib/shell/copilot/config';
 import { createCopilotBridgeHandler } from '../lib/shell/copilot/background-handler';
+import { createDisabledCopilotCoordinator } from '../lib/shell/copilot/disabled-coordinator';
 import { generateAsset } from '../lib/shell/ai/mission-generator';
 import { generateFieldProposal } from '../lib/shell/form-assistant/local-generator';
 import { getFormAssistSettings, setFormAssistEnabled } from '../lib/shell/form-assistant/settings';
@@ -1367,23 +1368,42 @@ const settingsReleaseCoordinator = createSettingsReleaseCoordinator(
   createChromeSettingsReleasePorts(settingsReleaseScanPort)
 );
 
-const copilotOrigins = getCopilotOrigins();
-const copilotCoordinator = createCopilotCoordinator({
-  rolloutEnabled: isCopilotRolloutEnabled(),
-  identity: {
-    getRedirectURL: (path) => chrome.identity.getRedirectURL(path),
-    launchWebAuthFlow: (details) => chrome.identity.launchWebAuthFlow(details),
-  },
-  sessions: createCopilotSessionRepository(),
-  checkpoints: createCopilotCheckpointRepository(),
-  transport: createCopilotTransport(copilotOrigins),
-  getMissionById,
-  getProfile,
-  loadTJMHistory,
-  now: () => Date.now(),
-  randomUUID: () => crypto.randomUUID(),
-});
-const handleCopilotBridgeMessage = createCopilotBridgeHandler(copilotCoordinator);
+/**
+ * Copilot bridge. Release builds compile the rollout out
+ * (`VITE_COPILOT_ROLLOUT_ENABLED` unset), so the service worker wires the
+ * disabled coordinator: no `chrome.identity` call, no Copilot session or
+ * checkpoint read, no request to the Copilot API. The release manifest
+ * therefore declares neither `identity` nor `copilot.missionpulse.app`.
+ */
+function createCopilotBridge() {
+  if (!isCopilotRolloutEnabled()) {
+    return createCopilotBridgeHandler(createDisabledCopilotCoordinator());
+  }
+  const identityApi = (): typeof chrome.identity => {
+    if (!chrome.identity) {
+      throw new Error('chrome.identity is unavailable: the manifest must declare "identity".');
+    }
+    return chrome.identity;
+  };
+  return createCopilotBridgeHandler(
+    createCopilotCoordinator({
+      rolloutEnabled: true,
+      identity: {
+        getRedirectURL: (path) => identityApi().getRedirectURL(path),
+        launchWebAuthFlow: (details) => identityApi().launchWebAuthFlow(details),
+      },
+      sessions: createCopilotSessionRepository(),
+      checkpoints: createCopilotCheckpointRepository(),
+      transport: createCopilotTransport(getCopilotOrigins()),
+      getMissionById,
+      getProfile,
+      loadTJMHistory,
+      now: () => Date.now(),
+      randomUUID: () => crypto.randomUUID(),
+    })
+  );
+}
+const handleCopilotBridgeMessage = createCopilotBridge();
 
 async function requireSettingsReleaseSnapshot() {
   const result = await settingsReleaseCoordinator.read();

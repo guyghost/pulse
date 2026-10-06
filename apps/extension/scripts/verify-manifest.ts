@@ -85,12 +85,24 @@ const ManifestV3Schema = z.object({
 
 type ManifestV3 = z.infer<typeof ManifestV3Schema>;
 
-export const ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS = [
-  'https://copilot.missionpulse.app/*',
-  // Vercel AI Gateway — Jev mission classification (DAO #202).
-  'https://ai-gateway.vercel.sh/*',
-  'https://ai-gateway.vercel.app/*',
-] as const;
+/**
+ * Infrastructure hosts not owned by a connector. Keep this list to hosts the
+ * shipped build actually calls: the Chrome Web Store review rejects declared
+ * but unused host permissions.
+ *
+ * - `copilot.missionpulse.app` is intentionally absent: the Copilot rollout is
+ *   compiled out of release builds. Re-enabling it requires adding the host
+ *   (and the `identity` permission) back in the same change.
+ * - Only `ai-gateway.vercel.sh` is called by the AI SDK gateway provider
+ *   (BYOK Jev classification, DAO #202); `ai-gateway.vercel.app` is unused.
+ */
+export const ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS = ['https://ai-gateway.vercel.sh/*'] as const;
+
+/**
+ * Permissions the release manifest must never declare: they would be unused
+ * by the shipped build (see ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS).
+ */
+export const FORBIDDEN_RELEASE_PERMISSIONS = ['identity', 'activeTab'] as const;
 
 // Pure validation functions
 
@@ -142,8 +154,13 @@ export const validateLinkedInProfileImportPermissions = (
     errors.push('permissions must include "scripting" for user-triggered LinkedIn DOM extraction');
   }
 
-  if (!permissions.has('activeTab')) {
-    errors.push('permissions must include "activeTab" for active LinkedIn profile imports');
+  // `activeTab` is not needed: the optional `https://www.linkedin.com/*` host
+  // permission (requested from the side panel during the user gesture) lets the
+  // service worker read the LinkedIn tab URL and inject the extraction script.
+  for (const forbidden of FORBIDDEN_RELEASE_PERMISSIONS) {
+    if (permissions.has(forbidden)) {
+      errors.push(`permissions must not include "${forbidden}" (unused by the release build)`);
+    }
   }
 
   if (!optionalHostPermissions.has('https://www.linkedin.com/*')) {

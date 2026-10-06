@@ -3,14 +3,20 @@ import type { Mission } from '../../core/types/mission';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
 import { createMission, stripHtml } from '$lib/core/connectors/parser-utils';
-import { type RequestHeaderRuleHeader, injectCookieRule, removeCookieRule } from './cookie-rules';
+import {
+  type RequestHeaderRuleHeader,
+  injectUrlScopedCookieRule,
+  removeCookieRule,
+} from './cookie-rules';
 
 const API_BASE = 'https://api.lehibou.com/api';
 const MISSIONS_URL = `${API_BASE}/search/mission/list`;
 const COOKIE_DOMAIN = '.lehibou.com';
 const COOKIE_RULE_ID = 10;
 const REQUEST_DOMAIN = 'api.lehibou.com';
-const URL_FILTER = '|https://api.lehibou.com/api/';
+// The rule only exists while fetchMissions runs and only matches the mission
+// list endpoint — the single request issued inside that window.
+const URL_FILTER = `|${MISSIONS_URL}`;
 const ITEMS_PER_PAGE = 50;
 const LEHIBOU_HEADERS: RequestHeaderRuleHeader[] = [
   { header: 'Origin', value: 'https://www.lehibou.com' },
@@ -94,8 +100,11 @@ export class LeHibouConnector extends BaseConnector {
     signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>> {
     try {
-      await injectCookieRule(
-        COOKIE_DOMAIN,
+      // Forward only the cookies a browser would send to the mission list
+      // endpoint (domain/path/Secure scope of api.lehibou.com), never the
+      // whole lehibou.com jar.
+      await injectUrlScopedCookieRule(
+        MISSIONS_URL,
         URL_FILTER,
         COOKIE_RULE_ID,
         [REQUEST_DOMAIN],

@@ -77,7 +77,7 @@
       </p>
 
       <p>
-        <strong>Version 0.2.4 de l'extension (Chrome Web Store)</strong> : elle ne propose pas la connexion
+        <strong>Version 0.2.5 de l'extension (Chrome Web Store)</strong> : elle ne propose pas la connexion
         d'un compte MissionPulse et n'envoie aucune donnée à un serveur MissionPulse. Les éléments marqués
         « compte connecté » ci-dessous ne s'appliquent qu'au site missionpulse.app et à une future version
         de l'extension.
@@ -150,7 +150,7 @@
           être gardés localement pendant l'exécution.
         </li>
         <li>
-          <strong>Supabase</strong> (compte connecté, indisponible dans l'extension 0.2.4) — si vous connectez
+          <strong>Supabase</strong> (compte connecté, indisponible dans l'extension 0.2.5) — si vous connectez
           un compte MissionPulse, le dashboard peut synchroniser des snapshots normalisés via Supabase
           pour vos missions, candidatures, assets générés, CV canonique, conflits et statuts de synchronisation.
         </li>
@@ -214,18 +214,21 @@
 
       <p>
         MissionPulse ne modifie, ne crée et ne supprime aucun cookie utilisateur. Dans la version
-        0.2.4 :
+        0.2.5 :
       </p>
 
       <ul>
         <li>
           <strong>LeHibou</strong> — l'extension vérifie la présence de votre cookie de session
-          LeHibou puis joint les cookies du domaine lehibou.com (tous sous-domaines confondus) aux
-          seules requêtes qu'elle envoie à l'API LeHibou (<code>api.lehibou.com</code>), pour lire
-          les missions qui vous sont accessibles. Pour cela, l'en-tête Cookie est placé
-          temporairement dans une règle réseau dynamique (<code>declarativeNetRequest</code>)
-          supprimée après la requête et au redémarrage de l'extension ; si le navigateur
-          s'interrompt pendant un scan, cette règle peut subsister jusqu'au redémarrage suivant.
+          LeHibou puis joint à la seule requête qui liste les missions (<code
+            >https://api.lehibou.com/api/search/mission/list</code
+          >) les cookies que votre navigateur enverrait lui-même à cette adresse (portée de domaine,
+          de chemin et attribut Secure respectés), pour lire les missions qui vous sont accessibles.
+          Les autres cookies lehibou.com ne sont pas transmis. Pour cela, l'en-tête Cookie est placé
+          temporairement dans une règle réseau dynamique (<code>declarativeNetRequest</code>),
+          limitée à cette adresse et supprimée après la requête et au redémarrage de l'extension ;
+          si le navigateur s'interrompt pendant un scan, cette règle peut subsister jusqu'au
+          redémarrage suivant.
         </li>
         <li>
           <strong>LinkedIn</strong> (import déclenché par vous) — l'extension vérifie seulement la présence
@@ -262,7 +265,7 @@
         <dd>Sauvegarde locale des préférences, caches et données de fonctionnement.</dd>
         <dt>cookies</dt>
         <dd>Détection de session sur les plateformes supportées lorsque c'est nécessaire.</dd>
-        <dt>scripting / activeTab</dt>
+        <dt>scripting</dt>
         <dd>
           Import LinkedIn et assistance de formulaire déclenchés explicitement par l'utilisateur.
         </dd>
@@ -272,10 +275,6 @@
         <dd>Alertes lors de la détection de nouvelles missions pertinentes.</dd>
         <dt>declarativeNetRequest</dt>
         <dd>Application de règles réseau temporaires nécessaires à certains connecteurs.</dd>
-        <dt>identity</dt>
-        <dd>
-          Connexion future du Copilot au compte MissionPulse ; inutilisée dans l'extension 0.2.4.
-        </dd>
       </dl>
 
       <h2>6. Services externes contactés</h2>
@@ -283,7 +282,7 @@
       <p>
         MissionPulse peut communiquer directement depuis votre navigateur avec les domaines des
         plateformes supportées pour récupérer les missions, ainsi qu'avec les services strictement
-        nécessaires à leur fonctionnement selon les permissions déclarées. Dans la version 0.2.4 :
+        nécessaires à leur fonctionnement selon les permissions déclarées. Dans la version 0.2.5 :
       </p>
 
       <ul>
@@ -307,12 +306,9 @@
           transmis.
         </li>
         <li>
-          <strong>Pas de serveur MissionPulse</strong> — <code>copilot.missionpulse.app</code> est
-          déclaré dans le manifest. L'interface de la version 0.2.4 n'émet aucune requête vers ce
-          domaine ; le code de reprise ou de suppression du Copilot ne peut le contacter qu'avec une
-          session Copilot déjà ouverte (conservée dans <code>chrome.storage.session</code>, effacée
-          à la fermeture du navigateur), qui ne peut pas être créée dans la version 0.2.4. Aucun
-          outil d'analytics ni de télémétrie n'est intégré.
+          <strong>Pas de serveur MissionPulse</strong> — l'extension 0.2.5 ne déclare aucun domaine MissionPulse
+          dans son manifest et n'envoie aucune requête à un serveur MissionPulse. Aucun outil d'analytics
+          ni de télémétrie n'est intégré.
         </li>
       </ul>
 

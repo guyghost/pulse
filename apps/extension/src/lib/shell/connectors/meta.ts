@@ -19,6 +19,25 @@ export interface ConnectorMeta {
    * connectors. Source of truth: src/models/form-assistant.model.md.
    */
   formAssist?: boolean;
+  /**
+   * Page patterns where the Form Assistant content script runs. Defaults to
+   * `hostPermissions`; set it when a connector also owns an API-only host
+   * (no candidate form) that must keep its host permission for fetches but
+   * must not receive a content script.
+   */
+  formAssistMatches?: readonly string[];
+}
+
+/**
+ * Patterns where the Form Assistant content script is injected for a
+ * connector: none unless `formAssist` is set, otherwise `formAssistMatches`
+ * (falling back to `hostPermissions`). Consumed by vite.config.ts.
+ */
+export function getFormAssistMatches(connector: ConnectorMeta): readonly string[] {
+  if (!connector.formAssist) {
+    return [];
+  }
+  return connector.formAssistMatches ?? connector.hostPermissions;
 }
 
 /**
@@ -51,6 +70,8 @@ const CATALOG: readonly ConnectorMeta[] = [
     // Hiway-owned infra and must be dropped when Hiway is excluded.
     hostPermissions: ['https://hiway-missions.fr/*', 'https://jhgjtlkfewuiiofxfrvh.supabase.co/*'],
     formAssist: true,
+    // The Supabase host is a REST API (no form): fetch only, no content script.
+    formAssistMatches: ['https://hiway-missions.fr/*'],
   },
   {
     id: 'collective',
