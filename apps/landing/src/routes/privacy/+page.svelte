@@ -67,13 +67,20 @@
       <h1>Politique de confidentialité</h1>
 
       <p class="last-updated">
-        Dernière mise à jour : <time datetime="2026-07-30">30 juillet 2026</time>
-        (<span>2026-07-30</span>)
+        Dernière mise à jour : <time datetime="2026-10-06">6 octobre 2026</time>
+        (<span>2026-10-06</span>)
       </p>
 
       <p>
         MissionPulse collecte et traite les données suivantes pour faire fonctionner l'extension
         locale et, si vous connectez un compte MissionPulse, le dashboard connecté optionnel.
+      </p>
+
+      <p>
+        <strong>Version 0.2.5 de l'extension (Chrome Web Store)</strong> : elle ne propose pas la connexion
+        d'un compte MissionPulse et n'envoie aucune donnée à un serveur MissionPulse. Les éléments marqués
+        « compte connecté » ci-dessous ne s'appliquent qu'au site missionpulse.app et à une future version
+        de l'extension.
       </p>
 
       <h2>1. Données collectées</h2>
@@ -96,18 +103,28 @@
           vues, cache sémantique local, historique TJM et état des connecteurs.
         </li>
         <li>
-          <strong>Données synchronisées du dashboard</strong> — snapshots normalisés de missions, scores,
-          pipeline de candidature, assets générés, profil CV canonique, historique d'import et état de
-          synchronisation.
+          <strong>Données synchronisées du dashboard</strong> (compte connecté) — snapshots normalisés
+          de missions, scores, pipeline de candidature, assets générés, profil CV canonique, historique
+          d'import et état de synchronisation.
         </li>
         <li>
-          <strong>Liaisons multi-compte</strong> — plateforme, libellé choisi, compte actif et hash pseudonymisé
-          de la session détectée. Aucun cookie brut n'est synchronisé.
+          <strong>Liaisons multi-compte</strong> (compte connecté) — plateforme, libellé choisi, compte
+          actif et hash pseudonymisé de la session détectée. Aucun cookie brut n'est synchronisé.
         </li>
         <li>
           <strong>Assistance de formulaire</strong> — après consentement explicite, les champs autorisés
           et suggestions restent dans une session éphémère locale le temps de la revue. Ils ne sont pas
           envoyés au dashboard.
+        </li>
+        <li>
+          <strong>Classification de missions (optionnelle)</strong> — uniquement si vous enregistrez
+          votre propre clé Vercel AI Gateway dans les paramètres, le titre (200 caractères max), les
+          technologies, le mode de travail et la description (1 500 caractères max) des missions
+          enregistrées pas encore classées sont envoyés à Vercel AI Gateway pour être catégorisés,
+          jusqu'à 25 missions par scan par défaut (réglable de 0 à 100) ; cela peut inclure des
+          missions récupérées lors de scans précédents. Votre profil n'est pas envoyé. La clé reste
+          dans
+          <code>chrome.storage.local</code>.
         </li>
       </ul>
 
@@ -122,7 +139,7 @@
       <ul>
         <li>
           <strong>chrome.storage.local</strong> — paramètres, favoris, missions masquées, cache sémantique
-          local et autres données légères.
+          local, clé Vercel AI Gateway facultative et autres données légères.
         </li>
         <li>
           <strong>IndexedDB</strong> — profil, missions scrapées, historique TJM, états de connecteurs
@@ -133,9 +150,9 @@
           être gardés localement pendant l'exécution.
         </li>
         <li>
-          <strong>Supabase</strong> — si vous connectez un compte MissionPulse, le dashboard peut synchroniser
-          des snapshots normalisés via Supabase pour vos missions, candidatures, assets générés, CV canonique,
-          conflits et statuts de synchronisation.
+          <strong>Supabase</strong> (compte connecté, indisponible dans l'extension 0.2.5) — si vous connectez
+          un compte MissionPulse, le dashboard peut synchroniser des snapshots normalisés via Supabase
+          pour vos missions, candidatures, assets générés, CV canonique, conflits et statuts de synchronisation.
         </li>
       </ul>
 
@@ -145,7 +162,7 @@
         connectées.
       </p>
 
-      <h2>3. IA locale</h2>
+      <h2>3. IA locale et classification optionnelle</h2>
 
       <p>
         MissionPulse peut utiliser les capacités d'IA locales au navigateur, notamment
@@ -154,7 +171,16 @@
       </p>
 
       <ul>
-        <li>Aucune clé API externe n'est requise dans l'expérience actuelle de l'application.</li>
+        <li>
+          Aucune clé API externe n'est requise : les fonctions d'IA actives par défaut sont locales.
+        </li>
+        <li>
+          Exception optionnelle : si vous saisissez votre propre clé Vercel AI Gateway, la
+          classification des missions envoie le contenu des annonces décrit en section 1 à Vercel AI
+          Gateway, avec la conservation des données désactivée dans la requête. Sans clé, ce service
+          reste inactif. Le traitement par Vercel est régi par la politique de confidentialité de
+          Vercel.
+        </li>
         <li>Les scores sémantiques sont mis en cache localement pour limiter les recalculs.</li>
         <li>
           Si l'IA locale n'est pas disponible, l'application continue de fonctionner avec son
@@ -187,8 +213,41 @@
       </ul>
 
       <p>
-        MissionPulse ne modifie, ne crée et ne supprime aucun cookie utilisateur. Ces accès servent
-        uniquement au fonctionnement local de l'extension.
+        MissionPulse ne modifie, ne crée et ne supprime aucun cookie utilisateur. Dans la version
+        0.2.5 :
+      </p>
+
+      <ul>
+        <li>
+          <strong>LeHibou</strong> — l'extension vérifie la présence de votre cookie de session
+          LeHibou puis joint à la seule requête qui liste les missions (<code
+            >https://api.lehibou.com/api/search/mission/list</code
+          >) les cookies que votre navigateur enverrait lui-même à cette adresse (portée de domaine,
+          de chemin et attribut Secure respectés), pour lire les missions qui vous sont accessibles.
+          Les autres cookies lehibou.com ne sont pas transmis. Pour cela, l'en-tête Cookie est placé
+          temporairement dans une règle réseau dynamique (<code>declarativeNetRequest</code>),
+          limitée à cette adresse et supprimée après la requête et au redémarrage de l'extension ;
+          si le navigateur s'interrompt pendant un scan, cette règle peut subsister jusqu'au
+          redémarrage suivant.
+        </li>
+        <li>
+          <strong>LinkedIn</strong> (import déclenché par vous) — l'extension vérifie seulement la présence
+          du cookie de session LinkedIn.
+        </li>
+        <li>
+          <strong>Cherry Pick</strong> — l'extension ne lit pas vos cookies ; comme lors d'une visite
+          normale, le navigateur peut joindre vos cookies Cherry Pick aux requêtes envoyées à Cherry Pick.
+        </li>
+        <li>
+          <strong>Hiway</strong> — aucune session n'est requise et l'extension ne lit pas de cookies ;
+          le navigateur peut joindre d'éventuels cookies existants du domaine Supabase de Hiway.
+        </li>
+        <li><strong>Free-Work</strong> — requêtes envoyées sans cookies.</li>
+      </ul>
+
+      <p>
+        Aucun cookie n'est envoyé à MissionPulse ni à un service extérieur à la plateforme
+        concernée.
       </p>
 
       <p>
@@ -223,8 +282,35 @@
       <p>
         MissionPulse peut communiquer directement depuis votre navigateur avec les domaines des
         plateformes supportées pour récupérer les missions, ainsi qu'avec les services strictement
-        nécessaires à leur fonctionnement selon les permissions déclarées.
+        nécessaires à leur fonctionnement selon les permissions déclarées. Dans la version 0.2.5 :
       </p>
+
+      <ul>
+        <li>
+          <strong>Plateformes</strong> — <code>www.free-work.com</code>, <code>*.lehibou.com</code>,
+          <code>hiway-missions.fr</code>, <code>app.cherry-pick.io</code>, avec vos mots-clés de
+          recherche.
+        </li>
+        <li>
+          <strong>Supabase de Hiway</strong> (<code>jhgjtlkfewuiiofxfrvh.supabase.co</code>) — API
+          publique appartenant à Hiway, d'où proviennent les missions Hiway. Ce n'est pas un serveur
+          MissionPulse.
+        </li>
+        <li>
+          <strong>Vercel AI Gateway</strong> (<code>ai-gateway.vercel.sh</code>) — uniquement avec
+          votre propre clé (section 3).
+        </li>
+        <li>
+          <strong>Service de favicons Google</strong> (<code>www.google.com/s2/favicons</code>) —
+          affichage des icônes des plateformes ; seul le nom de domaine de la plateforme est
+          transmis.
+        </li>
+        <li>
+          <strong>Pas de serveur MissionPulse</strong> — l'extension 0.2.5 ne déclare aucun domaine MissionPulse
+          dans son manifest et n'envoie aucune requête à un serveur MissionPulse. Aucun outil d'analytics
+          ni de télémétrie n'est intégré.
+        </li>
+      </ul>
 
       <p>
         Aucun backend MissionPulse ne scrape les plateformes à votre place. Le dashboard connecté

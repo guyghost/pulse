@@ -76,11 +76,20 @@ d'issues n'est actif.
 ### Extension
 
 Les défauts de production sont compilés au build : le lien de compte utilise
-`https://missionpulse.app`, tandis que les appels Copilot bearer utilisent le domaine
-sans cookie `https://copilot.missionpulse.app`. Ce dernier est la seule `host_permission`
-Copilot de MissionPulse. Tout changement d'origine exige les variables de build
-`VITE_COPILOT_*_ORIGIN` correspondantes, une mise à jour du manifest, une vérification et
-une re-soumission au CWS.
+`https://missionpulse.app`, tandis que les appels Copilot bearer utiliseraient le domaine
+sans cookie `https://copilot.missionpulse.app`. Depuis 0.2.5, ni ce domaine ni la permission
+`identity` ne sont déclarés dans le manifest, puisque le Copilot est fermé au build. Le rouvrir
+exige de rajouter `identity` et `https://copilot.missionpulse.app/*` au manifest (et d'adapter
+`apps/extension/scripts/verify-manifest.ts`, qui les refuse aujourd'hui), les variables de build
+`VITE_COPILOT_*` correspondantes, une vérification et une re-soumission au CWS.
+
+Le Copilot reste fermé tant que `VITE_COPILOT_ROLLOUT_ENABLED` n'est pas exactement `true` au
+build (`apps/extension/src/lib/shell/copilot/config.ts`). Le job de seal ne définit pas cette
+variable : dans le package 0.2.5, `isCopilotRolloutEnabled()` est compilé en `return false`, la
+surface `connected` vaut `false` (`packages/domain/src/feature-flags.ts`), et le service worker
+n'instancie qu'un coordinateur désactivé
+(`apps/extension/src/lib/shell/copilot/disabled-coordinator.ts`) : aucun appel à
+`chrome.identity` ni au réseau Copilot n'est possible.
 
 ### Cache distant Turbo
 
@@ -239,12 +248,37 @@ La soumission, l'observation, la promotion en production et le rollback sont des
 
 ### Checklist du manifest
 
-- Version alignée avec `package.json` (actuellement `0.2.2`)
+- Version alignée avec `package.json` (actuellement `0.2.5`, scellée au commit
+  `5eb7ab830a75a459aba8f02b1b22208706a5998e`, GitHub Release `v0.2.5`)
 - `minimum_chrome_version` : `114`
 - Permissions : sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting
-- Host permissions : connecteurs de missions livrés + le projet Supabase configuré +
-  l'API Copilot sans cookie uniquement
+  (`activeTab` et `identity` retirées en 0.2.5 ; `apps/extension/scripts/verify-manifest.ts` les
+  refuse en release)
+- Host permissions du manifest **livré** (`apps/extension/src/manifest.json`, filtré au build par
+  `apps/extension/connectors.config.json`, qui exclut aujourd'hui deux connecteurs du catalogue
+  source) :
+  - plateformes livrées : `https://www.free-work.com/*`, `https://*.lehibou.com/*`,
+    `https://hiway-missions.fr/*`, `https://app.cherry-pick.io/*` ;
+  - `https://jhgjtlkfewuiiofxfrvh.supabase.co/*` : API Supabase **de Hiway** (connecteur Hiway,
+    `apps/extension/src/lib/shell/connectors/hiway.connector.ts`), pas un projet MissionPulse ;
+  - `https://ai-gateway.vercel.sh/*` : classification Jev via Vercel AI Gateway, active seulement
+    avec une clé personnelle saisie par l'utilisateur
+    (`apps/extension/src/lib/shell/ai/mission-classifier.ts`) ;
+  - `https://copilot.missionpulse.app/*` et `https://ai-gateway.vercel.app/*` : retirés en 0.2.5.
+- `content_scripts` (assistant de formulaire, désactivé par défaut) : limités aux pages des
+  4 plateformes livrées (`getFormAssistMatches` dans `apps/extension/src/lib/shell/connectors/meta.ts`) ;
+  aucun sur le host d'API Supabase de Hiway.
+- Cookies LeHibou : seule la requête de liste des missions reçoit, via une règle DNR limitée à cet
+  endpoint, les cookies en portée de son URL (`injectUrlScopedCookieRule` dans
+  `apps/extension/src/lib/shell/connectors/cookie-rules.ts`).
 - LinkedIn : `optional_host_permissions` uniquement
+- Fiche Store, justification de chaque permission/host et risques de revue :
+  [`docs/store-listing.md`](./store-listing.md). Brouillon du questionnaire de confidentialité CWS :
+  [`docs/cws-privacy-questionnaire.md`](./cws-privacy-questionnaire.md).
+- Risques de revue résiduels pour 0.2.5 : lecture des cookies LeHibou et transfert opt-in à
+  Vercel AI Gateway (détail dans `docs/store-listing.md`). Tout changement de permission exige une
+  nouvelle version, un nouveau seal et un nouveau package (ne jamais modifier le manifest d'un
+  candidat scellé).
 
 ### Tree-shaking du code dev
 
@@ -276,21 +310,21 @@ Les déploiements de preview utilisent `*.vercel.app` ; ajouter les URLs de redi
 - [ ] La maintenance des reçus rejette un bearer manquant/erroné, réussit avec le `CRON_SECRET` Vercel, et son dernier run réussi date de moins de 25 heures
 - [ ] `private.copilot_job_facts` est inaccessible à `anon` et `authenticated` ; aucune route publique de métriques Copilot n'existe
 - [ ] L'extension se charge dans Chrome ; le side panel s'ouvre ; un scan s'exécute sur une plateforme connectée
-- [ ] L'extension se synchronise avec Supabase (host permission pour l'URL du projet)
+- [ ] L'extension 0.2.5 ne contacte aucun serveur MissionPulse : seuls les 4 plateformes, le Supabase de Hiway, le service de favicons Google et, avec une clé utilisateur, Vercel AI Gateway apparaissent dans l'onglet réseau
 
 ---
 
 ## Manques connus (non bloquants pour le build)
 
-| Priorité | Élément                                                                                                | Propriétaire |
-| -------- | ------------------------------------------------------------------------------------------------------ | ------------ |
-| Haute    | Configurer les variables d'env Vercel (voir tables ci-dessus)                                          | Ops          |
-| Haute    | Projet Supabase de production + migrations (`apps/landing/supabase/migrations/`)                       | Ops          |
-| Haute    | URLs de redirection Supabase Auth : `https://missionpulse.app/api/auth/callback`                       | Ops          |
-| Haute    | Webhook Lemon Squeezy : `https://missionpulse.app/api/webhooks/lemon`                                  | Ops          |
-| Haute    | Secrets GitHub Chrome Web Store pour le workflow de release                                            | Ops          |
-| Moyenne  | URL Supabase en dur dans le manifest de l'extension — changer de projet exige code + re-soumission CWS | Dev          |
-| Basse    | CSP non configurée (s'appuyer sur les headers Vercel + défauts SvelteKit)                              | Dev          |
+| Priorité | Élément                                                                                                                | Propriétaire |
+| -------- | ---------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Haute    | Configurer les variables d'env Vercel (voir tables ci-dessus)                                                          | Ops          |
+| Haute    | Projet Supabase de production + migrations (`apps/landing/supabase/migrations/`)                                       | Ops          |
+| Haute    | URLs de redirection Supabase Auth : `https://missionpulse.app/api/auth/callback`                                       | Ops          |
+| Haute    | Webhook Lemon Squeezy : `https://missionpulse.app/api/webhooks/lemon`                                                  | Ops          |
+| Haute    | Secrets GitHub Chrome Web Store pour le workflow de release                                                            | Ops          |
+| Moyenne  | URL Supabase de Hiway en dur dans le manifest de l'extension — un changement côté Hiway exige code + re-soumission CWS | Dev          |
+| Basse    | CSP non configurée (s'appuyer sur les headers Vercel + défauts SvelteKit)                                              | Dev          |
 
 ---
 
