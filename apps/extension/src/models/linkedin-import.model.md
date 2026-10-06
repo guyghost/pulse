@@ -58,6 +58,14 @@ install), so the host permission must be requested from a UI context with a
 user gesture before the service worker can read the tab URL, read LinkedIn
 cookies, or inject the extraction script.
 
+Depuis la 0.2.5, le manifest ne déclare plus `activeTab` : la permission
+d'hôte optionnelle LinkedIn, une fois accordée, suffit à renseigner `tab.url`,
+à autoriser la vérification du cookie LinkedIn et à permettre
+`chrome.scripting.executeScript` sur les onglets LinkedIn (y compris l'onglet
+de détail des expériences ouvert en arrière-plan). `activeTab` n'apportait
+donc aucune capacité et constituait une permission inutilisée au regard de la
+revue Chrome Web Store.
+
 `chrome.permissions.request()` may only be called from a UI context (popup,
 side panel, options page) during a user gesture — never from the service
 worker. Requesting it from the SW (the old flow) always fails.

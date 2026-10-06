@@ -180,7 +180,7 @@ describe('LinkedInProfileExtractor', () => {
     const request = vi.fn(async () => true);
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
-        // scripting/activeTab (declared permissions) are contained; the LinkedIn
+        // scripting (declared permission) is contained; the LinkedIn
         // origin (optional_host_permissions) is not.
         contains: async (permissions) => Boolean(permissions.permissions?.length),
         request,
@@ -223,7 +223,7 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorCode(result)).toBe('profile_not_found');
   });
 
-  it('returns permission_required when scripting or activeTab is missing', async () => {
+  it('returns permission_required when scripting is missing', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
         contains: async () => false,

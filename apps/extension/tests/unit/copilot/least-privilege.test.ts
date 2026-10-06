@@ -18,7 +18,9 @@ describe('Copilot least-privilege boundary', () => {
     const manifest = JSON.parse(readFileSync(join(root, 'manifest.json'), 'utf8')) as {
       host_permissions?: string[];
     };
-    expect(manifest.host_permissions).toContain('https://copilot.missionpulse.app/*');
+    // 0.2.5: the Copilot rollout is compiled out of release builds, so its API
+    // host is not declared at all (Chrome Web Store least-privilege).
+    expect(manifest.host_permissions).not.toContain('https://copilot.missionpulse.app/*');
     expect(manifest.host_permissions).not.toContain('https://missionpulse.app/*');
 
     const copilotSources = sourceFiles(join(root, 'lib', 'shell', 'copilot'))

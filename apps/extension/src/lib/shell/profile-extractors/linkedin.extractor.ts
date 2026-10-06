@@ -445,7 +445,7 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     }
 
     const hasScriptApis = await this.chromeApi.permissions.contains({
-      permissions: ['scripting', 'activeTab'],
+      permissions: ['scripting'],
     });
     if (!hasScriptApis) {
       return false;

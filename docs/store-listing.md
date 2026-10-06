@@ -99,6 +99,5 @@ source ouvert sur GitHub.
 | `notifications`             | Alertes pour les missions à haut score                                                                 |
 | `declarativeNetRequest`     | Réécriture headers Origin/Referer pour les API cross-origin                                            |
 | `scripting`                 | Extraction DOM du profil LinkedIn après autorisation explicite                                         |
-| `activeTab`                 | Limite l'import LinkedIn à l'onglet actif choisi par l'utilisateur                                     |
 | `host_permissions`          | Accès aux 4 plateformes pour le scraping de missions                                                   |
 | `optional_host_permissions` | `https://www.linkedin.com/*`, demandé uniquement pendant le geste utilisateur d'import du profil actif |
