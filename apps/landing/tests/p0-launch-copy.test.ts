@@ -82,8 +82,8 @@ describe('P0 launch copy (Comex / Tor)', () => {
   });
 
   it('aligns the live privacy page date with docs/privacy-policy.md', () => {
-    expect(privacyPage).toContain('2026-07-30');
-    expect(privacyPage).toContain('datetime="2026-07-30"');
+    expect(privacyPage).toContain('2026-10-06');
+    expect(privacyPage).toContain('datetime="2026-10-06"');
     expect(privacyPage).not.toContain('Mai 2026');
   });
 });

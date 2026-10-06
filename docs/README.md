@@ -9,6 +9,7 @@
 - [Politique de confidentialité](./privacy-policy.md)
 - [Préparation open source](./open-source-readiness.md)
 - [Fiche store](./store-listing.md)
+- [Questionnaire de confidentialité CWS (brouillon 0.2.4)](./cws-privacy-questionnaire.md)
 - [Go-to-market](./go-to-market-missionpulse.md)
 - [Audit UX opérationnel](./operational-ux-audit.md)
 - [Design](./design/README.md)

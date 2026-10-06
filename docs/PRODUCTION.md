@@ -82,6 +82,12 @@ Copilot de MissionPulse. Tout changement d'origine exige les variables de build
 `VITE_COPILOT_*_ORIGIN` correspondantes, une mise à jour du manifest, une vérification et
 une re-soumission au CWS.
 
+Le Copilot reste fermé tant que `VITE_COPILOT_ROLLOUT_ENABLED` n'est pas exactement `true` au
+build (`apps/extension/src/lib/shell/copilot/config.ts`). Le job de seal ne définit pas cette
+variable : dans le package 0.2.4, `isCopilotRolloutEnabled()` est compilé en `return false`, la
+surface `connected` vaut `false` (`packages/domain/src/feature-flags.ts`), et ni
+`chrome.identity` ni `https://copilot.missionpulse.app` ne sont atteignables.
+
 ### Cache distant Turbo
 
 `turbo.json` `build.env` suit : `PUBLIC_CHROME_STORE_URL`, `PUBLIC_LANDING_URL`, `PUBLIC_SUPABASE_ANON_KEY`, `PUBLIC_SUPABASE_URL`.
@@ -239,12 +245,32 @@ La soumission, l'observation, la promotion en production et le rollback sont des
 
 ### Checklist du manifest
 
-- Version alignée avec `package.json` (actuellement `0.2.2`)
+- Version alignée avec `package.json` (actuellement `0.2.4`, scellée au commit
+  `fff1872c9d1544abc5e3c6d2957fd17ef8a0f028`, GitHub Release `v0.2.4`)
 - `minimum_chrome_version` : `114`
 - Permissions : sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting, activeTab, identity
-- Host permissions : connecteurs de missions livrés + le projet Supabase configuré +
-  l'API Copilot sans cookie uniquement
+- Host permissions du manifest **livré** (`apps/extension/src/manifest.json`, filtré au build par
+  `apps/extension/connectors.config.json`, qui exclut aujourd'hui deux connecteurs du catalogue
+  source) :
+  - plateformes livrées : `https://www.free-work.com/*`, `https://*.lehibou.com/*`,
+    `https://hiway-missions.fr/*`, `https://app.cherry-pick.io/*` ;
+  - `https://jhgjtlkfewuiiofxfrvh.supabase.co/*` : API Supabase **de Hiway** (connecteur Hiway,
+    `apps/extension/src/lib/shell/connectors/hiway.connector.ts`), pas un projet MissionPulse ;
+  - `https://ai-gateway.vercel.sh/*` : classification Jev via Vercel AI Gateway, active seulement
+    avec une clé personnelle saisie par l'utilisateur
+    (`apps/extension/src/lib/shell/ai/mission-classifier.ts`) ;
+  - `https://ai-gateway.vercel.app/*` : déclaré, jamais appelé par le bundle 0.2.4 ;
+  - `https://copilot.missionpulse.app/*` : API Copilot sans cookie, inatteignable en 0.2.4.
+- `content_scripts` (assistant de formulaire, désactivé par défaut) : mêmes matches que les hosts
+  des connecteurs livrés, y compris le host Supabase de Hiway.
 - LinkedIn : `optional_host_permissions` uniquement
+- Fiche Store, justification de chaque permission/host et risques de revue :
+  [`docs/store-listing.md`](./store-listing.md). Brouillon du questionnaire de confidentialité CWS :
+  [`docs/cws-privacy-questionnaire.md`](./cws-privacy-questionnaire.md).
+- Risque de revue connu pour 0.2.4 : `identity`, `copilot.missionpulse.app` et
+  `ai-gateway.vercel.app` sont déclarés sans usage atteignable. Les retirer exige une nouvelle
+  version, un nouveau seal et un nouveau package (ne jamais modifier le manifest d'un candidat
+  scellé).
 
 ### Tree-shaking du code dev
 
@@ -276,21 +302,22 @@ Les déploiements de preview utilisent `*.vercel.app` ; ajouter les URLs de redi
 - [ ] La maintenance des reçus rejette un bearer manquant/erroné, réussit avec le `CRON_SECRET` Vercel, et son dernier run réussi date de moins de 25 heures
 - [ ] `private.copilot_job_facts` est inaccessible à `anon` et `authenticated` ; aucune route publique de métriques Copilot n'existe
 - [ ] L'extension se charge dans Chrome ; le side panel s'ouvre ; un scan s'exécute sur une plateforme connectée
-- [ ] L'extension se synchronise avec Supabase (host permission pour l'URL du projet)
+- [ ] L'extension 0.2.4 ne contacte aucun serveur MissionPulse : seuls les 4 plateformes, le Supabase de Hiway, le service de favicons Google et, avec une clé utilisateur, Vercel AI Gateway apparaissent dans l'onglet réseau
 
 ---
 
 ## Manques connus (non bloquants pour le build)
 
-| Priorité | Élément                                                                                                | Propriétaire |
-| -------- | ------------------------------------------------------------------------------------------------------ | ------------ |
-| Haute    | Configurer les variables d'env Vercel (voir tables ci-dessus)                                          | Ops          |
-| Haute    | Projet Supabase de production + migrations (`apps/landing/supabase/migrations/`)                       | Ops          |
-| Haute    | URLs de redirection Supabase Auth : `https://missionpulse.app/api/auth/callback`                       | Ops          |
-| Haute    | Webhook Lemon Squeezy : `https://missionpulse.app/api/webhooks/lemon`                                  | Ops          |
-| Haute    | Secrets GitHub Chrome Web Store pour le workflow de release                                            | Ops          |
-| Moyenne  | URL Supabase en dur dans le manifest de l'extension — changer de projet exige code + re-soumission CWS | Dev          |
-| Basse    | CSP non configurée (s'appuyer sur les headers Vercel + défauts SvelteKit)                              | Dev          |
+| Priorité | Élément                                                                                                                             | Propriétaire |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------ |
+| Haute    | Configurer les variables d'env Vercel (voir tables ci-dessus)                                                                       | Ops          |
+| Haute    | Projet Supabase de production + migrations (`apps/landing/supabase/migrations/`)                                                    | Ops          |
+| Haute    | URLs de redirection Supabase Auth : `https://missionpulse.app/api/auth/callback`                                                    | Ops          |
+| Haute    | Webhook Lemon Squeezy : `https://missionpulse.app/api/webhooks/lemon`                                                               | Ops          |
+| Haute    | Secrets GitHub Chrome Web Store pour le workflow de release                                                                         | Ops          |
+| Moyenne  | URL Supabase de Hiway en dur dans le manifest de l'extension — un changement côté Hiway exige code + re-soumission CWS              | Dev          |
+| Moyenne  | Permissions sans usage atteignable en 0.2.4 (`identity`, `copilot.missionpulse.app`, `ai-gateway.vercel.app`) — risque de rejet CWS | Dev          |
+| Basse    | CSP non configurée (s'appuyer sur les headers Vercel + défauts SvelteKit)                                                           | Dev          |
 
 ---
 
