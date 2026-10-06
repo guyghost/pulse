@@ -541,6 +541,40 @@ describe('production release surfaces', () => {
     expect(privacyPolicy).toContain('privacy@missionpulse.app');
   });
 
+  it('discloses exactly the packaged permissions in the Store listing and privacy policy', () => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
+    ) as { permissions?: string[] };
+    const declared = new Set(manifest.permissions ?? []);
+    // Permission rows of the Markdown tables: first cell made of backticked
+    // API permission names (manifest keys such as `host_permissions` excluded).
+    const tablePermissions = (markdown: string): string[] =>
+      markdown
+        .split('\n')
+        .filter((line) => /^\|\s*`[A-Za-z]+`/.test(line))
+        .flatMap((line) => [...line.split('|')[1].matchAll(/`([A-Za-z]+)`/g)].map((m) => m[1]));
+    const storeListing = readFileSync(resolve(repoRoot, 'docs/store-listing.md'), 'utf-8');
+    const privacyPolicy = readFileSync(resolve(repoRoot, 'docs/privacy-policy.md'), 'utf-8');
+    const landingPrivacy = readFileSync(
+      resolve(repoRoot, 'apps/landing/src/routes/privacy/+page.svelte'),
+      'utf-8'
+    );
+    const landingPermissions = [...landingPrivacy.matchAll(/<dt>([^<]+)<\/dt>/g)].flatMap((m) =>
+      m[1].split('/').map((value) => value.trim())
+    );
+
+    for (const [label, listed] of [
+      ['store-listing.md', tablePermissions(storeListing)],
+      ['privacy-policy.md', tablePermissions(privacyPolicy)],
+      ['landing privacy page', landingPermissions],
+    ] as const) {
+      const undeclared = listed.filter((permission) => !declared.has(permission));
+      expect(undeclared, `${label} discloses undeclared permissions`).toEqual([]);
+      const missing = [...declared].filter((permission) => !listed.includes(permission));
+      expect(missing, `${label} omits declared permissions`).toEqual([]);
+    }
+  });
+
   it('discloses the user-triggered LinkedIn permission surface in the Store listing', () => {
     const storeListing = readFileSync(resolve(repoRoot, 'docs/store-listing.md'), 'utf-8');
 

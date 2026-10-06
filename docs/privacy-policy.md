@@ -73,15 +73,15 @@ Nous ne synchronisons pas les mots de passe, cookies, jetons de session des plat
 
 ## 5. Permissions
 
-| Permission                | Utilisation                                                                             |
-| ------------------------- | --------------------------------------------------------------------------------------- |
-| `sidePanel`               | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres.       |
-| `storage`                 | Sauvegarde locale des preferences, caches et donnees de fonctionnement.                 |
-| `cookies`                 | Detection de session sur les plateformes supportees lorsque c'est necessaire.           |
-| `scripting` / `activeTab` | Import LinkedIn et assistance de formulaire declenches explicitement par l'utilisateur. |
-| `alarms`                  | Planification des cycles de scan automatiques a intervalles reguliers.                  |
-| `notifications`           | Alertes lors de la detection de nouvelles missions pertinentes.                         |
-| `declarativeNetRequest`   | Application de regles reseau temporaires necessaires a certains connecteurs.            |
+| Permission              | Utilisation                                                                             |
+| ----------------------- | --------------------------------------------------------------------------------------- |
+| `sidePanel`             | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres.       |
+| `storage`               | Sauvegarde locale des preferences, caches et donnees de fonctionnement.                 |
+| `cookies`               | Detection de session sur les plateformes supportees lorsque c'est necessaire.           |
+| `scripting`             | Import LinkedIn et assistance de formulaire declenches explicitement par l'utilisateur. |
+| `alarms`                | Planification des cycles de scan automatiques a intervalles reguliers.                  |
+| `notifications`         | Alertes lors de la detection de nouvelles missions pertinentes.                         |
+| `declarativeNetRequest` | Application de regles reseau temporaires necessaires a certains connecteurs.            |
 
 ---
 

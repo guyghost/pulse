@@ -206,7 +206,7 @@
         <dd>Sauvegarde locale des préférences, caches et données de fonctionnement.</dd>
         <dt>cookies</dt>
         <dd>Détection de session sur les plateformes supportées lorsque c'est nécessaire.</dd>
-        <dt>scripting / activeTab</dt>
+        <dt>scripting</dt>
         <dd>
           Import LinkedIn et assistance de formulaire déclenchés explicitement par l'utilisateur.
         </dd>

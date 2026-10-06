@@ -241,7 +241,7 @@ La soumission, l'observation, la promotion en production et le rollback sont des
 
 - Version alignée avec `package.json` (actuellement `0.2.2`)
 - `minimum_chrome_version` : `114`
-- Permissions : sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting, activeTab, identity
+- Permissions : sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting
 - Host permissions : connecteurs de missions livrés + le projet Supabase configuré +
   l'API Copilot sans cookie uniquement
 - LinkedIn : `optional_host_permissions` uniquement
