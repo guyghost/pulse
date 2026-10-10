@@ -192,7 +192,7 @@ def compose_slide(
                 (CAPTION_X, subtitle_y + index * SUBTITLE_LINE),
                 line,
                 font=subtitle_font,
-                fill=INK,
+                fill=MUTED,
                 anchor="lt",
             )
     draw.text(NOTE_POS, NOTE, font=note_font, fill=MUTED, anchor="ls")
