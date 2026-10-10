@@ -674,6 +674,115 @@ async function preparePrivacy(panel: PanelDriver): Promise<void> {
   await panel.requireTextInView('Gemini Nano');
 }
 
+async function prepareLocalData(panel: PanelDriver): Promise<void> {
+  await dismissOverlays(panel);
+  await panel.clickNamed('Réglages');
+  await panel.waitForText('Exports et sécurité');
+  const expanded = await panel.attribute('#settings-trigger-data', 'aria-expanded');
+  if (expanded !== 'true') {
+    await panel.clickSelector('#settings-trigger-data');
+  }
+  await panel.waitForText('Une archive locale');
+  const framed = await panel.evaluate<{ ok: boolean; reason: string }>(`() => {
+    const textElement = (needle) => {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let node = walker.nextNode();
+      while (node) {
+        const value = node.textContent ?? '';
+        if (value.includes(needle) && node.parentElement && node.parentElement.childElementCount <= 4) {
+          return node.parentElement;
+        }
+        node = walker.nextNode();
+      }
+      return null;
+    };
+    const exportHeading = textElement('Préparer une shortlist');
+    const archiveLine = textElement('Une archive locale');
+    const backupButton = textElement('Créer une sauvegarde');
+    if (!exportHeading || !archiveLine || !backupButton) {
+      return { ok: false, reason: 'missing local-data copy' };
+    }
+    let scroller = exportHeading.parentElement;
+    while (scroller) {
+      const style = getComputedStyle(scroller);
+      if (/(auto|scroll)/.test(style.overflowY) && scroller.scrollHeight > scroller.clientHeight + 8) {
+        break;
+      }
+      scroller = scroller.parentElement;
+    }
+    if (!scroller) {
+      return { ok: false, reason: 'no scroller' };
+    }
+    const intersects = (element) => {
+      const rect = element.getBoundingClientRect();
+      const box = scroller.getBoundingClientRect();
+      const top = Math.max(rect.top, box.top);
+      const bottom = Math.min(rect.bottom, box.bottom, window.innerHeight);
+      return rect.height > 0 && bottom - top >= Math.min(rect.height - 1, 12) && rect.top < box.bottom - 2;
+    };
+    const forbidden = () => {
+      for (const needle of ['Indisponible', 'Gemini Nano']) {
+        const element = textElement(needle);
+        if (element && intersects(element)) {
+          return needle;
+        }
+      }
+      return '';
+    };
+    const exportTop =
+      exportHeading.getBoundingClientRect().top -
+      scroller.getBoundingClientRect().top +
+      scroller.scrollTop;
+    scroller.scrollTop = exportTop;
+    const start = scroller.scrollTop;
+    for (let delta = 0; delta <= 480; delta += 4) {
+      scroller.scrollTop = start + delta;
+      const bad = forbidden();
+      if (bad) {
+        scroller.scrollTop = start + Math.max(0, delta - 4);
+        break;
+      }
+      if (intersects(archiveLine) && intersects(backupButton) && intersects(exportHeading)) {
+        return { ok: true, reason: 'export and local archive' };
+      }
+    }
+    const bad = forbidden();
+    if (!bad && intersects(archiveLine) && intersects(backupButton)) {
+      const formats = textElement('Formats secondaires');
+      if (formats) {
+        const saved = scroller.scrollTop;
+        const formatsTop =
+          formats.getBoundingClientRect().top -
+          scroller.getBoundingClientRect().top +
+          scroller.scrollTop;
+        scroller.scrollTop = formatsTop;
+        if (intersects(archiveLine) && intersects(backupButton) && !forbidden()) {
+          return { ok: true, reason: 'export formats and local archive' };
+        }
+        scroller.scrollTop = saved;
+      }
+      return { ok: true, reason: 'local archive above the AI status' };
+    }
+    return {
+      ok: false,
+      reason: bad
+        ? 'AI status entered before the archive was visible'
+        : 'local archive is below this viewport',
+    };
+  }`);
+  console.log(`Local-data frame: ${framed.reason}`);
+  if (!framed.ok) {
+    throw new Error(`Could not frame local data without the AI status. ${framed.reason}`);
+  }
+  await panel.requireTextInView('archive locale');
+  await panel.requireTextInView('Créer une sauvegarde');
+  for (const forbidden of ['Indisponible', 'Gemini Nano']) {
+    if (await panel.textInView(forbidden)) {
+      throw new Error(`"${forbidden}" is inside the local-data frame.`);
+    }
+  }
+}
+
 const SCREENS: ScreenSpec[] = [
   { id: '01-feed', file: '01-feed.png', prepare: prepareFeed },
   { id: '01b-feed-scrolled', file: '01b-feed-scrolled.png', prepare: prepareFeedScrolled },
@@ -682,6 +791,7 @@ const SCREENS: ScreenSpec[] = [
   { id: '03b-sources', file: '03b-sources.png', prepare: prepareSources },
   { id: '04-alerts', file: '04-alerts.png', prepare: prepareAlerts },
   { id: '05-local-privacy', file: '05-local-privacy.png', prepare: preparePrivacy },
+  { id: '05b-local-privacy', file: '05b-local-privacy.png', prepare: prepareLocalData },
 ];
 
 async function main(): Promise<void> {
