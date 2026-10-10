@@ -557,7 +557,7 @@ async function prepareDetail(panel: PanelDriver): Promise<void> {
 async function prepareFilters(panel: PanelDriver): Promise<void> {
   await dismissOverlays(panel);
   await panel.clickNamed('Profil');
-  await panel.waitForText('Bonjour Exemple');
+  await panel.waitForText('Bonjour Alex');
   await panel.resetScroll();
   await panel.waitForText('Remote');
   await panel.requireTextInView('Remote');

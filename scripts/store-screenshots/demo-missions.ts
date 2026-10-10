@@ -195,7 +195,7 @@ export function loadDemoCatalogue(): DemoCatalogue {
     '';
 
   const profile: UserProfile = {
-    firstName: 'Exemple',
+    firstName: 'Alex',
     keywords: keywords.slice(0, 40),
     tjmMin,
     tjmMax: null,
