@@ -53,12 +53,14 @@ class BrowserCdp {
       if (message.id === undefined) {
         return;
       }
-      const resolve = this.#pending.get(message.id);
-      if (!resolve) {
+      const onResponse = this.#pending.get(message.id);
+      // The id comes from the local DevTools socket. Only call a callback this
+      // driver stored; CodeQL treats map.get(remote id)() as a dynamic call.
+      if (typeof onResponse !== 'function') {
         return;
       }
       this.#pending.delete(message.id);
-      resolve(message);
+      onResponse(message);
     });
   }
 
