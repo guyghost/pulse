@@ -234,20 +234,36 @@ def main() -> int:
     note_font = inter(13, 400)
     title_font = inter(28, 600)
 
-    FINAL_DIR.mkdir(parents=True, exist_ok=True)
-    slides: list[Image.Image] = []
-    mismatch = False
-
+    checked: list[tuple[dict[str, object], Path]] = []
+    mismatches: list[str] = []
     for spec in SLIDES:
         filename = str(spec["file"])
         source = PANEL_DIR / filename
-        digest = sha256(source)
         prefix = EXPECTED_INPUT_PREFIXES[filename]
-        status = "MATCH" if digest.startswith(prefix) else "MISMATCH"
-        if status != "MATCH":
-            mismatch = True
-        print(f"input  {filename} {digest} {status} (expected {prefix}…)")
+        if not source.is_file():
+            mismatches.append(filename)
+            print(f"input  {filename} MISSING (expected {prefix}…)")
+            continue
+        digest = sha256(source)
+        matched = digest.startswith(prefix)
+        if not matched:
+            mismatches.append(filename)
+        print(f"input  {filename} {digest} {'MATCH' if matched else 'MISMATCH'} (expected {prefix}…)")
+        checked.append((spec, source))
 
+    if mismatches:
+        print(
+            "Input panel crop hash mismatch: "
+            f"{', '.join(mismatches)}. No final was written.",
+            file=sys.stderr,
+        )
+        return 1
+
+    FINAL_DIR.mkdir(parents=True, exist_ok=True)
+    slides: list[Image.Image] = []
+
+    for spec, source in checked:
+        filename = str(spec["file"])
         crop_bottom = spec.get("crop_bottom")
         panel = prepare_panel(source, int(crop_bottom) if isinstance(crop_bottom, int) else None)
         slide = compose_slide(
@@ -270,8 +286,6 @@ def main() -> int:
     board.save(board_path, "PNG")
     print(f"output board.png {sha256(board_path)} {board.size[0]}x{board.size[1]}")
     print(f"Pillow {Image.__version__ if hasattr(Image, '__version__') else 'unknown'}")
-    if mismatch:
-        print("Input panel crop hash mismatch.", file=sys.stderr)
     return 0
 
 

@@ -62,28 +62,36 @@ function rewriteContacts(value: string): { value: string; replaced: boolean } {
   return { value: next, replaced: next !== value };
 }
 
+const REDACTED_CONTACT = '[contact retiré]';
+
+function approvedClient(found: string): string {
+  const mapped = CLIENT_PLACEHOLDERS[found];
+  if (mapped) {
+    return mapped;
+  }
+  const redacted = rewriteContacts(found).value.trim();
+  const leftover = redacted.split(REDACTED_CONTACT).join('').trim();
+  if (redacted && !leftover) {
+    return REDACTED_CONTACT;
+  }
+  throw new Error(
+    `Fixture client ${JSON.stringify(found)} has no approved placeholder. Add one in the capture script before it can appear on a Store screenshot.`
+  );
+}
+
 function sanitizeMission(mission: Mission, audit: FieldAudit[]): Mission {
   const next: Mission = { ...mission };
   const client = mission.client?.trim() ?? '';
-  if (client) {
-    const placeholder = CLIENT_PLACEHOLDERS[client] ?? null;
-    audit.push({
-      source: mission.source,
-      field: 'client',
-      found: client,
-      replaced: placeholder,
-    });
-    if (placeholder) {
-      next.client = placeholder;
-    }
-  } else {
-    audit.push({
-      source: mission.source,
-      field: 'client',
-      found: '',
-      replaced: null,
-    });
+  const approved = client ? approvedClient(client) : null;
+  if (approved) {
+    next.client = approved;
   }
+  audit.push({
+    source: mission.source,
+    field: 'client',
+    found: client,
+    replaced: approved,
+  });
 
   for (const field of ['title', 'description', 'location'] as const) {
     const found = mission[field] ?? '';
@@ -93,8 +101,8 @@ function sanitizeMission(mission: Mission, audit: FieldAudit[]): Mission {
     }
     let value = found;
     let replaced = false;
-    if (client && CLIENT_PLACEHOLDERS[client] && value.includes(client)) {
-      value = value.split(client).join(CLIENT_PLACEHOLDERS[client]);
+    if (approved && client && value.includes(client)) {
+      value = value.split(client).join(approved);
       replaced = true;
     }
     const contacts = rewriteContacts(value);

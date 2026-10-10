@@ -29,6 +29,7 @@ const EXPECTED_VERSION = '0.2.5';
 const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 800;
 const PANEL_TARGET_WIDTH = 420;
+const PANEL_CROP_HEIGHT = 661;
 const DEBUG_PORT = 9333;
 
 const BLOCKED_HOSTS = [
@@ -210,8 +211,17 @@ async function ensureNameHelper(page: Page): Promise<void> {
 }
 
 async function settle(panel: PanelDriver): Promise<void> {
-  await panel.evaluate<boolean>(`() => document.fonts.status === 'loaded' || true`);
-  await new Promise((resolve) => setTimeout(resolve, 450));
+  const deadline = Date.now() + 8_000;
+  let status = 'unknown';
+  while (Date.now() < deadline) {
+    status = await panel.evaluate<string>(`() => document.fonts.status`);
+    if (status === 'loaded') {
+      await new Promise((resolve) => setTimeout(resolve, 450));
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 100));
+  }
+  throw new Error(`Panel fonts did not finish loading (status ${status}).`);
 }
 
 async function seedExtension(page: Page, missions: unknown[], profile: unknown): Promise<void> {
@@ -923,9 +933,9 @@ async function main(): Promise<void> {
         }
       }
       const panelSize = pngSize(panelPath);
-      if (panelSize.width !== panelWidth && Math.abs(panelSize.width - panelWidth) > 2) {
-        console.log(
-          `${screen.id} panel crop is ${panelSize.width}x${panelSize.height} (viewport ${panelWidth}).`
+      if (panelSize.width !== PANEL_TARGET_WIDTH || panelSize.height !== PANEL_CROP_HEIGHT) {
+        throw new Error(
+          `${screen.id} panel crop is ${panelSize.width}x${panelSize.height}, expected ${PANEL_TARGET_WIDTH}x${PANEL_CROP_HEIGHT}.`
         );
       }
       console.log(`Captured ${screen.id}: window ${windowPath}, panel ${panelPath}.`);
