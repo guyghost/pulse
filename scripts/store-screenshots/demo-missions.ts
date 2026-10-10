@@ -7,6 +7,10 @@
  * show Free-Work, LeHibou, Hiway and Cherry Pick together. Nothing here is a
  * live offer, and no score or count is invented — scores are left null so the
  * extension's own rescore can fill them.
+ *
+ * Fixture client labels are rewritten here, after parsing, so the captures
+ * never show company-shaped names or contact details. The shared fixtures and
+ * the extension stay untouched.
  */
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
@@ -29,9 +33,89 @@ const HIWAY_BASE_URL = 'https://hiway-missions.fr';
 
 export const DEMO_PLATFORMS = ['free-work', 'lehibou', 'hiway', 'cherry-pick'] as const;
 
+export interface FieldAudit {
+  readonly source: string;
+  readonly field: 'title' | 'client' | 'description' | 'location';
+  readonly found: string;
+  readonly replaced: string | null;
+}
+
 export interface DemoCatalogue {
   readonly missions: Mission[];
   readonly profile: UserProfile;
+  readonly audit: readonly FieldAudit[];
+}
+
+const CLIENT_PLACEHOLDERS: Record<string, string> = {
+  'Société ABC': 'Client confidentiel',
+  'Acme Corp': 'Scale-up fintech',
+  'Tech SA': 'Client confidentiel',
+};
+
+const EMAIL_PATTERN = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi;
+const PHONE_PATTERN = /(?:\+33|0)[1-9](?:[\s.-]?\d{2}){4}/g;
+
+function rewriteContacts(value: string): { value: string; replaced: boolean } {
+  const next = value
+    .replace(EMAIL_PATTERN, '[contact retiré]')
+    .replace(PHONE_PATTERN, '[contact retiré]');
+  return { value: next, replaced: next !== value };
+}
+
+function sanitizeMission(mission: Mission, audit: FieldAudit[]): Mission {
+  const next: Mission = { ...mission };
+  const client = mission.client?.trim() ?? '';
+  if (client) {
+    const placeholder = CLIENT_PLACEHOLDERS[client] ?? null;
+    audit.push({
+      source: mission.source,
+      field: 'client',
+      found: client,
+      replaced: placeholder,
+    });
+    if (placeholder) {
+      next.client = placeholder;
+    }
+  } else {
+    audit.push({
+      source: mission.source,
+      field: 'client',
+      found: '',
+      replaced: null,
+    });
+  }
+
+  for (const field of ['title', 'description', 'location'] as const) {
+    const found = mission[field] ?? '';
+    if (!found) {
+      audit.push({ source: mission.source, field, found: '', replaced: null });
+      continue;
+    }
+    let value = found;
+    let replaced = false;
+    if (client && CLIENT_PLACEHOLDERS[client] && value.includes(client)) {
+      value = value.split(client).join(CLIENT_PLACEHOLDERS[client]);
+      replaced = true;
+    }
+    const contacts = rewriteContacts(value);
+    value = contacts.value;
+    replaced = replaced || contacts.replaced;
+    if (field === 'title') {
+      next.title = value;
+    } else if (field === 'description') {
+      next.description = value;
+    } else {
+      next.location = value;
+    }
+    audit.push({
+      source: mission.source,
+      field,
+      found,
+      replaced: replaced ? value : null,
+    });
+  }
+
+  return next;
 }
 
 function readText(relativePath: string): string {
@@ -77,7 +161,10 @@ export function loadDemoCatalogue(): DemoCatalogue {
     cherryPickMissions.find((mission) => mission.title === 'Lead Java Spring') ??
     firstMission(cherryPickMissions, 'cherry-pick');
 
-  const missions = [freeWork, lehibou, hiway, cherryPick];
+  const audit: FieldAudit[] = [];
+  const missions = [freeWork, lehibou, hiway, cherryPick].map((mission) =>
+    sanitizeMission(mission, audit)
+  );
   const sources = new Set(missions.map((mission) => mission.source));
   for (const platform of DEMO_PLATFORMS) {
     if (!sources.has(platform)) {
@@ -120,7 +207,7 @@ export function loadDemoCatalogue(): DemoCatalogue {
     availability: null,
   };
 
-  return { missions, profile };
+  return { missions, profile, audit };
 }
 
 /** IndexedDB stores dates as strings. The extension deserializes them on read. */

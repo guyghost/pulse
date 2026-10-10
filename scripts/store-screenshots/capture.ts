@@ -3,9 +3,8 @@
  *
  * The extension sources, manifest and build config are not modified. Demo
  * missions are the existing parser-regression fixtures, written into a fresh
- * Chrome profile at runtime. The landing "Exemple" badge is stamped onto
- * rendered mission cards by this script because the shipped UI has no such
- * badge — it is a capture-time label, not a product change.
+ * Chrome profile at runtime. Client labels are sanitized in this script only.
+ * The captures show the shipped panel with no overlay.
  *
  * Usage (repo root): pnpm store-screenshots
  * Skip the rebuild when dist is already the committed 0.2.5 package:
@@ -532,23 +531,17 @@ async function prepareFeed(panel: PanelDriver): Promise<void> {
   await panel.waitForText('free-work');
   await dismissOverlays(panel);
   await panel.resetScroll();
-  await panel.stampExempleBadges();
-  const badgeInView = await panel.evaluate<boolean>(`() => {
-    const badge = document.querySelector('[data-store-exemple]');
-    if (!badge) {
-      return false;
-    }
-    const rect = badge.getBoundingClientRect();
-    return rect.top >= 0 && rect.bottom <= window.innerHeight && rect.height > 0;
-  }`);
-  if (!badgeInView) {
-    throw new Error('Exemple badge is missing on the visible feed.');
-  }
   for (const source of ['free-work', 'lehibou', 'hiway', 'cherry-pick']) {
     await panel.waitForText(source);
     const inView = await panel.textInView(source);
     console.log(`Feed source ${source} in view: ${inView}`);
   }
+}
+
+async function prepareFeedScrolled(panel: PanelDriver): Promise<void> {
+  await prepareFeed(panel);
+  const platforms = await panel.scrollFeedToPlatforms(3);
+  console.log(`Scrolled feed platforms: ${platforms.join(', ')}`);
 }
 
 async function prepareDetail(panel: PanelDriver): Promise<void> {
@@ -558,8 +551,6 @@ async function prepareDetail(panel: PanelDriver): Promise<void> {
   await panel.clickNamed('Analyser');
   await panel.waitForText('Investigation');
   await panel.resetScroll();
-  await panel.stampExempleBadges();
-  await panel.requireTextInView('Exemple');
   await panel.requireTextInView('Investigation');
 }
 
@@ -601,6 +592,7 @@ async function preparePrivacy(panel: PanelDriver): Promise<void> {
 
 const SCREENS: ScreenSpec[] = [
   { id: '01-feed', file: '01-feed.png', prepare: prepareFeed },
+  { id: '01b-feed-scrolled', file: '01b-feed-scrolled.png', prepare: prepareFeedScrolled },
   { id: '02-mission-detail', file: '02-mission-detail.png', prepare: prepareDetail },
   { id: '03-filters-settings', file: '03-filters-settings.png', prepare: prepareFilters },
   { id: '04-alerts', file: '04-alerts.png', prepare: prepareAlerts },
@@ -629,6 +621,7 @@ async function main(): Promise<void> {
   console.log(
     `Demo missions: ${catalogue.missions.map((mission) => `${mission.source}:${mission.title}`).join(' | ')}`
   );
+  console.log(`Demo data audit: ${JSON.stringify(catalogue.audit, null, 2)}`);
 
   mkdirSync(OUTPUT_DIR, { recursive: true });
   mkdirSync(PANEL_DIR, { recursive: true });
@@ -710,10 +703,15 @@ async function main(): Promise<void> {
           await panel.clickNamed('Analyser');
           await panel.waitForText('Investigation');
         }
-        await panel.stampExempleBadges();
+      }
+      const overlay = await panel.evaluate<boolean>(
+        `() => Boolean(document.querySelector('[data-store-exemple], .score-flow__example-badge'))`
+      );
+      if (overlay) {
+        throw new Error(`${screen.id} contains a capture overlay inside the panel.`);
+      }
+      if (screen.id === '02-mission-detail') {
         await panel.pause();
-      } else {
-        await panel.stampExempleBadges();
       }
       const panelPath = resolve(PANEL_DIR, screen.file);
       const windowPath = resolve(OUTPUT_DIR, screen.file);

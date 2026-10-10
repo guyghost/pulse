@@ -347,61 +347,166 @@ export class PanelDriver {
     await this.send('Debugger.disable').catch(() => undefined);
   }
 
-  async stampExempleBadges(): Promise<number> {
-    return this.evaluate<number>(`() => {
-      const styleId = 'store-exemple-badge-style';
-      if (!document.getElementById(styleId)) {
-        const style = document.createElement('style');
-        style.id = styleId;
-        style.textContent = '.score-flow__example-badge{display:inline-flex;align-items:center;padding:4px 12px;border:1px solid #f0efef;border-radius:100px;background:#ffffff;color:#57534d;font-size:0.75rem;font-weight:600;letter-spacing:0.02em;line-height:1.2;}';
-        document.head.appendChild(style);
-      }
-      const badge = () => {
-        const node = document.createElement('span');
-        node.className = 'score-flow__example-badge';
-        node.dataset.storeExemple = 'true';
-        node.textContent = 'Exemple';
-        return node;
-      };
-      const stamp = () => {
-        let stamped = 0;
-        for (const card of document.querySelectorAll('[aria-label^="Mission "]')) {
-          if (card.querySelector('[data-store-exemple]')) {
+  async scrollFeedToPlatforms(minPlatforms: number): Promise<string[]> {
+    const result = await this.evaluate<{
+      ok: boolean;
+      platforms: string[];
+      attempts: string;
+    }>(
+      `(minimum) => {
+        const platformIds = ['free-work', 'lehibou', 'hiway', 'cherry-pick'];
+        const cards = [...document.querySelectorAll('[aria-label^="Mission "]')];
+        const first = cards[0];
+        if (!first) {
+          return { ok: false, platforms: [], attempts: 'no cards' };
+        }
+        let scroller = first.parentElement;
+        while (scroller) {
+          const style = getComputedStyle(scroller);
+          if (/(auto|scroll)/.test(style.overflowY) && scroller.scrollHeight > scroller.clientHeight + 8) {
+            break;
+          }
+          scroller = scroller.parentElement;
+        }
+        if (!scroller) {
+          return { ok: false, platforms: [], attempts: 'no scroller' };
+        }
+        const contentTop = () => {
+          const style = getComputedStyle(scroller);
+          return scroller.getBoundingClientRect().top + (parseFloat(style.paddingTop) || 0);
+        };
+        const visibleBottom = () => {
+          const scrollerRect = scroller.getBoundingClientRect();
+          let cover = Math.min(scrollerRect.bottom, window.innerHeight);
+          for (const element of document.querySelectorAll('nav, form, [role="search"]')) {
+            if (!(element instanceof HTMLElement)) {
+              continue;
+            }
+            const style = getComputedStyle(element);
+            if (style.position !== 'sticky' && style.position !== 'fixed') {
+              continue;
+            }
+            const rect = element.getBoundingClientRect();
+            if (rect.height <= 0 || rect.top >= cover || rect.bottom < scrollerRect.top) {
+              continue;
+            }
+            if (rect.top > scrollerRect.top + 40) {
+              cover = Math.min(cover, rect.top);
+            }
+          }
+          return cover;
+        };
+        const badgeNodes = () => {
+          const nodes = [];
+          for (const node of document.querySelectorAll('span, p')) {
+            if (node.childElementCount > 2) {
+              continue;
+            }
+            const text = (node.textContent ?? '').trim();
+            if (!platformIds.includes(text)) {
+              continue;
+            }
+            nodes.push({ text, rect: node.getBoundingClientRect() });
+          }
+          return nodes;
+        };
+        const readablePlatforms = () => {
+          const top = contentTop();
+          const bottom = visibleBottom();
+          const seen = [];
+          for (const badge of badgeNodes()) {
+            const rect = badge.rect;
+            if (rect.width <= 0 || rect.height <= 0) {
+              continue;
+            }
+            const visible = Math.min(rect.bottom, bottom) - Math.max(rect.top, top);
+            if (visible >= Math.min(rect.height, 8) && rect.top < bottom - 4 && rect.bottom > top + 4) {
+              if (!seen.includes(badge.text)) {
+                seen.push(badge.text);
+              }
+            }
+          }
+          return seen;
+        };
+        const cardCut = () => {
+          const top = contentTop();
+          for (const card of document.querySelectorAll('[aria-label^="Mission "]')) {
+            const rect = card.getBoundingClientRect();
+            if (rect.height <= 0) {
+              continue;
+            }
+            if (rect.top < top - 1 && rect.bottom > top + 1) {
+              return true;
+            }
+          }
+          return false;
+        };
+        const describe = () => {
+          const top = contentTop();
+          const bottom = visibleBottom();
+          const bits = ['h=' + Math.round(bottom - top)];
+          for (const badge of badgeNodes()) {
+            const rect = badge.rect;
+            const visible = Math.min(rect.bottom, bottom) - Math.max(rect.top, top);
+            bits.push(
+              badge.text +
+                '@' +
+                Math.round(rect.top - top) +
+                ' vis=' +
+                Math.round(visible) +
+                '/' +
+                Math.round(rect.height)
+            );
+          }
+          return bits.join(' ');
+        };
+        const attempts = [];
+        let best = null;
+        for (const card of cards) {
+          const nextTop =
+            card.getBoundingClientRect().top -
+            scroller.getBoundingClientRect().top +
+            scroller.scrollTop;
+          scroller.scrollTop = nextTop;
+          const gap = card.getBoundingClientRect().top - contentTop();
+          const platforms = readablePlatforms();
+          const cut = cardCut();
+          attempts.push(
+            platforms.join(',') + ' gap=' + gap.toFixed(1) + ' cut=' + cut + ' ' + describe()
+          );
+          const clean = Math.abs(gap) <= 2 && !cut;
+          if (!clean) {
             continue;
           }
-          const row = card.querySelector('.flex.flex-wrap');
-          if (!row) {
-            continue;
+          if (!best || platforms.length > best.platforms.length) {
+            best = { platforms: platforms.slice(), scrollTop: scroller.scrollTop };
           }
-          row.prepend(badge());
-          stamped += 1;
-        }
-        const drawer = document.querySelector('[aria-label="Investigation mission"]');
-        if (drawer && !drawer.querySelector('[data-store-exemple]')) {
-          const row = drawer.querySelector('.mt-3.flex');
-          if (row) {
-            row.prepend(badge());
-            stamped += 1;
+          if (platforms.length >= minimum) {
+            return { ok: true, platforms, attempts: attempts.join(' | ') };
           }
         }
-        return stamped;
-      };
-      const root = document.documentElement;
-      if (root.dataset.storeExempleObserver !== 'true') {
-        root.dataset.storeExempleObserver = 'true';
-        let stamping = false;
-        const observer = new MutationObserver(() => {
-          if (stamping) {
-            return;
-          }
-          stamping = true;
-          stamp();
-          stamping = false;
-        });
-        observer.observe(document.body, { childList: true, subtree: true });
-      }
-      return stamp();
-    }`);
+        if (best) {
+          scroller.scrollTop = best.scrollTop;
+          return {
+            ok: false,
+            platforms: best.platforms,
+            attempts: attempts.join(' | '),
+          };
+        }
+        return { ok: false, platforms: readablePlatforms(), attempts: attempts.join(' | ') };
+      }`,
+      minPlatforms
+    );
+    console.log(`Feed scroll attempts: ${result.attempts}`);
+    if (!result.ok && result.platforms.length < minPlatforms) {
+      console.log(
+        `Feed viewport shows ${result.platforms.length} platform badge(s) at a clean card edge (${result.platforms.join(', ') || 'none'}). A third badge stays below the fold: the shipped cards are taller than the feed scroller.`
+      );
+    }
+    if (result.platforms.length === 0) {
+      throw new Error(`Could not settle the feed on a card edge. Attempts: ${result.attempts}`);
+    }
+    return result.platforms;
   }
 
   async innerWidth(): Promise<number> {
