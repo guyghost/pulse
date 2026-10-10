@@ -564,6 +564,90 @@ async function prepareFilters(panel: PanelDriver): Promise<void> {
   await panel.requireTextInView('TJM');
 }
 
+const SHIPPED_SOURCE_NAMES = ['Free-Work', 'LeHibou', 'Hiway', 'Cherry Pick'] as const;
+
+async function alignContainingText(panel: PanelDriver, text: string): Promise<void> {
+  const aligned = await panel.evaluate<boolean>(
+    `(needle) => {
+      const nodes = [...document.querySelectorAll('p, h2, h3, span')];
+      const element = nodes.find((node) => {
+        if (node.childElementCount > 2) {
+          return false;
+        }
+        return (node.textContent ?? '').trim().includes(needle);
+      });
+      if (!element) {
+        return false;
+      }
+      let scroller = element.parentElement;
+      while (scroller) {
+        const style = getComputedStyle(scroller);
+        if (/(auto|scroll)/.test(style.overflowY) && scroller.scrollHeight > scroller.clientHeight) {
+          const top =
+            element.getBoundingClientRect().top -
+            scroller.getBoundingClientRect().top +
+            scroller.scrollTop;
+          scroller.scrollTop = top;
+          return true;
+        }
+        scroller = scroller.parentElement;
+      }
+      return false;
+    }`,
+    text
+  );
+  if (!aligned) {
+    throw new Error(`Could not align "${text}" to the top of its scroll container.`);
+  }
+}
+
+async function prepareSources(panel: PanelDriver): Promise<void> {
+  await dismissOverlays(panel);
+  await panel.clickNamed('Réglages');
+  await panel.waitForText('Sources incluses dans cette version');
+  const expanded = await panel.attribute('#settings-trigger-sources', 'aria-expanded');
+  if (expanded !== 'true') {
+    await panel.clickSelector('#settings-trigger-sources');
+    await panel.waitForText('Sources incluses dans cette version');
+  }
+  for (const name of SHIPPED_SOURCE_NAMES) {
+    await panel.waitForText(name);
+  }
+  const started = Date.now();
+  while (Date.now() - started < 12_000) {
+    const checking = await panel.evaluate<boolean>(
+      `() => (document.querySelector('#settings-panel-sources')?.textContent ?? '').includes('Vérification en cours')`
+    );
+    if (!checking) {
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  }
+  await alignContainingText(panel, 'Sources incluses dans cette version');
+  let missing: string[] = [];
+  for (const name of SHIPPED_SOURCE_NAMES) {
+    const inView = await panel.textInView(name);
+    console.log(`Settings source ${name} in view: ${inView}`);
+    if (!inView) {
+      missing.push(name);
+    }
+  }
+  if (missing.length > 0) {
+    await alignContainingText(panel, 'Free-Work');
+    missing = [];
+    for (const name of SHIPPED_SOURCE_NAMES) {
+      const inView = await panel.textInView(name);
+      console.log(`Settings source ${name} in view after list align: ${inView}`);
+      if (!inView) {
+        missing.push(name);
+      }
+    }
+  }
+  if (missing.length > 0) {
+    throw new Error(`Enabled sources are not fully visible: ${missing.join(', ')}`);
+  }
+}
+
 async function prepareAlerts(panel: PanelDriver): Promise<void> {
   await dismissOverlays(panel);
   await panel.clickNamed('Réglages');
@@ -595,6 +679,7 @@ const SCREENS: ScreenSpec[] = [
   { id: '01b-feed-scrolled', file: '01b-feed-scrolled.png', prepare: prepareFeedScrolled },
   { id: '02-mission-detail', file: '02-mission-detail.png', prepare: prepareDetail },
   { id: '03-filters-settings', file: '03-filters-settings.png', prepare: prepareFilters },
+  { id: '03b-sources', file: '03b-sources.png', prepare: prepareSources },
   { id: '04-alerts', file: '04-alerts.png', prepare: prepareAlerts },
   { id: '05-local-privacy', file: '05-local-privacy.png', prepare: preparePrivacy },
 ];
