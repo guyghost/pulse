@@ -40,6 +40,7 @@
     "improvement:loop": "node scripts/improvement-loop.mjs",
     "store-screenshots": "tsx scripts/store-screenshots/capture.ts",
     "store-screenshots:final": "python3 scripts/store-screenshots/compose_final.py",
+    "store-screenshots:final:a": "python3 scripts/store-screenshots/compose_final.py --direction a",
     "clean": "turbo clean && rm -rf node_modules .turbo",
     "prepare": "simple-git-hooks"
   },
