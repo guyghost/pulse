@@ -99,7 +99,9 @@ TILE_GAP = 24
 TILE_COLUMNS = 3
 BOARD_MARGIN = 48
 
-# Native side-panel crop. Direction A source rects are in this space.
+# Native side-panel crop. Loupe `source` rects are always written in this 1×
+# space. `logical_crop` multiplies them by the detected input scale, so a 2×
+# panel (840×1322) crops twice as many pixels from the same config numbers.
 LOGICAL_PANEL = (420, 661)
 DIRECTION_A_DIR = ROOT / "docs" / "store-screenshots" / "0.2.5" / "direction-a"
 
@@ -131,7 +133,7 @@ DIRECTION_A: dict[str, dict[str, object]] = {
             "shadow_color": (14, 26, 43),
         },
         "caption": {
-            "text": "4 plateformes.\n**1 seul feed.**",
+            "text": "4 plateformes.\n**1 seul feed**.",
             "x": 860,
             "y": 292,
             "max_width": 360,
@@ -177,7 +179,7 @@ DIRECTION_A: dict[str, dict[str, object]] = {
             "shadow_color": (14, 26, 43),
         },
         "caption": {
-            "text": "Le score **explique**.\nTu décides.",
+            "text": "Le score explique.\n**Tu décides**.",
             "x": 860,
             "y": 292,
             "max_width": 360,
@@ -223,7 +225,7 @@ DIRECTION_A: dict[str, dict[str, object]] = {
             "shadow_color": (14, 26, 43),
         },
         "caption": {
-            "text": "**Ton profil**,\nton classement.",
+            "text": "Ton profil,\n**ton classement**.",
             "x": 860,
             "y": 292,
             "max_width": 360,
@@ -269,7 +271,7 @@ DIRECTION_A: dict[str, dict[str, object]] = {
             "shadow_color": (14, 26, 43),
         },
         "caption": {
-            "text": "**Tes alertes**,\ntes critères.",
+            "text": "Tes alertes,\n**tes critères**.",
             "x": 860,
             "y": 292,
             "max_width": 360,
@@ -315,7 +317,7 @@ DIRECTION_A: dict[str, dict[str, object]] = {
             "shadow_color": (14, 26, 43),
         },
         "caption": {
-            "text": "Par défaut,\n**tout reste en local.**",
+            "text": "Par défaut,\n**tout reste en local**.",
             "x": 860,
             "y": 292,
             "max_width": 360,
@@ -607,6 +609,7 @@ def composite_shadow(
 
 
 def logical_crop(image: Image.Image, source: dict[str, object], input_scale: int) -> Image.Image:
+    """Crop a 1× source rect. Coordinates are scaled by the detected input scale."""
     x = int(round(float(source["x"]) * input_scale))
     y = int(round(float(source["y"]) * input_scale))
     width = int(round(float(source["w"]) * input_scale))
