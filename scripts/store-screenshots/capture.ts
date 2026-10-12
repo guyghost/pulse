@@ -9,6 +9,11 @@
  * Usage (repo root): pnpm store-screenshots
  * Skip the rebuild when dist is already the committed 0.2.5 package:
  *   STORE_SCREENSHOTS_SKIP_BUILD=1 pnpm store-screenshots
+ * Direction A panels at 2× (840×1322), same screens and demo data:
+ *   STORE_SCREENSHOTS_DEVICE_SCALE=2 STORE_SCREENSHOTS_PANELS_ONLY=1 \
+ *   STORE_SCREENSHOTS_OUTPUT=docs/store-screenshots/0.2.5-dirA \
+ *   STORE_SCREENSHOTS_SCREENS=01b-feed-scrolled,02-mission-detail,03-filters-settings,04-alerts,05b-local-privacy \
+ *   pnpm store-screenshots
  */
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
@@ -23,14 +28,18 @@ import { attachSidePanel, type PanelDriver } from './panel-driver';
 const REPO_ROOT = resolve(import.meta.dirname, '../..');
 const EXTENSION_ROOT = resolve(REPO_ROOT, 'apps/extension');
 const DIST_PATH = resolve(EXTENSION_ROOT, 'dist');
-const OUTPUT_DIR = resolve(REPO_ROOT, 'docs/store-screenshots/0.2.5');
+const OUTPUT_DIR = process.env.STORE_SCREENSHOTS_OUTPUT
+  ? resolve(REPO_ROOT, process.env.STORE_SCREENSHOTS_OUTPUT)
+  : resolve(REPO_ROOT, 'docs/store-screenshots/0.2.5');
 const PANEL_DIR = resolve(OUTPUT_DIR, 'panel');
 const EXPECTED_VERSION = '0.2.5';
 const WINDOW_WIDTH = 1280;
 const WINDOW_HEIGHT = 800;
 const PANEL_TARGET_WIDTH = 420;
 const PANEL_CROP_HEIGHT = 661;
-const DEBUG_PORT = 9333;
+const DEVICE_SCALE = Number(process.env.STORE_SCREENSHOTS_DEVICE_SCALE ?? '1');
+const PANELS_ONLY = process.env.STORE_SCREENSHOTS_PANELS_ONLY === '1';
+const DEBUG_PORT = Number(process.env.STORE_SCREENSHOTS_DEBUG_PORT ?? '9333');
 
 const BLOCKED_HOSTS = [
   'www.free-work.com',
@@ -93,6 +102,23 @@ function assertBuiltVersion(): string {
     );
   }
   return built.version;
+}
+
+function cropPngTop(path: string, width: number, height: number): void {
+  const result = spawnSync(
+    'python3',
+    [
+      '-c',
+      'import sys\nfrom PIL import Image\npath, width, height = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])\nimage = Image.open(path)\nimage.crop((0, 0, width, height)).save(path)\n',
+      path,
+      String(width),
+      String(height),
+    ],
+    { encoding: 'utf8' }
+  );
+  if (result.status !== 0) {
+    throw new Error(`Could not crop ${path}: ${result.stderr || result.stdout}`);
+  }
 }
 
 function pngSize(path: string): { width: number; height: number } {
@@ -500,15 +526,15 @@ async function dragDivider(fromX: number, toX: number, y: number): Promise<void>
 async function resizeSidePanel(panel: PanelDriver, windowId: string): Promise<number> {
   let current = await panel.innerWidth();
   const geometry = windowGeometry(windowId);
-  const y = geometry.y + 160;
-  const estimated = geometry.x + geometry.width - current;
+  const y = geometry.y + 160 * DEVICE_SCALE;
+  const estimated = geometry.x + geometry.width - current * DEVICE_SCALE;
   for (const offset of [0, -6, 6, -14, 14, -24, 24]) {
     if (Math.abs(current - PANEL_TARGET_WIDTH) <= 12) {
       break;
     }
     const before = current;
     const dividerX = Math.round(estimated + offset);
-    const destinationX = dividerX + (current - PANEL_TARGET_WIDTH);
+    const destinationX = dividerX + (current - PANEL_TARGET_WIDTH) * DEVICE_SCALE;
     await dragDivider(dividerX, destinationX, y);
     current = await panel.innerWidth();
     if (current !== before) {
@@ -793,7 +819,7 @@ async function prepareLocalData(panel: PanelDriver): Promise<void> {
   }
 }
 
-const SCREENS: ScreenSpec[] = [
+const ALL_SCREENS: ScreenSpec[] = [
   { id: '01-feed', file: '01-feed.png', prepare: prepareFeed },
   { id: '01b-feed-scrolled', file: '01b-feed-scrolled.png', prepare: prepareFeedScrolled },
   { id: '02-mission-detail', file: '02-mission-detail.png', prepare: prepareDetail },
@@ -804,7 +830,30 @@ const SCREENS: ScreenSpec[] = [
   { id: '05b-local-privacy', file: '05b-local-privacy.png', prepare: prepareLocalData },
 ];
 
+function screensToCapture(): ScreenSpec[] {
+  const requested = (process.env.STORE_SCREENSHOTS_SCREENS ?? '')
+    .split(',')
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0);
+  if (requested.length === 0) {
+    return ALL_SCREENS;
+  }
+  const known = new Set(ALL_SCREENS.map((screen) => screen.id));
+  const missing = requested.filter((id) => !known.has(id));
+  if (missing.length > 0) {
+    throw new Error(`Unknown store screenshot id(s): ${missing.join(', ')}.`);
+  }
+  return ALL_SCREENS.filter((screen) => requested.includes(screen.id));
+}
+
 async function main(): Promise<void> {
+  if (!Number.isInteger(DEVICE_SCALE) || DEVICE_SCALE < 1) {
+    throw new Error(`STORE_SCREENSHOTS_DEVICE_SCALE must be an integer ≥ 1, got ${DEVICE_SCALE}.`);
+  }
+  if (DEVICE_SCALE !== 1 && !PANELS_ONLY) {
+    throw new Error('A device scale above 1 only captures panels (STORE_SCREENSHOTS_PANELS_ONLY=1).');
+  }
+  const screens = screensToCapture();
   const committed = readCommittedVersion();
   if (
     committed.packageVersion !== EXPECTED_VERSION ||
@@ -850,7 +899,7 @@ async function main(): Promise<void> {
       '--disable-popup-blocking',
       '--hide-crash-restore-bubble',
       '--disable-infobars',
-      '--force-device-scale-factor=1',
+      `--force-device-scale-factor=${DEVICE_SCALE}`,
       '--ozone-platform=x11',
       '--window-size=1280,800',
       '--window-position=0,0',
@@ -883,21 +932,27 @@ async function main(): Promise<void> {
     if (!windowId) {
       throw new Error('Could not find the Chrome window.');
     }
-    const geometry = resizeWindow(windowId, WINDOW_WIDTH, WINDOW_HEIGHT);
+    const frameWidth = WINDOW_WIDTH * DEVICE_SCALE;
+    const frameHeight = WINDOW_HEIGHT * DEVICE_SCALE;
+    const geometry = resizeWindow(windowId, frameWidth, frameHeight);
     const panelWidth = await resizeSidePanel(panel, windowId);
     console.log(`Side panel width ${panelWidth}px (target ~${PANEL_TARGET_WIDTH}).`);
-    resizeWindow(windowId, WINDOW_WIDTH, WINDOW_HEIGHT);
+    resizeWindow(windowId, frameWidth, frameHeight);
+    if (DEVICE_SCALE !== 1) {
+      const innerHeight = await panel.evaluate<number>(`async () => window.innerHeight`);
+      console.log(`Panel CSS height ${innerHeight} (target ${PANEL_CROP_HEIGHT}).`);
+    }
     run('xdotool', ['mousemove', '--sync', '1910', '1190']);
 
     const dark = await panel.isDark();
     const pixelRatio = await panel.devicePixelRatio();
-    if (dark || pixelRatio !== 1) {
+    if (dark || pixelRatio !== DEVICE_SCALE) {
       throw new Error(
-        `Expected light theme at 100% zoom, observed dark=${dark} dpr=${pixelRatio}.`
+        `Expected light theme at device scale ${DEVICE_SCALE}, observed dark=${dark} dpr=${pixelRatio}.`
       );
     }
 
-    for (const screen of SCREENS) {
+    for (const screen of screens) {
       await screen.prepare(panel);
       await settle(panel);
       if (screen.id === '02-mission-detail') {
@@ -922,20 +977,37 @@ async function main(): Promise<void> {
       const windowPath = resolve(OUTPUT_DIR, screen.file);
       try {
         await panel.screenshot(panelPath);
-        const freshGeometry = windowGeometry(windowId);
-        if (freshGeometry.width !== WINDOW_WIDTH || freshGeometry.height !== WINDOW_HEIGHT) {
-          resizeWindow(windowId, WINDOW_WIDTH, WINDOW_HEIGHT);
+        if (!PANELS_ONLY) {
+          const freshGeometry = windowGeometry(windowId);
+          if (freshGeometry.width !== WINDOW_WIDTH || freshGeometry.height !== WINDOW_HEIGHT) {
+            resizeWindow(windowId, WINDOW_WIDTH, WINDOW_HEIGHT);
+          }
+          captureWindow(windowGeometry(windowId), windowPath);
         }
-        captureWindow(windowGeometry(windowId), windowPath);
       } finally {
         if (screen.id === '02-mission-detail') {
           await panel.resume();
         }
       }
-      const panelSize = pngSize(panelPath);
-      if (panelSize.width !== PANEL_TARGET_WIDTH || panelSize.height !== PANEL_CROP_HEIGHT) {
+      const expectedWidth = PANEL_TARGET_WIDTH * DEVICE_SCALE;
+      const expectedHeight = PANEL_CROP_HEIGHT * DEVICE_SCALE;
+      let panelSize = pngSize(panelPath);
+      const extraHeight = panelSize.height - expectedHeight;
+      if (
+        DEVICE_SCALE !== 1 &&
+        panelSize.width === expectedWidth &&
+        extraHeight > 0 &&
+        extraHeight <= 24
+      ) {
+        console.log(
+          `${screen.id} panel is ${panelSize.width}x${panelSize.height}; cropping the extra ${extraHeight}px from the bottom so the 1× coordinates stay top-aligned.`
+        );
+        cropPngTop(panelPath, expectedWidth, expectedHeight);
+        panelSize = pngSize(panelPath);
+      }
+      if (panelSize.width !== expectedWidth || panelSize.height !== expectedHeight) {
         throw new Error(
-          `${screen.id} panel crop is ${panelSize.width}x${panelSize.height}, expected ${PANEL_TARGET_WIDTH}x${PANEL_CROP_HEIGHT}.`
+          `${screen.id} panel crop is ${panelSize.width}x${panelSize.height}, expected ${expectedWidth}x${expectedHeight}.`
         );
       }
       console.log(`Captured ${screen.id}: window ${windowPath}, panel ${panelPath}.`);
@@ -948,14 +1020,18 @@ async function main(): Promise<void> {
     rmSync(profileDir, { recursive: true, force: true });
   }
 
-  const report = SCREENS.map((screen) => {
-    const windowPath = resolve(OUTPUT_DIR, screen.file);
+  const report = screens.map((screen) => {
     const panelPath = resolve(PANEL_DIR, screen.file);
+    const panel = { path: panelPath, ...pngSize(panelPath) };
+    if (PANELS_ONLY) {
+      return { id: screen.id, version: builtVersion, panel };
+    }
+    const windowPath = resolve(OUTPUT_DIR, screen.file);
     return {
       id: screen.id,
       version: builtVersion,
       window: { path: windowPath, ...pngSize(windowPath) },
-      panel: { path: panelPath, ...pngSize(panelPath) },
+      panel,
     };
   });
   console.log(JSON.stringify(report, null, 2));

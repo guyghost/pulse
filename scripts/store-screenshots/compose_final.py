@@ -4,13 +4,12 @@
 Direction B (default, ``pnpm store-screenshots:final``) writes the approved
 1280×800 finals to ``docs/store-screenshots/0.2.5/final/``, plus ``board.png``.
 
-Direction A (``pnpm store-screenshots:final:a``) writes sample loupe frames to
-``docs/store-screenshots/0.2.5/direction-a/``. Each screen is one dict in
-``DIRECTION_A``: panel position and scale, loupe source rect (logical 1×
-panel pixels), loupe dest rect, zoom, caption box, font sizes and weights,
-and colors. Caption text accepts ``**bold**`` segments. Panel PNGs may be
-1× (420×661) or an integer multiple such as 2×; the scale is detected from
-the image size and source rects stay in logical pixels.
+Direction A (``pnpm store-screenshots:final:a``) writes the design-spec
+frames to ``docs/store-screenshots/0.2.5-dirA/``. It reads the 2× panel
+crops in ``0.2.5-dirA/panel/`` (840×1322). Loupe ``source`` rects are 1×
+coordinates and are multiplied by the detected input scale. A 2× panel uses
+panel scale 0.475 (0.95/2) and loupe scale 0.65 (1.3/2), which keeps the
+same rendered sizes as 1×.
 
 Font: vendored, not downloaded at runtime.
 ``fonts/Inter-VariableFont_opsz,wght.ttf`` is the Google Fonts Inter variable
@@ -99,247 +98,149 @@ TILE_GAP = 24
 TILE_COLUMNS = 3
 BOARD_MARGIN = 48
 
-# Native side-panel crop. Loupe `source` rects are always written in this 1×
-# space. `logical_crop` multiplies them by the detected input scale, so a 2×
-# panel (840×1322) crops twice as many pixels from the same config numbers.
+# Native side-panel crop. Loupe source rects below are 1× coordinates.
+# logical_crop multiplies them by the detected input scale.
 LOGICAL_PANEL = (420, 661)
-DIRECTION_A_DIR = ROOT / "docs" / "store-screenshots" / "0.2.5" / "direction-a"
+DIRECTION_A_DIR = ROOT / "docs" / "store-screenshots" / "0.2.5-dirA"
+DIRECTION_A_PANEL_DIR = DIRECTION_A_DIR / "panel"
 
-# Placeholder loupe zones. Replace any screen dict with the design spec;
-# every layout value lives here, nothing is hard-coded in the renderer.
-DIRECTION_A: dict[str, dict[str, object]] = {
-    "01b-feed-scrolled.png": {
-        "canvas": {"width": 1280, "height": 800, "background": (245, 247, 250)},
-        "panel": {
-            "x": 64,
-            "y": 80,
-            "scale": 0.88,
-            "radius": 16,
-            "shadow_blur": 18,
-            "shadow_offset": (0, 10),
-            "shadow_opacity": 0.18,
-            "shadow_color": (14, 26, 43),
-        },
-        "loupe": {
-            "source": {"x": 16, "y": 122, "w": 388, "h": 160},
-            "dest": {"x": 148, "y": 148, "w": 631, "h": 269},
-            "zoom": 1.8,
-            "border_width": 8,
-            "border_color": (255, 255, 255),
-            "radius": 24,
-            "shadow_blur": 22,
-            "shadow_offset": (0, 12),
-            "shadow_opacity": 0.2,
-            "shadow_color": (14, 26, 43),
-        },
-        "caption": {
-            "text": "4 plateformes.\n**1 seul feed**.",
-            "x": 860,
-            "y": 292,
-            "max_width": 360,
-            "line_height": 52,
-            "size": 40,
-            "weight": 400,
-            "bold_weight": 700,
-            "color": (14, 26, 43),
-            "bold_color": (14, 26, 43),
-        },
-        "note": {
-            "text": "Données d'exemple",
-            "x": 32,
-            "y": 776,
-            "anchor": "ls",
-            "size": 13,
-            "weight": 400,
-            "color": (95, 107, 120),
-        },
-    },
-    "02-mission-detail.png": {
-        "canvas": {"width": 1280, "height": 800, "background": (245, 247, 250)},
-        "panel": {
-            "x": 64,
-            "y": 80,
-            "scale": 0.88,
-            "radius": 16,
-            "shadow_blur": 18,
-            "shadow_offset": (0, 10),
-            "shadow_opacity": 0.18,
-            "shadow_color": (14, 26, 43),
-        },
-        "loupe": {
-            "source": {"x": 20, "y": 145, "w": 380, "h": 160},
-            "dest": {"x": 156, "y": 156, "w": 618, "h": 269},
-            "zoom": 1.8,
-            "border_width": 8,
-            "border_color": (255, 255, 255),
-            "radius": 24,
-            "shadow_blur": 22,
-            "shadow_offset": (0, 12),
-            "shadow_opacity": 0.2,
-            "shadow_color": (14, 26, 43),
-        },
-        "caption": {
-            "text": "Le score explique.\n**Tu décides**.",
-            "x": 860,
-            "y": 292,
-            "max_width": 360,
-            "line_height": 52,
-            "size": 40,
-            "weight": 400,
-            "bold_weight": 700,
-            "color": (14, 26, 43),
-            "bold_color": (14, 26, 43),
-        },
-        "note": {
-            "text": "Données d'exemple",
-            "x": 32,
-            "y": 776,
-            "anchor": "ls",
-            "size": 13,
-            "weight": 400,
-            "color": (95, 107, 120),
-        },
-    },
-    "03-filters-settings.png": {
-        "canvas": {"width": 1280, "height": 800, "background": (245, 247, 250)},
-        "panel": {
-            "x": 64,
-            "y": 80,
-            "scale": 0.88,
-            "radius": 16,
-            "shadow_blur": 18,
-            "shadow_offset": (0, 10),
-            "shadow_opacity": 0.18,
-            "shadow_color": (14, 26, 43),
-        },
-        "loupe": {
-            "source": {"x": 16, "y": 84, "w": 388, "h": 114},
-            "dest": {"x": 148, "y": 176, "w": 631, "h": 197},
-            "zoom": 1.8,
-            "border_width": 8,
-            "border_color": (255, 255, 255),
-            "radius": 24,
-            "shadow_blur": 22,
-            "shadow_offset": (0, 12),
-            "shadow_opacity": 0.2,
-            "shadow_color": (14, 26, 43),
-        },
-        "caption": {
-            "text": "Ton profil,\n**ton classement**.",
-            "x": 860,
-            "y": 292,
-            "max_width": 360,
-            "line_height": 52,
-            "size": 40,
-            "weight": 400,
-            "bold_weight": 700,
-            "color": (14, 26, 43),
-            "bold_color": (14, 26, 43),
-        },
-        "note": {
-            "text": "Données d'exemple",
-            "x": 32,
-            "y": 776,
-            "anchor": "ls",
-            "size": 13,
-            "weight": 400,
-            "color": (95, 107, 120),
-        },
-    },
-    "04-alerts.png": {
-        "canvas": {"width": 1280, "height": 800, "background": (245, 247, 250)},
-        "panel": {
-            "x": 64,
-            "y": 80,
-            "scale": 0.88,
-            "radius": 16,
-            "shadow_blur": 18,
-            "shadow_offset": (0, 10),
-            "shadow_opacity": 0.18,
-            "shadow_color": (14, 26, 43),
-        },
-        "loupe": {
-            "source": {"x": 32, "y": 84, "w": 370, "h": 136},
-            "dest": {"x": 160, "y": 164, "w": 602, "h": 231},
-            "zoom": 1.8,
-            "border_width": 8,
-            "border_color": (255, 255, 255),
-            "radius": 24,
-            "shadow_blur": 22,
-            "shadow_offset": (0, 12),
-            "shadow_opacity": 0.2,
-            "shadow_color": (14, 26, 43),
-        },
-        "caption": {
-            "text": "Tes alertes,\n**tes critères**.",
-            "x": 860,
-            "y": 292,
-            "max_width": 360,
-            "line_height": 52,
-            "size": 40,
-            "weight": 400,
-            "bold_weight": 700,
-            "color": (14, 26, 43),
-            "bold_color": (14, 26, 43),
-        },
-        "note": {
-            "text": "Données d'exemple",
-            "x": 32,
-            "y": 776,
-            "anchor": "ls",
-            "size": 13,
-            "weight": 400,
-            "color": (95, 107, 120),
-        },
-    },
-    "05b-local-privacy.png": {
-        "canvas": {"width": 1280, "height": 800, "background": (245, 247, 250)},
-        "panel": {
-            "x": 64,
-            "y": 80,
-            "scale": 0.88,
-            "radius": 16,
-            "shadow_blur": 18,
-            "shadow_offset": (0, 10),
-            "shadow_opacity": 0.18,
-            "shadow_color": (14, 26, 43),
-        },
-        "loupe": {
-            "source": {"x": 32, "y": 176, "w": 360, "h": 140},
-            "dest": {"x": 156, "y": 196, "w": 586, "h": 238},
-            "zoom": 1.8,
-            "border_width": 8,
-            "border_color": (255, 255, 255),
-            "radius": 24,
-            "shadow_blur": 22,
-            "shadow_offset": (0, 12),
-            "shadow_opacity": 0.2,
-            "shadow_color": (14, 26, 43),
-        },
-        "caption": {
-            "text": "Par défaut,\n**tout reste en local**.",
-            "x": 860,
-            "y": 292,
-            "max_width": 360,
-            "line_height": 52,
-            "size": 40,
-            "weight": 400,
-            "bold_weight": 700,
-            "color": (14, 26, 43),
-            "bold_color": (14, 26, 43),
-        },
-        "note": {
-            "text": "Données d'exemple",
-            "x": 32,
-            "y": 776,
-            "anchor": "ls",
-            "size": 13,
-            "weight": 400,
-            "color": (95, 107, 120),
-        },
-    },
+# Design spec, direction A. Shared numbers are the spec; each screen only
+# overrides the loupe rect, the caption parts, and (where the spec says so)
+# the forced loupe y, the bottom crop, and the subtitle.
+DIRECTION_A_CANVAS = {
+    "width": 1280,
+    "height": 800,
+    "background": (0xF5, 0xF7, 0xFA),
+    "tint": (0xE6, 0xEC, 0xF4),
+    "tint_width": 470,
+}
+DIRECTION_A_SHADOW = {
+    "blur": 18,
+    "offset": (0, 8),
+    "opacity": 0.22,
+    "color": (0x0E, 0x1A, 0x2B),
+}
+DIRECTION_A_PANEL = {
+    "x": 90,
+    "scale": 0.95,
+    "radius": 12,
+    **DIRECTION_A_SHADOW,
+}
+DIRECTION_A_LOUPE = {
+    "x": 240,
+    "scale": 1.3,
+    "radius": 14,
+    "y_nudge": 40,
+    "clamp_bottom": 56,
+    **DIRECTION_A_SHADOW,
+}
+DIRECTION_A_CAPTION = {
+    "x": 800,
+    "y": 338,
+    "y_with_subtitle": 308,
+    "max_width": 430,
+    "size": 50,
+    "line_height": 61,
+    "baseline_offset": 50,
+    "anchor": "ls",
+    "weight": 400,
+    "bold_weight": 700,
+    "color": (0x15, 0x22, 0x42),
+}
+DIRECTION_A_NOTE = {
+    "text": "Données d'exemple",
+    "x": 32,
+    "y": 776,
+    "anchor": "ls",
+    "size": 13,
+    "weight": 400,
+    "color": (0x5F, 0x6B, 0x78),
+}
+DIRECTION_A_SUBTITLE = {
+    "size": 22,
+    "weight": 400,
+    "color": (0x5F, 0x6B, 0x78),
+    "gap": 14,
+    "line_height": 30,
 }
 
+
+def direction_a_screen(
+    source: tuple[int, int, int, int],
+    box: tuple[int, int, int, int],
+    parts: tuple[tuple[str, int], ...],
+    *,
+    loupe_y: int | None = None,
+    crop_bottom: int | None = None,
+    subtitle: tuple[str, ...] | None = None,
+    panel_box: tuple[int, int, int, int],
+) -> dict[str, object]:
+    x0, y0, x1, y1 = source
+    loupe = {
+        **DIRECTION_A_LOUPE,
+        "source": {"x0": x0, "y0": y0, "x1": x1, "y1": y1},
+        "box": {"x": box[0], "y": box[1], "w": box[2], "h": box[3]},
+    }
+    if loupe_y is not None:
+        loupe["y"] = loupe_y
+    screen: dict[str, object] = {
+        "canvas": dict(DIRECTION_A_CANVAS),
+        "panel": {
+            **DIRECTION_A_PANEL,
+            "box": {"x": panel_box[0], "y": panel_box[1], "w": panel_box[2], "h": panel_box[3]},
+        },
+        "loupe": loupe,
+        "caption": {
+            **DIRECTION_A_CAPTION,
+            "parts": [{"text": text, "weight": weight} for text, weight in parts],
+        },
+        "note": dict(DIRECTION_A_NOTE),
+    }
+    if crop_bottom is not None:
+        screen["crop_bottom"] = crop_bottom
+    if subtitle is not None:
+        screen["subtitle"] = {**DIRECTION_A_SUBTITLE, "lines": list(subtitle)}
+    return screen
+
+
+# Loupe rects are (x0, y0, x1, y1) at 1×. box is the rendered loupe (x, y, w, h).
+_PANEL_BOX = (90, 86, 399, 628)
+_PANEL_BOX_05B = (90, 115, 399, 570)
+DIRECTION_A: dict[str, dict[str, object]] = {
+    "01b-feed-scrolled.png": direction_a_screen(
+        (16, 64, 390, 338),
+        (240, 187, 486, 356),
+        (("4 plateformes. ", 400), ("1 seul feed", 700), (".", 400)),
+        panel_box=_PANEL_BOX,
+    ),
+    "02-mission-detail.png": direction_a_screen(
+        (16, 130, 390, 416),
+        (240, 250, 486, 372),
+        (("Le score explique. ", 400), ("Tu décides", 700), (".", 400)),
+        panel_box=_PANEL_BOX,
+    ),
+    "03-filters-settings.png": direction_a_screen(
+        (16, 80, 388, 302),
+        (240, 202, 484, 289),
+        (("Ton profil, ", 400), ("ton classement", 700), (".", 400)),
+        panel_box=_PANEL_BOX,
+    ),
+    "04-alerts.png": direction_a_screen(
+        (54, 448, 352, 602),
+        (240, 400, 387, 200),
+        (("Tes alertes, ", 400), ("tes critères", 700), (".", 400)),
+        loupe_y=400,
+        panel_box=_PANEL_BOX,
+    ),
+    "05b-local-privacy.png": direction_a_screen(
+        (34, 216, 372, 590),
+        (240, 258, 439, 486),
+        (("Par défaut, ", 400), ("tout reste en local", 700), (".", 400)),
+        crop_bottom=600,
+        subtitle=("Export JSON, CSV ou Markdown.", "Sauvegarde locale."),
+        panel_box=_PANEL_BOX_05B,
+    ),
+}
 
 def sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -610,73 +511,52 @@ def composite_shadow(
 
 def logical_crop(image: Image.Image, source: dict[str, object], input_scale: int) -> Image.Image:
     """Crop a 1× source rect. Coordinates are scaled by the detected input scale."""
-    x = int(round(float(source["x"]) * input_scale))
-    y = int(round(float(source["y"]) * input_scale))
-    width = int(round(float(source["w"]) * input_scale))
-    height = int(round(float(source["h"]) * input_scale))
-    right = x + width
-    bottom = y + height
-    if x < 0 or y < 0 or right > image.width or bottom > image.height or width < 1 or height < 1:
+    x = int(round(float(source["x0"]) * input_scale))
+    y = int(round(float(source["y0"]) * input_scale))
+    right = int(round(float(source["x1"]) * input_scale))
+    bottom = int(round(float(source["y1"]) * input_scale))
+    if x < 0 or y < 0 or right > image.width or bottom > image.height or right <= x or bottom <= y:
         raise SystemExit(
-            f"Loupe source {source} at {input_scale}× is ({x}, {y}, {width}×{height}), "
+            f"Loupe source {source} at {input_scale}× is ({x}, {y})-({right}, {bottom}), "
             f"outside the {image.size[0]}×{image.size[1]} panel."
         )
     return image.crop((x, y, right, bottom))
 
 
-def resolve_loupe_box(
-    loupe: dict[str, object],
-    source: dict[str, object],
-    panel_scale: float,
-) -> tuple[int, int, int, int, int, int]:
-    """Return dest origin plus outer and inner sizes. Explicit dest w/h win over zoom."""
-    dest = loupe["dest"]
-    if not isinstance(dest, dict):
-        raise SystemExit("Loupe dest must be a dict")
-    border = int(loupe["border_width"])
-    dest_w = dest.get("w")
-    dest_h = dest.get("h")
-    if dest_w is None or dest_h is None:
-        zoom = float(loupe["zoom"])
-        inner_w = round(float(source["w"]) * panel_scale * zoom)
-        inner_h = round(float(source["h"]) * panel_scale * zoom)
-        outer_w = inner_w + border * 2
-        outer_h = inner_h + border * 2
-    else:
-        outer_w = int(dest_w)
-        outer_h = int(dest_h)
-        inner_w = outer_w - border * 2
-        inner_h = outer_h - border * 2
-    if inner_w < 2 or inner_h < 2:
-        raise SystemExit(f"Loupe inner size {inner_w}×{inner_h} is too small for border {border}.")
-    return int(dest["x"]), int(dest["y"]), outer_w, outer_h, inner_w, inner_h
-
-
-def draw_markup(
-    draw: ImageDraw.ImageDraw,
-    caption: dict[str, object],
+def caption_lines(
+    parts: list[dict[str, object]],
     regular: ImageFont.FreeTypeFont,
     bold: ImageFont.FreeTypeFont,
-) -> None:
-    origin_x = int(caption["x"])
-    origin_y = int(caption["y"])
-    line_height = int(caption["line_height"])
-    max_width = float(caption["max_width"])
-    color = rgb(caption["color"])
-    bold_color = rgb(caption["bold_color"])
-    y = origin_y
-    for raw_line in str(caption["text"]).split("\n"):
-        wrapped = wrap_markup_line(markup_runs(raw_line), regular, bold, max_width)
-        if not wrapped:
-            y += line_height
-            continue
-        for line in wrapped:
-            x = origin_x
-            for segment, is_bold in line:
-                font = bold if is_bold else regular
-                draw.text((x, y), segment, font=font, fill=bold_color if is_bold else color, anchor="lt")
-                x += font.getlength(segment)
-            y += line_height
+    max_width: float,
+) -> list[list[tuple[str, int]]]:
+    """One line when it fits. Otherwise break between the regular prefix and the bold part."""
+    segments = [(str(part["text"]), int(part["weight"])) for part in parts]
+
+    def font_for(weight: int) -> ImageFont.FreeTypeFont:
+        return bold if weight >= 700 else regular
+
+    def width_of(line: list[tuple[str, int]]) -> float:
+        return sum(font_for(weight).getlength(text) for text, weight in line)
+
+    if width_of(segments) <= max_width:
+        return [segments]
+    bold_at = next((index for index, (_, weight) in enumerate(segments) if weight >= 700), None)
+    if bold_at is None or bold_at == 0:
+        raise SystemExit(f"Caption exceeds {max_width}px and has no regular/bold break: {segments!r}")
+    first = segments[:bold_at]
+    text, weight = first[-1]
+    first[-1] = (text.rstrip(), weight)
+    first = [(text, weight) for text, weight in first if text]
+    second = list(segments[bold_at:])
+    text, weight = second[0]
+    second[0] = (text.lstrip(), weight)
+    lines = [line for line in (first, second) if line]
+    for line in lines:
+        measured = width_of(line)
+        if measured > max_width:
+            rendered = "".join(text for text, _weight in line)
+            raise SystemExit(f"Caption line {rendered!r} is {measured:.1f}px, max {max_width}px.")
+    return lines
 
 
 def compose_loupe_slide(panel_image: Image.Image, spec: dict[str, object]) -> tuple[Image.Image, int]:
@@ -688,72 +568,149 @@ def compose_loupe_slide(panel_image: Image.Image, spec: dict[str, object]) -> tu
     source = loupe["source"]
     if not isinstance(source, dict):
         raise SystemExit("Loupe source must be a dict")
+    expected_box = loupe["box"]
+    if not isinstance(expected_box, dict):
+        raise SystemExit("Loupe box must be a dict")
+    expected_panel = panel_spec["box"]
+    if not isinstance(expected_panel, dict):
+        raise SystemExit("Panel box must be a dict")
 
     width = int(canvas_spec["width"])
     height = int(canvas_spec["height"])
     background = rgb(canvas_spec["background"])
-    input_scale = detect_input_scale(panel_image)
+    tint = rgb(canvas_spec["tint"])
+    tint_width = int(canvas_spec["tint_width"])
+    full = panel_image.convert("RGBA")
+    input_scale = detect_input_scale(full)
+    crop_bottom = spec.get("crop_bottom")
+    if isinstance(crop_bottom, int):
+        cut = int(round(crop_bottom * input_scale))
+        full = full.crop((0, 0, full.width, cut))
+        logical_height = crop_bottom
+    else:
+        logical_height = LOGICAL_PANEL[1]
+
     panel_scale = float(panel_spec["scale"])
     display = (
         round(LOGICAL_PANEL[0] * panel_scale),
-        round(LOGICAL_PANEL[1] * panel_scale),
+        round(logical_height * panel_scale),
     )
-    panel = panel_image.convert("RGBA").resize(display, Image.Resampling.LANCZOS)
-    panel_origin = (int(panel_spec["x"]), int(panel_spec["y"]))
-    panel_mask = rounded_mask(display, int(panel_spec["radius"]))
+    panel_origin = (int(panel_spec["x"]), (height - display[1]) // 2)
+    if (
+        panel_origin[0] != int(expected_panel["x"])
+        or panel_origin[1] != int(expected_panel["y"])
+        or display != (int(expected_panel["w"]), int(expected_panel["h"]))
+    ):
+        raise SystemExit(
+            f"Panel renders at {panel_origin} {display[0]}×{display[1]}, "
+            f"spec box is {expected_panel}."
+        )
 
-    canvas = Image.new("RGBA", (width, height), (*background, 255))
-    panel_offset = panel_spec["shadow_offset"]
+    panel = full.resize(display, Image.Resampling.LANCZOS)
+    panel_mask = rounded_mask(display, int(panel_spec["radius"]))
+    base = Image.new("RGB", (width, height), background)
+    ImageDraw.Draw(base).rectangle((0, 0, tint_width - 1, height - 1), fill=tint)
+    canvas = base.convert("RGBA")
+    panel_offset = panel_spec["offset"]
     if not isinstance(panel_offset, tuple):
-        raise SystemExit("Panel shadow_offset must be a tuple")
+        raise SystemExit("Panel shadow offset must be a tuple")
     composite_shadow(
         canvas,
         panel_mask,
         panel_origin,
-        blur=int(panel_spec["shadow_blur"]),
+        blur=int(panel_spec["blur"]),
         offset=(int(panel_offset[0]), int(panel_offset[1])),
-        opacity=float(panel_spec["shadow_opacity"]),
-        color=rgb(panel_spec["shadow_color"]),
+        opacity=float(panel_spec["opacity"]),
+        color=rgb(panel_spec["color"]),
     )
     clipped = panel.copy()
     clipped.putalpha(panel_mask)
     canvas.paste(clipped, panel_origin, clipped)
 
-    crop = logical_crop(panel_image.convert("RGBA"), source, input_scale)
-    dest_x, dest_y, outer_w, outer_h, inner_w, inner_h = resolve_loupe_box(loupe, source, panel_scale)
-    border = int(loupe["border_width"])
-    radius = int(loupe["radius"])
-    magnified = crop.resize((inner_w, inner_h), Image.Resampling.LANCZOS)
-    inner_mask = rounded_mask((inner_w, inner_h), max(0, radius - border))
-    magnified.putalpha(inner_mask)
-    plate = Image.new("RGBA", (outer_w, outer_h), (*rgb(loupe["border_color"]), 255))
-    outer_mask = rounded_mask((outer_w, outer_h), radius)
-    plate.putalpha(outer_mask)
-    plate.paste(magnified, (border, border), magnified)
+    crop = logical_crop(full, source, input_scale)
+    x0 = float(source["x0"])
+    y0 = float(source["y0"])
+    loupe_w = round((float(source["x1"]) - x0) * float(loupe["scale"]))
+    loupe_h = round((float(source["y1"]) - y0) * float(loupe["scale"]))
+    loupe_x = int(loupe["x"])
+    if "y" in loupe:
+        loupe_y = int(loupe["y"])
+    else:
+        loupe_y = round(panel_origin[1] + y0 * panel_scale + float(loupe["y_nudge"]))
+        loupe_y = min(loupe_y, height - int(loupe["clamp_bottom"]) - loupe_h)
+    if (loupe_x, loupe_y, loupe_w, loupe_h) != (
+        int(expected_box["x"]),
+        int(expected_box["y"]),
+        int(expected_box["w"]),
+        int(expected_box["h"]),
+    ):
+        raise SystemExit(
+            f"Loupe renders at ({loupe_x}, {loupe_y}) {loupe_w}×{loupe_h}, spec box is {expected_box}."
+        )
+    caption_limit = int(caption["x"]) - 60
+    if loupe_x + loupe_w > caption_limit:
+        raise SystemExit(f"Loupe right edge {loupe_x + loupe_w} passes {caption_limit}.")
 
-    loupe_offset = loupe["shadow_offset"]
+    magnified = crop.resize((loupe_w, loupe_h), Image.Resampling.LANCZOS)
+    loupe_mask = rounded_mask((loupe_w, loupe_h), int(loupe["radius"]))
+    magnified.putalpha(loupe_mask)
+    loupe_offset = loupe["offset"]
     if not isinstance(loupe_offset, tuple):
-        raise SystemExit("Loupe shadow_offset must be a tuple")
+        raise SystemExit("Loupe shadow offset must be a tuple")
     composite_shadow(
         canvas,
-        outer_mask,
-        (dest_x, dest_y),
-        blur=int(loupe["shadow_blur"]),
+        loupe_mask,
+        (loupe_x, loupe_y),
+        blur=int(loupe["blur"]),
         offset=(int(loupe_offset[0]), int(loupe_offset[1])),
-        opacity=float(loupe["shadow_opacity"]),
-        color=rgb(loupe["shadow_color"]),
+        opacity=float(loupe["opacity"]),
+        color=rgb(loupe["color"]),
     )
-    canvas.alpha_composite(plate, (dest_x, dest_y))
+    canvas.paste(magnified, (loupe_x, loupe_y), magnified)
 
     flat = Image.new("RGB", (width, height), background)
     flat.paste(canvas, (0, 0), canvas)
     draw = ImageDraw.Draw(flat)
-    draw_markup(
-        draw,
-        caption,
-        inter(int(caption["size"]), int(caption["weight"])),
-        inter(int(caption["size"]), int(caption["bold_weight"])),
-    )
+    parts = caption["parts"]
+    if not isinstance(parts, list):
+        raise SystemExit("Caption parts must be a list")
+    regular = inter(int(caption["size"]), int(caption["weight"]))
+    bold = inter(int(caption["size"]), int(caption["bold_weight"]))
+    subtitle = spec.get("subtitle")
+    line_y = int(caption["y_with_subtitle"] if isinstance(subtitle, dict) else caption["y"])
+    max_width = float(caption["max_width"])
+    color = rgb(caption["color"])
+    for line in caption_lines(parts, regular, bold, max_width):
+        baseline = line_y + int(caption["baseline_offset"])
+        cursor = int(caption["x"])
+        for text, weight in line:
+            font = bold if weight >= 700 else regular
+            draw.text((cursor, baseline), text, font=font, fill=color, anchor="ls")
+            cursor += font.getlength(text)
+        line_y += int(caption["line_height"])
+    if isinstance(subtitle, dict):
+        subtitle_font = inter(int(subtitle["size"]), int(subtitle["weight"]))
+        subtitle_color = rgb(subtitle["color"])
+        subtitle_y = line_y + int(subtitle["gap"])
+        lines = subtitle["lines"]
+        if not isinstance(lines, list) or not lines:
+            raise SystemExit("Subtitle lines must be a non-empty list")
+        for raw_line in lines:
+            sentence = str(raw_line)
+            words = sentence.split()
+            if len(words) < 2:
+                raise SystemExit(f"Subtitle line is a single word: {sentence!r}")
+            measured = subtitle_font.getlength(sentence)
+            if measured > max_width:
+                raise SystemExit(f"Subtitle line {sentence!r} is {measured:.1f}px, max {max_width}px.")
+            draw.text(
+                (int(caption["x"]), subtitle_y),
+                sentence,
+                font=subtitle_font,
+                fill=subtitle_color,
+                anchor="lt",
+            )
+            subtitle_y += int(subtitle["line_height"])
     note_font = inter(int(note["size"]), int(note["weight"]))
     draw.text(
         (int(note["x"]), int(note["y"])),
@@ -762,6 +719,8 @@ def compose_loupe_slide(panel_image: Image.Image, spec: dict[str, object]) -> tu
         fill=rgb(note["color"]),
         anchor=str(note.get("anchor", "ls")),
     )
+    if flat.mode != "RGB" or flat.size != (width, height):
+        raise SystemExit(f"Frame is {flat.mode} {flat.size}, expected RGB {width}×{height}.")
     return flat, input_scale
 
 
@@ -835,7 +794,7 @@ def compose_direction_a() -> int:
 
     pending: list[tuple[str, Path, dict[str, object]]] = []
     for filename, spec in DIRECTION_A.items():
-        source = PANEL_DIR / filename
+        source = DIRECTION_A_PANEL_DIR / filename
         if not source.is_file():
             print(f"input  {filename} MISSING", file=sys.stderr)
             return 1
@@ -847,8 +806,10 @@ def compose_direction_a() -> int:
         slide, input_scale = compose_loupe_slide(panel, spec)
         canvas = require_mapping(spec, "canvas")
         expected = (int(canvas["width"]), int(canvas["height"]))
-        if slide.size != expected:
-            raise SystemExit(f"{filename} is {slide.size[0]}×{slide.size[1]}, expected {expected[0]}×{expected[1]}")
+        if slide.mode != "RGB" or slide.size != expected:
+            raise SystemExit(
+                f"{filename} is {slide.mode} {slide.size[0]}×{slide.size[1]}, expected RGB {expected[0]}×{expected[1]}"
+            )
         destination = DIRECTION_A_DIR / filename
         slide.save(destination, "PNG")
         print(
