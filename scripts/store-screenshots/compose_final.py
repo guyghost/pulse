@@ -4,9 +4,11 @@
 Direction B (default, ``pnpm store-screenshots:final``) writes the approved
 1280×800 finals to ``docs/store-screenshots/0.2.5/final/``, plus ``board.png``.
 
-Direction A (``pnpm store-screenshots:final:a``) writes the design-spec
-frames to ``docs/store-screenshots/0.2.5-dirA/``. It reads the 2× panel
-crops in ``0.2.5-dirA/panel/`` (840×1322). Loupe ``source`` rects are 1×
+Direction A (``pnpm store-screenshots:final:a``) writes its output frames
+to ``docs/store-screenshots/0.2.5-dirA/``. It reads the 2× panel crops in
+``docs/store-screenshots/0.2.5-dirA/panel/``. Full panels are 840×1322.
+``05b-local-privacy.png`` is stored already cropped to 840×1200 so
+« Diagnostics IA » is not in the file. Loupe ``source`` rects are 1×
 coordinates and are multiplied by the detected input scale. A 2× panel uses
 panel scale 0.475 (0.95/2) and loupe scale 0.65 (1.3/2), which keeps the
 same rendered sizes as 1×.
@@ -387,23 +389,31 @@ def require_mapping(spec: dict[str, object], key: str) -> dict[str, object]:
     return value
 
 
-def detect_input_scale(image: Image.Image) -> int:
-    """Return the integer pixel scale of a panel crop (1× is 420×661, 2× is 840×1322)."""
-    logical_w, logical_h = LOGICAL_PANEL
+def detect_input_scale(
+    image: Image.Image,
+    logical_heights: tuple[int, ...] = (LOGICAL_PANEL[1],),
+) -> int:
+    """Return the integer pixel scale of a panel crop (1× is 420×661, 2× is 840×1322).
+
+    Height may also match a declared bottom crop, such as 05b at 600×scale
+    (1200px when the input is 2×).
+    """
+    logical_w = LOGICAL_PANEL[0]
     scale_x = image.width / logical_w
-    scale_y = image.height / logical_h
     nearest = round(scale_x)
-    if (
-        nearest < 1
-        or abs(scale_x - nearest) > 0.03
-        or abs(scale_y - nearest) > 0.03
-        or abs(scale_x - scale_y) > 0.03
-    ):
+    if nearest < 1 or abs(scale_x - nearest) > 0.03:
         raise SystemExit(
-            f"Panel is {image.size[0]}×{image.size[1]}, expected an integer multiple of "
-            f"{logical_w}×{logical_h} (measured scale x={scale_x:.3f} y={scale_y:.3f})."
+            f"Panel is {image.size[0]}×{image.size[1]}, expected a width that is an integer "
+            f"multiple of {logical_w} (measured scale x={scale_x:.3f})."
         )
-    return nearest
+    for logical_h in logical_heights:
+        scale_y = image.height / logical_h
+        if abs(scale_y - nearest) <= 0.03:
+            return nearest
+    expected = ", ".join(str(logical_h * nearest) for logical_h in logical_heights)
+    raise SystemExit(
+        f"Panel is {image.size[0]}×{image.size[1]}, expected height {expected} at {nearest}×."
+    )
 
 
 def markup_runs(text: str) -> list[tuple[str, bool]]:
@@ -581,8 +591,11 @@ def compose_loupe_slide(panel_image: Image.Image, spec: dict[str, object]) -> tu
     tint = rgb(canvas_spec["tint"])
     tint_width = int(canvas_spec["tint_width"])
     full = panel_image.convert("RGBA")
-    input_scale = detect_input_scale(full)
     crop_bottom = spec.get("crop_bottom")
+    logical_heights = [LOGICAL_PANEL[1]]
+    if isinstance(crop_bottom, int):
+        logical_heights.append(crop_bottom)
+    input_scale = detect_input_scale(full, tuple(logical_heights))
     if isinstance(crop_bottom, int):
         cut = int(round(crop_bottom * input_scale))
         full = full.crop((0, 0, full.width, cut))
