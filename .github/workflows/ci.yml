@@ -250,7 +250,7 @@ jobs:
       - id: upload-mv3-evidence
         name: Upload MV3 Playwright evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: missionpulse-mv3-evidence-${{ github.run_id }}-${{ github.run_attempt }}
           path: output/playwright/
@@ -331,7 +331,7 @@ jobs:
 
       - id: upload
         name: Upload the exact attested transport bytes
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: missionpulse-sealed-candidate
           path: ${{ steps.build.outputs.transport-path }}
