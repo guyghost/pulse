@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
 import MissionComparison from '../../../src/ui/organisms/MissionComparison.svelte';
+import { dialogTabStops } from './fixtures/focusables';
 import type { Mission } from '$lib/core/types/mission';
 import type { Grade, ScoreBreakdown } from '$lib/core/types/score';
 
@@ -169,21 +170,39 @@ describe('MissionComparison modal focus', () => {
     expect(document.activeElement).toBe(close);
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
 
-    // The disclosure toggle is now keyboard-focusable (no tabindex="-1"), so it
-    // joins the trap as the last tab stop. Forward Tab must wrap to the first
-    // focusable (the mission link), proving the trap still cycles correctly.
+    // The disclosure toggle is keyboard-focusable (no tabindex="-1") and joins
+    // the trap. Tab stops are resolved from the dialog in tree order so the
+    // assertions do not depend on jsdom's node ordering.
     const toggle = document.querySelector<HTMLButtonElement>(
       'button[aria-controls="comparison-details"]'
     );
     expect(toggle?.getAttribute('tabindex')).toBeNull();
 
-    toggle!.focus();
+    const tabStops = dialogTabStops(dialog!);
+    expect(tabStops.length).toBeGreaterThan(1);
+    expect(tabStops).toContain(toggle);
+    const firstTabStop = tabStops[0];
+    const lastTabStop = tabStops.at(-1)!;
+
+    // Forward Tab on the last tab stop wraps to the first.
+    lastTabStop.focus();
+    expect(document.activeElement).toBe(lastTabStop);
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     );
-    expect(document.activeElement).toBe(
-      document.querySelector<HTMLAnchorElement>('[data-modal-mission-link]')
+    expect(document.activeElement).toBe(firstTabStop);
+
+    // Shift+Tab on the first tab stop wraps back to the last.
+    firstTabStop.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
     );
+    expect(document.activeElement).toBe(lastTabStop);
 
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })

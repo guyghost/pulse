@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick, unmount } from 'svelte';
 import BackupRestoreModal from '../../../src/ui/molecules/BackupRestoreModal.svelte';
+import { dialogTabStops } from './fixtures/focusables';
 import { createBackup, type BackupData } from '../../../src/lib/core/backup/backup';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 import type { AppSettings } from '../../../src/lib/core/types/app-settings';
@@ -169,13 +170,23 @@ describe('BackupRestoreModal — modal focus contract', () => {
     expect(document.activeElement).toBe(confirmation);
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
 
-    confirmation!.focus();
+    const tabStops = dialogTabStops(dialog!);
+    expect(tabStops.length).toBeGreaterThan(1);
+    expect(tabStops).toContain(confirmation);
+    expect(tabStops).toContain(cancel);
+    const firstTabStop = tabStops[0];
+    const lastTabStop = tabStops.at(-1)!;
+
+    // Forward Tab on the last tab stop wraps to the first.
+    lastTabStop.focus();
+    expect(document.activeElement).toBe(lastTabStop);
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     );
-    expect(document.activeElement).toBe(cancel);
+    expect(document.activeElement).toBe(firstTabStop);
 
-    cancel!.focus();
+    // Shift+Tab on the first tab stop wraps back to the last.
+    firstTabStop.focus();
     document.dispatchEvent(
       new KeyboardEvent('keydown', {
         key: 'Tab',
@@ -184,7 +195,7 @@ describe('BackupRestoreModal — modal focus contract', () => {
         cancelable: true,
       })
     );
-    expect(document.activeElement).toBe(confirmation);
+    expect(document.activeElement).toBe(lastTabStop);
 
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
