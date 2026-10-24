@@ -27,7 +27,7 @@ async function onHost<T>(
   }
 }
 
-describe.sequential('release runtime host-admission capability boundary', () => {
+describe('release runtime host-admission capability boundary', () => {
   it.each([
     ['darwin', 'x64'],
     ['linux', 'arm64'],
