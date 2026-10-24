@@ -9,6 +9,18 @@ updates:
         update-types:
           - 'minor'
           - 'patch'
+    # Versions pinned by runtime contracts. Bumping any of these requires a
+    # dedicated upgrade PR that updates the contract, not a blind group bump.
+    # - eve + ai: apps/landing/tests/eve/eve-surface.test.ts
+    # - @playwright/test: apps/extension/tests/mv3/harness/chromium-process.ts
+    # Dependabot cannot scope an ignore to one workspace, so ignoring `ai` here
+    # also stops the extension's ^7.x line from auto-updating: it takes ai bumps
+    # manually until the landing leaves eve 0.37.
+    ignore:
+      - dependency-name: 'eve'
+      - dependency-name: 'ai'
+      - dependency-name: '@playwright/test'
+      - dependency-name: 'playwright-core'
   - package-ecosystem: 'github-actions'
     directory: '/'
     schedule:
