@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -15,8 +15,8 @@ describe('Eve landing surface', () => {
     };
     const svelteConfig = readLandingFile('svelte.config.js');
 
-    expect(packageJson.dependencies.eve).toBe('0.37.1');
-    expect(packageJson.dependencies.ai).toBe('7.0.65');
+    expect(packageJson.dependencies.eve).toBe('0.83.2');
+    expect(packageJson.dependencies.ai).toBe('7.0.153');
     expect(packageJson.dependencies['@vercel/oidc']).toBe('4.0.3');
     expect(packageJson.engines.node).toBe('24.x');
     expect(svelteConfig).toContain("runtime: 'nodejs24.x'");
@@ -73,31 +73,16 @@ describe('Eve landing surface', () => {
     const agent = readLandingFile('agent/agent.ts');
     expect(agent).toContain("model: 'anthropic/claude-sonnet-5'");
     expect(agent).toContain('modelContextWindowTokens: 1_000_000');
-    expect(agent).toContain('maxInputTokensPerSession: 32_000');
-    expect(agent).toContain('maxOutputTokensPerSession: 8_000');
+    expect(agent).toContain('sessionUsage: ({ window })');
+    expect(agent).toContain('window.inputTokens - window.cacheReadTokens >= 32_000');
+    expect(agent).toContain('window.outputTokens >= 8_000');
   });
 
-  it('explicitly disables every dangerous default tool', () => {
-    const toolNames = [
-      'bash',
-      'read_file',
-      'write_file',
-      'glob',
-      'grep',
-      'web_fetch',
-      'web_search',
-      'agent',
-      'todo',
-      'ask_question',
-    ];
+  it('keeps the model-facing tool surface empty', () => {
+    const agent = readLandingFile('agent/agent.ts');
 
-    for (const toolName of toolNames) {
-      const source = readLandingFile(`agent/tools/${toolName}.ts`);
-      expect(source, `${toolName} must import disableTool`).toContain(
-        "import { disableTool } from 'eve/tools'"
-      );
-      expect(source, `${toolName} must be disabled`).toContain('export default disableTool()');
-    }
+    expect(agent).toContain('defaultTools: false');
+    expect(existsSync(resolve(landingDir, 'agent/tools'))).toBe(false);
   });
 
   it('labels mission and profile content as untrusted data', () => {

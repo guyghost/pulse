@@ -1,12 +1,12 @@
 # Eve Session Lifecycle Model
 
-Source de vérité pour le cycle de vie des sessions Eve côté landing, depuis
-l'upgrade vers Eve 0.37 (sessions durables adressées par ID, suppression des
+Source de vérité pour le cycle de vie des sessions Eve côté landing, vérifiée
+avec Eve 0.83.2 (sessions durables adressées par ID, suppression des
 continuation tokens).
 
 ## Contexte
 
-Eve 0.37 remplace l'API `client.session()` par une collection
+Depuis Eve 0.37, l'API `client.session()` est remplacée par une collection
 `client.sessions` :
 
 - `create(input)` : crée la session ET envoie le premier tour ; retourne
@@ -38,11 +38,11 @@ conservé pour compatibilité de stockage mais devient **vestigial : toujours
 
 ## Événements / transitions
 
-| Événement        | Premier tour                                | Follow-up                                        |
-| ---------------- | ------------------------------------------- | ------------------------------------------------ |
-| `run(session=null)` | `client.sessions.create({message, …})`  | —                                                |
-| `run(session)`   | —                                           | `client.sessions.attach(sessionId, {streamIndex: 0}).send(message, …)` |
-| `cancel(sessionId)` | `client.sessions.attach(sessionId, {streamIndex: 0}).cancel()` | — |
+| Événement           | Premier tour                                                   | Follow-up                                                              |
+| ------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `run(session=null)` | `client.sessions.create({message, …})`                         | —                                                                      |
+| `run(session)`      | —                                                              | `client.sessions.attach(sessionId, {streamIndex: 0}).send(message, …)` |
+| `cancel(sessionId)` | `client.sessions.attach(sessionId, {streamIndex: 0}).cancel()` | —                                                                      |
 
 ## Effets de bord
 
@@ -65,7 +65,7 @@ conservé pour compatibilité de stockage mais devient **vestigial : toujours
    ou `string` — inchangée.
 4. La réécriture idempotente
    (`recordProviderSessionWithRecovery`) compare `durable.continuationToken
-   === session.continuationToken` : `null === null` reste vrai.
+=== session.continuationToken` : `null === null` reste vrai.
 5. Les transitions métier restent possédées par la machine à états XState
    (`remoteCopilotJobMachine`) ; le transport ne fait que signaler
    `{status, data, sessionId}`. Le LLM produit du contenu, jamais une
