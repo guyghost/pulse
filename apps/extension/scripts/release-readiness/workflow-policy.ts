@@ -7,7 +7,7 @@ import { jcsCanonicalize, sha256Hex } from './canonical';
 const MAX_WORKFLOW_BLOB_BYTES = 262_144;
 const MAX_PRIVILEGED_WORKFLOW_USES = 32;
 const OFFICIAL_ATTEST_SHA = '1e69f48acb82d1966a394da916b4c1698aa569d6';
-const OFFICIAL_UPLOAD_SHA = '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
+const OFFICIAL_UPLOAD_SHA = 'cf430e030ddbb5b0abf93d22962f4752f3646cd9';
 const MV3_DIAGNOSTIC_JOB_ID = 'test-mv3';
 const MV3_DIAGNOSTIC_STEP_ID = 'upload-mv3-evidence';
 const MV3_DIAGNOSTIC_NAME =
@@ -18,8 +18,8 @@ const VERIFY_UPLOAD_DIGEST_RUN = `[[ "$CAPTURED_TRANSPORT_SHA256" =~ ^[0-9a-f]{6
 `;
 const REVIEWED_ACTION_PINS = new Map<string, string>([
   ['actions/checkout', '3d3c42e5aac5ba805825da76410c181273ba90b1'],
-  ['actions/setup-node', '820762786026740c76f36085b0efc47a31fe5020'],
-  ['actions/setup-python', '5fda3b95a4ea91299a34e894583c3862153e4b97'],
+  ['actions/setup-node', '949feb2413d6458794dcd2491c4babbbce0c15c1'],
+  ['actions/setup-python', '6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'],
   ['pnpm/action-setup', 'ea17c68df8912ef543352723c149a84f56e3d413'],
   ['actions/attest', OFFICIAL_ATTEST_SHA],
   ['actions/upload-artifact', OFFICIAL_UPLOAD_SHA],
@@ -178,7 +178,7 @@ function validateOfficialReleaseActions(
   }
   if (uploadUses.length !== 1 || uploadUses[0]?.commitSha !== OFFICIAL_UPLOAD_SHA) {
     throw new ReleaseWorkflowPolicyError(
-      'The official actions/upload-artifact action must appear once at the reviewed v7.0.1 pin.'
+      'The official actions/upload-artifact action must appear once at the reviewed v7.0.2 pin.'
     );
   }
 

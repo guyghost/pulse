@@ -1440,7 +1440,7 @@ interface ProducerHostToolMaterialsPolicyV1 {
   policySha256: Sha256;
   runner: 'ubuntu-24.04';
   architecture: 'x64';
-  setupNodeAction: 'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020';
+  setupNodeAction: 'actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1';
   setupPnpmAction: 'pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86';
   node: {
     version: '22.23.1';
@@ -2846,7 +2846,7 @@ interface DerivedDirectUploadAuthorityV1 {
   privilegedJobProjectionSha256: Sha256;
   correlation: ProducerRunCorrelationV1;
   stepId: 'upload';
-  actionUsesLiteral: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
+  actionUsesLiteral: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9';
   inputs: {
     name: 'missionpulse-sealed-candidate';
     pathExpression: '${{ steps.verify-attestation.outputs.transport-path }}';
@@ -3293,7 +3293,7 @@ adding it here would require a new parent model review before START.
 The same committed workflow may contain the parent model's separately projected
 read-only `test-mv3` diagnostic job. It grants only `contents: read`; its
 `upload-mv3-evidence` step uses
-`actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`, exact
+`actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9`, exact
 condition `always()`, name
 `missionpulse-mv3-evidence-${{ github.run_id }}-${{ github.run_attempt }}`,
 path `output/playwright/`, `if-no-files-found:error`, `overwrite:false`, and
@@ -3315,7 +3315,7 @@ committed run steps below, then exactly these two remote-effect actions:
 
 ```text
 actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
-actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
 ```
 
 No reusable workflow, matrix, service, container action, local action, tag,

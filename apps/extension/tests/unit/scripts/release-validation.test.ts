@@ -343,7 +343,7 @@ describe('Release validation — fail-closed artifact contracts', () => {
     expect(runs).not.toContain('test:mv3');
 
     const upload = steps.find(
-      (step) => step.uses === 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+      (step) => step.uses === 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9'
     );
     expect(upload).toMatchObject({
       with: {
