@@ -1,29 +1,22 @@
 <script lang="ts">
-  import { browser } from '$app/environment';
+  import { browser } from '$app/env';
   import { goto } from '$app/navigation';
   import { page } from '$app/state';
+  import { normalizeLoginRedirect } from '#lib/auth/login-redirect.js';
   import {
     passkeyErrorMessage,
     requestEmailSessionLink,
     signInWithPasskey,
-  } from '$lib/auth/passkey';
+  } from '#lib/auth/passkey.js';
 
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
   let linkSent = $state(false);
   let submitting = $state(false);
   const redirectTo = $derived(
-    browser ? normalizeRedirectPath(page.url.searchParams.get('redirectTo')) : '/dashboard'
+    browser ? normalizeLoginRedirect(page.url.searchParams.get('redirectTo')) : '/dashboard'
   );
   const loginIntent = $derived(getLoginIntent(redirectTo));
-
-  function normalizeRedirectPath(value: string | null): string {
-    if (!value || !value.startsWith('/') || value.startsWith('//')) {
-      return '/dashboard';
-    }
-
-    return value;
-  }
 
   function getLoginIntent(path: string): {
     title: string;
@@ -110,7 +103,7 @@
             stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
-          />
+          ></polyline>
         </svg>
       </div>
       <span class="nav__title">Mission<span>Pulse</span></span>
@@ -156,9 +149,9 @@
                 stroke-linecap="round"
                 stroke-linejoin="round"
               >
-                <circle cx="12" cy="12" r="10" />
-                <line x1="15" y1="9" x2="9" y2="15" />
-                <line x1="9" y1="9" x2="15" y2="15" />
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="15" y1="9" x2="9" y2="15"></line>
+                <line x1="9" y1="9" x2="15" y2="15"></line>
               </svg>
               {formError}
             </div>

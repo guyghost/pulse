@@ -1,10 +1,9 @@
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { EXTENSION_LINK_TTL_MS } from '$lib/server/extension-link';
-import { enforceRateLimits, NO_STORE_HEADERS } from '$lib/server/rate-limit';
-import { getCanonicalPublicOrigin } from '$lib/server/public-origin';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import { EXTENSION_LINK_TTL_MS } from '#lib/server/extension-link.js';
+import { enforceRateLimits, NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
+import { getCanonicalPublicOrigin } from '#lib/server/public-origin.js';
 
 const LinkStartSchema = z.object({
   installId: z.string().min(8).max(128),
@@ -20,7 +19,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     now
   );
   if (!ipDecision.ok) {
-    return json(
+    return Response.json(
       { error: ipDecision.kind === 'denied' ? 'RATE_LIMITED' : 'RATE_LIMIT_UNAVAILABLE' },
       {
         status: ipDecision.kind === 'denied' ? 429 : 503,
@@ -34,7 +33,10 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
   const parsed = LinkStartSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return json({ error: 'INVALID_LINK_REQUEST' }, { status: 400, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'INVALID_LINK_REQUEST' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
   }
   const installDecision = await enforceRateLimits(
     admin,
@@ -42,7 +44,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     now
   );
   if (!installDecision.ok) {
-    return json(
+    return Response.json(
       { error: installDecision.kind === 'denied' ? 'RATE_LIMITED' : 'RATE_LIMIT_UNAVAILABLE' },
       {
         status: installDecision.kind === 'denied' ? 429 : 503,
@@ -56,7 +58,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
   const origin = getCanonicalPublicOrigin();
   if (origin === null) {
-    return json(
+    return Response.json(
       { error: 'PUBLIC_ORIGIN_NOT_CONFIGURED' },
       { status: 503, headers: NO_STORE_HEADERS }
     );
@@ -75,10 +77,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     .single();
 
   if (error || !data) {
-    return json({ error: 'LINK_CREATE_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'LINK_CREATE_FAILED' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 
-  return json(
+  return Response.json(
     {
       linkId: data.id,
       expiresAt: data.expires_at,

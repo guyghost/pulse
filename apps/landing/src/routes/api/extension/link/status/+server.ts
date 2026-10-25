@@ -1,10 +1,9 @@
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { matchesExtensionDeviceSecret } from '$lib/server/extension-link';
-import { getPremiumServerConfig } from '$lib/server/premium-config';
-import { enforceRateLimits, NO_STORE_HEADERS } from '$lib/server/rate-limit';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import { matchesExtensionDeviceSecret } from '#lib/server/extension-link.js';
+import { getPremiumServerConfig } from '#lib/server/premium-config.js';
+import { enforceRateLimits, NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 
 const LinkStatusSchema = z.object({
   linkId: z.string().uuid(),
@@ -20,7 +19,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     now
   );
   if (!ipDecision.ok) {
-    return json(
+    return Response.json(
       { error: ipDecision.kind === 'denied' ? 'RATE_LIMITED' : 'RATE_LIMIT_UNAVAILABLE' },
       {
         status: ipDecision.kind === 'denied' ? 429 : 503,
@@ -34,7 +33,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
 
   const parsed = LinkStatusSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return json(
+    return Response.json(
       { error: 'INVALID_LINK_STATUS_REQUEST' },
       { status: 400, headers: NO_STORE_HEADERS }
     );
@@ -46,7 +45,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     now
   );
   if (!linkDecision.ok) {
-    return json(
+    return Response.json(
       { error: linkDecision.kind === 'denied' ? 'RATE_LIMITED' : 'RATE_LIMIT_UNAVAILABLE' },
       {
         status: linkDecision.kind === 'denied' ? 429 : 503,
@@ -66,7 +65,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
   let link = storedLink;
 
   if (!link || !matchesExtensionDeviceSecret(parsed.data.secret, link.secret_hash)) {
-    return json({ error: 'LINK_NOT_FOUND' }, { status: 404, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'LINK_NOT_FOUND' }, { status: 404, headers: NO_STORE_HEADERS });
   }
 
   if (link.state === 'pending' && Date.parse(link.expires_at) <= now.getTime()) {
@@ -75,10 +74,13 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       p_now: now.toISOString(),
     });
     if (expiryError) {
-      return json({ error: 'LINK_EXPIRY_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+      return Response.json(
+        { error: 'LINK_EXPIRY_FAILED' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
     }
     if (expiryResult === 'expired') {
-      return json({ state: 'expired' }, { headers: NO_STORE_HEADERS });
+      return Response.json({ state: 'expired' }, { headers: NO_STORE_HEADERS });
     }
 
     const { data: refreshedLink, error: refreshError } = await admin
@@ -87,13 +89,16 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
       .eq('id', link.id)
       .maybeSingle();
     if (refreshError || !refreshedLink) {
-      return json({ error: 'LINK_REFRESH_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+      return Response.json(
+        { error: 'LINK_REFRESH_FAILED' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
     }
     link = refreshedLink;
   }
 
   if (link.state !== 'approved' || typeof link.user_id !== 'string') {
-    return json({ state: link.state }, { headers: NO_STORE_HEADERS });
+    return Response.json({ state: link.state }, { headers: NO_STORE_HEADERS });
   }
 
   const { data: entitlement } = await admin
@@ -104,7 +109,7 @@ export const POST: RequestHandler = async ({ request, getClientAddress }) => {
     .eq('user_id', link.user_id)
     .maybeSingle();
 
-  return json(
+  return Response.json(
     {
       state: 'approved',
       accountId: link.user_id,

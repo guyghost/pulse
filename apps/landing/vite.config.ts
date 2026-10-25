@@ -1,3 +1,4 @@
+import adapter from '@sveltejs/adapter-vercel';
 import { microfrontends } from '@vercel/microfrontends/experimental/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { eveSvelteKit } from 'eve/sveltekit';
@@ -8,7 +9,9 @@ export default defineConfig(async ({ mode }) => {
   const plugins = [
     microfrontends(),
     ...(mode === 'test' ? [] : [eveSvelteKit()]),
-    ...(await sveltekit()),
+    ...(await sveltekit({
+      adapter: adapter({ runtime: 'nodejs24.x', maxDuration: 135 }),
+    })),
   ] as unknown as PluginOption[];
 
   return {

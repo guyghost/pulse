@@ -1,15 +1,17 @@
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { authenticateExtensionDevice, hashExtensionDeviceSecret } from '$lib/server/extension-link';
-import { getPremiumServerConfig } from '$lib/server/premium-config';
-import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import {
+  authenticateExtensionDevice,
+  hashExtensionDeviceSecret,
+} from '#lib/server/extension-link.js';
+import { getPremiumServerConfig } from '#lib/server/premium-config.js';
+import { NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 
 export const GET: RequestHandler = async ({ request }) => {
   const admin = createSupabaseAdminClient();
   const authentication = await authenticateExtensionDevice(request);
   if (!authentication.ok) {
-    return json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
   }
 
   const { data: entitlement } = await admin
@@ -25,7 +27,7 @@ export const GET: RequestHandler = async ({ request }) => {
     .update({ last_seen_at: new Date().toISOString() })
     .eq('id', authentication.deviceId);
 
-  return json(
+  return Response.json(
     {
       accountId: authentication.accountId,
       entitlement,
@@ -39,7 +41,10 @@ export const DELETE: RequestHandler = async ({ request }) => {
   const authorization = request.headers.get('authorization') ?? '';
   const token = authorization.startsWith('Bearer ') ? authorization.slice(7) : '';
   if (token.length < 43 || token.length > 128) {
-    return json({ error: 'DEVICE_TOKEN_REQUIRED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'DEVICE_TOKEN_REQUIRED' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   const { data, error } = await createSupabaseAdminClient()
@@ -51,10 +56,13 @@ export const DELETE: RequestHandler = async ({ request }) => {
     .maybeSingle();
 
   if (error) {
-    return json({ error: 'DEVICE_REVOKE_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'DEVICE_REVOKE_FAILED' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
   if (!data) {
-    return json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
   }
-  return json({ revoked: true }, { headers: NO_STORE_HEADERS });
+  return Response.json({ revoked: true }, { headers: NO_STORE_HEADERS });
 };

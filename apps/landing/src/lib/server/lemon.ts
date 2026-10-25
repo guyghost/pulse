@@ -1,8 +1,8 @@
-import { env } from '$env/dynamic/private';
+import { LEMON_SQUEEZY_WEBHOOK_SECRET } from '$app/env/private';
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
 export const verifyLemonSqueezyWebhook = (rawBody: string, signature: string): boolean => {
-  const secret = env.LEMON_SQUEEZY_WEBHOOK_SECRET;
+  const secret = LEMON_SQUEEZY_WEBHOOK_SECRET;
   if (!secret) {
     console.error('LEMON_SQUEEZY_WEBHOOK_SECRET not configured');
     return false;

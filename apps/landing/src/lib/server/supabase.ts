@@ -1,9 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
-import { env } from '$env/dynamic/private';
-import { env as pubEnv } from '$env/dynamic/public';
+import { SUPABASE_SERVICE_ROLE_KEY } from '$app/env/private';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$app/env/public';
 import type { Cookies } from '@sveltejs/kit';
 
-type CookieOptions = Partial<Parameters<Cookies['set']>[2]>;
+type CookieOptions = Partial<NonNullable<Parameters<Cookies['set']>[2]>>;
 type CookieToSet = {
   name: string;
   value: string;
@@ -11,7 +11,7 @@ type CookieToSet = {
 };
 
 export const createSupabaseServerClient = (cookies: Cookies) =>
-  createServerClient(pubEnv.PUBLIC_SUPABASE_URL!, pubEnv.PUBLIC_SUPABASE_ANON_KEY!, {
+  createServerClient(PUBLIC_SUPABASE_URL!, PUBLIC_SUPABASE_ANON_KEY!, {
     cookies: {
       getAll() {
         return cookies.getAll();
@@ -25,9 +25,6 @@ export const createSupabaseServerClient = (cookies: Cookies) =>
   });
 
 export const createSupabaseAdminClient = () =>
-  createServerClient(pubEnv.PUBLIC_SUPABASE_URL!, env.SUPABASE_SERVICE_ROLE_KEY!, {
-    cookies: {
-      getAll: () => [],
-      setAll: () => {},
-    },
+  createServerClient(PUBLIC_SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+    cookies: { getAll: () => [], setAll: () => {} },
   });

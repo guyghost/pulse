@@ -1,7 +1,7 @@
 import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase';
-import { hasSupabaseAuthCookie } from '$lib/server/auth-cookie';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
+import { hasSupabaseAuthCookie } from '#lib/server/auth-cookie.js';
 
 function normalizeRedirectPath(value: string | null): string {
   if (!value || !value.startsWith('/') || value.startsWith('//')) {

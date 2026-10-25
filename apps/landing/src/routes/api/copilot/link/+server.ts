@@ -1,12 +1,11 @@
-import { env } from '$env/dynamic/private';
-import { json } from '@sveltejs/kit';
+import { COPILOT_EXTENSION_REDIRECT_URIS } from '$app/env/private';
 import type { RequestHandler } from './$types';
 
-import { isAllowedCopilotRedirect, loadCopilotEntitlement } from '$lib/server/copilot/auth';
-import { publicError } from '$lib/server/copilot/remote-response';
-import { copilotAuthorizationDependencies } from '$lib/server/copilot/runtime';
-import { issueCopilotSessionToken } from '$lib/server/copilot/session-token';
-import { createSupabaseServerClient } from '$lib/server/supabase';
+import { isAllowedCopilotRedirect, loadCopilotEntitlement } from '#lib/server/copilot/auth.js';
+import { publicError } from '#lib/server/copilot/remote-response.js';
+import { copilotAuthorizationDependencies } from '#lib/server/copilot/runtime.js';
+import { issueCopilotSessionToken } from '#lib/server/copilot/session-token.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 const REQUEST_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -15,13 +14,14 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
   try {
     const redirectUri = url.searchParams.get('redirect_uri');
     const state = url.searchParams.get('state');
+
     if (
       redirectUri === null ||
       state === null ||
       !REQUEST_ID.test(state) ||
-      !isAllowedCopilotRedirect(redirectUri, env.COPILOT_EXTENSION_REDIRECT_URIS)
+      !isAllowedCopilotRedirect(redirectUri, COPILOT_EXTENSION_REDIRECT_URIS)
     ) {
-      return json(
+      return Response.json(
         {
           error: {
             code: 'INVALID_REQUEST',
@@ -72,6 +72,6 @@ export const GET: RequestHandler = async ({ url, cookies }) => {
     });
   } catch (error) {
     const response = publicError(error);
-    return json({ error: response.error }, { status: response.status, headers: NO_STORE });
+    return Response.json({ error: response.error }, { status: response.status, headers: NO_STORE });
   }
 };

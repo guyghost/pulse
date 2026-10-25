@@ -1,9 +1,9 @@
 import type { PageServerLoad, Actions } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { CREDIT_PACK_LIST } from '$lib/credits';
-import { createSupabaseServerClient } from '$lib/server/supabase';
-import { hasSupabaseAuthCookie } from '$lib/server/auth-cookie';
-import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
+import { CREDIT_PACK_LIST } from '#lib/credits.js';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
+import { hasSupabaseAuthCookie } from '#lib/server/auth-cookie.js';
+import { NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 
 export const load: PageServerLoad = async ({ cookies, url, setHeaders }) => {
   setHeaders(NO_STORE_HEADERS);

@@ -1,7 +1,15 @@
-import { env } from '$env/dynamic/private';
+import {
+  COPILOT_SESSION_SIGNING_SECRET,
+  COPILOT_ROLLOUT_ENABLED,
+  COPILOT_ROLLOUT_USER_IDS,
+  MISSIONPULSE_EVE_ENABLED,
+  MISSIONPULSE_EVE_BASE_URL,
+  EVE_BASE_URL,
+  MISSIONPULSE_EVE_TIMEOUT_MS,
+} from '$app/env/private';
 
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { grantPremiumMonthlyCredits } from '$lib/server/credits';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import { grantPremiumMonthlyCredits } from '#lib/server/credits.js';
 
 import {
   authenticateCopilotRequest,
@@ -16,9 +24,9 @@ import { SupabaseCopilotRepository } from './supabase-repository';
 export function copilotAuthorizationDependencies(): CopilotAuthorizationDependencies {
   const admin = createSupabaseAdminClient();
   return {
-    signingSecret: env.COPILOT_SESSION_SIGNING_SECRET ?? '',
-    rolloutEnabled: env.COPILOT_ROLLOUT_ENABLED,
-    rolloutUserIds: env.COPILOT_ROLLOUT_USER_IDS,
+    signingSecret: COPILOT_SESSION_SIGNING_SECRET ?? '',
+    rolloutEnabled: COPILOT_ROLLOUT_ENABLED,
+    rolloutUserIds: COPILOT_ROLLOUT_USER_IDS,
     now: () => new Date(),
     grantMonthlyCredits: (userId, now) => grantPremiumMonthlyCredits(admin, userId, now),
     async loadProfile(userId): Promise<CopilotEntitlementProfile | null> {
@@ -52,9 +60,9 @@ export async function createAuthorizedCopilotRuntime(request: Request) {
   const admin = createSupabaseAdminClient();
   const repository = new SupabaseCopilotRepository(admin);
   const providerConfig = readEveProviderConfig({
-    MISSIONPULSE_EVE_ENABLED: env.MISSIONPULSE_EVE_ENABLED,
-    MISSIONPULSE_EVE_BASE_URL: env.MISSIONPULSE_EVE_BASE_URL ?? env.EVE_BASE_URL,
-    MISSIONPULSE_EVE_TIMEOUT_MS: env.MISSIONPULSE_EVE_TIMEOUT_MS,
+    MISSIONPULSE_EVE_ENABLED,
+    MISSIONPULSE_EVE_BASE_URL: MISSIONPULSE_EVE_BASE_URL ?? EVE_BASE_URL,
+    MISSIONPULSE_EVE_TIMEOUT_MS,
   });
   return {
     principal,
@@ -74,9 +82,9 @@ export async function createAuthenticatedCopilotRuntime(request: Request) {
   const admin = createSupabaseAdminClient();
   const repository = new SupabaseCopilotRepository(admin);
   const providerConfig = readEveProviderConfig({
-    MISSIONPULSE_EVE_ENABLED: env.MISSIONPULSE_EVE_ENABLED,
-    MISSIONPULSE_EVE_BASE_URL: env.MISSIONPULSE_EVE_BASE_URL ?? env.EVE_BASE_URL,
-    MISSIONPULSE_EVE_TIMEOUT_MS: env.MISSIONPULSE_EVE_TIMEOUT_MS,
+    MISSIONPULSE_EVE_ENABLED,
+    MISSIONPULSE_EVE_BASE_URL: MISSIONPULSE_EVE_BASE_URL ?? EVE_BASE_URL,
+    MISSIONPULSE_EVE_TIMEOUT_MS,
   });
   return {
     principal,

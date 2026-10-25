@@ -1,15 +1,14 @@
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
-import { verifyLemonSqueezyWebhook } from '$lib/server/lemon';
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { CREDIT_PACKS, isCreditPackId } from '$lib/credits';
-import { getCreditAmountForVariant, getCreditPackVariantId } from '$lib/server/credits';
+import { verifyLemonSqueezyWebhook } from '#lib/server/lemon.js';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import { CREDIT_PACKS, isCreditPackId } from '#lib/credits.js';
+import { getCreditAmountForVariant, getCreditPackVariantId } from '#lib/server/credits.js';
 import {
   applyPremiumBillingEvent,
   normalizePremiumBillingEvent,
-} from '$lib/server/premium-billing';
-import { getPremiumServerConfig } from '$lib/server/premium-config';
-import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
+} from '#lib/server/premium-billing.js';
+import { getPremiumServerConfig } from '#lib/server/premium-config.js';
+import { NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 import { z } from 'zod';
 
 type LemonEventEnvelope = {
@@ -89,23 +88,32 @@ export const POST: RequestHandler = async ({ request }) => {
   const eventNameHeader = request.headers.get('x-event-name') ?? '';
 
   if (!verifyLemonSqueezyWebhook(rawBody, signature)) {
-    return json({ error: 'INVALID_SIGNATURE' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'INVALID_SIGNATURE' },
+      { status: 401, headers: NO_STORE_HEADERS }
+    );
   }
 
   let event: LemonEventEnvelope;
   try {
     event = JSON.parse(rawBody) as LemonEventEnvelope;
   } catch {
-    return json({ error: 'INVALID_JSON' }, { status: 400, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'INVALID_JSON' }, { status: 400, headers: NO_STORE_HEADERS });
   }
 
   if (eventNameHeader.length === 0 || eventNameHeader !== event.meta?.event_name) {
-    return json({ error: 'EVENT_NAME_MISMATCH' }, { status: 422, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'EVENT_NAME_MISMATCH' },
+      { status: 422, headers: NO_STORE_HEADERS }
+    );
   }
 
   const config = getPremiumServerConfig();
   if (!config.storeId || config.expectedTestMode === null) {
-    return json({ error: 'WEBHOOK_NOT_CONFIGURED' }, { status: 503, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'WEBHOOK_NOT_CONFIGURED' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
   }
 
   if (
@@ -115,11 +123,17 @@ export const POST: RequestHandler = async ({ request }) => {
       expectedTestMode: config.expectedTestMode,
     }))
   ) {
-    return json({ received: true, result: 'credit_order_applied' }, { headers: NO_STORE_HEADERS });
+    return Response.json(
+      { received: true, result: 'credit_order_applied' },
+      { headers: NO_STORE_HEADERS }
+    );
   }
 
   if (!config.variantId) {
-    return json({ error: 'WEBHOOK_NOT_CONFIGURED' }, { status: 503, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'WEBHOOK_NOT_CONFIGURED' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
   }
   const normalized = normalizePremiumBillingEvent(event, rawBody, Date.now(), {
     eventNameHeader,
@@ -129,12 +143,18 @@ export const POST: RequestHandler = async ({ request }) => {
   });
   if (!normalized.ok) {
     if (normalized.error === 'UNSUPPORTED_EVENT') {
-      return json({ received: true, result: 'ignored_unsupported' }, { headers: NO_STORE_HEADERS });
+      return Response.json(
+        { received: true, result: 'ignored_unsupported' },
+        { headers: NO_STORE_HEADERS }
+      );
     }
     if (normalized.error === 'AUXILIARY_EVENT' || normalized.error === 'PARTIAL_REFUND') {
-      return json({ received: true, result: 'ignored_auxiliary' }, { headers: NO_STORE_HEADERS });
+      return Response.json(
+        { received: true, result: 'ignored_auxiliary' },
+        { headers: NO_STORE_HEADERS }
+      );
     }
-    return json({ error: normalized.error }, { status: 422, headers: NO_STORE_HEADERS });
+    return Response.json({ error: normalized.error }, { status: 422, headers: NO_STORE_HEADERS });
   }
 
   const applied = await applyPremiumBillingEvent(
@@ -143,8 +163,8 @@ export const POST: RequestHandler = async ({ request }) => {
     config.entitlementCacheTtlHours
   );
   if (!applied.ok) {
-    return json({ error: applied.error }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json({ error: applied.error }, { status: 500, headers: NO_STORE_HEADERS });
   }
 
-  return json({ received: true, result: applied.result }, { headers: NO_STORE_HEADERS });
+  return Response.json({ received: true, result: applied.result }, { headers: NO_STORE_HEADERS });
 };

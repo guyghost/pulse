@@ -1,6 +1,6 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { passkeyErrorMessage, registerCurrentUserPasskey } from '$lib/auth/passkey';
+  import { passkeyErrorMessage, registerCurrentUserPasskey } from '#lib/auth/passkey.js';
 
   let formError = $state<string | undefined>(undefined);
   let submitting = $state(false);

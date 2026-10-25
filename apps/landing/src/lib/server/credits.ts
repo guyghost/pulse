@@ -1,13 +1,18 @@
-import { env } from '$env/dynamic/private';
+import {
+  LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID,
+  LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID,
+  LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID,
+} from '$app/env/private';
+
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CREDIT_PACKS, type CreditPackId } from '$lib/credits';
+import { CREDIT_PACKS, type CreditPackId } from '#lib/credits.js';
 
 const PREMIUM_MONTHLY_CREDITS = 20;
 
 export const creditPackVariantIds: Record<CreditPackId, string | undefined> = {
-  starter: env.LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID,
-  pro: env.LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID,
-  power: env.LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID,
+  starter: LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID,
+  pro: LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID,
+  power: LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID,
 };
 
 export function currentPremiumCreditPeriod(now = new Date()): string {

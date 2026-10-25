@@ -1,6 +1,6 @@
 import type { RequestHandler } from './$types';
 import { redirect } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 const defaultRedirectPath = '/dashboard';
 

@@ -1,8 +1,8 @@
 <script lang="ts">
-  import { env } from '$env/dynamic/public';
+  import { PUBLIC_CHROME_STORE_URL } from '$app/env/public';
   import { tick } from 'svelte';
   import { EXTENSION_SURFACE_FLAGS } from '@pulse/domain';
-  import { theme } from '$lib/theme.svelte';
+  import { theme } from '#lib/theme.svelte.js';
 
   type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'prepare';
 
@@ -12,7 +12,7 @@
   let showDeferredContent = $state(false);
   let shortcutsOpen = $state(false);
 
-  const configuredChromeStoreUrl = env.PUBLIC_CHROME_STORE_URL?.trim() || '';
+  const configuredChromeStoreUrl = PUBLIC_CHROME_STORE_URL?.trim() || '';
   const chromeStoreUrl = configuredChromeStoreUrl || '#install';
   const chromeStoreIsExternal = /^https?:\/\//.test(configuredChromeStoreUrl);
   const installCtaLabel = "Installer l'extension gratuite";
@@ -116,7 +116,6 @@
 
   const prefersReducedMotion = (): boolean =>
     typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-
   const scrollBehavior = (): ScrollBehavior => (prefersReducedMotion() ? 'auto' : 'smooth');
 
   function jumpTo(id: string): void {
@@ -288,7 +287,7 @@
             stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
-          />
+          ></polyline>
         </svg>
       </div>
       <span class="nav__title">MissionPulse</span>
@@ -321,10 +320,8 @@
             stroke="currentColor"
             stroke-width="2"
             stroke-linecap="round"
-            stroke-linejoin="round"
+            stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path></svg
           >
-            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
-          </svg>
         {:else}
           <svg
             width="16"
@@ -336,11 +333,15 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <circle cx="12" cy="12" r="4" />
-            <path d="M12 2v2" /><path d="M12 20v2" />
-            <path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
-            <path d="M2 12h2" /><path d="M20 12h2" />
-            <path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
           </svg>
         {/if}
       </button>
@@ -368,12 +369,9 @@
     <ul>
       <li><a href="#workflow" onclick={closeMobileMenu}>Workflow</a></li>
       <li><a href="#shortlist" onclick={closeMobileMenu}>Shortlist</a></li>
-      <li>
-        <a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a>
-      </li>
-      <li>
-        <a href="#plans" onclick={closeMobileMenu}>Offre</a>
-      </li>
+      <li><a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a></li>
+      <li><a href="#plans" onclick={closeMobileMenu}>Offre</a></li>
+
       <li>
         <a href={chromeStoreUrl} class="btn btn--primary" onclick={closeMobileMenu}>Installer</a>
       </li>
@@ -418,7 +416,7 @@
       </div>
 
       <div class="hero__meta" aria-label="Positionnement MissionPulse">
-        <span class="hero__meta-item">Freelance tech · France &amp; remote</span>
+        <span class="hero__meta-item">Freelance tech · France & remote</span>
       </div>
     </div>
   </div>
@@ -451,10 +449,8 @@
               role="tab"
               aria-selected={activeShowcaseStep === step.id}
               aria-controls="showcase-panel"
-              onclick={() => (activeShowcaseStep = step.id)}
+              onclick={() => (activeShowcaseStep = step.id)}>{step.label}</button
             >
-              {step.label}
-            </button>
           {/each}
         </div>
 
@@ -476,7 +472,7 @@
                 {:else if activeShowcaseStep === 'comparer'}
                   Comparateur local
                 {:else}
-                  Profil &amp; CV locaux
+                  Profil & CV locaux
                 {/if}
               </h2>
             </div>
@@ -755,6 +751,7 @@
           </p>
           <div class="daily-radar__actions">
             <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Scanner mes plateformes</a>
+
             <a
               href="mailto:contact@missionpulse.app?subject=Shortlist%20quotidienne%20Java%20Spring%20Boot"
               class="btn btn--secondary btn--lg">Recevoir la shortlist</a
@@ -981,9 +978,9 @@
               stroke-linecap="round"
               stroke-linejoin="round"
             >
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
             </svg>
             {installCtaLabel}
           </a>
@@ -1006,7 +1003,7 @@
                 stroke-width="8"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-              />
+              ></polyline>
             </svg>
           </div>
           <span class="footer__title">Mission<span>Pulse</span></span>
@@ -1060,7 +1057,8 @@
           stroke-linecap="round"
           stroke-linejoin="round"
         >
-          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+          <path d="M18 6 6 18"></path>
+          <path d="m6 6 12 12"></path>
         </svg>
       </button>
     </div>

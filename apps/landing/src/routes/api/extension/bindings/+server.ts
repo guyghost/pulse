@@ -1,10 +1,9 @@
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { authenticateExtensionDevice } from '$lib/server/extension-link';
-import { getPremiumServerConfig } from '$lib/server/premium-config';
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
+import { authenticateExtensionDevice } from '#lib/server/extension-link.js';
+import { getPremiumServerConfig } from '#lib/server/premium-config.js';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import { NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 
 const ConnectorIdSchema = z.enum([
   'free-work',
@@ -33,7 +32,7 @@ const SwitchBindingSchema = z
 export const GET: RequestHandler = async ({ request }) => {
   const authentication = await authenticateExtensionDevice(request);
   if (!authentication.ok) {
-    return json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
   }
   const { data, error } = await createSupabaseAdminClient()
     .from('platform_account_bindings')
@@ -44,9 +43,12 @@ export const GET: RequestHandler = async ({ request }) => {
     .neq('status', 'removed')
     .order('created_at', { ascending: true });
   if (error) {
-    return json({ error: 'BINDINGS_READ_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'BINDINGS_READ_FAILED' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
-  return json(
+  return Response.json(
     {
       bindings: data ?? [],
       premiumMaxBindingsPerConnector: getPremiumServerConfig().premiumMaxBindingsPerConnector,
@@ -58,11 +60,14 @@ export const GET: RequestHandler = async ({ request }) => {
 export const POST: RequestHandler = async ({ request }) => {
   const authentication = await authenticateExtensionDevice(request);
   if (!authentication.ok) {
-    return json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
   }
   const parsed = AddBindingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return json({ error: 'INVALID_BINDING_REQUEST' }, { status: 400, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'INVALID_BINDING_REQUEST' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
   }
 
   const { data, error } = await createSupabaseAdminClient().rpc('add_platform_account_binding', {
@@ -74,19 +79,25 @@ export const POST: RequestHandler = async ({ request }) => {
     p_now: new Date().toISOString(),
   });
   if (error) {
-    return json({ error: 'BINDING_CREATE_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'BINDING_CREATE_FAILED' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
-  return json(data, { headers: NO_STORE_HEADERS });
+  return Response.json(data, { headers: NO_STORE_HEADERS });
 };
 
 export const PATCH: RequestHandler = async ({ request }) => {
   const authentication = await authenticateExtensionDevice(request);
   if (!authentication.ok) {
-    return json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'DEVICE_REVOKED' }, { status: 401, headers: NO_STORE_HEADERS });
   }
   const parsed = SwitchBindingSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success) {
-    return json({ error: 'INVALID_SWITCH_REQUEST' }, { status: 400, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'INVALID_SWITCH_REQUEST' },
+      { status: 400, headers: NO_STORE_HEADERS }
+    );
   }
 
   const { data, error } = await createSupabaseAdminClient().rpc('switch_platform_account_binding', {
@@ -96,7 +107,10 @@ export const PATCH: RequestHandler = async ({ request }) => {
     p_now: new Date().toISOString(),
   });
   if (error) {
-    return json({ error: 'BINDING_SWITCH_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'BINDING_SWITCH_FAILED' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
-  return json(data, { headers: NO_STORE_HEADERS });
+  return Response.json(data, { headers: NO_STORE_HEADERS });
 };

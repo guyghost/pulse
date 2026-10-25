@@ -1,4 +1,4 @@
-import { env } from '$env/dynamic/public';
+import { PUBLIC_LANDING_URL } from '$app/env/public';
 
 export function parseCanonicalPublicOrigin(configured: string | undefined): string | null {
   if (typeof configured !== 'string' || configured.length === 0) {
@@ -29,5 +29,5 @@ export function parseCanonicalPublicOrigin(configured: string | undefined): stri
 }
 
 export function getCanonicalPublicOrigin(): string | null {
-  return parseCanonicalPublicOrigin(env.PUBLIC_LANDING_URL);
+  return parseCanonicalPublicOrigin(PUBLIC_LANDING_URL);
 }

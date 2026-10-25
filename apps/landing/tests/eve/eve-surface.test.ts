@@ -11,23 +11,30 @@ describe('Eve landing surface', () => {
   it('pins the reviewed packages and isolates Node 24 to the landing app', () => {
     const packageJson = JSON.parse(readLandingFile('package.json')) as {
       dependencies: Record<string, string>;
+      devDependencies: Record<string, string>;
       engines: Record<string, string>;
     };
-    const svelteConfig = readLandingFile('svelte.config.js');
+    const viteConfig = readLandingFile('vite.config.ts');
 
     expect(packageJson.dependencies.eve).toBe('0.83.2');
     expect(packageJson.dependencies.ai).toBe('7.0.153');
     expect(packageJson.dependencies['@vercel/oidc']).toBe('4.0.3');
+    expect(packageJson.devDependencies['@sveltejs/kit']).toBe('3.1.0');
+    expect(packageJson.devDependencies['@sveltejs/adapter-vercel']).toBe('^7.0.1');
+    expect(packageJson.devDependencies.typescript).toBe('~6.0.3');
     expect(packageJson.engines.node).toBe('24.x');
-    expect(svelteConfig).toContain("runtime: 'nodejs24.x'");
-    expect(svelteConfig).toContain('maxDuration: 135');
+    expect(viteConfig).toContain("runtime: 'nodejs24.x'");
+    expect(viteConfig).toContain('maxDuration: 135');
+    expect(existsSync(resolve(landingDir, 'svelte.config.js'))).toBe(false);
   });
 
   it('keeps microfrontends and places Eve before SvelteKit', () => {
     const viteConfig = readLandingFile('vite.config.ts');
     expect(viteConfig).toContain('microfrontends()');
     expect(viteConfig.indexOf('eveSvelteKit(')).toBeGreaterThan(-1);
-    expect(viteConfig.indexOf('sveltekit()')).toBeGreaterThan(viteConfig.indexOf('eveSvelteKit('));
+    expect(viteConfig.indexOf('...(await sveltekit({')).toBeGreaterThan(
+      viteConfig.indexOf('eveSvelteKit()')
+    );
     expect(viteConfig).toContain("mode === 'test' ? [] : [eveSvelteKit()]");
     expect(viteConfig).toContain("ssr: { noExternal: ['eve'] }");
     expect(viteConfig).toContain("exclude: [...configDefaults.exclude, '.eve/**']");
@@ -58,7 +65,9 @@ describe('Eve landing surface', () => {
 
   it('accepts the SvelteKit plugin Eve base URL only as a local fallback', () => {
     const runtime = readLandingFile('src/lib/server/copilot/runtime.ts');
-    expect(runtime).toContain('env.MISSIONPULSE_EVE_BASE_URL ?? env.EVE_BASE_URL');
+    expect(runtime).toContain(
+      'MISSIONPULSE_EVE_BASE_URL: MISSIONPULSE_EVE_BASE_URL ?? EVE_BASE_URL'
+    );
   });
 
   it('keeps the Eve protocol private to Vercel OIDC or local development', () => {

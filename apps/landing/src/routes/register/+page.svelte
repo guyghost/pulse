@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { passkeyErrorMessage, requestEmailSessionLink } from '$lib/auth/passkey';
+  import { passkeyErrorMessage, requestEmailSessionLink } from '#lib/auth/passkey.js';
 
   let { data } = $props();
   let formError = $state<string | undefined>(undefined);
