@@ -1132,7 +1132,7 @@ interface Mv3DiagnosticArtifactPolicyV1 {
   jobProjectionSha256: Sha256;
   stepId: 'upload-mv3-evidence';
   ifExpression: 'always()';
-  usesLiteral: 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
+  usesLiteral: 'actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9';
   inputs: {
     nameExpression: 'missionpulse-mv3-evidence-${{ github.run_id }}-${{ github.run_attempt }}';
     path: 'output/playwright/';
@@ -2890,8 +2890,8 @@ derives rather than trusts every projection. Its authenticated claims project ex
 `signerWorkflowRef` and `signerWorkflowSha`; they must resolve to the committed
 main-branch workflow and `headSha`. Only then is it projected into
 `GitHubTransportAttestationV1`, and only then does
-`actions/upload-artifact` at the exact reviewed v7.0.1 commit
-(`043fb46d1a93c77aae656e7c1c64a875d1fc6a0a`) upload the single blob with
+`actions/upload-artifact` at the exact reviewed v7.0.2 commit
+(`cf430e030ddbb5b0abf93d22962f4752f3646cd9`) upload the single blob with
 `archive:false`, no overwrite and requested retention of exactly 30 days. Its
 output digest must equal the captured and attested digest in the same job or the
 run fails. A swap before or during upload therefore yields an unsigned artifact

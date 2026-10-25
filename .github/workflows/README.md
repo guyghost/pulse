@@ -62,7 +62,8 @@ pnpm --filter @pulse/extension verify:release-artifact -- \
 | Action                      | Version | Rôle                                   |
 | --------------------------- | ------- | -------------------------------------- |
 | `actions/checkout`          | v6.0.2  | Checkout exact de la source            |
-| `actions/setup-node`        | v6      | Toolchain Node                         |
+| `actions/setup-node`        | v7      | Toolchain Node                         |
+| `actions/setup-python`      | v7      | Toolchain Python                       |
 | `pnpm/action-setup`         | v6      | Toolchain pnpm                         |
 | `actions/cache`             | v6      | Cache dépendances et navigateur        |
 | `actions/upload-artifact`   | v7      | Transfert de preuves immuable          |
