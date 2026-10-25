@@ -15,7 +15,7 @@
  * FC&IS: zero I/O, zero async, fully testable without mocks.
  */
 
-import type { MissionApplication } from '$lib/core/dashboard';
+import type { MissionApplication } from '#lib/core/dashboard.js';
 
 export type MetricsPhase = 'hidden' | 'partial' | 'ready';
 

@@ -1,10 +1,9 @@
 import { mergeConfig } from 'vite';
 import { configDefaults, defineConfig } from 'vitest/config';
-import viteConfig from './vite.config';
+import viteConfig from './vite.config.ts';
 
-export default mergeConfig(
-  viteConfig,
-  defineConfig({
+export default defineConfig(async (configEnv) =>
+  mergeConfig(await viteConfig(configEnv), {
     test: {
       exclude: [...configDefaults.exclude, 'tests/e2e/**'],
     },

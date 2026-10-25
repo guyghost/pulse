@@ -1,5 +1,5 @@
-import { json, type RequestHandler } from '@sveltejs/kit';
-import { createSupabaseServerClient } from '$lib/server/supabase';
+import type { RequestHandler } from '@sveltejs/kit';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 
 const USER_OWNED_TABLES = [
   'missions',
@@ -100,7 +100,7 @@ export const GET: RequestHandler = async ({ cookies }) => {
   } = await supabase.auth.getSession();
 
   if (!session) {
-    return json({ error: 'Session requise.' }, { status: 401 });
+    return Response.json({ error: 'Session requise.' }, { status: 401 });
   }
 
   try {
@@ -143,12 +143,12 @@ export const GET: RequestHandler = async ({ cookies }) => {
       } as ConnectedExportPayload['tables'],
     };
 
-    return json(payload, {
+    return Response.json(payload, {
       headers: {
         'content-disposition': 'attachment; filename="missionpulse-connected-data.json"',
       },
     });
   } catch {
-    return json({ error: "L'export des données connectées a échoué." }, { status: 500 });
+    return Response.json({ error: "L'export des données connectées a échoué." }, { status: 500 });
   }
 };

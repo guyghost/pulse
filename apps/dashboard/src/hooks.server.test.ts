@@ -5,7 +5,11 @@ const privateEnv = vi.hoisted(() => ({
   MISSIONPULSE_PERF_CACHE_HTML: '1' as string | undefined,
 }));
 
-vi.mock('$env/dynamic/private', () => ({ env: privateEnv }));
+vi.mock('$app/env/private', () => ({
+  get MISSIONPULSE_PERF_CACHE_HTML() {
+    return privateEnv.MISSIONPULSE_PERF_CACHE_HTML;
+  },
+}));
 
 interface HookCase {
   routeId?: string | null;
