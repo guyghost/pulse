@@ -51,7 +51,7 @@ export class EveClientTransport implements EveTransport {
   async run<TOutput>(request: EveTurnTransportRequest): Promise<EveTurnTransportResult<TOutput>> {
     try {
       const client = this.#createClient();
-      // Eve 0.37 sessions are durable and addressed by session ID alone. The
+      // Eve sessions are durable and addressed by session ID alone. The
       // continuation token no longer exists; the contract keeps a vestigial
       // always-null field for storage compatibility (see
       // src/models/eve-session-lifecycle.model.md).

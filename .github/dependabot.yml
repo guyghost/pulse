@@ -14,8 +14,8 @@ updates:
     # - eve + ai: apps/landing/tests/eve/eve-surface.test.ts
     # - @playwright/test: apps/extension/tests/mv3/harness/chromium-process.ts
     # Dependabot cannot scope an ignore to one workspace, so ignoring `ai` here
-    # also stops the extension's ^7.x line from auto-updating: it takes ai bumps
-    # manually until the landing leaves eve 0.37.
+    # also stops the extension's ^7.x line from auto-updating: ai bumps are
+    # reviewed manually in the same contract PR as the landing agent.
     ignore:
       - dependency-name: 'eve'
       - dependency-name: 'ai'
