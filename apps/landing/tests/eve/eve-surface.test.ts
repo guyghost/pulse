@@ -17,7 +17,7 @@ describe('Eve landing surface', () => {
 
     expect(packageJson.dependencies.eve).toBe('0.37.1');
     expect(packageJson.dependencies.ai).toBe('7.0.65');
-    expect(packageJson.dependencies['@vercel/oidc']).toBe('3.8.4');
+    expect(packageJson.dependencies['@vercel/oidc']).toBe('4.0.3');
     expect(packageJson.engines.node).toBe('24.x');
     expect(svelteConfig).toContain("runtime: 'nodejs24.x'");
     expect(svelteConfig).toContain('maxDuration: 135');
