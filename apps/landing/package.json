@@ -26,7 +26,7 @@
     "ai": "7.0.153",
     "eve": "0.83.2",
     "svelte": "^5.57.2",
-    "zod": "^3.25.76"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@pulse/tsconfig": "workspace:*",
