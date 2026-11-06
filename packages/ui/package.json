@@ -31,21 +31,21 @@
     "check": "svelte-check --tsconfig ./tsconfig.json"
   },
   "dependencies": {
-    "svelte": "^5.57.2"
+    "svelte": "^5.57.3"
   },
   "devDependencies": {
     "@pulse/tsconfig": "workspace:*",
     "@sveltejs/package": "^2.5.8",
     "@sveltejs/vite-plugin-svelte": "^7.3.1",
-    "@tailwindcss/vite": "^4.3.3",
-    "svelte-check": "^4.7.7",
-    "svelte2tsx": "^0.7.62",
-    "tailwindcss": "^4.3.3",
+    "@tailwindcss/vite": "^4.3.4",
+    "svelte-check": "^4.7.8",
+    "svelte2tsx": "^0.7.63",
+    "tailwindcss": "^4.3.4",
     "typescript": "^5.9.3",
-    "vite": "^8.2.2",
-    "vitest": "^5.0.3"
+    "vite": "^8.3.5",
+    "vitest": "^5.1.0"
   },
   "peerDependencies": {
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.4"
   }
 }
