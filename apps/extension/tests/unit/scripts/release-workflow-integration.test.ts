@@ -17,8 +17,8 @@ const REVIEWED_ACTION_PINS = new Map([
   ['actions/setup-node', '949feb2413d6458794dcd2491c4babbbce0c15c1'],
   // v7.1.0 — reviewed supply-chain refresh (supersedes dependabot PR #453).
   ['actions/setup-python', '6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'],
-  // v6.1.1 — bump reviewed from dependabot PR #468 (pinned commit for the
-  // v6.1.1 tag, "docs: clarify manifest-based version selection").
+  // v6.1.1 — reviewed from dependabot PR #468; the release includes a guard
+  // against saving a cache when its configured directory is missing.
   ['pnpm/action-setup', '73e46992e05b19abd31f2f3c20e0e7370d762115'],
   // v4.2.2 — bump reviewed from dependabot PR #307.
   ['actions/attest', '1e69f48acb82d1966a394da916b4c1698aa569d6'],
