@@ -1,8 +1,8 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
-  import { env } from '$env/dynamic/public';
+  import { PUBLIC_CHROME_STORE_URL, PUBLIC_LEMON_SQUEEZY_BILLING_URL } from '$app/env/public';
   import { PREMIUM_YEARLY_OFFER } from '@pulse/domain';
-  import { CREDIT_PACKS, formatPrice, type CreditPackId } from '$lib/credits';
+  import { CREDIT_PACKS, formatPrice, type CreditPackId } from '#lib/credits.js';
 
   let { data } = $props();
 
@@ -19,8 +19,8 @@
     primaryLabel: string;
   }
 
-  const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
-  const billingPortalUrl = env.PUBLIC_LEMON_SQUEEZY_BILLING_URL || null;
+  const chromeStoreUrl = PUBLIC_CHROME_STORE_URL || '#install';
+  const billingPortalUrl = PUBLIC_LEMON_SQUEEZY_BILLING_URL || null;
   const isPremium = $derived(
     (data.entitlement?.status === 'premium_active' ||
       data.entitlement?.status === 'premium_cancel_at_period_end') &&
@@ -162,7 +162,7 @@
             stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
-          />
+          ></polyline>
         </svg>
       </div>
       <span class="nav__title">Mission<span>Pulse</span></span>
@@ -417,9 +417,9 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="7 10 12 15 17 10"></polyline>
+            <line x1="12" y1="15" x2="12" y2="3"></line>
           </svg>
           Installer l'extension
         </a>

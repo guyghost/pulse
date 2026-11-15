@@ -1,8 +1,8 @@
 import { createServerClient } from '@supabase/ssr';
-import { env } from '$env/dynamic/public';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$app/env/public';
 import type { Cookies } from '@sveltejs/kit';
 
-type CookieOptions = Partial<Parameters<Cookies['set']>[2]>;
+type CookieOptions = Partial<NonNullable<Parameters<Cookies['set']>[2]>>;
 type CookieToSet = {
   name: string;
   value: string;
@@ -10,7 +10,7 @@ type CookieToSet = {
 };
 
 export const createSupabaseServerClient = (cookies: Cookies) =>
-  createServerClient(env.PUBLIC_SUPABASE_URL ?? '', env.PUBLIC_SUPABASE_ANON_KEY ?? '', {
+  createServerClient(PUBLIC_SUPABASE_URL ?? '', PUBLIC_SUPABASE_ANON_KEY ?? '', {
     cookies: {
       getAll() {
         return cookies.getAll();

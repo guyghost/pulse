@@ -1,18 +1,17 @@
-import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
 
 import {
   createJobBodySchema,
   parseConsent,
   validIdempotencyKey,
-} from '$lib/server/copilot/contracts';
+} from '#lib/server/copilot/contracts.js';
 import {
   invalidRequestError,
   publicError,
   toRemoteCopilotJob,
-} from '$lib/server/copilot/remote-response';
-import { assertCopilotInputHash } from '$lib/server/copilot/input-hash';
-import { createAuthorizedCopilotRuntime } from '$lib/server/copilot/runtime';
+} from '#lib/server/copilot/remote-response.js';
+import { assertCopilotInputHash } from '#lib/server/copilot/input-hash.js';
+import { createAuthorizedCopilotRuntime } from '#lib/server/copilot/runtime.js';
 
 const MAX_BODY_BYTES = 256 * 1024;
 const NO_STORE = { 'Cache-Control': 'no-store' };
@@ -44,7 +43,7 @@ export const POST: RequestHandler = async ({ request }) => {
       operationKind: parsed.data.kind,
     });
     if (existing) {
-      return json(toRemoteCopilotJob(existing, principal.creditsRemaining), {
+      return Response.json(toRemoteCopilotJob(existing, principal.creditsRemaining), {
         headers: NO_STORE,
       });
     }
@@ -64,11 +63,11 @@ export const POST: RequestHandler = async ({ request }) => {
       payload: parsed.data.input,
       tjmFacts: parsed.data.tjmFacts,
     });
-    return json(toRemoteCopilotJob(outcome.job, outcome.creditsRemaining), {
+    return Response.json(toRemoteCopilotJob(outcome.job, outcome.creditsRemaining), {
       headers: NO_STORE,
     });
   } catch (error) {
     const response = publicError(error);
-    return json({ error: response.error }, { status: response.status, headers: NO_STORE });
+    return Response.json({ error: response.error }, { status: response.status, headers: NO_STORE });
   }
 };

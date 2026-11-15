@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { env } from '$env/dynamic/public';
+  import { PUBLIC_CHROME_STORE_URL } from '$app/env/public';
   import { Badge } from '@pulse/ui';
   import {
     buildMissionComparisonSnapshot,
@@ -13,7 +13,7 @@
     getNextFollowUp,
     getReadyCvSyncPlatforms,
     getSyncBlockers,
-  } from '$lib/core/dashboard';
+  } from '#lib/core/dashboard.js';
   import {
     deriveDashboardPhase,
     isFeedPrimary,
@@ -23,7 +23,7 @@
   } from '../models/dashboard-surface.model';
   import { deriveMetricsVisibility } from '../models/metrics-visibility.model';
   import type { BulkAction, BulkSummary } from '../models/batch-selection.machine';
-  import { BatchSelectionStore } from '$lib/state/batch-selection.svelte';
+  import { BatchSelectionStore } from '#lib/state/batch-selection.svelte.js';
   import { enhance } from '$app/forms';
   import type { ActionData, PageData, SubmitFunction } from './$types';
   import type {
@@ -44,7 +44,7 @@
     MissionScoreCriteria,
     PlatformSyncStatus,
     TjmRadarSnapshot,
-  } from '$lib/core/dashboard';
+  } from '#lib/core/dashboard.js';
 
   let { data, form }: { data: PageData; form?: ActionData } = $props();
 
@@ -81,7 +81,7 @@
   }
 
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
-  const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || 'https://chromewebstore.google.com/';
+  const chromeStoreUrl = PUBLIC_CHROME_STORE_URL || 'https://chromewebstore.google.com/';
   const tjmRadar = $derived(data.tjmRadar as TjmRadarSnapshot);
   const applications = $derived(data.applications as MissionApplication[]);
   const applicationTimeline = $derived(data.applicationTimeline as ApplicationTimelineEvent[]);
@@ -520,7 +520,6 @@
     Object.entries(counts)
       .map(([field, count]) => `${field}: ${count}`)
       .join(' · ');
-
   const formatDailyRate = (value: number | null) => (value ? `${value}€` : 'N/A');
   const formatStacks = (stacks: string[]) => stacks.join(', ');
   const scoreCriteriaLabels: { key: keyof MissionScoreCriteria; label: string }[] = [
@@ -531,6 +530,7 @@
     { key: 'seniorityBonus', label: 'Séniorité' },
     { key: 'startDateBonus', label: 'Démarrage' },
   ];
+
   const formatScoreCriterion = (value: number | null) =>
     typeof value === 'number' ? `${value}` : 'N/A';
 
@@ -713,7 +713,7 @@
                 stroke-width="8"
                 stroke-linecap="round"
                 stroke-linejoin="round"
-              />
+              ></polyline>
             </svg>
           </span>
           <span class="text-sm font-semibold tracking-normal">MissionPulse</span>
@@ -819,7 +819,7 @@
               stroke-width="8"
               stroke-linecap="round"
               stroke-linejoin="round"
-            />
+            ></polyline>
           </svg>
         </span>
         <span class="text-sm font-semibold tracking-normal">MissionPulse</span>
@@ -945,9 +945,8 @@
                 stroke="currentColor"
                 stroke-width="2"
                 aria-hidden="true"
+                ><path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z"></path></svg
               >
-                <path d="M3 7h6l2 2h10v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2Z" />
-              </svg>
             </button>
             <button
               class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-subtle hover:bg-page-canvas hover:text-text-primary"
@@ -961,8 +960,8 @@
                 stroke-width="2"
                 aria-hidden="true"
               >
-                <circle cx="12" cy="8" r="4" />
-                <path d="M4 20c1.8-4 4.5-6 8-6s6.2 2 8 6" />
+                <circle cx="12" cy="8" r="4"></circle>
+                <path d="M4 20c1.8-4 4.5-6 8-6s6.2 2 8 6"></path>
               </svg>
             </button>
           </div>
@@ -1117,6 +1116,7 @@
                       <p class="text-sm font-semibold text-text-primary">
                         Aucune mission reçue depuis l'extension
                       </p>
+
                       <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
                         Connectez l'extension à votre compte MissionPulse puis lancez un scan. Les
                         missions retenues, les favoris et les statuts de candidature apparaîtront
@@ -1444,10 +1444,12 @@
                 <p id="dashboard-setup-title" class="text-sm font-medium text-text-primary">
                   Checklist de setup
                 </p>
+
                 <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
                   Le dashboard devient utile après trois validations: compte reconnu, extension
                   reliée, premier scan lancé depuis Chrome.
                 </p>
+
                 <p class="mt-2 text-xs leading-5 text-text-subtle">
                   Les cookies et sessions Free-Work, LeHibou, Hiway, Collective, Cherry Pick ou Malt
                   restent dans Chrome.
@@ -1490,10 +1492,8 @@
                           stroke="currentColor"
                           stroke-width="2.5"
                           stroke-linecap="round"
-                          stroke-linejoin="round"
+                          stroke-linejoin="round"><path d="m5 12 4 4L19 6"></path></svg
                         >
-                          <path d="m5 12 4 4L19 6" />
-                        </svg>
                       {:else}
                         {index + 1}
                       {/if}
@@ -2017,8 +2017,8 @@
                       stroke-width="2"
                       aria-hidden="true"
                     >
-                      <circle cx="11" cy="11" r="7" />
-                      <path d="m20 20-3.5-3.5" />
+                      <circle cx="11" cy="11" r="7"></circle>
+                      <path d="m20 20-3.5-3.5"></path>
                     </svg>
                     <input
                       class="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
@@ -2097,6 +2097,7 @@
                     <div>
                       <div class="flex items-start justify-between gap-3">
                         <Badge label={sourceLabels[application.source]} variant="source" />
+
                         <Badge
                           label={`${application.score}%`}
                           variant={application.score >= 85 ? 'success' : 'warning'}
@@ -3068,6 +3069,7 @@
                           <p class="text-sm font-semibold text-text-primary">
                             Aucune extension connectée
                           </p>
+
                           <p class="mt-2 max-w-xl text-xs leading-5 text-text-subtle">
                             Connectez MissionPulse à ce compte depuis les réglages de l'extension
                             pour suivre les uploads, téléchargements et arbitrages de conflit.

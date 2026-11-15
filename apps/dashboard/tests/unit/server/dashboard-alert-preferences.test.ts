@@ -26,11 +26,9 @@ vi.mock('../../../src/lib/server/sync-status', () => ({
   markEntityPendingExtensionPull: syncStatusMock.markEntityPendingExtensionPull,
 }));
 
-vi.mock('$env/dynamic/public', () => ({
-  env: {
-    PUBLIC_SUPABASE_URL: 'https://supabase.example',
-    PUBLIC_SUPABASE_ANON_KEY: 'anon-key',
-  },
+vi.mock('$app/env/public', () => ({
+  PUBLIC_SUPABASE_URL: 'https://supabase.example',
+  PUBLIC_SUPABASE_ANON_KEY: 'anon-key',
 }));
 
 function createPreferencesSelectBuilder(row: { revision: number } | null) {

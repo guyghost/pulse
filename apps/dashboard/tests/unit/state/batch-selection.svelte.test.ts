@@ -7,7 +7,7 @@
  * store. The reducer's correctness is covered by batch-selection.machine.test.ts.
  */
 import { describe, expect, it } from 'vitest';
-import { BatchSelectionStore } from '$lib/state/batch-selection.svelte';
+import { BatchSelectionStore } from '#lib/state/batch-selection.svelte.js';
 
 describe('BatchSelectionStore (M3 wrapper)', () => {
   it('starts idle with an empty selection', () => {

@@ -50,11 +50,9 @@ vi.mock('../../../src/lib/server/pipeline-events', () => ({
   upsertDashboardPipelineEvent: pipelineEventsMock.upsertDashboardPipelineEvent,
 }));
 
-vi.mock('$env/dynamic/public', () => ({
-  env: {
-    PUBLIC_SUPABASE_URL: 'https://supabase.example',
-    PUBLIC_SUPABASE_ANON_KEY: 'anon-key',
-  },
+vi.mock('$app/env/public', () => ({
+  PUBLIC_SUPABASE_URL: 'https://supabase.example',
+  PUBLIC_SUPABASE_ANON_KEY: 'anon-key',
 }));
 
 function createSelectBuilder<Row>(row: Row | null) {

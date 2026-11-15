@@ -1,12 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createSupabaseAdminClient, createSupabaseServerClient } from '$lib/server/supabase';
-import { getPremiumServerConfig } from '$lib/server/premium-config';
-import { readSecureCheckoutUrl } from '$lib/server/premium-billing';
-import { getCanonicalPublicOrigin } from '$lib/server/public-origin';
-import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '#lib/server/supabase.js';
+import { getPremiumServerConfig } from '#lib/server/premium-config.js';
+import { readSecureCheckoutUrl } from '#lib/server/premium-billing.js';
+import { getCanonicalPublicOrigin } from '#lib/server/public-origin.js';
+import { NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 
 const CheckoutRequestSchema = z.object({
   requestId: z.string().uuid().optional(),
@@ -19,21 +18,24 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return json({ error: 'ACCOUNT_REQUIRED' }, { status: 401, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'ACCOUNT_REQUIRED' }, { status: 401, headers: NO_STORE_HEADERS });
   }
 
   const parsed = CheckoutRequestSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
-    return json({ error: 'INVALID_REQUEST' }, { status: 400, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'INVALID_REQUEST' }, { status: 400, headers: NO_STORE_HEADERS });
   }
 
   const config = getPremiumServerConfig();
   if (!config.storeId || !config.variantId || !config.apiKey || config.expectedTestMode === null) {
-    return json({ error: 'CHECKOUT_NOT_CONFIGURED' }, { status: 503, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'CHECKOUT_NOT_CONFIGURED' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
   }
   const origin = getCanonicalPublicOrigin();
   if (origin === null) {
-    return json(
+    return Response.json(
       { error: 'PUBLIC_ORIGIN_NOT_CONFIGURED' },
       { status: 503, headers: NO_STORE_HEADERS }
     );
@@ -52,7 +54,7 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
     typeof existingEntitlement.valid_until === 'string' &&
     Date.parse(existingEntitlement.valid_until) > Date.now();
   if (premiumStillValid) {
-    return json({ error: 'ALREADY_PREMIUM' }, { status: 409, headers: NO_STORE_HEADERS });
+    return Response.json({ error: 'ALREADY_PREMIUM' }, { status: 409, headers: NO_STORE_HEADERS });
   }
 
   const checkoutAttemptId = randomUUID();
@@ -69,7 +71,7 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
     existingIntent?.state === 'awaiting_payment' &&
     typeof existingIntent.checkout_url === 'string'
   ) {
-    return json(
+    return Response.json(
       {
         checkoutAttemptId: existingIntent.id,
         state: existingIntent.state,
@@ -93,7 +95,10 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
       state: 'creating_checkout',
     });
     if (intentError) {
-      return json({ error: 'INTENT_CREATE_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+      return Response.json(
+        { error: 'INTENT_CREATE_FAILED' },
+        { status: 500, headers: NO_STORE_HEADERS }
+      );
     }
   }
 
@@ -139,7 +144,10 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
       })
       .eq('id', intentId)
       .eq('user_id', user.id);
-    return json({ error: 'CHECKOUT_CREATE_FAILED' }, { status: 502, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'CHECKOUT_CREATE_FAILED' },
+      { status: 502, headers: NO_STORE_HEADERS }
+    );
   }
 
   const checkout = (await checkoutResponse.json()) as {
@@ -167,7 +175,7 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
       })
       .eq('id', intentId)
       .eq('user_id', user.id);
-    return json(
+    return Response.json(
       { error: checkoutUrl === null ? 'CHECKOUT_URL_INVALID' : 'CHECKOUT_CONTRACT_MISMATCH' },
       { status: 502, headers: NO_STORE_HEADERS }
     );
@@ -188,10 +196,13 @@ export const POST: RequestHandler = async ({ request, cookies, fetch }) => {
     .eq('user_id', user.id);
 
   if (updateError) {
-    return json({ error: 'INTENT_UPDATE_FAILED' }, { status: 500, headers: NO_STORE_HEADERS });
+    return Response.json(
+      { error: 'INTENT_UPDATE_FAILED' },
+      { status: 500, headers: NO_STORE_HEADERS }
+    );
   }
 
-  return json(
+  return Response.json(
     { checkoutAttemptId: intentId, state: 'awaiting_payment', url: checkoutUrl },
     { headers: NO_STORE_HEADERS }
   );

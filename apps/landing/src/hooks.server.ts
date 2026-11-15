@@ -1,6 +1,7 @@
-import { env } from '$env/dynamic/private';
+import type { Handle } from '@sveltejs/kit/hooks';
+import { MISSIONPULSE_PERF_CACHE_HTML } from '$app/env/private';
+
 import { classifyReleaseCache, parsePerformanceCacheMode, type CacheDecision } from '@pulse/domain';
-import type { Handle } from '@sveltejs/kit';
 
 function hasVerifiedUser(locals: App.Locals): boolean {
   return Reflect.get(locals, 'session') != null;
@@ -26,7 +27,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       surface: 'landing',
       method: event.request.method,
       routeId: event.route.id,
-      performanceCacheMode: parsePerformanceCacheMode(env.MISSIONPULSE_PERF_CACHE_HTML),
+      performanceCacheMode: parsePerformanceCacheMode(MISSIONPULSE_PERF_CACHE_HTML),
       hasAuthorizationHeader: event.request.headers.has('authorization'),
       hasAnyCookieHeader: event.request.headers.has('cookie'),
       hasVerifiedUser: hasVerifiedUser(event.locals),

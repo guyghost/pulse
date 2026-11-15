@@ -1,4 +1,5 @@
-import { env } from '$env/dynamic/public';
+import { PUBLIC_LANDING_URL, PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$app/env/public';
+
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect, type Cookies } from '@sveltejs/kit';
 import {
@@ -11,7 +12,7 @@ import {
   type EntitlementSnapshot,
   type PremiumFeature,
 } from '@pulse/domain';
-import { createSupabaseServerClient } from '$lib/server/supabase';
+import { createSupabaseServerClient } from '#lib/server/supabase.js';
 import {
   buildDashboardAlertPreferencesPatch,
   buildApplicationDetailsUpdatePatch,
@@ -62,9 +63,9 @@ import {
   type DashboardAccountEntitlements,
   type DashboardAlertPreferencesRow,
   type MissionApplication,
-} from '$lib/core/dashboard';
-import { markEntityPendingExtensionPull } from '$lib/server/sync-status';
-import { upsertDashboardPipelineEvent } from '$lib/server/pipeline-events';
+} from '#lib/core/dashboard.js';
+import { markEntityPendingExtensionPull } from '#lib/server/sync-status.js';
+import { upsertDashboardPipelineEvent } from '#lib/server/pipeline-events.js';
 
 type DashboardProfileRow = {
   credit_balance: number | null;
@@ -101,16 +102,8 @@ type FavoriteMissionRow = {
   favorited_at: string | null;
 };
 
-type ApplicationTransitionRow = {
-  id: string;
-  stage: string;
-  revision: number;
-};
-
-type ApplicationDetailsRow = {
-  id: string;
-  revision: number;
-};
+type ApplicationTransitionRow = { id: string; stage: string; revision: number };
+type ApplicationDetailsRow = { id: string; revision: number };
 
 type ApplicationConflictUpdatePayload = {
   revision: number;
@@ -137,24 +130,10 @@ type CvSuggestionResolutionRow = {
   revision: number;
 };
 
-type MissionSelectionRow = {
-  id: string;
-  title: string;
-};
-
-type ExistingApplicationSelectionRow = {
-  id: string;
-  stage: string;
-  revision: number;
-};
-
-type CandidateProfileIdentityRow = {
-  id: string;
-};
-
-type SyncConflictIdentityRow = {
-  id: string;
-};
+type MissionSelectionRow = { id: string; title: string };
+type ExistingApplicationSelectionRow = { id: string; stage: string; revision: number };
+type CandidateProfileIdentityRow = { id: string };
+type SyncConflictIdentityRow = { id: string };
 
 type SyncConflictResolutionRow = {
   id: string;
@@ -250,17 +229,15 @@ const favoriteRowToApplication = (row: FavoriteMissionRow): MissionApplication |
 
 const getLoginUrl = (): string => {
   const loginPath = `/login?redirectTo=${encodeURIComponent('/dashboard')}`;
-  const landingUrl = env.PUBLIC_LANDING_URL?.replace(/\/$/, '');
+  const landingUrl = PUBLIC_LANDING_URL?.replace(/\/$/, '');
 
   return landingUrl ? `${landingUrl}${loginPath}` : loginPath;
 };
 
 const isApplicationStage = (value: unknown): value is ApplicationStage =>
   APPLICATION_STAGES.includes(value as ApplicationStage);
-
 const isCvSuggestionResolutionAction = (value: unknown): value is 'apply' | 'dismiss' =>
   value === 'apply' || value === 'dismiss';
-
 const isManualSyncConflictResolutionAction = (
   value: unknown
 ): value is 'resolved' | 'keep_remote' | 'apply_local' | 'dismissed' =>
@@ -298,7 +275,7 @@ const deleteProfileChildRows = async (
 };
 
 export const load: PageServerLoad = async ({ cookies }) => {
-  const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+  const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
   const loginUrl = getLoginUrl();
 
   if (!hasSupabaseConfig) {
@@ -332,7 +309,11 @@ export const load: PageServerLoad = async ({ cookies }) => {
     : null;
 
   if (!session) {
-    redirect(303, loginUrl);
+    redirect(
+      303,
+      loginUrl,
+      PUBLIC_LANDING_URL ? { external: [new URL(PUBLIC_LANDING_URL).origin] } : undefined
+    );
   }
 
   const supabase = createSupabaseServerClient(cookies);
@@ -419,8 +400,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
     .order('updated_at', { ascending: false })
     .limit(100)
     .returns<DashboardCanonicalApplicationRow[]>();
-
   const missionIds = [...new Set((canonicalApplicationRows ?? []).map((row) => row.mission_id))];
+
   const { data: canonicalMissionRows } =
     missionIds.length > 0
       ? await supabase
@@ -477,7 +458,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
       : { data: [] };
 
   const applicationTimeline = pipelineEventRowsToTimeline(pipelineEventRows ?? []);
-
   const { data: favoriteRows } = await supabase
     .from('favorite_missions')
     .select('mission_id, mission, favorited_at')
@@ -499,7 +479,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
     )
     .eq('user_id', session.user.id)
     .maybeSingle<DashboardCandidateProfileRow>();
-
   const { data: profileImports } = await supabase
     .from('profile_imports')
     .select(
@@ -587,12 +566,10 @@ export const load: PageServerLoad = async ({ cookies }) => {
   const extensionDevicesById = new Map(
     (extensionDeviceRows ?? []).map((device) => [device.id, device])
   );
-
   const connectedSyncStatuses = syncRowsToConnectedSyncStatuses(
     syncStatusRows ?? [],
     extensionDevicesById
   );
-
   const { data: syncConflictRows } = await supabase
     .from('sync_conflicts')
     .select(
@@ -603,12 +580,10 @@ export const load: PageServerLoad = async ({ cookies }) => {
     .order('detected_at', { ascending: false })
     .limit(20)
     .returns<DashboardSyncConflictRow[]>();
-
   const syncConflicts = syncConflictRowsToDashboardConflicts(
     syncConflictRows ?? [],
     extensionDevicesById
   );
-
   const { data: alertPreferencesRow } = await supabase
     .from('dashboard_alert_preferences')
     .select(
@@ -948,7 +923,7 @@ async function applyMissionStageTransition(
 const BULK_MISSION_CAP = 50;
 
 async function resolveAuthenticatedDashboardRequest(cookies: Cookies) {
-  const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+  const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
   if (!hasSupabaseConfig) {
     return {
       kind: 'unavailable' as const,
@@ -982,7 +957,7 @@ function readBulkMissionIds(formData: FormData): { ids: string[]; requestedCount
 
 export const actions: Actions = {
   updateAlertPreferences: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { alertError: 'Dashboard connecté indisponible pour le moment.' });
     }
@@ -1053,7 +1028,7 @@ export const actions: Actions = {
   },
 
   resolveCvSuggestion: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { cvError: 'Dashboard connecté indisponible pour le moment.' });
     }
@@ -1204,7 +1179,7 @@ export const actions: Actions = {
   },
 
   resolveSyncConflict: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { syncConflictError: 'Dashboard connecté indisponible pour le moment.' });
     }
@@ -1259,7 +1234,9 @@ export const actions: Actions = {
           };
 
     if (!resolution || (conflict.entity !== 'applications' && resolutionAction === 'apply_local')) {
-      return fail(400, { syncConflictError: 'Résolution incompatible avec ce conflit.' });
+      return fail(400, {
+        syncConflictError: 'Résolution incompatible avec ce conflit.',
+      });
     }
 
     if (resolution.application) {
@@ -1398,7 +1375,7 @@ export const actions: Actions = {
   },
 
   deleteConnectedData: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { privacyError: 'Dashboard connecté indisponible pour le moment.' });
     }
@@ -1461,7 +1438,7 @@ export const actions: Actions = {
   },
 
   updateCvProfile: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { cvError: 'Dashboard connecté indisponible pour le moment.' });
     }
@@ -1583,7 +1560,7 @@ export const actions: Actions = {
   },
 
   updateApplicationDetails: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { detailsError: 'Dashboard connecté indisponible pour le moment.' });
     }
@@ -1833,7 +1810,7 @@ export const actions: Actions = {
   },
 
   transitionApplication: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    const hasSupabaseConfig = Boolean(PUBLIC_SUPABASE_URL && PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
       return fail(503, { transitionError: 'Dashboard connecté indisponible pour le moment.' });
     }

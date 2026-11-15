@@ -24,12 +24,10 @@ vi.mock('../../../src/lib/server/supabase', () => ({
   }),
 }));
 
-vi.mock('$env/dynamic/public', () => ({
-  env: {
-    PUBLIC_SUPABASE_URL: 'https://supabase.example',
-    PUBLIC_SUPABASE_ANON_KEY: 'anon-key',
-    PUBLIC_LANDING_URL: 'https://missionpulse.app',
-  },
+vi.mock('$app/env/public', () => ({
+  PUBLIC_SUPABASE_URL: 'https://supabase.example',
+  PUBLIC_SUPABASE_ANON_KEY: 'anon-key',
+  PUBLIC_LANDING_URL: 'https://missionpulse.app',
 }));
 
 function createQueryBuilder(table: string, rows: unknown[], calls: QueryCall[]) {

@@ -1,11 +1,10 @@
 import type { RequestHandler } from './$types';
-import { json } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
-import { env as pubEnv } from '$env/dynamic/public';
+import { GLM_API_KEY, GLM_MODEL } from '$app/env/private';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$app/env/public';
 import { createServerClient } from '@supabase/ssr';
-import { createSupabaseAdminClient } from '$lib/server/supabase';
-import { consumeGenerationCredit, refundGenerationCredit } from '$lib/server/credits';
-import { parseGenerateBodyText, type GenerateBody } from '$lib/server/generate-validation';
+import { createSupabaseAdminClient } from '#lib/server/supabase.js';
+import { consumeGenerationCredit, refundGenerationCredit } from '#lib/server/credits.js';
+import { parseGenerateBodyText, type GenerateBody } from '#lib/server/generate-validation.js';
 
 function buildPrompt(body: GenerateBody): string {
   const mission = body.mission;
@@ -39,27 +38,23 @@ export const POST: RequestHandler = async ({ request }) => {
   // Verify JWT
   const authHeader = request.headers.get('authorization');
   if (!authHeader?.startsWith('Bearer ')) {
-    return json({ error: 'Unauthorized' }, { status: 401 });
+    return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
   const token = authHeader.slice(7);
 
   // Create a Supabase client with the user's JWT
-  const supabase = createServerClient(
-    pubEnv.PUBLIC_SUPABASE_URL!,
-    pubEnv.PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      global: { headers: { Authorization: `Bearer ${token}` } },
-      cookies: { getAll: () => [], setAll: () => {} },
-    }
-  );
+  const supabase = createServerClient(PUBLIC_SUPABASE_URL!, PUBLIC_SUPABASE_ANON_KEY!, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    cookies: { getAll: () => [], setAll: () => {} },
+  });
 
   const {
     data: { user },
     error: authError,
   } = await supabase.auth.getUser();
   if (authError || !user) {
-    return json({ error: 'Invalid token' }, { status: 401 });
+    return Response.json({ error: 'Invalid token' }, { status: 401 });
   }
 
   const userId = user.id;
@@ -71,7 +66,7 @@ export const POST: RequestHandler = async ({ request }) => {
     request.headers.get('content-length')
   );
   if (!parsedBody.ok) {
-    return json({ error: parsedBody.error }, { status: parsedBody.status });
+    return Response.json({ error: parsedBody.error }, { status: parsedBody.status });
   }
 
   const body = parsedBody.body;
@@ -89,7 +84,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const creditBalance = profile?.credit_balance ?? 0;
 
   if (creditBalance <= 0) {
-    return json(
+    return Response.json(
       {
         error: 'INSUFFICIENT_CREDITS',
         creditBalance,
@@ -99,11 +94,11 @@ export const POST: RequestHandler = async ({ request }) => {
     );
   }
 
-  const glmApiKey = env.GLM_API_KEY;
-  const glmModel = env.GLM_MODEL || 'glm-4-flash';
+  const glmApiKey = GLM_API_KEY;
+  const glmModel = GLM_MODEL || 'glm-4-flash';
 
   if (!glmApiKey) {
-    return json({ error: 'GLM API not configured' }, { status: 503 });
+    return Response.json({ error: 'GLM API not configured' }, { status: 503 });
   }
 
   const reservationMetadata = {
@@ -114,7 +109,7 @@ export const POST: RequestHandler = async ({ request }) => {
   const reservedBalance = await consumeGenerationCredit(admin, userId, reservationMetadata);
 
   if (reservedBalance === null) {
-    return json(
+    return Response.json(
       {
         error: 'INSUFFICIENT_CREDITS',
         creditBalance,
@@ -158,7 +153,7 @@ export const POST: RequestHandler = async ({ request }) => {
       const errorText = await glmResponse.text();
       console.error('GLM API error:', glmResponse.status, errorText);
       const refundedBalance = await refundReservedCredit(`glm_status_${glmResponse.status}`);
-      return json(
+      return Response.json(
         { error: 'AI generation failed', creditBalance: refundedBalance, creditsConsumed: 0 },
         { status: 502 }
       );
@@ -169,7 +164,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
     if (!generatedText) {
       const refundedBalance = await refundReservedCredit('empty_content');
-      return json(
+      return Response.json(
         {
           error: 'AI generation returned empty content',
           creditBalance: refundedBalance,
@@ -179,7 +174,7 @@ export const POST: RequestHandler = async ({ request }) => {
       );
     }
 
-    return json({
+    return Response.json({
       content: generatedText,
       type,
       model: glmModel,
@@ -189,7 +184,7 @@ export const POST: RequestHandler = async ({ request }) => {
   } catch (err) {
     console.error('GLM API request failed:', err);
     const refundedBalance = await refundReservedCredit('request_failed');
-    return json(
+    return Response.json(
       { error: 'AI service unavailable', creditBalance: refundedBalance, creditsConsumed: 0 },
       { status: 503 }
     );

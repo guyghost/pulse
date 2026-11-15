@@ -1,5 +1,5 @@
-import { createSupabaseBrowserClient } from '$lib/supabase';
-import { env } from '$env/dynamic/public';
+import { createSupabaseBrowserClient } from '#lib/supabase.js';
+import { PUBLIC_SUPABASE_URL, PUBLIC_SUPABASE_ANON_KEY } from '$app/env/public';
 
 type JsonObject = Record<string, unknown>;
 
@@ -254,10 +254,10 @@ async function supabaseAuthRequest<T>(
   body: JsonObject,
   accessToken?: string
 ): Promise<T> {
-  const response = await fetch(`${env.PUBLIC_SUPABASE_URL}/auth/v1${path}`, {
+  const response = await fetch(`${PUBLIC_SUPABASE_URL}/auth/v1${path}`, {
     method: 'POST',
     headers: {
-      apikey: env.PUBLIC_SUPABASE_ANON_KEY!,
+      apikey: PUBLIC_SUPABASE_ANON_KEY!,
       ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       'Content-Type': 'application/json',
     },

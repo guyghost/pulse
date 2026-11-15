@@ -34,7 +34,7 @@ describe('landing account dashboard operational UI', () => {
     expect(homeSource).toContain('4 plateformes');
     expect(homeSource).toContain('1 feed.');
     expect(homeSource).toContain('Tu décides.');
-    expect(homeSource).toContain('Freelance tech · France &amp; remote');
+    expect(homeSource).toContain('Freelance tech · France & remote');
     expect(homeSource).not.toContain('TJM 450-900€');
     expect(homeSource).not.toContain('Développeurs 3+ ans');
     expect(homeSource).toContain('Shortlist quotidienne');

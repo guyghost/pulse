@@ -216,7 +216,8 @@ describe('Copilot SQL cut-point contracts', () => {
       'perform public.purge_expired_copilot_deleted_job_receipts(100)'
     );
     expect(begin).toContain('perform public.purge_expired_copilot_deleted_job_receipts(100)');
-    expect(maintenanceRoute).toContain('env.CRON_SECRET');
+    expect(maintenanceRoute).toContain("import { CRON_SECRET } from '$app/env/private'");
+    expect(maintenanceRoute).toContain("request.headers.get('authorization'), CRON_SECRET");
     expect(maintenanceRoute).toContain('createSupabaseAdminClient()');
     expect(vercelConfig.crons).toContainEqual({
       path: '/api/internal/copilot/receipt-maintenance',

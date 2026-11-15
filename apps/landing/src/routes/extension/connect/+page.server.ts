@@ -1,8 +1,8 @@
 import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createSupabaseAdminClient, createSupabaseServerClient } from '$lib/server/supabase';
-import { enforceRateLimits, NO_STORE_HEADERS } from '$lib/server/rate-limit';
+import { createSupabaseAdminClient, createSupabaseServerClient } from '#lib/server/supabase.js';
+import { enforceRateLimits, NO_STORE_HEADERS } from '#lib/server/rate-limit.js';
 
 const LinkIdSchema = z.string().uuid();
 

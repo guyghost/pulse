@@ -20,7 +20,7 @@ describe('P0 launch copy (Comex / Tor)', () => {
       'Free-Work, LeHibou, Hiway, Cherry Pick — radar scoré sur ta stack, ton TJM, ton remote.'
     );
     expect(homePage).toContain('Dans le navigateur. Sans compte.');
-    expect(homePage).toContain('Freelance tech · France &amp; remote');
+    expect(homePage).toContain('Freelance tech · France & remote');
     expect(homePage).not.toContain('TJM 450-900');
     expect(homePage).not.toContain('450–900');
     expect(homePage).not.toContain('Le dernier scan a remonté 42 missions');
