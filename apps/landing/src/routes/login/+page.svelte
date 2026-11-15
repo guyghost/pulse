@@ -75,6 +75,10 @@
 
     try {
       await signInWithPasskey();
+      if (redirectTo.startsWith('/api/')) {
+        window.location.assign(redirectTo);
+        return;
+      }
       await goto(redirectTo);
     } catch (error) {
       formError = passkeyErrorMessage(error);
