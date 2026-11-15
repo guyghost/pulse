@@ -1,132 +1,131 @@
-# MV3 packaged harness model
+# Modèle du harnais packagé MV3
 
-Status: **proposed — persistent-session CDP lease revision 26**.
-Pending behaviour SHA-256: `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`.
+Statut : **proposé — révision 26 du bail CDP à session persistante**.
+SHA-256 du comportement en attente : `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`.
 
-Hash convention: compute SHA-256 over all raw UTF-8/LF bytes of this file after
-replacing only the value between backticks on the `Pending behaviour SHA-256`
-line with the literal `__PENDING_BEHAVIOUR_SHA256__`; the surrounding backticks,
-period and every other byte remain unchanged. The reviewer must reproduce that
-substitution before comparing the digest, so recording the digest creates no
-self-referential cycle.
+Convention de hachage : calculer le SHA-256 sur l'ensemble des octets UTF-8/LF bruts de ce fichier après
+avoir remplacé uniquement la valeur entre les accents graves sur la ligne `Pending behaviour SHA-256`
+par le littéral `__PENDING_BEHAVIOUR_SHA256__` ; les accents graves environnants,
+le point et tout autre octet demeurent inchangés. Le réviseur doit reproduire cette
+substitution avant de comparer le condensat, de sorte que l'enregistrement du condensat ne crée
+aucun cycle autoréférentiel.
 
-Revision 25 was independently rejected at normalized UTF-8/LF behaviour hash
-`84bc0ce47cb24d9fd998970daca04fbe6553931ede2b1be272348a16e665255f`:
-two earlier hostile-test labels still named revision 24. Revision 26 replaces
-all current proof labels with stable references to this pending revision; only
-the historical ledger retains explicit superseded revision numbers.
+La révision 25 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`84bc0ce47cb24d9fd998970daca04fbe6553931ede2b1be272348a16e665255f` :
+deux libellés de tests hostiles antérieurs désignaient toujours la révision 24. La révision 26 remplace
+tous les libellés de preuve actuels par des références stables à cette révision en attente ; seul
+le registre historique conserve les numéros explicites des révisions remplacées.
 
-Revision 24 was independently rejected at normalized UTF-8/LF behaviour hash
-`494464489184b4c7075fece27d581c71ee9d75b0bb989858abff9f790603842a`:
-three final-obligation labels still named revision 23 despite the corrected
-revision-24 authority bytes. Revision 25 corrects those remaining labels only.
+La révision 24 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`494464489184b4c7075fece27d581c71ee9d75b0bb989858abff9f790603842a` :
+trois libellés d'obligations finales désignaient toujours la révision 23 malgré les octets d'autorité
+corrigés de la révision 24. La révision 25 corrige uniquement ces libellés restants.
 
-Revision 23 was independently rejected at normalized UTF-8/LF behaviour hash
-`96f913a4ce21c0c07c20499d3ec4d966fe375baf1a49cfa56e7992f2b2f3b917`:
-two hostile-test labels still named revision 22 and one invariant incorrectly
-required a failed-connect transport close before the lease that necessarily
-owned it. Revision 24 corrects those normative labels without changing the
-source-bound authority behavior.
+La révision 23 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`96f913a4ce21c0c07c20499d3ec4d966fe375baf1a49cfa56e7992f2b2f3b917` :
+deux libellés de tests hostiles désignaient toujours la révision 22 et un invariant exigeait
+incorrectement une fermeture de transport en échec de connexion avant le bail qui en détenait
+nécessairement la propriété. La révision 24 corrige ces libellés normatifs sans modifier
+le comportement d'autorité lié à la source.
 
-Revision 22 was independently rejected at normalized UTF-8/LF behaviour hash
-`942ea53ff3c0960ba7d029174c1ec47d2797e335f1e45fd5dc26115ce39fb2cf`:
-its event DTO/hash was not compared with the retained raw authority, so a
-self-consistent foreign DTO could reserve the Playwright lease. Its final
-obligation also conflated the hostile matrix with nominal Chrome repetitions.
-Revision 23 resolves both findings below.
+La révision 22 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`942ea53ff3c0960ba7d029174c1ec47d2797e335f1e45fd5dc26115ce39fb2cf` :
+son DTO/hachage d'événement n'était pas comparé à l'autorité brute conservée, de sorte qu'un
+DTO étranger cohérent en interne pouvait réserver le bail Playwright. Son obligation finale
+confondait également la matrice hostile avec les répétitions nominales de Chrome.
+La révision 23 résout ces deux conclusions ci-dessous.
 
-Revision 21 was independently rejected at normalized UTF-8/LF behaviour hash
-`0694b990c2c8c8329697c05e6711fa53520b1071bf4e6e931bd6553ba60e6a88`:
-its success event omitted the DTO, its no-owner receipt was not closed, hostile
-reflection exceptions escaped the typed error union, and one final obligation
-still named revision 19. Revision 22 resolves those four findings below.
+La révision 21 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`0694b990c2c8c8329697c05e6711fa53520b1071bf4e6e931bd6553ba60e6a88` :
+son événement de succès omettait le DTO, son reçu sans propriétaire (no-owner) n'était pas fermé, des
+exceptions de réflexion hostiles s'échappaient de l'union typée d'erreurs, et une obligation finale
+désignait toujours la révision 19. La révision 22 résout ces quatre conclusions ci-dessous.
 
-Revision 20 was independently rejected at normalized UTF-8/LF behaviour hash
-`c1131e755549170e09f747fd06b09ced7f2f7778087bcb39a50d72a80f442222`:
-the authority projection was not represented in the outer machine, its rejection
-cleanup was ambiguous after transport allocation, and its error/test matrix was
-not closed. Revision 21 resolves those three findings below. No approval
-transfers from any earlier revision.
+La révision 20 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`c1131e755549170e09f747fd06b09ced7f2f7778087bcb39a50d72a80f442222` :
+la projection d'autorité n'était pas représentée dans la machine externe, son nettoyage
+de rejet était ambigu après l'allocation du transport, et sa matrice d'erreurs/tests n'était
+pas fermée. La révision 21 résout ces trois conclusions ci-dessous. Aucune approbation ne se
+transfère depuis une quelconque révision antérieure.
 
-Revision 19 was independently approved at raw UTF-8/LF behaviour hash
+La révision 19 a été approuvée de manière indépendante au hachage de comportement brut UTF-8/LF
 `ba1e91ea1af5fc802c2d9f026a1ce97fa16750e244c71677ed9cebcfaf67b458`,
-then verified by four real Chrome-for-Testing 149 same-session restart runs. The
-canonical packaged runtime scenario subsequently falsified its Playwright
-handoff boundary as described below. No approval transfers to revision 20, and
-implementation is forbidden until an independent review approves the exact
-pending raw UTF-8/LF behaviour hash above.
+puis vérifiée par quatre exécutions réelles de redémarrage dans la même session sous Chrome-for-Testing 149. Le
+scénario d'exécution packagé canonique a ultérieurement falsifié sa frontière de transfert
+Playwright comme décrit ci-dessous. Aucune approbation ne se transfère à la révision 20, et
+l'implémentation est interdite jusqu'à ce qu'une revue indépendante approuve le hachage de
+comportement brut UTF-8/LF exact en attente ci-dessus.
 
-Revision 18 was independently approved at raw UTF-8/LF behaviour hash
+La révision 18 a été approuvée de manière indépendante au hachage de comportement brut UTF-8/LF
 `a0f201a6273feb1edd51b024330f54534eed9b1890c2587690a81ab011e0521d`,
-then falsified by the real same-session paused-bootstrap command ordering
-described below. No approval transfers to revision 19, and implementation is
-forbidden until an independent review approves the exact pending raw UTF-8/LF
-behaviour hash above.
+puis falsifiée par l'ordonnancement réel des commandes d'amorçage en pause dans la même session
+décrit ci-dessous. Aucune approbation ne se transfère à la révision 19, et l'implémentation est
+interdite jusqu'à ce qu'une revue indépendante approuve le hachage de comportement brut UTF-8/LF
+exact en attente ci-dessus.
 
-Revision 16 was independently approved at raw UTF-8/LF behaviour hash
+La révision 16 a été approuvée de manière indépendante au hachage de comportement brut UTF-8/LF
 `f374bdaa20cedbea1be9abccfe53c39f6ede7c47a1df8126c64623f71cc96927`,
-then falsified by the first real paused-bootstrap probe ordering described
-below.
+puis falsifiée par le premier ordonnancement réel de sondes d'amorçage en pause décrit
+ci-dessous.
 
-Revision 17 was independently rejected at raw UTF-8/LF SHA-256
+La révision 17 a été rejetée de manière indépendante au SHA-256 brut UTF-8/LF
 `142b65a82c492f895a31bcb697c16f34e24c2bb87780d9c422f90a7c9a53025f`
-because an exact selected-version `running` update could arrive during the
-probe/resume batch but was defined only in `resuming`. Revisions 18 and 19
-retain that native proof idempotently in every bootstrap-batch state as
-specified below.
+car une mise à jour exacte `running` de la version sélectionnée pouvait arriver pendant
+le lot (batch) sonde/reprise mais n'était définie que dans `resuming`. Les révisions 18 et 19
+conservent cette preuve native de manière idempotente dans chaque état du lot d'amorçage comme
+spécifié ci-dessous.
 
-Revision 14 was independently approved for raw UTF-8/LF behaviour hash
+La révision 14 a été approuvée de manière indépendante pour le hachage de comportement brut UTF-8/LF
 `69caaba95c035ce51d6d549252884c3a2893a8146d15355eac0df57b17866fba`,
-then falsified by the real post-reload Runtime ordering described below.
-Revision 15 was independently rejected at raw UTF-8/LF SHA-256
+puis falsifiée par l'ordonnancement réel de Runtime post-rechargement décrit ci-dessous.
+La révision 15 a été rejetée de manière indépendante au SHA-256 brut UTF-8/LF
 `0e701a15bef6b9ddef15ac26b1232c976404d9a08dee8ee1783087b8675b15cc`
-because a post-crash `executionContextDestroyed` ID was counted but not
-tombstoned, allowing a later context creation to restore destroyed authority.
+car un identifiant `executionContextDestroyed` post-crash était comptabilisé mais non
+consigné dans la table d'exclusion (tombstoned), permettant à une création ultérieure de contexte de restaurer une autorité détruite.
 
-Revision 9 was independently approved at pending raw UTF-8/LF SHA-256
+La révision 9 a été approuvée de manière indépendante au SHA-256 brut UTF-8/LF en attente
 `3cfeb1d001cc1ae98d9a79139ed01f8eebfba5cbc724b4a410e2a4d0c47e7dc1`,
-then falsified by all three real packaged-Chrome repetitions. Revision 10 was
-rejected during independent review before implementation because it still
-expected a new target attachment for a same-version restart. No approval
-transfers to revision 11. Revision 12 superseded rejected pending revision-11
-hash `956e31105c1c6f33b916f8bc161de0ff357f07464eb040b8214ec1082d29d2e8`
-and remained pending at raw UTF-8/LF SHA-256
+puis falsifiée par l'ensemble des trois répétitions réelles sous Chrome packagé. La révision 10 a été
+rejetée lors de la revue indépendante avant l'implémentation car elle attendait toujours un nouvel
+attachement de cible pour un redémarrage avec la même version. Aucune approbation ne se transfère
+à la révision 11. La révision 12 a remplacé le hachage rejeté en attente de la révision 11
+`956e31105c1c6f33b916f8bc161de0ff357f07464eb040b8214ec1082d29d2e8`
+et est restée en attente au SHA-256 brut UTF-8/LF
 `c1a66bdb5341b6118d9eda5d17de478b83abe98ecebc9ded7cbd9019f6e85617`.
-Repeated real Chrome 149 traces now falsify revision 12 as described below;
-revision 12 cannot be approved or implemented as written. Revision 13
-superseded it and was independently approved at raw UTF-8/LF SHA-256
+Des traces répétées sous Chrome 149 réel falsifient désormais la révision 12 comme décrit ci-dessous ;
+la révision 12 ne peut être approuvée ni implémentée telle qu'écrite. La révision 13
+l'a remplacée et a été approuvée de manière indépendante au SHA-256 brut UTF-8/LF
 `23fa088bca21bf9ad191adb7f6fbdb469112b762bdb3a624c992bbbac1fcfa1d`.
-A real packaged-Chrome smoke then rejected a valid repeated replacement-version
-update because the implementation incorrectly treated the proof as one-shot.
-Revision 14 made the already intended idempotent metadata semantics explicit
-and was approved at the hash recorded above before its later native-ordering
-falsification.
+Un smoke réel sous Chrome packagé a ensuite rejeté une mise à jour valide et répétée de version de remplacement
+parce que l'implémentation traitait incorrectement la preuve comme étant à usage unique.
+La révision 14 a rendu explicite la sémantique de métadonnées idempotente déjà visée
+et a été approuvée au hachage consigné ci-dessus avant sa falsification ultérieure d'ordonnancement natif.
 
-Revision date: 2026-07-17
+Date de révision : 2026-07-17
 
-## Scope
+## Portée
 
-This model owns only verification of the exact sealed
-`apps/extension/dist` package in a real Chromium Manifest V3 process. It does
-not change product behavior or application state. The canonical entry point
-remains `pnpm --filter @pulse/extension test:mv3`.
+Ce modèle détient uniquement la vérification du package exact et scellé
+`apps/extension/dist` dans un véritable processus Chromium Manifest V3. Il ne
+modifie pas le comportement du produit ni l'état de l'application. Le point d'entrée
+canonique demeure `pnpm --filter @pulse/extension test:mv3`.
 
-The model separates two claims that must never be conflated:
+Le modèle sépare deux revendications qui ne doivent jamais être confondues :
 
-1. **instrumented bootstrap**: a raw CDP owner installs Runtime and diagnostic
-   observers before a restarted worker is resumed;
-2. **functional restart**: after Playwright has exercised the extension, the
-   same Chromium process and profile are handed back to the raw owner, restarted,
-   reconnected to Playwright, and verified for persisted settings, IndexedDB and
-   alarms.
+1. **amorçage instrumenté (instrumented bootstrap)** : un propriétaire CDP brut installe Runtime et des
+   observateurs de diagnostic avant qu'un worker redémarré ne soit repris ;
+2. **redémarrage fonctionnel (functional restart)** : après que Playwright a exercé l'extension, le
+   même processus et profil Chromium sont restitués au propriétaire brut, redémarrés,
+   reconnectés à Playwright, et vérifiés quant à la persistance des réglages, d'IndexedDB et
+   des alarmes.
 
-A restart performed while Playwright still owns a CDP connection can prove only
-functional behavior, never pre-bootstrap instrumentation. Revision 13 therefore
-forbids that topology rather than weakening the native pause proof.
+Un redémarrage effectué pendant que Playwright détient toujours une connexion CDP ne peut prouver
+qu'un comportement fonctionnel, jamais l'instrumentation préalable à l'amorçage. La révision 13 interdit
+donc cette topologie plutôt que d'affaiblir la preuve native de pause.
 
-## Revision-9 falsification evidence
+## Preuves de falsification de la révision 9
 
-The command below failed three times before any UI interaction:
+La commande ci-dessous a échoué trois fois avant toute interaction avec l'UI :
 
 ```text
 playwright test --config=playwright.mv3.config.ts
@@ -135,355 +134,332 @@ playwright test --config=playwright.mv3.config.ts
   --repeat-each=3
 ```
 
-The traces establish two independent modes:
+Les traces établissent deux modes indépendants :
 
-1. the base run and repeat 1 failed during initial authority acquisition, before
-   any `stopWorker` or `startWorker`; revision 9 treated either a transient
-   overlapping non-redundant version or the provisional version becoming
-   `redundant` as immediately terminal;
-2. repeat 2 froze registration `0`, version `0` and target
-   `6E5F00D02842631CE14197B441F1B3D7`, stopped and detached it, then Chrome
-   restarted the same version with the same target ID but emitted no replacement
-   `Target.attachedToTarget` or `Runtime.executionContextCreated` to the second
-   raw connection.
+1. l'exécution de base et la répétition 1 ont échoué lors de l'acquisition initiale de l'autorité, avant
+   tout `stopWorker` ou `startWorker` ; la révision 9 traitait soit une version transitoire chevauchante
+   non redondante, soit le passage de la version provisoire à `redundant` comme immédiatement terminal ;
+2. la répétition 2 a figé l'enregistrement `0`, la version `0` et la cible
+   `6E5F00D02842631CE14197B441F1B3D7`, l'a arrêtée et détachée, puis Chrome
+   a redémarré la même version avec le même identifiant de cible mais n'a émis aucun
+   `Target.attachedToTarget` ou `Runtime.executionContextCreated` de remplacement vers la seconde
+   connexion brute.
 
-The second result is explained by the real owner topology. Playwright 1.61.1
-arms its own root `Target.setAutoAttach` while connecting
-(`playwright-core/lib/coreBundle.js:37742-37773`). Its `CRServiceWorker`
-immediately sends `Runtime.enable` and `Runtime.runIfWaitingForDebugger`, and
-does so again after a worker reload (`coreBundle.js:37591-37633`). The raw
-observer was therefore not the sole pause/resume authority.
+Le second résultat s'explique par la topologie réelle des propriétaires. Playwright 1.61.1
+arme son propre `Target.setAutoAttach` racine lors de la connexion
+(`playwright-core/lib/coreBundle.js:37742-37773`). Son `CRServiceWorker`
+envoie immédiatement `Runtime.enable` et `Runtime.runIfWaitingForDebugger`, et
+le fait à nouveau après un rechargement de worker (`coreBundle.js:37591-37633`). L'observateur
+brut n'était donc pas la seule autorité de pause/reprise.
 
-Revision-11 hypotheses are deliberately falsifiable:
+Les hypothèses de la révision 11 sont délibérément falsifiables :
 
-- **H11.1**: when the raw connection is the only harness-created root CDP
-  transport and its exact service-worker session remains attached through
-  `stopWorker`/`startWorker`, Chromium reuses that agent host, emits
-  `Inspector.targetCrashed` then `Inspector.targetReloadedAfterCrash`, and pauses
-  the replacement before bootstrap because the host was attached at worker
-  creation;
-- **H11.2**: initial installation may transiently expose multiple related
-  versions, but converges under one deadline to one activated non-redundant
-  version while all older related versions become redundant;
-- **H11.3**: `browser.close()` on a `connectOverCDP` Browser closes only that
-  Playwright transport, so the same manually owned Chromium process and profile
-  can be leased back to raw CDP and later reconnected.
+- **H11.1** : lorsque la connexion brute est le seul transport CDP racine créé par le harnais et que sa
+  session exacte de service worker demeure attachée à travers
+  `stopWorker`/`startWorker`, Chromium réutilise cet hôte agent, émet
+  `Inspector.targetCrashed` puis `Inspector.targetReloadedAfterCrash`, et met en pause
+  le remplaçant avant l'amorçage parce que l'hôte était attaché lors de la création du worker ;
+- **H11.2** : l'installation initiale peut exposer transitoirement plusieurs versions
+  liées, mais converge sous une échéance unique vers une version activée non redondante
+  tandis que toutes les versions liées plus anciennes deviennent redondantes ;
+- **H11.3** : `browser.close()` sur un Browser issu de `connectOverCDP` ferme uniquement ce
+  transport Playwright, si bien que le même processus et profil Chromium détenus manuellement
+  peuvent être prêtés en retour au CDP brut et reconnectés ultérieurement.
 
-If any hypothesis fails in deterministic tests or any of three real repetitions,
-implementation stops and returns to model review. There is no fallback to a
-detached old worker session, a guessed new target attachment, an unproved
-warm-up start, a new browser process or a new profile.
+Si une quelconque hypothèse échoue dans les tests déterministes ou dans l'une quelconque des trois répétitions réelles,
+l'implémentation s'arrête et retourne en revue de modèle. Il n'existe aucun repli vers une
+ancienne session de worker détachée, un attachement de nouvelle cible deviné, un démarrage d'échauffement
+non prouvé, un nouveau processus de navigateur ou un nouveau profil.
 
-## Revision-12 falsification evidence and revision-13 decision
+## Preuves de falsification de la révision 12 et décision de la révision 13
 
-Repeated real traces with the pinned Chrome for Testing 149 build falsify the
-revision-12 stop proof. On the retained selected target and session, every trace
-observed all three native stop facts:
+Des traces réelles répétées avec le build épinglé de Chrome for Testing 149 falsifient la
+preuve d'arrêt de la révision 12. Sur la cible et session sélectionnées conservées, chaque trace
+a observé l'ensemble des trois faits d'arrêt natifs :
 
-1. the correlated `ServiceWorker.stopWorker` response succeeded;
-2. the same selected version became `status:activated` and
-   `runningStatus:stopped`;
-3. the selected session emitted `Inspector.targetCrashed` for the same target.
+1. la réponse corrélée à `ServiceWorker.stopWorker` a réussi ;
+2. la même version sélectionnée est passée en `status:activated` et
+   `runningStatus:stopped` ;
+3. la session sélectionnée a émis `Inspector.targetCrashed` pour la même cible.
 
-No trace emitted `Runtime.executionContextDestroyed` or
-`Runtime.executionContextsCleared`, including repeated observation windows from
-8 through 30 seconds after the crash. Waiting longer therefore adds elapsed
-time, not evidence. Revision 12 made progress depend on a Runtime lifecycle
-event that this native same-session stop does not emit and is falsified.
+Aucune trace n'a émis `Runtime.executionContextDestroyed` ou
+`Runtime.executionContextsCleared`, y compris lors de fenêtres d'observation répétées de
+8 à 30 secondes après le crash. Attendre plus longtemps ajoute donc du temps écoulé,
+et non des preuves. La révision 12 faisait dépendre la progression d'un événement de cycle de vie
+Runtime que cet arrêt natif dans la même session n'émet pas, et est donc falsifiée.
 
-The same Chrome 149 traces establish a second native contract for the
-replacement: `Runtime.executionContextCreated.context.origin` equals the full
-frozen worker `scriptURL`
-(`chrome-extension://<extensionId>/service-worker-loader.js`), not the root
-scope with its trailing slash removed. Revision 12 did not make `origin` a stop
-proof, so this does not replace the crash falsification above; it does reject a
-scope-derived context guard.
+Les mêmes traces sous Chrome 149 établissent un second contrat natif pour le
+remplaçant : `Runtime.executionContextCreated.context.origin` est égal au `scriptURL`
+complet et figé du worker (`chrome-extension://<extensionId>/service-worker-loader.js`),
+et non à la portée (scope) racine avec sa barre oblique finale supprimée. La révision 12 ne faisait pas de
+l'`origin` une preuve d'arrêt, donc ceci ne remplace pas la falsification de crash ci-dessus ; cela
+rejette en revanche une garde de contexte dérivée de la portée.
 
-Revision 13 treats the exact current `Inspector.targetCrashed` event as the
-native context-generation boundary. One atomic XState action on that event:
+La révision 13 traite l'événement `Inspector.targetCrashed` courant exact comme la
+frontière native de génération de contexte. Une action XState atomique sur cet événement :
 
-1. freezes the crash event hash against the selected target and session;
-2. increments the selected session's monotonic `contextGeneration` exactly once;
-3. moves every `uniqueContextId` admitted in the pre-crash generation, whether
-   still active or already inactive, into the bounded append-only
-   `revokedUniqueContextIds` tombstone set and freezes its canonical set hash;
-4. clears the active-context authority map for that session; and
-5. marks the crash/revocation proof complete in the same transition.
+1. fige le hachage de l'événement de crash par rapport à la cible et à la session sélectionnées ;
+2. incrémente le `contextGeneration` monotone de la session sélectionnée exactement une fois ;
+3. déplace chaque `uniqueContextId` admis dans la génération pré-crash, qu'il soit
+   encore actif ou déjà inactif, dans l'ensemble de tombstones borné à ajout seul
+   `revokedUniqueContextIds` et fige son hachage d'ensemble canonique ;
+4. vide la carte d'autorité de contexte actif pour cette session ; et
+5. marque la preuve de crash/révocation comme achevée dans la même transition.
 
-No pre-crash context remains current after that action. A revoked
-`uniqueContextId` can never satisfy `isCurrentContext`, authorize a probe or be
-passed to `Runtime.evaluate`, even if Chromium later repeats its bytes. A late
-`Runtime.executionContextDestroyed` or `Runtime.executionContextsCleared`
-reduced while the actor remains in `controlled_stop` is normalized as retired
-evidence only; it neither creates nor completes a stop proof and cannot select a
-transition. After the crash, every valid destroyed `uniqueContextId` that is not
-already in that crash set is retained in a separate bounded post-crash tombstone
-set. Outside `controlled_stop`, revision 16 permits only the narrow post-reload,
-pre-context window defined below; every other such event is terminal because it
-carries no trustworthy context-generation discriminator.
+Aucun contexte pré-crash ne demeure actuel après cette action. Un `uniqueContextId` révoqué
+ne peut jamais satisfaire `isCurrentContext`, autoriser une sonde ou être
+transmis à `Runtime.evaluate`, même si Chromium répète ultérieurement ses octets. Un
+`Runtime.executionContextDestroyed` ou `Runtime.executionContextsCleared` tardif
+réduit pendant que l'acteur demeure dans `controlled_stop` est normalisé comme une preuve
+retirée uniquement ; il ne crée ni n'achève aucune preuve d'arrêt et ne peut sélectionner une
+transition. Après le crash, chaque `uniqueContextId` détruit valide qui ne se trouve pas
+déjà dans cet ensemble de crash est conservé dans un ensemble de tombstones post-crash borné distinct.
+En dehors de `controlled_stop`, la révision 16 n'autorise que l'étroite fenêtre post-rechargement et
+pré-contexte définie ci-dessous ; tout autre événement de ce type est terminal car il
+ne transporte aucun discriminateur fiable de génération de contexte.
 
-The replacement proof remains fail-closed. It requires
-`Inspector.targetReloadedAfterCrash` on the same target/session while the same
-frozen version remains selected before admitting any replacement context,
-followed by exactly one new
-`Runtime.executionContextCreated` on that retained session. Its non-empty
-`uniqueContextId` must belong to the incremented generation and must occur in
-neither `revokedUniqueContextIds` nor
-`postCrashDestroyedUniqueContextIds`, and its `origin` must equal the exact
-frozen `scriptURL`. A context before reload, a scope-derived or otherwise
-mismatched origin, an old or destroyed ID reused after reload, a second
-replacement context, a new selected attachment, a detach or any
-target/session/version drift is terminal.
-No absence, delay or locally cleared boolean substitutes for these positive
-native proofs.
+La preuve de remplacement demeure hermétique en échec (fail-closed). Elle exige
+`Inspector.targetReloadedAfterCrash` sur la même cible/session pendant que la même
+version figée reste sélectionnée avant d'admettre le moindre contexte remplaçant,
+suivi d'exactement un nouveau `Runtime.executionContextCreated` sur cette session conservée.
+Son `uniqueContextId` non vide doit appartenir à la génération incrémentée et ne doit apparaître
+ni dans `revokedUniqueContextIds` ni dans `postCrashDestroyedUniqueContextIds`,
+et son `origin` doit être égal au `scriptURL` figé exact. Un contexte avant le rechargement, une
+origine dérivée de la portée ou discordante, un identifiant ancien ou détruit réutilisé après le rechargement,
+un second contexte remplaçant, un nouvel attachement sélectionné, un détachement ou toute
+dérive de cible/session/version est terminal.
+Aucune absence, aucun délai ni aucun booléen effacé localement ne se substitue à ces preuves
+positives natives.
 
-After independent approval of revision 13, any implementation derived from
-revision 12 must replace a `scopeURL`-derived context-origin guard with the exact
-frozen `scriptURL` rule. This model edit does not authorize that implementation
-change before approval.
+Après approbation indépendante de la révision 13, toute implémentation dérivée de
+la révision 12 doit remplacer une garde d'origine de contexte dérivée de `scopeURL` par la règle
+du `scriptURL` figé exact. Cette modification du modèle n'autorise pas ce changement d'implémentation
+avant approbation.
 
-## Revision-13 implementation falsification and revision-14 decision
+## Falsification d'implémentation de la révision 13 et décision de la révision 14
 
-The first real packaged-Chrome smoke of the revision-13 implementation reached
-the full native stop proof, then emitted this same-version replacement sequence
-on the retained registration, target and session:
+Le premier smoke réel sous Chrome packagé de l'implémentation de la révision 13 a atteint
+la preuve d'arrêt native complète, puis a émis cette séquence de remplacement avec la même version
+sur l'enregistrement, la cible et la session conservés :
 
-1. `activated/starting` without `targetId`;
-2. `activated/starting` again with the exact frozen `targetId`.
+1. `activated/starting` sans `targetId` ;
+2. `activated/starting` à nouveau avec le `targetId` figé exact.
 
-The first update completed the implementation's boolean replacement-version
-proof. Its one-shot guard then sent the second valid update to failure solely
-because that proof was already true. This contradicts the transition-table
-requirement to retain current same-version starting/running updates and makes a
-normal Chrome metadata enrichment terminal.
+La première mise à jour a complété la preuve booléenne de version de remplacement de l'implémentation.
+Sa garde à usage unique a alors envoyé la seconde mise à jour valide en échec uniquement
+parce que cette preuve était déjà vraie. Cela contredit l'exigence de la table de transition
+de conserver les mises à jour starting/running actuelles avec la même version et transforme un
+enrichissement normal de métadonnées de Chrome en échec terminal.
 
-Revision 14 separates identity admission from repeated metadata observation.
-The first current update with exact registration/version/script identity,
-`status='activated'`, `runningStatus in {'starting','running'}` and either no
-`targetId` or the frozen target completes the replacement-version proof. Every
-later update satisfying the same guard remains admissible. An exactly repeated
-record is an exact no-op. A valid `starting -> running` change or addition of the
-exact frozen `targetId` may refresh non-authoritative current metadata, but it
-does not allocate a second proof, change restart/context generation, replace
-frozen identity or authorize progress by itself. A different registration,
-version, script, status, target, or any other running status remains terminal.
+La révision 14 sépare l'admission de l'identité de l'observation répétée des métadonnées.
+La première mise à jour actuelle avec une identité exacte d'enregistrement/version/script,
+`status='activated'`, `runningStatus in {'starting','running'}` et soit aucun
+`targetId`, soit la cible figée, complète la preuve de version de remplacement. Toute
+mise à jour ultérieure satisfaisant la même garde demeure admissible. Un enregistrement
+exactement répété est une absence d'opération (no-op) exacte. Un changement valide `starting -> running`
+ou l'ajout du `targetId` figé exact peut rafraîchir des métadonnées actuelles ne faisant pas autorité,
+mais n'alloue pas de seconde preuve, ne modifie pas la génération de redémarrage/contexte,
+ne remplace pas l'identité figée et n'autorise pas la progression par lui-même. Un enregistrement,
+une version, un script, un statut, une cible différents, ou tout autre statut d'exécution demeure terminal.
 
-## Revision-14 falsification evidence, revision-15 rejection and revision-16 decision
+## Preuves de falsification de la révision 14, rejet de la révision 15 et décision de la révision 16
 
-After rebuilding and verifying the exact production `dist`, the next real
-packaged-Chrome smoke completed stop and emitted this retained-session order:
+Après avoir recompilé et vérifié le `dist` de production exact, le smoke réel suivant sous
+Chrome packagé a complété l'arrêt et a émis cet ordre sur la session conservée :
 
-1. `Inspector.targetReloadedAfterCrash`;
-2. `Runtime.executionContextsCleared`;
-3. `Runtime.executionContextCreated` with a fresh non-revoked `uniqueId` and
-   exact full-script origin.
+1. `Inspector.targetReloadedAfterCrash` ;
+2. `Runtime.executionContextsCleared` ;
+3. `Runtime.executionContextCreated` avec un `uniqueId` frais non révoqué et une
+   origine exacte de script complet.
 
-Revision 14 made step 2 terminal merely because the machine had left
-`controlled_stop`. That rejects Chrome's native reload initialization before
-any replacement context authority exists.
+La révision 14 rendait l'étape 2 terminale au seul motif que la machine avait quitté
+`controlled_stop`. Cela rejette l'initialisation native de rechargement de Chrome avant
+qu'une quelconque autorité de contexte remplaçant n'existe.
 
-The first revision-15 proposal counted both lifecycle events without retaining
-the native destroyed unique ID. Independent review rejected it: a later
-`executionContextCreated` could reuse that unrecorded ID and restore authority
-that Chrome had already destroyed. Revision 16 closes that hole as follows.
+La première proposition de révision 15 comptabilisait les deux événements de cycle de vie sans conserver
+l'identifiant unique détruit natif. La revue indépendante l'a rejetée : un
+`executionContextCreated` ultérieur pouvait réutiliser cet identifiant non consigné et restaurer
+une autorité que Chrome avait déjà détruite. La révision 16 comble cette lacune comme suit.
 
-Revision 16 admits a bounded retired-generation Runtime lifecycle event only
-when every guard below is true:
+La révision 16 n'admet un événement de cycle de vie Runtime de génération retirée et borné que
+lorsque chaque garde ci-dessous est vérifiée :
 
-- process generation, lease epoch and selected session are current;
-- the exact same-session `targetReloadedAfterCrash` proof is already retained;
-- no replacement context has been observed or frozen yet;
-- the event is `executionContextsCleared` or `executionContextDestroyed`.
+- la génération de processus, l'époque de bail et la session sélectionnée sont actuelles ;
+- la preuve exacte `targetReloadedAfterCrash` sur la même session est déjà conservée ;
+- aucun contexte remplaçant n'a encore été observé ou figé ;
+- l'événement est `executionContextsCleared` ou `executionContextDestroyed`.
 
-`Runtime.executionContextsCleared` updates the bounded retired-evidence counter
-only. `Runtime.executionContextDestroyed` must additionally carry its native
-non-negative safe-integer `executionContextId`, a non-empty normalized
-`executionContextUniqueId` of at most 512 UTF-8 bytes with no NUL, CR or LF, and
-the SHA-256 of the complete schema-validated parameters. If that unique ID is
-not already in `revokedUniqueContextIds`, the same transition appends it to
-`postCrashDestroyedUniqueContextIds` and recomputes
-`postCrashDestroyedUniqueContextIdsSha256` over RFC 8785 JCS of the sorted set.
-The set starts empty in the atomic crash transition. Its IDs share the single
-4,096-entry execution-context authority budget with crash tombstones and the
-fresh replacement context. A duplicate destroyed ID is idempotent but its event
-still consumes one of the 4,096 bounded retired-evidence observations. A
-malformed or over-budget destroy/clear is terminal and can never authorize
-progress.
+`Runtime.executionContextsCleared` met à jour uniquement le compteur borné de preuves retirées.
+`Runtime.executionContextDestroyed` doit en outre transporter son entier sûr non négatif
+`executionContextId` natif, un `executionContextUniqueId` normalisé non vide d'au plus 512 octets
+UTF-8 sans NUL, CR ou LF, et le SHA-256 des paramètres complets validés selon le schéma. Si cet identifiant unique
+ne se trouve pas déjà dans `revokedUniqueContextIds`, la même transition l'ajoute à
+`postCrashDestroyedUniqueContextIds` et recalcule
+`postCrashDestroyedUniqueContextIdsSha256` sur le JCS RFC 8785 de l'ensemble trié.
+L'ensemble commence vide lors de l'action atomique de crash. Ses identifiants partagent le budget unique
+d'autorité de contexte d'exécution de 4 096 entrées avec les tombstones de crash et le contexte
+remplaçant frais. Un identifiant détruit dupliqué est idempotent mais son événement consomme
+toujours l'une des 4 096 observations bornées de preuves retirées. Une destruction ou un vidage
+malformé ou hors budget est terminal et ne peut jamais autoriser la progression.
 
-Neither event can complete start, Runtime, version, context or identity proof;
-increment `contextGeneration`; mutate the crash-time revoked-ID set/hash; clear
-the reload proof; or authorize a probe or transition. The first admissible fresh
-context closes the window atomically and must be absent from both tombstone
-sets. Once `replacement_starting` begins, the same lifecycle event before
-reload, after a fresh context, on another session, or in any later probe/resume
-state is terminal. Thus Chrome may
-announce that the reloaded Runtime cleared its old execution world, while a
-later context creation can never restore an authority that Chrome already
-destroyed.
+Aucun des deux événements ne peut compléter la preuve de démarrage, de Runtime, de version,
+de contexte ou d'identité ; incrémenter `contextGeneration` ; muter l'ensemble/hachage d'identifiants
+révoqués au moment du crash ; effacer la preuve de rechargement ; ou autoriser une sonde ou transition.
+Le premier contexte frais admissible ferme la fenêtre de manière atomique et doit être absent des
+deux ensembles de tombstones. Une fois que `replacement_starting` commence, le même événement de cycle
+de vie avant le rechargement, après un contexte frais, sur une autre session, ou dans tout état ultérieur
+de sonde/reprise est terminal. Ainsi, Chrome peut annoncer que le Runtime rechargé a nettoyé son ancien
+monde d'exécution, tandis qu'une création ultérieure de contexte ne pourra jamais restaurer une autorité
+que Chrome a déjà détruite.
 
-## Revision-16 falsification evidence and revisions 17-18 decisions
+## Preuves de falsification de la révision 16 et décisions des révisions 17-18
 
-After the revision-16 deterministic suite passed, a real production-package
-Chrome run reached the exact same-session sequence required by that revision:
+Après que la suite déterministe de la révision 16 a réussi, une exécution réelle de Chrome avec le package
+de production a atteint la séquence exacte sur la même session exigée par cette révision :
 
-1. `Inspector.targetReloadedAfterCrash`;
-2. `Runtime.executionContextsCleared`;
-3. one fresh `Runtime.executionContextCreated` with exact script origin.
+1. `Inspector.targetReloadedAfterCrash` ;
+2. `Runtime.executionContextsCleared` ;
+3. un `Runtime.executionContextCreated` frais avec l'origine exacte du script.
 
-The owner then sent the fixed identity `Runtime.evaluate` and awaited its reply
-before sending `Runtime.runIfWaitingForDebugger`. That evaluation never settled
-within the 30-second absolute raw deadline. The replacement trace emitted no
-`Inspector.workerScriptLoaded` before the wait and later returned to
-`targetCrashed/stopped`. The positive evidence is that the replacement context
-exists while the worker is still paused on start; evaluating bootstrap globals
-cannot be awaited to completion before the only command that releases that
-pause. Revision 16 therefore encodes a causal deadlock even though its context
-authority proof is correct.
+Le propriétaire a alors envoyé le `Runtime.evaluate` d'identité fixe et a attendu sa réponse
+avant d'envoyer `Runtime.runIfWaitingForDebugger`. Cette évaluation ne s'est jamais résolue
+au cours du délai limite absolu brut de 30 secondes. La trace de remplacement n'a émis aucun
+`Inspector.workerScriptLoaded` avant l'attente et est retournée ultérieurement à
+`targetCrashed/stopped`. La preuve positive est que le contexte remplaçant existe alors
+que le worker est encore en pause au démarrage ; l'évaluation de globales d'amorçage ne peut
+pas être attendue jusqu'à son terme avant la seule commande qui libère cette pause. La révision 16
+encode donc un interblocage causal (deadlock) bien que sa preuve d'autorité de contexte soit correcte.
 
-Revision 17 proposed changing the fixed bootstrap command effect. Revision 18
-kept every revision-16 identity and tombstone rule and, after closing the
-revision-17 selected-version metadata gap, dispatched one synchronous
-tracked-client batch in this exact order without awaiting any reply between
-sends:
+La révision 17 a proposé de modifier l'effet de la commande d'amorçage fixe. La révision 18
+a conservé chaque règle d'identité et de tombstone de la révision 16 et, après avoir comblé l'écart
+de métadonnées de la version sélectionnée de la révision 17, a distribué un lot synchrone de client
+suivi dans cet ordre exact sans attendre de réponse entre les envois :
 
-1. the fixed identity `Runtime.evaluate`;
-2. the optional explicit test `Runtime.evaluate`, only when the machine's
-   frozen `testProbeConfigured` input is true;
-3. exactly one `Runtime.runIfWaitingForDebugger`.
+1. le `Runtime.evaluate` d'identité fixe ;
+2. le `Runtime.evaluate` de test explicite facultatif, uniquement lorsque l'entrée
+   `testProbeConfigured` figée de la machine est vraie ;
+3. exactement un `Runtime.runIfWaitingForDebugger`.
 
-All commands target the retained selected session. Both evaluations use the
-same frozen fresh `uniqueContextId` and the exact parameters defined below. The
-tracked client sends each command synchronously before returning its promise,
-so the evaluation command bytes are queued before resume bytes even though the
-evaluation replies require resume. With no other command producer in this
-state, successful receipts must carry strictly consecutive monotonic IDs in the
-dispatch order above. The batch consumes two operational slots without a test
-probe and three with one, within the existing pending-command budget.
+Toutes les commandes ciblent la session sélectionnée conservée. Les deux évaluations utilisent le
+même `uniqueContextId` frais figé et les paramètres exacts définis ci-dessous. Le client suivi
+envoie chaque commande de manière synchrone avant de renvoyer sa promesse, de sorte que les octets
+de commande d'évaluation sont mis en file d'attente avant les octets de reprise même si les
+réponses d'évaluation nécessitent la reprise. En l'absence d'autre producteur de commandes dans cet
+état, les reçus réussis doivent porter des identifiants monotones strictement consécutifs dans l'ordre
+de distribution ci-dessus. Le lot consomme deux emplacements opérationnels sans sonde de test et
+trois avec une sonde, dans la limite du budget existant de commandes en attente.
 
-The shell waits under the unchanged absolute deadline for every dispatched
-promise, validates exact method/session/result schemas and consecutive IDs, then
-reduces the typed response events in canonical order: identity, optional test,
-resume. Native version/Inspector/Runtime events continue to reach XState while
-the promises are pending. Promise completion order never selects a transition.
-Any command rejection, missing receipt, ID gap/crossing, session mismatch,
-identity mismatch or protocol/schema failure enters failed release; the worker
-having been resumed cannot convert failure into authority. An optional test
-exception/rejection remains an application diagnostic and cannot block resume
-or choose a state. Only exact identity proof, optional-test completion when
-configured, exact resume receipt and selected-version `running` can complete
-bootstrap.
+Le shell attend sous l'échéance absolue inchangée chaque promesse distribuée, valide les schémas exacts
+de méthode/session/résultat et les identifiants consécutifs, puis réduit les événements de réponse typés
+dans l'ordre canonique : identité, test facultatif, reprise. Les événements natifs de version, d'Inspector
+et de Runtime continuent de parvenir à XState pendant que les promesses sont en attente. L'ordre
+d'achèvement des promesses ne sélectionne jamais une transition. Tout rejet de commande, reçu manquant,
+écart/croisement d'identifiant, discordance de session, discordance d'identité ou échec de protocole/schéma
+entre dans la release en échec ; le fait que le worker ait été repris ne peut transformer l'échec en autorité.
+Une exception ou un rejet du test facultatif demeure un diagnostic applicatif et ne peut bloquer la reprise
+ni choisir un état. Seules la preuve exacte d'identité, l'achèvement du test facultatif lorsqu'il est configuré,
+le reçu exact de reprise et le statut `running` de la version sélectionnée peuvent compléter l'amorçage.
 
-Revision 18 also made the selected-version proof sticky across the entire
-batch. In `identity_probing`, `test_probe_deciding`, `test_probing` and
-`resuming`, every
-current `VERSION_UPDATED` with the exact frozen registration, version, script,
-`status='activated'`, frozen-or-absent target and `runningStatus` of `starting`
-or `running` is retained idempotently. `running` may refine `starting` once and
-cannot regress. An exact duplicate is a no-op. Any registration/version/script/
-status/target drift, `stopping`, `stopped`, `redundant`, or a `starting` update
-after `running` is terminal. Thus a single native `running` event remains
-available whether it arrives before identity reduction, between identity and
-optional-test reduction, between optional-test and resume reduction, or after
-the resume receipt.
+La révision 18 a également rendu la preuve de version sélectionnée persistante (sticky) sur l'ensemble du
+lot. Dans `identity_probing`, `test_probe_deciding`, `test_probing` et `resuming`, chaque
+`VERSION_UPDATED` courant avec l'enregistrement, la version, le script figés exacts,
+`status='activated'`, la cible figée ou absente et un `runningStatus` de `starting` ou
+`running` est conservé de manière idempotente. `running` peut affiner `starting` une fois et ne peut régresser.
+Un doublon exact est sans effet (no-op). Toute dérive d'enregistrement/version/script/statut/cible,
+`stopping`, `stopped`, `redundant`, ou une mise à jour `starting` après `running` est terminale.
+Ainsi, un événement natif unique `running` demeure disponible qu'il arrive avant la réduction d'identité,
+entre l'identité et la réduction du test facultatif, entre le test facultatif et la réduction de reprise,
+ou après le reçu de reprise.
 
-## Revision-18 falsification evidence and revision-19 decision
+## Preuves de falsification de la révision 18 et décision de la révision 19
 
-A real Chrome-for-Testing 149 run against the exact rebuilt production package
-falsified revision 18 after it had already proved the complete revision-16
-replacement authority. The retained target/session emitted, in order:
+Une exécution réelle sous Chrome-for-Testing 149 sur le package de production recompilé exact
+a falsifié la révision 18 après qu'elle avait déjà prouvé l'autorité de remplacement complète de la révision 16.
+La cible/session conservée a émis, dans l'ordre :
 
-1. `Inspector.targetReloadedAfterCrash`;
-2. `Runtime.executionContextsCleared`;
-3. one fresh `Runtime.executionContextCreated` with the exact full-script origin.
+1. `Inspector.targetReloadedAfterCrash` ;
+2. `Runtime.executionContextsCleared` ;
+3. un `Runtime.executionContextCreated` frais avec l'origine exacte du script complet.
 
-The revision-18 owner then synchronously sent the identity
-`Runtime.evaluate` before `Runtime.runIfWaitingForDebugger`. The trace emitted
-no `Inspector.workerScriptLoaded`; the identity command remained unresolved for
-the full 30-second absolute probe deadline, after which the same replacement
-returned to `Inspector.targetCrashed` and `stopped`. The fresh context therefore
-proved authority but did not prove that the paused worker could execute an
-evaluation.
+Le propriétaire de la révision 18 a alors envoyé de manière synchrone le `Runtime.evaluate` d'identité
+avant `Runtime.runIfWaitingForDebugger`. La trace n'a émis aucun `Inspector.workerScriptLoaded` ;
+la commande d'identité est restée non résolue pendant toute l'échéance absolue de sonde de 30 secondes,
+après quoi le même remplaçant est retourné à `Inspector.targetCrashed` et `stopped`. Le contexte frais
+a donc prouvé l'autorité mais n'a pas prouvé que le worker en pause pouvait exécuter une évaluation.
 
-This is not a deferred JavaScript or WebSocket send. The tracked raw CDP client
-calls `socket.send(serialized)` before returning each command promise. Its
-17 deterministic tests pass, including immediate observation of multiple sends
-and out-of-order response correlation. All revision-18 command bytes were on the
-wire without an intervening await. The falsification shows that Chrome processes
-commands serially on this retained service-worker session: a first
-`Runtime.evaluate` that requires the paused worker prevents the later same-session
-resume command from being processed. Queueing resume bytes later cannot break
-that protocol-level causal cycle.
+Il ne s'agit pas d'un envoi JavaScript ou WebSocket différé. Le client CDP brut suivi appelle
+`socket.send(serialized)` avant de renvoyer chaque promesse de commande. Ses 17 tests déterministes
+réussissent, y compris l'observation immédiate d'envois multiples et la corrélation de réponses désordonnées.
+Tous les octets de commande de la révision 18 étaient sur le câble sans await intermédiaire. La falsification
+montre que Chrome traite les commandes en série sur cette session de service worker conservée : un premier
+`Runtime.evaluate` qui requiert le worker en pause empêche la commande de reprise ultérieure sur la même session
+d'être traitée. Mettre en file d'attente les octets de reprise plus tard ne peut pas rompre ce cycle causal
+au niveau du protocole.
 
-Revision 19 retains every revision-16 crash, reload, context-generation,
-tombstone, origin and persistent-session guarantee and retains revision-18's
-sticky selected-version metadata semantics. It changes only the bootstrap batch
-order and its proof reduction. On the guarded transition out of
-`replacement_starting`, one synchronous tracked-client effect dispatches bytes
-to the exact retained session in this exact order, without awaiting any reply
-between sends:
+La révision 19 conserve l'ensemble des garanties de crash, rechargement, génération de contexte,
+tombstones, origine et session persistante de la révision 16 et conserve la sémantique de métadonnées
+persistante de version sélectionnée de la révision 18. Elle modifie uniquement l'ordre du lot d'amorçage
+et la réduction de ses preuves. Sur la transition gardée quittant `replacement_starting`, un effet
+synchrone de client suivi distribue des octets vers la session conservée exacte dans cet ordre exact,
+sans attendre de réponse entre les envois :
 
-1. exactly one `Runtime.runIfWaitingForDebugger` with `{}`;
-2. the fixed identity `Runtime.evaluate` on the frozen fresh
-   `uniqueContextId`;
-3. the optional explicit test `Runtime.evaluate` on that same context, only when
-   frozen `testProbeConfigured` is true.
+1. exactement un `Runtime.runIfWaitingForDebugger` avec `{}` ;
+2. le `Runtime.evaluate` d'identité fixe sur le `uniqueContextId` frais figé ;
+3. le `Runtime.evaluate` de test explicite facultatif sur ce même contexte, uniquement lorsque
+   `testProbeConfigured` figé est vrai.
 
-The resume command ID is a positive safe integer `n`; the identity command ID
-is exactly `n + 1`; when configured, the test command ID is exactly `n + 2`.
-Without a test probe, both test receipt fields are `null` and no third command
-ID is consumed. The batch consumes two operational command slots without the
-test probe and three with it, within the existing pending-command budget. No
-other producer may issue a selected-session command between these sends. Before
-the first send, the actor atomically reserves the complete slot count and the
-complete consecutive safe-integer ID range. Insufficient slots or an ID-range
-overflow fails before any batch byte is emitted; a synchronous send failure
-after that reservation retains the exact sent prefix, enters failed release and
-can never retry the bootstrap batch.
+L'identifiant de la commande de reprise est un entier sûr positif `n` ; l'identifiant de la commande
+d'identité est exactement `n + 1` ; lorsqu'il est configuré, l'identifiant de la commande de test est
+exactement `n + 2`. Sans sonde de test, les deux champs de reçu de test sont `null` et aucun troisième
+identifiant de commande n'est consommé. Le lot consomme deux emplacements opérationnels de commande
+sans la sonde de test et trois avec elle, dans la limite du budget existant de commandes en attente.
+Aucun autre producteur ne peut émettre de commande sur la session sélectionnée entre ces envois.
+Avant le premier envoi, l'acteur réserve de manière atomique le nombre complet d'emplacements et la
+plage complète d'identifiants entiers sûrs consécutifs. Un nombre d'emplacements insuffisant ou un
+dépassement de plage d'identifiants échoue avant qu'aucun octet du lot ne soit émis ; un échec d'envoi
+synchrone après cette réservation conserve le préfixe exact envoyé, entre dans la release en échec et
+ne peut jamais relancer le lot d'amorçage.
 
-The shell waits for every dispatched promise under the unchanged absolute raw
-deadline, validates each exact session, method, parameters, positive command ID,
-result schema and result hash, and only then emits typed machine events in the
-canonical dispatch order: resume, identity, optional test. Promise completion
-order never selects a transition. Native version, Inspector and Runtime events
-continue to reach the actor while the promise wait is pending. A resume rejection
-or malformed receipt means the pause was not released and is terminal. An
-identity rejection, exception or mismatch means authority was not proved and is
-terminal even though resume succeeded. An optional-test exception or rejected
-awaited application result is a blocking application diagnostic but still
-completes that operational state; a command/transport/schema failure is
-terminal. A missing promise, ID gap/crossing/duplicate, session or method
-mismatch, parameter drift, malformed result or deadline expiry enters failed
-release and can never publish bootstrap authority.
+Le shell attend chaque promesse distribuée sous l'échéance brute absolue inchangée, valide chaque session
+exacte, méthode, paramètres, identifiant positif de commande, schéma de résultat et hachage de résultat,
+et émet seulement alors des événements de machine typés dans l'ordre canonique de distribution : reprise,
+identité, test facultatif. L'ordre d'achèvement des promesses ne sélectionne jamais une transition. Les
+événements natifs de version, d'Inspector et de Runtime continuent de parvenir à l'acteur pendant que
+l'attente de promesse est en cours. Un rejet de reprise ou un reçu malformé signifie que la pause n'a pas
+été libérée et est terminal. Un rejet d'identité, une exception ou une discordance signifie que l'autorité
+n'a pas été prouvée et est terminal même si la reprise a réussi. Une exception de test facultatif ou un
+résultat applicatif attendu rejeté constitue un diagnostic applicatif bloquant mais complète néanmoins
+cet état opérationnel ; un échec de commande/transport/schéma est terminal. Une promesse manquante, un
+écart/croisement/doublon d'identifiant, une discordance de session ou de méthode, une dérive de paramètres,
+un résultat malformé ou l'expiration de l'échéance entre dans la release en échec et ne peut jamais publier
+d'autorité d'amorçage.
 
-The selected-version proof remains sticky while the batch is pending and while
-its receipts are reduced. In `resuming`, `identity_probing`,
-`test_probe_deciding` and `test_probing`, every current `VERSION_UPDATED` with
-the exact frozen registration, version, script, `status='activated'`,
-frozen-or-absent target and `runningStatus` of `starting` or `running` is
-retained idempotently. `running` may refine `starting` once and is sticky. An
-exact duplicate is a no-op. Registration/version/script/status/target drift,
-`stopping`, `stopped`, `redundant`, or `running -> starting` is terminal in each
-state. Thus the one native `running` proof survives whether it arrives before
-resume reduction, between resume and identity, between identity and optional
-test, or after the final command reduction. Bootstrap completes only after the
-exact resume receipt, identity proof, optional-test completion when configured,
-selected-version `running` and all batch correlation hashes are retained.
+La preuve de version sélectionnée demeure persistante pendant que le lot est en attente et que ses reçus
+sont réduits. Dans `resuming`, `identity_probing`, `test_probe_deciding` et `test_probing`, chaque
+`VERSION_UPDATED` courant avec l'enregistrement, la version, le script figés exacts, `status='activated'`,
+la cible figée ou absente et un `runningStatus` de `starting` ou `running` est conservé de manière
+idempotente. `running` peut affiner `starting` une fois et est persistant. Un doublon exact est sans effet (no-op).
+Une dérive d'enregistrement/version/script/statut/cible, `stopping`, `stopped`, `redundant`, ou
+`running -> starting` est terminale dans chaque état. Ainsi, l'unique preuve native `running` survit
+qu'elle arrive avant la réduction de reprise, entre reprise et identité, entre identité et test facultatif,
+ou après la réduction finale de commande. L'amorçage ne se termine qu'après que le reçu exact de reprise,
+la preuve d'identité, l'achèvement du test facultatif lorsqu'il est configuré, le statut `running` de la
+version sélectionnée et tous les hachages de corrélation du lot sont conservés.
 
-## Revision-19 handoff falsification and revision-20 decision
+## Falsification du transfert de la révision 19 et décision de la révision 20
 
-Four real Chrome-for-Testing 149 runs proved revision 19's raw restart and exact
-release. The first canonical `runtime.service-worker-reload` run then failed
-before `connectOverCDP`: the controller passed the complete
-`RawWorkerAuthority` object to the narrower Playwright owner. TypeScript allowed
-that structural superset, while the runtime validator iterated every enumerable
-value as a string. The numeric `attachmentGeneration` therefore reached
-`String.prototype.includes` and raised `TypeError: value.includes is not a
-function`. The handoff had no explicit runtime projection contract.
+Quatre exécutions réelles sous Chrome-for-Testing 149 ont prouvé le redémarrage brut et la libération
+exacte de la révision 19. La première exécution canonique de `runtime.service-worker-reload` a ensuite échoué
+avant `connectOverCDP` : le contrôleur a transmis l'objet complet `RawWorkerAuthority` au propriétaire
+Playwright plus étroit. TypeScript a autorisé ce sur-ensemble structurel, tandis que le validateur
+d'exécution a itéré chaque valeur énumérable comme une chaîne. L'`attachmentGeneration` numérique a donc
+atteint `String.prototype.includes` et a levé `TypeError: value.includes is not a function`. Le transfert
+ne disposait d'aucun contrat explicite de projection à l'exécution.
 
-Revision 20 retains all revision-19 behavior and adds exactly one boundary
-contract. After exact raw release and before Playwright acquisition, the
-controller constructs a fresh `PlaywrightAuthorityV1` object with exactly these
-six own enumerable fields and no spread operation:
+La révision 20 conserve l'ensemble des comportements de la révision 19 et ajoute exactement un contrat
+de frontière. Après la libération brute exacte et avant l'acquisition Playwright, le contrôleur construit
+un objet `PlaywrightAuthorityV1` frais avec exactement ces six champs énumérables propres et aucune opération
+de décomposition (spread) :
 
 ```text
 PlaywrightAuthorityV1 = {
@@ -496,47 +472,44 @@ PlaywrightAuthorityV1 = {
 }
 ```
 
-Every value is copied from the frozen `RawWorkerAuthority` of the current
-process/lease/restart epoch. `sessionId`, `uniqueContextId`,
-`attachmentGeneration` and `attachmentOrigin` are deliberately excluded: raw
-release has revoked that session/context capability, while the Playwright owner
-must establish its own nested diagnostic session and context on the same frozen
-target. The projection cannot alter state or authorize effects.
+Chaque valeur est copiée depuis le `RawWorkerAuthority` figé de l'époque actuelle de processus/bail/redémarrage.
+`sessionId`, `uniqueContextId`, `attachmentGeneration` et `attachmentOrigin` sont délibérément exclus :
+la libération brute a révoqué cette capacité de session/contexte, tandis que le propriétaire Playwright
+doit établir sa propre session et son propre contexte de diagnostic imbriqués sur la même cible figée.
+La projection ne peut altérer l'état ni autoriser d'effets.
 
-The pre-reservation projection boundary schema-validates this DTO. It rejects a
-non-record, missing or unknown key, non-string value, empty or over-bound
-identifier, NUL/CR/LF, non-canonical extension ID, mismatched scope, script
-outside the scope or malformed target identity with a typed harness error. It
-then copies the six values into a new deeply frozen object; the Playwright owner never enumerates
-or retains a caller-owned structural superset. A validation rejection cannot
-reach `connectOverCDP`, expose fixture capabilities or create a pass.
+La frontière de projection pré-réservation valide ce DTO selon le schéma. Elle rejette tout élément
+qui n'est pas un enregistrement, toute clé manquante ou inconnue, toute valeur non chaîne, tout identifiant
+vide ou hors limites, tout NUL/CR/LF, tout identifiant d'extension non canonique, toute portée discordante,
+tout script en dehors de la portée ou toute identité de cible malformée avec une erreur de harnais typée.
+Elle copie ensuite les six valeurs dans un nouvel objet profondément figé ; le propriétaire Playwright n'énumère
+ni ne conserve jamais un sur-ensemble structurel détenu par l'appelant. Un rejet de validation ne peut
+pas atteindre `connectOverCDP`, exposer des capacités de fixture ou créer un succès.
 
-Revision-20 contract tests must prove the exact raw-to-Playwright projection,
-reject each missing, extra and non-string field without a JavaScript `TypeError`,
-and retain all existing authority URL/scope checks. The canonical packaged
-runtime scenario must then pass three consecutive real-Chrome repetitions; a
-raw-only smoke cannot satisfy this handoff proof.
+Les tests de contrat de la révision 20 doivent prouver la projection brute vers Playwright exacte,
+rejeter chaque champ manquant, supplémentaire et non chaîne sans `TypeError` JavaScript, et conserver
+toutes les vérifications existantes d'URL/portée d'autorité. Le scénario d'exécution packagé canonique
+doit ensuite réussir trois répétitions consécutives réelles sous Chrome ; un smoke brut seul ne peut pas
+satisfaire cette preuve de transfert.
 
-Independent review rejected revision 20 because that projection remained an
-unmodeled shell precondition and did not decide ownership on rejection.
-Revision 21 added a pre-reservation actor step, but independent review rejected
-its omitted event DTO, open no-owner receipt, escaping reflection traps and
-stale final obligation. Revision 22 closed those boundaries but did not bind a
-self-consistent event DTO to its raw source. Revision 23 retains the DTO and
-actor step and closes that final authority edge below.
+La revue indépendante a rejeté la révision 20 car cette projection demeurait une précondition de shell
+non modélisée et ne décidait pas de la propriété lors du rejet. La révision 21 a ajouté une étape d'acteur
+pré-réservation, mais la revue indépendante a rejeté son DTO d'événement omis, son reçu sans propriétaire
+ouvert, ses pièges de réflexion qui s'échappaient et son obligation finale obsolète. La révision 22 a fermé
+ces frontières mais n'a pas lié un DTO d'événement cohérent en interne à sa source brute. La révision 23
+conserve le DTO et l'étape d'acteur et ferme cette arête d'autorité finale ci-dessous.
 
-The invoked raw epoch returns `RAW_RELEASE_PROVED` atomically with its exact
-private release receipt and the deeply frozen current `RawWorkerAuthority` from
-the same actor output. The outer transition retains both in machine context; no
-shell reconstruction or later mutable reference may replace them. From
-`owner_none`, and only with the current exact raw-release receipt, the outer
-machine accepts `PLAYWRIGHT_AUTHORITY_PROJECTION_REQUESTED` and enters
-`playwright_authority_projecting`. This state owns no root transport, reserves no
-lease and exposes no capability. Its sole pure invoked effect selects the six
-named raw fields into a new object, parses it, freezes it and computes
+L'époque brute invoquée renvoie `RAW_RELEASE_PROVED` de manière atomique avec son reçu privé exact
+de libération et le `RawWorkerAuthority` actuel profondément figé issu de la même sortie d'acteur.
+La transition externe conserve les deux dans le contexte de la machine ; aucune reconstruction de shell
+ni référence mutable ultérieure ne peut les remplacer. Depuis `owner_none`, et uniquement avec le reçu
+de libération brute exact actuel, la machine externe accepte `PLAYWRIGHT_AUTHORITY_PROJECTION_REQUESTED`
+et entre dans `playwright_authority_projecting`. Cet état ne détient aucun transport racine, ne réserve
+aucun bail et n'expose aucune capacité. Son unique effet invoqué pur sélectionne les six champs bruts
+nommés dans un nouvel objet, l'analyse, le fige et calcule
 `authorityProjectionSha256 = SHA-256(JCS(PlaywrightAuthorityV1))`.
 
-The invocation returns exactly one closed event:
+L'invocation renvoie exactement un événement fermé :
 
 ```text
 PLAYWRIGHT_AUTHORITY_PROJECTED {
@@ -568,32 +541,29 @@ PlaywrightAuthorityProjectionErrorV1 = {
 }
 ```
 
-The exact accepted projection fields use `MAX_ID_BYTES = 4,096`; all six values
-must be non-empty strings without NUL, CR or LF. `extensionId` must match
-`^[a-p]{32}$`; `scopeURL` must equal
-`chrome-extension://<extensionId>/`; `scriptURL` must begin with that exact
-scope; `targetId` has no additional syntax beyond the common bounded-ID rules.
-The parser uses `Reflect.ownKeys` and own data descriptors inside one closed
-inspection boundary: symbols, accessors, non-enumerable fields and a key set
-other than the exact six are `KEY_SET_INVALID`. Any thrown `ownKeys`,
-`getOwnPropertyDescriptor`, prototype or property-read trap, including a revoked
-Proxy, is caught before it crosses the boundary and normalized to
-`SOURCE_INTROSPECTION_FAILED` with `field:null`. It reads no accessor and never
-exposes a native reflection error or `TypeError`.
+Les champs exacts acceptés de la projection utilisent `MAX_ID_BYTES = 4_096` ; l'ensemble des six valeurs
+doivent être des chaînes non vides sans NUL, CR ou LF. `extensionId` doit correspondre à
+`^[a-p]{32}$` ; `scopeURL` doit être égal à
+`chrome-extension://<extensionId>/` ; `scriptURL` doit commencer par cette portée exacte ;
+`targetId` ne comporte aucune syntaxe supplémentaire au-delà des règles communes d'identifiants bornés.
+L'analyseur utilise `Reflect.ownKeys` et les descripteurs de données propres à l'intérieur d'une
+frontière d'inspection fermée unique : les symboles, les accesseurs, les champs non énumérables et un ensemble
+de clés autre que les six exacts constituent `KEY_SET_INVALID`. Tout piège levé par `ownKeys`,
+`getOwnPropertyDescriptor`, prototype ou lecture de propriété, y compris un Proxy révoqué, est intercepté
+avant de franchir la frontière et normalisé en `SOURCE_INTROSPECTION_FAILED` avec `field:null`.
+Il ne lit aucun accesseur et n'expose jamais d'erreur de réflexion native ni de `TypeError`.
 
-`PLAYWRIGHT_AUTHORITY_PROJECTED` with exact generation, epoch, current raw
-receipt hash, a schema-valid six-field DTO and a hash recomputed from that exact
-event DTO enters `playwright_authority_ready` only when all six DTO values equal
-the pure canonical projection of `context.currentRawAuthority` and
-`event.authorityProjectionSha256 ===
-SHA-256(JCS(project(context.currentRawAuthority)))`. The transition action copies and
-deeply freezes `event.authority` into private machine context; no invoked-actor
-or shell side channel can populate it. That state still owns no transport.
-`PLAYWRIGHT_RESERVE_REQUESTED` is admissible only there and must repeat the exact
-projection hash; only its transition reserves the next lease and opens the
-tracked transport. `PLAYWRIGHT_AUTHORITY_REJECTED` enters outer
-`failed_shutdown_connecting` directly. Its transition action freezes this
-private receipt before any shutdown effect runs:
+`PLAYWRIGHT_AUTHORITY_PROJECTED` avec la génération exacte, l'époque, le hachage du reçu brut actuel,
+un DTO à six champs valide selon le schéma et un hachage recalculé à partir de ce DTO d'événement exact
+entre dans `playwright_authority_ready` uniquement lorsque les six valeurs du DTO sont égales à la projection
+canonique pure de `context.currentRawAuthority` et
+`event.authorityProjectionSha256 === SHA-256(JCS(project(context.currentRawAuthority)))`.
+L'action de transition copie et fige profondément `event.authority` dans le contexte privé de la machine ;
+aucun canal latéral d'acteur invoqué ou de shell ne peut le peupler. Cet état ne détient toujours aucun
+transport. `PLAYWRIGHT_RESERVE_REQUESTED` n'est admissible que là et doit répéter le hachage exact de projection ;
+seule sa transition réserve le bail suivant et ouvre le transport suivi. `PLAYWRIGHT_AUTHORITY_REJECTED`
+entre directement dans `failed_shutdown_connecting` externe. Son action de transition fige ce reçu privé
+avant qu'aucun effet d'arrêt ne s'exécute :
 
 ```text
 NoOwnerReleaseReceiptV1 = {
@@ -609,127 +579,125 @@ NoOwnerReleaseReceiptV1 = {
 }
 ```
 
-`receiptSha256` is SHA-256 over RFC 8785 JCS of the preceding eight fields,
-excluding itself. The transition guard requires the current generation, pending
-Playwright epoch and exact current raw receipt hash; the state itself proves no
-lease counter was incremented and no transport identity exists. There is no
-`OWNER_RELEASE_PROVED` event in this branch because there is no owner to release.
-Failed shutdown/profile removal proceeds from the frozen no-owner receipt.
-Stale, duplicate, malformed or hash-divergent projection events cannot reserve
-a lease, connect or fabricate this receipt.
+`receiptSha256` est le SHA-256 sur le JCS RFC 8785 des huit champs précédents, en s'excluant lui-même.
+La garde de transition exige la génération actuelle, l'époque Playwright en attente et le hachage exact
+du reçu brut actuel ; l'état lui-même prouve qu'aucun compteur de bail n'a été incrémenté et qu'aucune
+identité de transport n'existe. Il n'y a aucun événement `OWNER_RELEASE_PROVED` dans cette branche
+car il n'y a aucun propriétaire à libérer. L'arrêt en échec/la suppression du profil se poursuit à partir
+du reçu sans propriétaire figé. Les événements de projection périmés, dupliqués, malformés ou divergents
+en hachage ne peuvent pas réserver de bail, se connecter ou fabriquer ce reçu.
 
-The controller passes only the privately retained, parsed and frozen DTO to the
-Playwright owner. The owner accepts that branded value; it never accepts or
-enumerates the raw structural superset. Thus no post-reservation authority
-validation rejection exists in the canonical path. A direct boundary parser
-test may supply hostile `unknown` values, but `connectOverCDP`, `transport.open`
-and every fixture effect must remain uncalled on rejection.
+Le contrôleur transmet uniquement le DTO conservé en privé, analysé et figé au propriétaire Playwright.
+Le propriétaire accepte cette valeur typée marquée (branded) ; il n'accepte ni n'énumère jamais le sur-ensemble
+structurel brut. Ainsi, aucun rejet de validation d'autorité post-réservation n'existe dans le chemin
+canonique. Un test direct d'analyseur de frontière peut fournir des valeurs `unknown` hostiles, mais
+`connectOverCDP`, `transport.open` et chaque effet de fixture doivent rester non appelés lors du rejet.
 
-This pending revision's hostile tests cover every error code and field, non-record inputs,
-each missing/extra/symbol/accessor/non-enumerable key case, every non-string,
-empty, 4,097-byte and NUL/CR/LF value, non-canonical extension ID, scope/script
-drift, throwing `ownKeys`/descriptor/property traps, a revoked Proxy, and exact
-exclusion of `sessionId`, `uniqueContextId`,
-`attachmentGeneration` and `attachmentOrigin`. Machine tests prove success,
-rejection, stale generation/epoch/raw receipt, duplicate result and projection
-hash drift. They also mutate each of the six authority fields independently,
-recompute a self-consistent event hash and retain the correct raw receipt; every
-such foreign DTO must leave the machine outside `playwright_authority_ready`
-with zero reservation and zero transport. Controller tests prove zero lease, zero transport and zero
-`connectOverCDP` before acceptance. The canonical runtime scenario must still
-pass three consecutive real-Chrome repetitions against this pending revision.
+Les tests hostiles de cette révision en attente couvrent chaque code d'erreur et champ, les entrées non-records,
+chaque cas de clé manquante/supplémentaire/symbole/accesseur/non énumérable, chaque valeur non chaîne,
+vide, de 4 097 octets et avec NUL/CR/LF, l'identifiant d'extension non canonique, la dérive de portée/script,
+les pièges levant des exceptions dans `ownKeys`/descripteur/propriété, un Proxy révoqué, et l'exclusion
+exacte de `sessionId`, `uniqueContextId`, `attachmentGeneration` et `attachmentOrigin`. Les tests de machine
+prouvent le succès, le rejet, la génération/époque/reçu brut périmé, le résultat dupliqué et la dérive de
+hachage de projection. Ils mutent également chacun des six champs d'autorité de manière indépendante,
+recalculent un hachage d'événement cohérent en interne et conservent le reçu brut correct ; chaque DTO
+étranger de ce type doit laisser la machine en dehors de `playwright_authority_ready` avec zéro réservation
+et zéro transport. Les tests de contrôleur prouvent zéro bail, zéro transport et zéro `connectOverCDP` avant
+acceptation. Le scénario d'exécution canonique doit toujours réussir trois répétitions consécutives réelles
+sous Chrome contre cette révision en attente.
 
-## Authoritative XState topology
+## Topologie XState faisant autorité
 
-Implementation uses two private XState v5 machines:
+L'implémentation utilise deux machines XState v5 privées :
 
-- `mv3HarnessMachine` owns artifact, process, exclusive CDP lease, Playwright
-  epochs, verdict and global cleanup;
-- an invoked `rawWorkerRestartMachine` owns one raw epoch from auto-attach arm
-  through exact release.
+- `mv3HarnessMachine` détient l'artefact, le processus, le bail CDP exclusif, les époques Playwright,
+  le verdict et le nettoyage global ;
+- une `rawWorkerRestartMachine` invoquée détient une époque brute depuis l'armement de l'auto-attachement
+  jusqu'à la libération exacte.
 
-The shell performs process, file, WebSocket, CDP and Playwright I/O only as
-invoked actors. Actor results are schema-validated typed events. No `phase`,
-boolean ownership flag, free-text status, promise arrival order, diagnostic text
-or LLM output may decide a transition. XState state nodes are the sole phase and
-ownership authority.
+Le shell n'effectue les I/O de processus, fichier, WebSocket, CDP et Playwright qu'en tant qu'acteurs invoqués.
+Les résultats d'acteurs sont des événements typés validés selon le schéma. Aucun `phase`, indicateur booléen
+de propriété, statut en texte libre, ordre d'arrivée de promesses, texte de diagnostic ou sortie de LLM
+ne peut décider d'une transition. Les nœuds d'état XState constituent la seule autorité de phase et de
+propriété.
 
-The public fixture receives detached frozen DTOs and one narrowly typed facade
-whose only operations are `openSidePanel`, `seedStorage`,
-`restartServiceWorkerForProbe`, `evaluateInRestartedServiceWorker` and
-read-only diagnostic/manifest access. It never receives an XState actor, native
-snapshot, Browser, BrowserContext, Worker, CDPSession, private capability,
-endpoint or mutable receipt. `Page` is returned only by `openSidePanel` for the
-current Playwright epoch and is invalidated by a restart.
+La fixture publique reçoit des DTO détachés et figés et une façade étroitement typée dont les seules opérations
+sont `openSidePanel`, `seedStorage`, `restartServiceWorkerForProbe`, `evaluateInRestartedServiceWorker`
+et l'accès en lecture seule aux diagnostics/manifeste. Elle ne reçoit jamais d'acteur XState, d'instantané natif,
+de Browser, de BrowserContext, de Worker, de CDPSession, de capacité privée, de point de terminaison (endpoint)
+ou de reçu mutable. `Page` n'est renvoyé que par `openSidePanel` pour l'époque Playwright actuelle et est
+invalidé par un redémarrage.
 
-### Outer machine
+### Machine externe
 
-The lifecycle region has these explicit transitions; every state entry invokes
-only the effect named in the final column:
+La région du cycle de vie comporte ces transitions explicites ; chaque entrée d'état n'invoque que
+l'effet nommé dans la colonne finale :
 
-| State                                                      | Event / guard                                                       | Next state                         | Effect                                                                    |
-| ---------------------------------------------------------- | ------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------- |
-| `absent`                                                   | `HARNESS_STARTED`                                                   | `artifact_sealing`                 | inspect and hash exact `dist`                                             |
-| `artifact_sealing`                                         | `ARTIFACT_SEALED`                                                   | `profile_creating`                 | create fresh profile after proving no endpoint file                       |
-| `profile_creating`                                         | `PROFILE_CREATED`                                                   | `process_spawning`                 | spawn exact child once                                                    |
-| `process_spawning`                                         | `PROCESS_SPAWNED`                                                   | `endpoint_waiting`                 | wait for strict file parse while racing child exit                        |
-| `endpoint_waiting`                                         | `ENDPOINT_PARSED`                                                   | `owner_none`                       | retain private parsed capability; open no socket                          |
-| `owner_none`                                               | `RAW_ACQUIRE_REQUESTED(initial_bootstrap)` and no reservation       | `raw_connecting.initial_bootstrap` | reserve epoch, then open tracked raw socket                               |
-| `raw_connecting.initial_bootstrap`                         | current `RAW_TRANSPORT_OPENED`                                      | `raw_connecting.initial_bootstrap` | retain exact transport ID; send `Browser.getVersion`                      |
-| `raw_connecting.initial_bootstrap`                         | current `ENDPOINT_VERIFIED`                                         | `raw_owned.initial_bootstrap`      | invoke raw restart actor                                                  |
-| `raw_owned.initial_bootstrap`                              | `RAW_BOOTSTRAP_PROVED`                                              | `raw_releasing.initial_bootstrap`  | invoke exact raw release                                                  |
-| `raw_releasing.initial_bootstrap`                          | `RAW_RELEASE_PROVED` from current invoked raw actor                 | `owner_none`                       | atomically retain private raw receipt and frozen `RawWorkerAuthority`     |
-| `owner_none`                                               | `PLAYWRIGHT_AUTHORITY_PROJECTION_REQUESTED` and current raw receipt | `playwright_authority_projecting`  | invoke pure six-field projection; own no lease or transport               |
-| `playwright_authority_projecting`                          | current exact `PLAYWRIGHT_AUTHORITY_PROJECTED`                      | `playwright_authority_ready`       | retain frozen DTO and projection hash privately                           |
-| `playwright_authority_projecting`                          | current exact `PLAYWRIGHT_AUTHORITY_REJECTED`                       | `failed_shutdown_connecting`       | freeze typed error and exact no-owner receipt; open no owner cleanup      |
-| `playwright_authority_ready`                               | `PLAYWRIGHT_RESERVE_REQUESTED` with exact projection hash           | `playwright_connecting`            | reserve epoch, open tracked public transport, connect                     |
-| `playwright_connecting`                                    | current `PLAYWRIGHT_TRANSPORT_OPENED`                               | `playwright_connecting`            | retain transport ID; call `connectOverCDP` once                           |
-| `playwright_connecting`                                    | `PLAYWRIGHT_HANDOFF_PROVED`                                         | `playwright_owned.exercising`      | expose detached fixture facade                                            |
-| `playwright_connecting`                                    | `PLAYWRIGHT_CONNECT_FAILED_CLOSED`                                  | `failed_releasing`                 | retain closed failed-connect receipt                                      |
-| `playwright_owned.exercising`                              | `RESTART_REQUESTED` and runtime restart count is `0`                | `playwright_releasing.restart`     | atomically reserve count `1`; close fixture pages; disconnect             |
-| `playwright_owned.exercising`                              | `RESTART_REQUESTED` and runtime restart count is `1`                | `failed_releasing`                 | retain restart-limit violation; release current owner                     |
-| `playwright_releasing.restart`                             | `PLAYWRIGHT_RELEASE_PROVED`                                         | `owner_none`                       | invalidate every old Playwright handle                                    |
-| `owner_none`                                               | `RAW_ACQUIRE_REQUESTED(runtime_restart)` and restart pending        | `raw_connecting.runtime_restart`   | reserve higher epoch, then open tracked raw socket                        |
-| `raw_connecting.runtime_restart`                           | current `RAW_TRANSPORT_OPENED`                                      | `raw_connecting.runtime_restart`   | retain exact transport ID; send `Browser.getVersion`                      |
-| `raw_connecting.runtime_restart`                           | current matching `ENDPOINT_VERIFIED`                                | `raw_owned.runtime_restart`        | invoke same-process raw restart actor                                     |
-| `raw_owned.runtime_restart`                                | `RAW_BOOTSTRAP_PROVED`                                              | `raw_releasing.runtime_restart`    | invoke exact raw release                                                  |
-| `raw_releasing.runtime_restart`                            | `RAW_RELEASE_PROVED` from current invoked raw actor                 | `owner_none`                       | atomically retain private restart receipt and frozen `RawWorkerAuthority` |
-| `playwright_owned.exercising`                              | `USE_COMPLETED`                                                     | `diagnostics_settling`             | settle late diagnostics for the fixed interval                            |
-| `diagnostics_settling`                                     | `DIAGNOSTICS_ACCEPTED` and verdict `eligible`                       | `artifact_reverifying`             | recompute exact tree digest                                               |
-| `diagnostics_settling`                                     | `DIAGNOSTICS_REJECTED` or verdict `blocked`                         | `failed_releasing`                 | retain rejected diagnostic ledger                                         |
-| `artifact_reverifying`                                     | late diagnostic or evidence overflow                                | `failed_releasing`                 | retain blocked verdict; release Playwright owner                          |
-| `artifact_reverifying`                                     | `ARTIFACT_MATCHED` and verdict `eligible`                           | `playwright_releasing.final`       | close fixture pages except sentinel; disconnect                           |
-| `playwright_releasing.final`                               | `PLAYWRIGHT_RELEASE_PROVED` and verdict `eligible`                  | `shutdown_connecting`              | reserve shutdown epoch; open tracked raw socket                           |
-| `playwright_releasing.final`                               | `PLAYWRIGHT_RELEASE_PROVED` and verdict `blocked`                   | `failed_shutdown_connecting`       | preserve release proof; perform failure shutdown only                     |
-| `shutdown_connecting`                                      | current `SHUTDOWN_TRANSPORT_OPENED`                                 | `shutdown_connecting`              | retain transport ID; send `Browser.getVersion`                            |
-| `shutdown_connecting`                                      | current matching `SHUTDOWN_ENDPOINT_VERIFIED`                       | `shutdown_owned`                   | send exact `Browser.close`                                                |
-| `shutdown_owned`                                           | current close response or causal socket-close receipt               | `shutdown_owned`                   | retain the exact close proof                                              |
-| `shutdown_owned`                                           | current exact `PROCESS_EXITED` and one retained close proof         | `profile_removing`                 | remove profile after causal shutdown proof                                |
-| `shutdown_owned`                                           | current exact `PROCESS_EXITED` without a retained close proof       | `failed_profile_removing`          | retain non-causal exit failure; remove profile; never pass                |
-| `profile_removing`                                         | late blocking diagnostic, protocol failure or evidence overflow     | `profile_removing`                 | revoke eligibility; continue bounded profile removal                      |
-| `profile_removing`                                         | `PROFILE_REMOVED` and every pass invariant and verdict `eligible`   | `passed`                           | freeze pass evidence                                                      |
-| `profile_removing`                                         | `PROFILE_REMOVED` and verdict `blocked`                             | `archived`                         | archive failed evidence; never enter passed                               |
-| `passed`                                                   | late blocking diagnostic, protocol failure or evidence overflow     | `passed_blocked`                   | revoke provisional pass; retain late evidence                             |
-| `passed`                                                   | `VERDICT_ARCHIVED` and verdict `eligible`                           | `archived`                         | atomically archive pass evidence                                          |
-| `passed_blocked`                                           | `VERDICT_ARCHIVED`                                                  | `archived`                         | archive failed evidence; never archive a pass                             |
-| any live operational state except shutdown/profile removal | current unexpected `PROCESS_EXITED`                                 | `failed_process_exited_releasing`  | retain original failure; close local owner/listeners only                 |
-| `failed_process_exited_releasing`                          | current `EXITED_OWNER_CLOSED`                                       | `failed_profile_removing`          | remove exact exited profile; never reconnect or signal PID                |
+| État                                                          | Événement / garde                                                        | État suivant                       | Effet                                                                                              |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `absent`                                                      | `HARNESS_STARTED`                                                        | `artifact_sealing`                 | inspecter et hacher le `dist` exact                                                                |
+| `artifact_sealing`                                            | `ARTIFACT_SEALED`                                                        | `profile_creating`                 | créer un profil vierge après avoir prouvé l'absence de fichier d'endpoint                          |
+| `profile_creating`                                            | `PROFILE_CREATED`                                                        | `process_spawning`                 | engendrer l'enfant exact une fois                                                                  |
+| `process_spawning`                                            | `PROCESS_SPAWNED`                                                        | `endpoint_waiting`                 | attendre l'analyse stricte du fichier en concurrence avec la sortie de l'enfant                    |
+| `endpoint_waiting`                                            | `ENDPOINT_PARSED`                                                        | `owner_none`                       | conserver la capacité privée analysée ; n'ouvrir aucun socket                                      |
+| `owner_none`                                                  | `RAW_ACQUIRE_REQUESTED(initial_bootstrap)` et aucune réservation         | `raw_connecting.initial_bootstrap` | réserver l'époque, puis ouvrir le socket brut suivi                                                |
+| `raw_connecting.initial_bootstrap`                            | `RAW_TRANSPORT_OPENED` actuel                                            | `raw_connecting.initial_bootstrap` | conserver l'identifiant exact de transport ; envoyer `Browser.getVersion`                          |
+| `raw_connecting.initial_bootstrap`                            | `ENDPOINT_VERIFIED` actuel                                               | `raw_owned.initial_bootstrap`      | invoquer l'acteur de redémarrage brut                                                              |
+| `raw_owned.initial_bootstrap`                                 | `RAW_BOOTSTRAP_PROVED`                                                   | `raw_releasing.initial_bootstrap`  | invoquer la libération brute exacte                                                                |
+| `raw_releasing.initial_bootstrap`                             | `RAW_RELEASE_PROVED` de l'acteur brut invoqué actuel                     | `owner_none`                       | conserver de façon atomique le reçu brut privé et le `RawWorkerAuthority` figé                     |
+| `owner_none`                                                  | `PLAYWRIGHT_AUTHORITY_PROJECTION_REQUESTED` et reçu brut actuel          | `playwright_authority_projecting`  | invoquer la projection pure à six champs ; ne détenir aucun bail ni transport                      |
+| `playwright_authority_projecting`                             | `PLAYWRIGHT_AUTHORITY_PROJECTED` exact actuel                            | `playwright_authority_ready`       | conserver le DTO figé et le hachage de projection en privé                                         |
+| `playwright_authority_projecting`                             | `PLAYWRIGHT_AUTHORITY_REJECTED` exact actuel                             | `failed_shutdown_connecting`       | figer l'erreur typée et le reçu exact sans propriétaire ; n'ouvrir aucun nettoyage de propriétaire |
+| `playwright_authority_ready`                                  | `PLAYWRIGHT_RESERVE_REQUESTED` avec le hachage de projection exact       | `playwright_connecting`            | réserver l'époque, ouvrir le transport public suivi, se connecter                                  |
+| `playwright_connecting`                                       | `PLAYWRIGHT_TRANSPORT_OPENED` actuel                                     | `playwright_connecting`            | conserver l'identifiant de transport ; appeler `connectOverCDP` une fois                           |
+| `playwright_connecting`                                       | `PLAYWRIGHT_HANDOFF_PROVED`                                              | `playwright_owned.exercising`      | exposer la façade détachée de fixture                                                              |
+| `playwright_connecting`                                       | `PLAYWRIGHT_CONNECT_FAILED_CLOSED`                                       | `failed_releasing`                 | conserver le reçu fermé d'échec de connexion                                                       |
+| `playwright_owned.exercising`                                 | `RESTART_REQUESTED` et le compteur de redémarrage à l'exécution est `0`  | `playwright_releasing.restart`     | réserver atomiquement le compteur `1` ; fermer les pages de fixture ; déconnecter                  |
+| `playwright_owned.exercising`                                 | `RESTART_REQUESTED` et le compteur de redémarrage à l'exécution est `1`  | `failed_releasing`                 | conserver la violation de limite de redémarrage ; libérer le propriétaire actuel                   |
+| `playwright_releasing.restart`                                | `PLAYWRIGHT_RELEASE_PROVED`                                              | `owner_none`                       | invalider chaque ancien descripteur (handle) Playwright                                            |
+| `owner_none`                                                  | `RAW_ACQUIRE_REQUESTED(runtime_restart)` et redémarrage en attente       | `raw_connecting.runtime_restart`   | réserver une époque supérieure, puis ouvrir le socket brut suivi                                   |
+| `raw_connecting.runtime_restart`                              | `RAW_TRANSPORT_OPENED` actuel                                            | `raw_connecting.runtime_restart`   | conserver l'identifiant de transport ; envoyer `Browser.getVersion`                                |
+| `raw_connecting.runtime_restart`                              | `ENDPOINT_VERIFIED` actuel                                               | `raw_owned.runtime_restart`        | invoquer l'acteur de redémarrage brut                                                              |
+| `raw_owned.runtime_restart`                                   | `RAW_BOOTSTRAP_PROVED`                                                   | `raw_releasing.runtime_restart`    | invoquer la libération brute exacte                                                                |
+| `raw_releasing.runtime_restart`                               | `RAW_RELEASE_PROVED` de l'acteur brut invoqué actuel                     | `owner_none`                       | conserver de façon atomique le reçu brut privé et le `RawWorkerAuthority` figé                     |
+| `owner_none`                                                  | `PLAYWRIGHT_AUTHORITY_PROJECTION_REQUESTED` et reçu brut actuel          | `playwright_authority_projecting`  | invoquer la projection pure à six champs ; ne détenir aucun bail ni transport                      |
+| `playwright_authority_ready`                                  | `PLAYWRIGHT_RESERVE_REQUESTED` avec le hachage de projection exact       | `playwright_connecting`            | réserver l'époque, ouvrir le transport public suivi, reconnecter                                   |
+| `playwright_owned.exercising`                                 | `USE_COMPLETED`                                                          | `diagnostics_settling`             | attendre l'échéance de stabilisation des diagnostics                                               |
+| `playwright_owned.exercising`                                 | `USE_FAILED`                                                             | `failed_releasing`                 | conserver l'erreur de fixture ; libérer le propriétaire actuel                                     |
+| `diagnostics_settling`                                        | fin d'échéance de stabilisation et verdict `eligible`                    | `diagnostics_evaluating`           | inspecter l'accumulateur d'événements                                                              |
+| `diagnostics_settling`                                        | fin d'échéance de stabilisation et verdict `blocked`                     | `diagnostics_evaluating`           | inspecter l'accumulateur d'événements                                                              |
+| `diagnostics_evaluating`                                      | `DIAGNOSTICS_ACCEPTED` et verdict `eligible`                             | `artifact_reverifying`             | réinspecter le `dist` scellé                                                                       |
+| `diagnostics_evaluating`                                      | `DIAGNOSTICS_REJECTED` ou verdict `blocked`                              | `failed_releasing`                 | figer le reçu de rejet ; libérer le propriétaire Playwright                                        |
+| `artifact_reverifying`                                        | `ARTIFACT_MATCHED` et verdict `eligible`                                 | `playwright_releasing.final`       | fermer les pages de fixture sauf la sentinelle ; déconnecter                                       |
+| `playwright_releasing.final`                                  | `PLAYWRIGHT_RELEASE_PROVED` et verdict `eligible`                        | `shutdown_connecting`              | réserver l'époque d'arrêt ; ouvrir le socket brut suivi                                            |
+| `playwright_releasing.final`                                  | `PLAYWRIGHT_RELEASE_PROVED` et verdict `blocked`                         | `failed_shutdown_connecting`       | préserver la preuve de libération ; exécuter l'arrêt en échec uniquement                           |
+| `shutdown_connecting`                                         | `SHUTDOWN_TRANSPORT_OPENED` actuel                                       | `shutdown_connecting`              | conserver l'identifiant de transport ; envoyer `Browser.getVersion`                                |
+| `shutdown_connecting`                                         | `SHUTDOWN_ENDPOINT_VERIFIED` correspondant actuel                        | `shutdown_owned`                   | envoyer le `Browser.close` exact                                                                   |
+| `shutdown_owned`                                              | réponse de fermeture actuelle ou reçu causal de fermeture de socket      | `shutdown_owned`                   | conserver la preuve exacte de fermeture                                                            |
+| `shutdown_owned`                                              | `PROCESS_EXITED` exact actuel et une preuve de fermeture conservée       | `profile_removing`                 | supprimer le profil après la preuve d'arrêt causal                                                 |
+| `shutdown_owned`                                              | `PROCESS_EXITED` exact actuel sans preuve de fermeture conservée         | `failed_profile_removing`          | conserver l'échec de sortie non causale ; supprimer le profil ; ne jamais passer en succès         |
+| `profile_removing`                                            | diagnostic bloquant tardif, échec de protocole ou dépassement de preuves | `profile_removing`                 | révoquer l'éligibilité ; poursuivre la suppression bornée du profil                                |
+| `profile_removing`                                            | `PROFILE_REMOVED` et chaque invariant de succès et verdict `eligible`    | `passed`                           | figer les preuves de succès                                                                        |
+| `profile_removing`                                            | `PROFILE_REMOVED` et verdict `blocked`                                   | `archived`                         | archiver les preuves en échec ; ne jamais entrer dans passed                                       |
+| `passed`                                                      | diagnostic bloquant tardif, échec de protocole ou dépassement de preuves | `passed_blocked`                   | révoquer le succès provisoire ; conserver les preuves tardives                                     |
+| `passed`                                                      | `VERDICT_ARCHIVED` et verdict `eligible`                                 | `archived`                         | archiver atomiquement les preuves de succès                                                        |
+| `passed_blocked`                                              | `VERDICT_ARCHIVED`                                                       | `archived`                         | archiver les preuves en échec ; ne jamais archiver un succès                                       |
+| tout état opérationnel actif sauf arrêt/suppression de profil | `PROCESS_EXITED` inattendu actuel                                        | `failed_process_exited_releasing`  | conserver l'échec initial ; fermer les propriétaires/écouteurs locaux uniquement                   |
+| `failed_process_exited_releasing`                             | `EXITED_OWNER_CLOSED` actuel                                             | `failed_profile_removing`          | supprimer le profil exact ayant quitté ; ne jamais reconnecter ni signaler le PID                  |
 
-Every guard/effect/protocol/identity failure transitions the lifecycle region to
-`failed_releasing`, except the explicitly pre-reservation authority-projection
-rejection, which freezes `NoOwnerReleaseReceiptV1` and enters
-`failed_shutdown_connecting` directly. `failed_releasing` invokes the
-owner-specific release. It accepts
-`OWNER_RELEASE_PROVED` only after either a complete normal release or an exact
-no-owner receipt, then enters `failed_shutdown_connecting`. If an exact current
-`PROCESS_EXITED` receipt already exists, `failed_releasing` first closes any
-remaining local transport object without opening a socket or signalling the dead
-PID, then transitions directly to `failed_profile_removing`. Otherwise exact
-shutdown transport acquisition enters `failed_shutdown`; exact child exit enters
-`failed_profile_removing`; `PROFILE_REMOVED` enters `archived`. `CLEANUP_FAILED`
-retains the failed lifecycle and evidence and can never reach `passed`.
+Tout échec de garde/effet/protocole/identité fait transiter la région de cycle de vie vers
+`failed_releasing`, sauf le rejet de projection d'autorité explicitement préalable à la réservation,
+qui fige `NoOwnerReleaseReceiptV1` et entre directement dans `failed_shutdown_connecting`.
+`failed_releasing` invoque la libération spécifique au propriétaire. Il n'accepte
+`OWNER_RELEASE_PROVED` qu'après soit une libération normale complète, soit un reçu exact sans propriétaire,
+puis entre dans `failed_shutdown_connecting`. Si un reçu exact `PROCESS_EXITED` actuel existe déjà,
+`failed_releasing` ferme d'abord tout objet de transport local restant sans ouvrir de socket ni signaler
+le PID éteint, puis transite directement vers `failed_profile_removing`. Sinon, l'acquisition exacte du transport
+d'arrêt entre dans `failed_shutdown` ; la sortie exacte de l'enfant entre dans `failed_profile_removing` ;
+`PROFILE_REMOVED` entre dans `archived`. `CLEANUP_FAILED` conserve le cycle de vie et les preuves en échec
+et ne peut jamais atteindre `passed`.
 
-The parallel verdict region has only:
+La région de verdict parallèle comporte uniquement :
 
 ```text
 eligible -- APPLICATION_DIAGNOSTIC_RECORDED | EVIDENCE_OVERFLOW_RECORDED |
@@ -737,23 +705,22 @@ eligible -- APPLICATION_DIAGNOSTIC_RECORDED | EVIDENCE_OVERFLOW_RECORDED |
 blocked -- any later event --> blocked
 ```
 
-The outer actor is parallel: the lifecycle region follows the operational path
-above while the verdict region is exactly `eligible | blocked`. Before diagnostic
-settlement, application diagnostics do not interrupt raw resume/release or the
-Playwright handoff needed to inspect evidence. `DIAGNOSTICS_ACCEPTED` may advance
-toward pass only while the verdict is `eligible`; any later diagnostic routes the
-remaining lifecycle through owner release and archived failure, with the guarded
-final-release/profile-removal branches above.
+L'acteur externe est parallèle : la région de cycle de vie suit le chemin opérationnel
+ci-dessus tandis que la région de verdict est exactement `eligible | blocked`. Avant la stabilisation
+du diagnostic, les diagnostics applicatifs n'interrompent pas la reprise/libération brute ni le
+transfert Playwright nécessaire pour inspecter les preuves. `DIAGNOSTICS_ACCEPTED` ne peut avancer
+vers le succès que pendant que le verdict est `eligible` ; tout diagnostic ultérieur oriente le cycle
+de vie restant vers la libération du propriétaire et l'échec archivé, avec les branches gardées de libération
+finale/suppression de profil ci-dessus.
 
-`archived` is the sole final state. `passed` is unreachable until all root
-transports are closed, the exact child process has exited and the fresh profile
-has been removed. A failed verdict never becomes passed; cleanup only makes the
-failed verdict archivable.
+`archived` est l'unique état final. `passed` est inaccessible tant que tous les transports racines
+ne sont pas fermés, que le processus enfant exact n'a pas quitté et que le profil vierge n'a pas été supprimé.
+Un verdict en échec ne devient jamais passant ; le nettoyage rend seulement le verdict en échec archivable.
 
-### Closed events
+### Événements fermés
 
-The outer machine admits only schema-validated events carrying the current
-`processGeneration` and, where applicable, `leaseEpoch`:
+La machine externe n'admet que des événements validés selon le schéma transportant le
+`processGeneration` actuel et, le cas échéant, le `leaseEpoch` :
 
 ```text
 HARNESS_STARTED
@@ -782,112 +749,44 @@ EXITED_OWNER_CLOSED
 VERDICT_ARCHIVED | CLEANUP_FAILED
 ```
 
-Unknown or malformed events are rejected by the schema boundary before XState.
-Well-formed stale-generation, stale-epoch and duplicate terminal events enter the
-machine and are rejected or ignored by explicit named guards. They are retained
-as diagnostics but cannot mutate a newer state.
+Les événements inconnus ou malformés sont rejetés par la frontière de schéma avant XState.
+Les événements bien formés d'une génération périmée, d'une époque périmée et terminaux dupliqués entrent
+dans la machine et sont rejetés ou ignorés par des gardes nommées explicites. Ils sont conservés en tant
+que diagnostics mais ne peuvent pas muter un état plus récent.
 
-## Sealed artifact and diagnostics
+## Artefact scellé et diagnostics
 
-The tree digest is SHA-256 over sorted relative POSIX path, byte length and
-per-file SHA-256, including `manifest.json`. Pre-launch and post-use digests must
-match. Packaged bytes identifying `src/dev`, Chrome stubs, DevPanel, bridge
-logger, DEV globals or DEV storage keys are terminal failure.
+Le condensat de l'arbre est le SHA-256 sur le chemin POSIX relatif trié, la longueur en octets et le SHA-256 par fichier, y compris `manifest.json`. Les condensats avant le lancement et après l'utilisation doivent correspondre. Tout octet packagé identifiant `src/dev`, des stubs Chrome, DevPanel, l'enregistreur de pont (bridge logger), des globales DEV ou des clés de stockage DEV constitue un échec terminal.
 
-Blocking diagnostics include every page `pageerror`, page `console.error`,
-failure-vocabulary warning, service-worker error/failure warning, raw or
-Playwright `Runtime.exceptionThrown`, unhandled rejection, unexpected process
-exit and matching late-settlement record. The fixture owns one epoch-keyed
-bounded evidence accumulator across every raw and Playwright epoch and exposes
-frozen copies only.
+Les diagnostics bloquants incluent chaque `pageerror` de page, `console.error` de page, avertissement avec vocabulaire d'échec, avertissement d'erreur/échec du service worker, `Runtime.exceptionThrown` brut ou Playwright, rejet non géré, sortie inattendue de processus et enregistrement correspondant de stabilisation tardive. La fixture détient un accumulateur de preuves borné indexé par époque sur l'ensemble des époques brutes et Playwright et n'expose que des copies figées.
 
-Every harness-controlled inbound CDP message (raw epoch client and nested
-service-worker session) is rejected above `MAX_CDP_MESSAGE_BYTES = 1_048_576`.
-The tracked Playwright browser-socket transport instead uses
-`PLAYWRIGHT_MAX_INBOUND_MESSAGE_BYTES = 16_777_216`, because it multiplexes
-Playwright's own protocol traffic — trace DOM snapshots with inlined
-stylesheets, captured resource bodies and on-failure screenshots — whose
-individual frames legitimately exceed 1 MiB.
-Every schema-valid evidence item has a canonical JCS form capped at 65,536 bytes.
-Diagnostic, protocol-command and nested-CDP accumulators each retain at most
-4,096 items and 4 MiB.
+Chaque message CDP entrant contrôlé par le harnais (client d'époque brute et session imbriquée de service worker) est rejeté au-delà de `MAX_CDP_MESSAGE_BYTES = 1_048_576`. Le transport de socket de navigateur Playwright suivi utilise en revanche `PLAYWRIGHT_MAX_INBOUND_MESSAGE_BYTES = 16_777_216`, car il multiplexe le trafic de protocole propre à Playwright — instantanés DOM de trace avec feuilles de style intégrées, corps de ressources capturées et captures d'écran en cas d'échec — dont les trames individuelles dépassent légitimement 1 Mio.
+Chaque élément de preuve valide selon le schéma possède une forme canonique JCS plafonnée à 65 536 octets. Les accumulateurs de diagnostics, de commandes de protocole et de CDP imbriqué conservent chacun au plus 4 096 éléments et 4 Mio.
 
-Authority maps never retain raw CDP `params`, descriptions, stack traces or
-remote-object payloads. Their schemas normalize only bounded IDs, URL identity,
-enums, booleans, safe integers and event hashes. Every retained string is first
-bounded by UTF-8 bytes: IDs at 512 bytes and canonical URLs at 4,096 bytes. The
-canonical JCS byte length is checked before a map or inventory mutation. The
-closed per-structure budgets are:
+Les cartes d'autorité ne conservent jamais les `params` CDP bruts, les descriptions, les traces de pile ou les charges utiles (payloads) d'objets distants. Leurs schémas normalisent uniquement les identifiants bornés, l'identité d'URL, les énumérations, les booléens, les entiers sûrs et les hachages d'événements. Chaque chaîne conservée est d'abord bornée par des octets UTF-8 : les identifiants à 512 octets et les URL canoniques à 4 096 octets. La longueur en octets JCS canonique est vérifiée avant toute mutation de carte ou d'inventaire. Les budgets fermés par structure sont :
 
-| Structure             | Entries | JCS bytes per entry | JCS bytes total |
-| --------------------- | ------: | ------------------: | --------------: |
-| registration map      |      64 |               4,096 |         262,144 |
-| version map           |     256 |               4,096 |       1,048,576 |
-| target map            |   1,024 |               4,096 |       4,194,304 |
-| session map           |   1,024 |               4,096 |       4,194,304 |
-| execution-context map |   4,096 |               2,048 |       8,388,608 |
-| attachment inventory  |   1,024 |               8,192 |       8,388,608 |
+| Structure                      | Entrées | Octets JCS par entrée | Total d'octets JCS |
+| ------------------------------ | ------: | --------------------: | -----------------: |
+| carte d'enregistrements        |      64 |                 4 096 |            262 144 |
+| carte de versions              |     256 |                 4 096 |          1 048 576 |
+| carte de cibles                |   1 024 |                 4 096 |          4 194 304 |
+| carte de sessions              |   1 024 |                 4 096 |          4 194 304 |
+| carte de contextes d'exécution |   4 096 |                 2 048 |          8 388 608 |
+| inventaire d'attachements      |   1 024 |                 8 192 |          8 388 608 |
 
-Active context records, crash-time revoked-context tombstones and post-crash
-destroyed-context tombstones share the single execution-context budget above.
-The crash transition changes pre-crash authority classification atomically
-without duplicating retained payloads. A post-crash destroy retains only its
-normalized unique ID in the separate tombstone set, never the raw CDP payload.
-The per-restart `retiredContextEvidenceCount` has a hard cap of 4,096 for
-destroy/clear observations; event 4,097 records typed overflow and enters failed
-release. Later context events therefore cannot create an unbounded second
-history even when IDs repeat.
+Les enregistrements de contexte actif, les tombstones de contextes révoqués au moment du crash et les tombstones de contextes détruits post-crash partagent le budget unique de contextes d'exécution ci-dessus. La transition de crash modifie la classification d'autorité pré-crash de manière atomique sans dupliquer les charges utiles conservées. Une destruction post-crash ne conserve que son identifiant unique normalisé dans l'ensemble de tombstones distinct, jamais le payload CDP brut. Le `retiredContextEvidenceCount` par redémarrage est plafonné strictement à 4 096 pour les observations de destruction/vidage ; l'événement 4 097 enregistre un dépassement typé et entre dans la release en échec. Les événements de contexte ultérieurs ne peuvent donc pas créer un second historique non borné même lorsque les identifiants se répètent.
 
-The listener registry is capped at 64 normalized entries and 65,536 total JCS
-bytes. Pending commands have a hard total cap of 256 split into 224 operational
-slots and 32 cleanup-only reserved slots; their normalized metadata is capped at
-2,048 bytes per entry and 524,288 bytes total. Operational code cannot consume
-the reserve; after overflow, cleanup commands are strictly serialized and reuse
-at most one reserved slot at a time. Each accumulator and bounded structure
-maintains an O(1) hash chain
-`H_n=SHA-256(H_(n-1)||u64(length)||SHA-256(item))`, total count/bytes, retained
-count/bytes and overflow count without retaining overflow payloads.
+Le registre des écouteurs est plafonné à 64 entrées normalisées et 65 536 octets JCS au total. Les commandes en attente ont un plafond total strict de 256 divisé en 224 emplacements opérationnels et 32 emplacements réservés exclusivement au nettoyage ; leurs métadonnées normalisées sont plafonnées à 2 048 octets par entrée et 524 288 octets au total. Le code opérationnel ne peut pas consommer la réserve ; après un dépassement, les commandes de nettoyage sont strictement sérialisées et réutilisent au plus un emplacement réservé à la fois. Chaque accumulateur et structure bornée maintient une chaîne de hachage en O(1) `H_n=SHA-256(H_(n-1)||u64(length)||SHA-256(item))`, le nombre/octets totaux, le nombre/octets conservés et le nombre de dépassements sans conserver les charges utiles de dépassement.
 
-The first cap breach emits typed `EVIDENCE_OVERFLOW_RECORDED`, moves the verdict
-to `blocked`, replaces further rendered records with metadata-only counters and
-continues mandatory release. Any authority-map, attachment-inventory or pending
-operational-command overflow enters `failed_releasing`, stops mutating that
-bounded map, disarms auto-attach using the reserved cleanup slot and can prove
-only failed shutdown, never a complete normal raw release. A pass requires zero
-overflow in every accumulator/map, so its retained evidence is complete.
-Flooding can therefore make the gate red but cannot grow memory without bound or
-consume the cleanup command capacity.
+La première violation de plafond émet le message typé `EVIDENCE_OVERFLOW_RECORDED`, fait passer le verdict à `blocked`, remplace les enregistrements rendus ultérieurs par des compteurs de métadonnées uniquement et poursuit la libération obligatoire. Tout dépassement de carte d'autorité, d'inventaire d'attachements ou de commande opérationnelle en attente entre dans `failed_releasing`, cesse de muter cette carte bornée, désarme l'auto-attachement en utilisant l'emplacement de nettoyage réservé et ne peut prouver qu'un arrêt en échec, jamais une libération brute normale complète. Un succès exige zéro dépassement dans chaque accumulateur/carte, afin que ses preuves conservées soient complètes. Une saturation (flooding) peut donc rendre la porte rouge mais ne peut pas faire croître la mémoire sans borne ni consommer la capacité de commande de nettoyage.
 
-Every raw replacement session installs `Runtime.enable`, console, exception and
-execution-context observers before any fixed probe and before
-`Runtime.runIfWaitingForDebugger`. Probe source is an explicit test input, never
-a transition signal. Probe success cannot authorize bootstrap. A console warning,
-rejection or exception produced by application/probe code emits the typed
-`APPLICATION_DIAGNOSTIC_RECORDED` event, appends the ledger and moves the
-parallel verdict region to `blocked`, but the raw machine continues through
-resume, exact release and handoff so adversarial tests can inspect the evidence.
-`DIAGNOSTICS_REJECTED` later makes pass impossible. A fixed identity response
-with wrong values or `exceptionDetails` also emits `IDENTITY_PROOF_FAILED` and
-enters release because authority was not proved; an optional test-probe
-exception remains diagnostic-only. Failure to install an
-observer, parse a protocol event, transport the probe command, correlate identity
-or preserve ownership emits `OBSERVER_PROTOCOL_FAILED` and interrupts
-immediately. A probe expression that returns `exceptionDetails` or rejects is an
-application diagnostic; a CDP command/transport/schema failure is an observer
-protocol failure. Diagnostic text never selects either category; the emitting
-typed channel does.
+Chaque session remplaçante brute installe `Runtime.enable`, les observateurs de console, d'exceptions et de contexte d'exécution avant toute sonde fixe et avant `Runtime.runIfWaitingForDebugger`. La source de la sonde est une entrée de test explicite, jamais un signal de transition. Le succès de la sonde ne peut pas autoriser l'amorçage. Un avertissement de console, un rejet ou une exception produit par le code applicatif ou de sonde émet l'événement typé `APPLICATION_DIAGNOSTIC_RECORDED`, ajoute au registre et déplace la région de verdict parallèle à `blocked`, mais la machine brute poursuit à travers la reprise, la libération exacte et le transfert afin que les tests contradictoires puissent inspecter les preuves. `DIAGNOSTICS_REJECTED` rend ultérieurement le succès impossible. Une réponse d'identité fixe avec des valeurs erronées ou `exceptionDetails` émet également `IDENTITY_PROOF_FAILED` et entre en libération car l'autorité n'a pas été prouvée ; une exception de sonde de test facultative demeure un simple diagnostic. L'incapacité à installer un observateur, à analyser un événement de protocole, à transporter la commande de sonde, à corréler l'identité ou à préserver la propriété émet `OBSERVER_PROTOCOL_FAILED` et interrompt immédiatement. Une expression de sonde qui renvoie `exceptionDetails` ou rejette constitue un diagnostic applicatif ; un échec de commande/transport/schéma CDP constitue un échec de protocole d'observateur. Le texte de diagnostic ne sélectionne jamais l'une ou l'autre catégorie ; le canal typé émetteur le fait.
 
-## Manually owned Chromium process
+## Processus Chromium détenu manuellement
 
-Playwright may resolve `chromium.executablePath()` before launch, but no
-Playwright browser-launch or connection API may run before the first raw proof.
-The process actor uses `node:child_process.spawn` with `shell:false`, the exact
-bundled Chrome for Testing executable, and an audited immutable argument
-allowlist for the pinned Playwright/Chromium version. It never imports private
-`playwright-core/lib` modules.
+Playwright peut résoudre `chromium.executablePath()` avant le lancement, mais aucune API de lancement de navigateur ou de connexion de Playwright ne peut s'exécuter avant la première preuve brute. L'acteur de processus utilise `node:child_process.spawn` avec `shell:false`, l'exécutable Chrome for Testing exact fourni dans le bundle, et une liste blanche d'arguments immuable et auditée pour la version Playwright/Chromium épinglée. Il n'importe jamais de modules privés `playwright-core/lib`.
 
-The common ordered allowlist is exact; `<profile>` and `<dist>` are absolute
-validated paths and every other byte is literal:
+La liste blanche ordonnée commune est exacte ; `<profile>` et `<dist>` sont des chemins absolus validés et chaque autre octet est littéral :
 
 ```text
 --disable-field-trial-config
@@ -934,7 +833,7 @@ validated paths and every other byte is literal:
 --window-size=420,900
 ```
 
-Headless mode then appends exactly:
+Le mode headless ajoute ensuite exactement :
 
 ```text
 --headless
@@ -943,40 +842,19 @@ Headless mode then appends exactly:
 --blink-settings=primaryHoverType=2,availableHoverTypes=2,primaryPointerType=4,availablePointerTypes=4
 ```
 
-Headed mode appends none of those four. Both reviewed modes append one final
-positional `about:blank` and no other argument. The implementation verifies the
-pinned `@playwright/test` version `1.61.1` and refuses a version drift before
-spawn; a future upgrade must review this allowlist.
+Le mode headed n'ajoute aucun de ces quatre éléments. Les deux modes revus ajoutent un unique `about:blank` positionnel final et aucun autre argument. L'implémentation vérifie la version épinglée de `@playwright/test` `1.61.1` et refuse toute dérive de version avant le spawn ; une future mise à niveau devra revoir cette liste blanche.
 
-Chromium admission is closed as well. Before spawn, the resolved
-`playwright-core/package.json` must be version `1.61.1`; its own
-`browsers.json` must contain exactly the installed `chromium` tuple
-`{revision:"1228",browserVersion:"149.0.7827.55",title:"Chrome for Testing"}`.
-`chromium.executablePath()` must resolve to a regular non-symlink executable
-under that revision's Playwright cache directory, its SHA-256 is frozen, and an
-argument-only `--version` preflight must trim to exactly
-`Google Chrome for Testing 149.0.7827.55`. The launched child later admits only
-`Browser.getVersion` with `protocolVersion:"1.3"`,
-`product:"Chrome/149.0.7827.55"`,
-`revision:"@3188f8a607ae7e067593be8aab7f02d2451fec07"` and
-`jsVersion:"14.9.207.21"`. Platform-specific user-agent bytes are frozen but do
-not weaken those exact fields. Any package, metadata, realpath, mode, preflight
-or CDP-version drift is terminal before extension authority.
+L'admission de Chromium est également fermée. Avant le spawn, le `playwright-core/package.json` résolu doit être en version `1.61.1` ; son propre `browsers.json` doit contenir exactement l'uplet `chromium` installé `{revision:"1228",browserVersion:"149.0.7827.55",title:"Chrome for Testing"}`. `chromium.executablePath()` doit pointer vers un exécutable régulier qui n'est pas un lien symbolique sous le répertoire de cache Playwright de cette révision, son SHA-256 est figé, et une vérification préalable (preflight) `--version` avec argument uniquement doit se réduire exactement à `Google Chrome for Testing 149.0.7827.55`. L'enfant lancé admet plus tard uniquement un `Browser.getVersion` avec `protocolVersion:"1.3"`, `product:"Chrome/149.0.7827.55"`, `revision:"@3188f8a607ae7e067593be8aab7f02d2451fec07"` et `jsVersion:"14.9.207.21"`. Les octets de l'agent utilisateur (user-agent) spécifiques à la plateforme sont figés mais n'affaiblissent pas ces champs exacts. Toute dérive de package, de métadonnées, de chemin réel (realpath), de mode, de prévérification ou de version CDP est terminale avant l'autorité d'extension.
 
-The allowlist therefore includes exactly one value for each launch capability:
+La liste blanche inclut donc exactement une valeur pour chaque capacité de lancement :
 
-- fresh `--user-data-dir=<profile>`;
-- `--remote-debugging-address=127.0.0.1` and
-  `--remote-debugging-port=0`;
-- `--disable-extensions-except=<sealed dist>` and
-  `--load-extension=<sealed dist>`;
-- deterministic headless/window flags or their reviewed headed equivalent;
-- the audited Playwright stability flags, `--no-sandbox` for the test runner,
-  `--no-default-browser-check`, `--no-first-run`, then one final `about:blank`.
+- nouveau `--user-data-dir=<profile>` ;
+- `--remote-debugging-address=127.0.0.1` et `--remote-debugging-port=0` ;
+- `--disable-extensions-except=<sealed dist>` et `--load-extension=<sealed dist>` ;
+- drapeaux headless/fenêtre déterministes ou leur équivalent headed revu ;
+- les drapeaux de stabilité Playwright audités, `--no-sandbox` pour le test runner, `--no-default-browser-check`, `--no-first-run`, puis un final `about:blank`.
 
-There is no user-provided passthrough, shell expansion, default user profile,
-remote host binding, Vite server, backend or unsealed extension path. The spawn
-receipt freezes:
+Il n'y a aucun relais fourni par l'utilisateur, aucune expansion de shell, aucun profil utilisateur par défaut, aucune liaison d'hôte distant, aucun serveur Vite, backend ou chemin d'extension non scellé. Le reçu de spawn fige :
 
 ```text
 (processGeneration, pid, executablePath, executableSha256,
@@ -984,54 +862,27 @@ receipt freezes:
  userDataDir, sealedTreeSha256, spawnedAt)
 ```
 
-Stdout/stderr are drained through a streaming UTF-8 line decoder with a
-16-KiB line cap and a 1-MiB total cap per stream. Raw process bytes never enter
-logs, errors, ledgers or attachments. Before retention, a structurally parsed
-line matching Chrome's `DevTools listening on ws://127.0.0.1:<port><path>` form
-is replaced in full by
-`[redacted-devtools-endpoint processGeneration=<n>]`; the port and browser path
-are never retained. Any other line containing a `ws://`/`wss://` endpoint is
-redacted in full and blocks the verdict. Invalid UTF-8 and overlong lines are
-replaced by bounded metadata-only records, never truncated raw content. `error`
-and `exit` race every startup, endpoint, raw, Playwright and cleanup wait.
+Stdout/stderr sont drainés via un décodeur de lignes UTF-8 en flux avec un plafond de ligne de 16 Kio et un plafond total de 1 Mio par flux. Les octets bruts de processus n'entrent jamais dans les logs, les erreurs, les registres ou les attachements. Avant la conservation, une ligne structurellement analysée correspondant à la forme de Chrome `DevTools listening on ws://127.0.0.1:<port><path>` est intégralement remplacée par `[redacted-devtools-endpoint processGeneration=<n>]` ; le port et le chemin du navigateur ne sont jamais conservés. Toute autre ligne contenant un endpoint `ws://`/`wss://` est caviardée dans son intégralité et bloque le verdict. Les lignes UTF-8 invalides et trop longues sont remplacées par des enregistrements bornés contenant uniquement des métadonnées, jamais par du contenu brut tronqué. `error` et `exit` sont en concurrence avec chaque attente de démarrage, d'endpoint, brute, Playwright et de nettoyage.
 
-### `DevToolsActivePort` capability
+### Capacité DevToolsActivePort
 
-The file must not exist before spawn. Admission requires, under one startup
-deadline:
+Le fichier ne doit pas exister avant le spawn. L'admission exige, sous une échéance unique de démarrage :
 
-1. `lstat` proves a regular non-symlink file inside the exact fresh profile;
-2. bytes match exactly `<port>\n<browser-path>` with one optional final `\n`, no
-   CR, and no third record;
-3. record one is a canonical decimal loopback port in `1..65535`;
-4. record two matches the complete lowercase canonical UUID form
-   `^/devtools/browser/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$`;
-5. the derived endpoint is exactly
-   `ws://127.0.0.1:<port><browser-path>`.
+1. que `lstat` prouve un fichier régulier qui n'est pas un lien symbolique à l'intérieur du profil vierge exact ;
+2. que les octets correspondent exactement à `<port>\n<browser-path>` avec un `\n` final facultatif, sans CR et sans troisième enregistrement ;
+3. que le premier enregistrement soit un port de boucle locale décimal canonique dans `1..65535` ;
+4. que le second enregistrement corresponde à la forme UUID canonique minuscule complète `^/devtools/browser/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$` ;
+5. que l'endpoint dérivé soit exactement `ws://127.0.0.1:<port><browser-path>`.
 
-While polling under that deadline, absence (`ENOENT`) and a zero-byte regular
-file are the same transient admission state: the child has not yet written the
-canonical bytes. A zero-byte file is retried exactly like absence and never
-parsed. A non-empty file whose bytes do not satisfy the canonical shape
-(one/three-line, invalid port/path, CR/NUL) is terminal. The deadline itself is
-terminal: a file that never admits within it fails closed.
+Lors de l'attente active sous cette échéance, l'absence (`ENOENT`) et un fichier régulier de zéro octet constituent le même état d'admission transitoire : l'enfant n'a pas encore écrit les octets canoniques. Un fichier de zéro octet est réessayé exactement comme une absence et n'est jamais analysé. Un fichier non vide dont les octets ne satisfont pas la forme canonique (sur une/trois lignes, port/chemin invalide, CR/NUL) est terminal. L'échéance elle-même est terminale : un fichier qui n'est jamais admis dans ce délai échoue de façon hermétique.
 
-This parsing emits `ENDPOINT_PARSED`; it opens no socket and does not claim that
-the endpoint belongs to the child. The endpoint becomes verified only after the
-machine reserves a raw lease, enters `raw_connecting`, opens its sole tracked
-socket, and receives `Browser.getVersion` before child exit. That response
-validates the pinned fields above and freezes `(protocolVersion, product,
-revision, userAgent, jsVersion, browserVersionResponseSha256)` into the
-process/endpoint receipt used at every handoff.
+Cette analyse émet `ENDPOINT_PARSED` ; elle n'ouvre aucun socket et ne prétend pas que l'endpoint appartienne à l'enfant. L'endpoint ne devient vérifié qu'après que la machine a réservé un bail brut, est entrée dans `raw_connecting`, a ouvert son unique socket suivi, et a reçu `Browser.getVersion` avant la sortie de l'enfant. Cette réponse valide les champs épinglés ci-dessus et fige `(protocolVersion, product, revision, userAgent, jsVersion, browserVersionResponseSha256)` dans le reçu de processus/endpoint utilisé à chaque transfert.
 
-The parsed endpoint is a private capability bound to the process generation. It
-is never attached to test evidence, fixture DTOs, logs or errors. A stale file,
-wrong generation, symlink, malformed port/path, timeout, connection failure,
-version failure or child exit is terminal.
+L'endpoint analysé est une capacité privée liée à la génération du processus. Il n'est jamais attaché aux preuves de test, aux DTO de fixture, aux logs ou aux erreurs. Un fichier périmé, une mauvaise génération, un lien symbolique, un port/chemin malformé, un timeout, un échec de connexion, un échec de version ou une sortie de l'enfant est terminal.
 
-## Exclusive CDP lease
+## Bail CDP exclusif
 
-`CdpLease` is a private capability with closed XState ownership states:
+`CdpLease` est une capacité privée avec des états de propriété XState fermés :
 
 ```text
 owner_none
@@ -1043,11 +894,9 @@ shutdown_connecting(processGeneration, leaseEpoch, transportId)
 shutdown_owned(processGeneration, leaseEpoch, transportId)
 ```
 
-`purpose` is only `initial_bootstrap` or `runtime_restart`. The machine reserves
-the next lease epoch before opening a transport. The endpoint opener is private
-to the lease actor, so harness code cannot create a second root socket.
+`purpose` est uniquement `initial_bootstrap` ou `runtime_restart`. La machine réserve l'époque de bail suivante avant d'ouvrir un transport. L'ouvreur d'endpoint est privé à l'acteur de bail, de sorte que le code du harnais ne peut pas créer un second socket racine.
 
-For the isolated test runner, these invariants are mandatory:
+Pour le test runner isolé, ces invariants sont obligatoires :
 
 ```text
 rootLeaseReservations in {0, 1}
@@ -1060,24 +909,13 @@ raw_connecting/playwright_connecting/shutdown_connecting
 raw and Playwright ownership are mutually exclusive
 ```
 
-Before every raw arm, a fresh exact `Target.getTargets` response must show no
-service-worker target with `attached:true`. Before raw acquisition after
-Playwright, the exact `browser.close()` promise, Playwright `disconnected` event
-and transport-close receipt must all exist. Before Playwright connection, the
-complete raw-release receipt must exist. No local boolean or missing event is a
-release proof.
+Avant chaque armement brut, une réponse fraîche et exacte de `Target.getTargets` doit montrer qu'aucune cible de service worker n'est à `attached:true`. Avant l'acquisition brute après Playwright, la promesse exacte `browser.close()`, l'événement `disconnected` de Playwright et le reçu de fermeture du transport doivent tous exister. Avant la connexion Playwright, le reçu complet de libération brute doit exister. Aucun booléen local ou événement manquant ne constitue une preuve de libération.
 
-The initial raw lease is reserved only after `ENDPOINT_PARSED`. Its
-`raw_connecting` actor opens the sole tracked socket and sends
-`Browser.getVersion`; only the exact current response emits `ENDPOINT_VERIFIED`
-and enters `raw_owned`. A connection or version failure must close the tracked
-socket and produce a close receipt before `owner_none`, failure shutdown or any
-new acquisition.
+Le bail brut initial n'est réservé qu'après `ENDPOINT_PARSED`. Son acteur `raw_connecting` ouvre l'unique socket suivi et envoie `Browser.getVersion` ; seule la réponse actuelle exacte émet `ENDPOINT_VERIFIED` et entre dans `raw_owned`. Un échec de connexion ou de version doit fermer le socket suivi et produire un reçu de fermeture avant `owner_none`, l'arrêt en échec ou toute nouvelle acquisition.
 
-### Deadline constants
+### Constantes de délais limites
 
-All time budgets use monotonic time and are configuration constants, not caller
-inputs:
+Tous les budgets de temps utilisent le temps monotone et sont des constantes de configuration, et non des entrées de l'appelant :
 
 ```text
 ARTIFACT_IO_TIMEOUT_MS = 5_000
@@ -1099,54 +937,26 @@ HARNESS_GLOBAL_DEADLINE_MS = 210_000
 MV3_TEST_TIMEOUT_MS = 240_000
 ```
 
-One absolute operation deadline is created before each phase and never reset
-within it. A separate release/cleanup deadline may free resources after an
-operation timeout, but can never convert that failed operation into success.
-Exactly one runtime restart may be requested and all test effects share the one
-`TEST_EFFECT_TIMEOUT_MS` budget. The closed worst-case sum for two artifact
-reads, profile creation, process startup, two raw operations/releases, two
-Playwright handoffs/releases, test effects, diagnostic settlement, one failure
-owner release, shutdown including TERM/KILL, and profile removal is 204,100 ms.
-The controller's 210,000-ms monotonic global deadline includes that work and
-refuses to start a phase unless its full bound plus remaining mandatory cleanup
-fits. The Playwright config and every test must use exactly the larger
-`MV3_TEST_TIMEOUT_MS`; its 30,000-ms margin prevents the framework timeout from
-preempting bounded cleanup.
+Une échéance d'opération absolue unique est créée avant chaque phase et n'est jamais réinitialisée en son sein. Une échéance de libération/nettoyage distincte peut libérer des ressources après un timeout d'opération, mais ne peut jamais transformer cette opération échouée en succès. Exactement un redémarrage à l'exécution peut être demandé et tous les effets de test partagent l'unique budget `TEST_EFFECT_TIMEOUT_MS`. La somme fermée du pire des cas pour deux lectures d'artefacts, la création de profil, le démarrage de processus, deux opérations/libérations brutes, deux transferts/libérations Playwright, les effets de test, la stabilisation du diagnostic, une libération de propriétaire en échec, l'arrêt y compris TERM/KILL, et la suppression de profil est de 204 100 ms. L'échéance globale monotone de 210 000 ms du contrôleur englobe ce travail et refuse de démarrer une phase à moins que sa limite complète plus le nettoyage obligatoire restant ne s'y insèrent. La configuration Playwright et chaque test doivent utiliser exactement le `MV3_TEST_TIMEOUT_MS` plus large ; sa marge de 30 000 ms empêche le timeout du framework d'interrompre prématurément le nettoyage borné.
 
-The loopback endpoint cannot cryptographically exclude a hostile local process.
-The absolute guarantee covers clients created by this harness in its isolated CI
-runner. A threat model containing a hostile same-host process requires a separate
-review for `--remote-debugging-pipe`; it is outside revision 13.
+L'endpoint de boucle locale ne peut pas exclure cryptographiquement un processus local hostile. La garantie absolue couvre les clients créés par ce harnais dans son exécuteur de CI isolé. Un modèle de menace contenant un processus hostile sur la même machine nécessite une revue séparée pour `--remote-debugging-pipe` ; cela sort du cadre de la révision 13.
 
-## Raw control plane
+## Plan de contrôle brut
 
-One raw WebSocket multiplexes every command. Root Target events are subscribed
-synchronously before the first command. The raw owner then:
+Un WebSocket brut unique multiplexe chaque commande. Les événements Target racines sont souscrits de manière synchrone avant la première commande. Le propriétaire brut effectue ensuite :
 
-1. freezes the one launch sentinel as the only complete `type:"page"`,
-   `url:"about:blank"` target from an exact explicit page-only
-   `Target.getTargets` response; the same `sentinelTargetId` survives every lease
-   epoch;
-2. proves with an exact service-worker-only `Target.getTargets` response that no
-   worker target is already attached before this raw epoch arms auto-attach;
-3. acknowledges exact service-worker-only `Target.setDiscoverTargets`;
-4. acknowledges browser-root `Target.setAutoAttach` before any stop/start;
-5. attaches to the frozen sentinel with `flatten:true` and acknowledges
-   `ServiceWorker.enable` on that child control session;
-6. converges installation metadata and obtains one exact selected worker
-   session;
-7. keeps that selected session attached across controlled stop/start, proves the
-   native crash/reload lifecycle, resumes the paused replacement and then probes
-   it through the same synchronously dispatched batch;
-8. releases every raw authority before Playwright may connect.
+1. fige l'unique sentinelle de lancement en tant que seule cible complète `type:"page"`, `url:"about:blank"` issue d'une réponse explicite exacte réservée aux pages de `Target.getTargets` ; le même `sentinelTargetId` survit à chaque époque de bail ;
+2. prouve par une réponse exacte réservée aux services workers de `Target.getTargets` qu'aucune cible de worker n'est déjà attachée avant que cette époque brute n'arme l'auto-attachement ;
+3. acquitte le `Target.setDiscoverTargets` exact réservé aux services workers ;
+4. acquitte `Target.setAutoAttach` à la racine du navigateur avant tout arrêt/démarrage ;
+5. s'attache à la sentinelle figée avec `flatten:true` et acquitte `ServiceWorker.enable` sur cette session de contrôle enfant ;
+6. fait converger les métadonnées d'installation et obtient une session de worker sélectionnée exacte ;
+7. maintient cette session sélectionnée attachée à travers l'arrêt/démarrage contrôlé, prouve le cycle de vie natif de crash/rechargement, reprend le remplaçant en pause puis le sonde via le même lot distribué de façon synchrone ;
+8. libère chaque autorité brute avant que Playwright ne puisse se connecter.
 
-The sentinel is created only by the final launch argument, never by a CDP
-command. It is not exposed through the fixture, is never used for product
-assertions and remains open until global browser shutdown. Playwright release
-closes every fixture-created page but preserves this exact sentinel so Chromium
-cannot disappear between lease epochs.
+La sentinelle n'est créée que par le dernier argument de lancement, jamais par une commande CDP. Elle n'est pas exposée via la fixture, n'est jamais utilisée pour les assertions de produit et demeure ouverte jusqu'à l'arrêt global du navigateur. La libération Playwright ferme chaque page créée par la fixture mais préserve cette sentinelle exacte afin que Chromium ne puisse pas disparaître entre les époques de bail.
 
-The page-only sentinel query is sent without `sessionId` and exactly:
+La requête de sentinelle réservée aux pages est envoyée sans `sessionId` et correspond exactement à :
 
 ```json
 {
@@ -1154,11 +964,7 @@ The page-only sentinel query is sent without `sessionId` and exactly:
 }
 ```
 
-No implementation-side post-filter may turn multiple/malformed targets into a
-unique sentinel. Discovery uses the exact same sequential service-worker filter
-as the pre-arm fence and arm command. A pre-arm response containing any
-`type:"service_worker"` target with `attached:true` is terminal before discovery
-or auto-attach. The arm is sent without `sessionId` and exactly:
+Aucun post-filtre côté implémentation ne peut transformer des cibles multiples/malformées en une sentinelle unique. La découverte utilise exactement le même filtre séquentiel de service worker que la barrière pré-armement et la commande d'armement. Une réponse de pré-armement contenant une cible quelconque de `type:"service_worker"` avec `attached:true` est terminale avant la découverte ou l'auto-attachement. L'armement est envoyé sans `sessionId` et correspond exactement à :
 
 ```json
 {
@@ -1169,46 +975,25 @@ or auto-attach. The arm is sent without `sessionId` and exactly:
 }
 ```
 
-Revision 13 never calls `Target.autoAttachRelated`. A rejected/mutated arm,
-socket loss or any start before its successful current-command response is
-terminal.
+La révision 13 n'appelle jamais `Target.autoAttachRelated`. Un armement rejeté/muté, une perte de socket ou tout démarrage avant sa réponse de commande actuelle réussie est terminal.
 
-## Installation convergence and warm authority
+## Convergence de l'installation et autorité à chaud
 
-The manifest's exact background service-worker path is known before launch. The
-extension ID is derived only from a complete `chrome-extension:` worker target or
-version URL with that exact path. The root scope is then exactly
-`chrome-extension://<extensionId>/`.
+Le chemin exact du service worker d'arrière-plan du manifeste est connu avant le lancement. L'identifiant d'extension est dérivé uniquement d'une cible de worker ou d'une URL de version complète en `chrome-extension:` comportant ce chemin exact. La portée racine est alors exactement `chrome-extension://<extensionId>/`.
 
-`ServiceWorker.workerRegistrationUpdated` and
-`ServiceWorker.workerVersionUpdated` are partial updates. The observer maintains
-the latest complete member by identity; it never treats one event array as a
-complete snapshot. Installation/update transitions and overlapping related
-versions are non-terminal until the one deadline expires. Convergence requires:
+`ServiceWorker.workerRegistrationUpdated` et `ServiceWorker.workerVersionUpdated` sont des mises à jour partielles. L'observateur maintient le membre complet le plus récent par identité ; il ne traite jamais un tableau d'événements comme un instantané complet. Les transitions d'installation/mise à jour et les versions liées chevauchantes ne sont pas terminales jusqu'à l'expiration de l'échéance unique. La convergence exige :
 
-1. exactly one non-deleted registration has the exact root scope;
-2. exactly one related version is non-`redundant`, with exact script URL and
-   `status:activated`; every other related version is `redundant`;
-3. a fresh exact-filter `Target.getTargets` round-trip completes and conditions
-   1-2 still hold;
-4. every older related session is classified, observed and resumed if paused;
-   no older related session remains live when authority freezes;
-5. every foreign/colliding live attachment is absent.
+1. exactement un enregistrement non supprimé possède la portée racine exacte ;
+2. exactement une version liée est non `redundant`, avec l'URL de script exacte et `status:activated` ; chaque autre version liée est `redundant` ;
+3. un aller-retour frais de `Target.getTargets` avec filtre exact s'achève et les conditions 1-2 sont toujours vérifiées ;
+4. chaque session liée plus ancienne est classée, observée et reprise si elle est en pause ; aucune session liée plus ancienne ne demeure active lorsque l'autorité se fige ;
+5. tout attachement actif étranger/en collision est absent.
 
-The round-trip is the convergence fence; no sleep authorizes freeze. A candidate
-that becomes redundant before the fence is discarded. Deletion, duplicate root
-registration, scope/script collision, malformed metadata or non-convergence is
-terminal.
+L'aller-retour constitue la barrière de convergence ; aucun sleep n'autorise le gel. Un candidat qui devient redondant avant la barrière est rejeté. Une suppression, un enregistrement racine dupliqué, une collision de portée/script, des métadonnées malformées ou une non-convergence est terminal.
 
-Every related attachment enters an append-only inventory. Before any resume,
-the raw owner enables `Inspector` and `Runtime`, installs schema-validated
-`Inspector.targetCrashed`, `Inspector.targetReloadedAfterCrash`,
-`Runtime.exceptionThrown`, `Runtime.consoleAPICalled` and context observers, and
-waits for the correlated command replies. Older related sessions are resumed if
-paused and must detach after becoming redundant. No older session may satisfy a
-later restart proof.
+Chaque attachement lié entre dans un inventaire à ajout seul. Avant toute reprise, le propriétaire brut active `Inspector` et `Runtime`, installe les observateurs validés selon le schéma de `Inspector.targetCrashed`, `Inspector.targetReloadedAfterCrash`, `Runtime.exceptionThrown`, `Runtime.consoleAPICalled` et de contexte, et attend les réponses de commande corrélées. Les sessions liées plus anciennes sont reprises si elles sont en pause et doivent se détacher après être devenues redondantes. Aucune session plus ancienne ne peut satisfaire une preuve de redémarrage ultérieure.
 
-Authority freeze captures:
+Le gel de l'autorité capture :
 
 ```text
 (processGeneration, leaseEpoch, restartGeneration,
@@ -1216,67 +1001,19 @@ Authority freeze captures:
  targetId?, sessionId?, attachmentGeneration?)
 ```
 
-The machine must next establish **warm authority**: the selected activated
-version is `running`, has exactly one observed current raw session, all observer
-enables are acknowledged, and that session is not waiting for a prior debugger
-resume. If the selected version is already `running` or `starting` and has an
-exact auto-attached session, that session is used; a paused `starting` session is
-observed and resumed, then must become `running`. If an activated `running` or
-`starting` version exposes a live target ID but has no raw session, the raw owner
-uses the exact target fence and, if still necessary, one manual attachment. That
-no-session branch performs no warm-up start. Only an activated `stopped` version,
-whether or not its retained DevTools target/session is already visible, receives
-one `ServiceWorker.startWorker({scopeURL})` as a warm-up. After its successful
-response and an activated `starting` or `running` version update exposes the
-exact target ID, an exact filtered `Target.getTargets` fence freezes its sole target.
-The `starting` branch is necessary because root auto-attach may already have
-paused the warm-up before it can report `running`. If root auto-attach supplied
-one exact session, that session is used; otherwise the raw owner sends one explicit
-`Target.attachToTarget({targetId,flatten:true})`, retains the correlated manual
-session response and installs the same observers. While that command is pending,
-at most one provisional selected `TARGET_ATTACHED` event may be retained; it is
-classified as the manual session only when the response returns the same session
-ID. A different or second selected attachment proves an auto/manual race and is
-terminal. The warm-up is resumed if necessary
-and can never be reported as bootstrap proof. `warm_authority_ready` is
-unreachable until Inspector/Runtime enable replies exist, every issued warm-up
-start has its successful `WARMUP_START_RESOLVED`, and every issued warm-up resume
-has its successful `WARMUP_RESUME_RESOLVED`, together with the selected running
-version and one exact session.
+La machine doit ensuite établir **l'autorité à chaud** : la version activée sélectionnée est `running`, possède exactement une session brute actuelle observée, toutes les activations d'observateurs sont acquittées, et cette session n'attend pas une reprise préalable du débogueur. Si la version sélectionnée est déjà `running` ou `starting` et possède une session auto-attachée exacte, cette session est utilisée ; une session en pause `starting` est observée et reprise, puis doit passer à `running`. Si une version activée `running` ou `starting` expose un identifiant de cible actif mais n'a pas de session brute, le propriétaire brut utilise la barrière de cible exacte et, si toujours nécessaire, un attachement manuel. Cette branche sans session n'effectue aucun démarrage d'échauffement. Seule une version activée `stopped`, que sa cible/session DevTools conservée soit déjà visible ou non, reçoit un `ServiceWorker.startWorker({scopeURL})` en guise d'échauffement. Après sa réponse réussie et qu'une mise à jour de version activée `starting` ou `running` expose l'identifiant exact de cible, une barrière exacte filtrée de `Target.getTargets` fige son unique cible. La branche `starting` est nécessaire car l'auto-attachement racine a pu déjà mettre en pause l'échauffement avant qu'il ne puisse signaler `running`. Si l'auto-attachement racine a fourni une session exacte, cette session est utilisée ; sinon, le propriétaire brut envoie un `Target.attachToTarget({targetId,flatten:true})` explicite, conserve la réponse de session manuelle corrélée et installe les mêmes observateurs. Pendant que cette commande est en attente, au plus un événement provisoire sélectionné `TARGET_ATTACHED` peut être conservé ; il est classé comme session manuelle uniquement lorsque la réponse renvoie le même identifiant de session. Un attachement sélectionné différent ou secondaire prouve une situation de concurrence auto/manuelle et est terminal. L'échauffement est repris si nécessaire et ne peut jamais être rapporté comme preuve d'amorçage. `warm_authority_ready` est inaccessible tant que les réponses d'activation d'Inspector/Runtime n'existent pas, que chaque démarrage d'échauffement émis possède son `WARMUP_START_RESOLVED` réussi, et que chaque reprise d'échauffement émise possède son `WARMUP_RESUME_RESOLVED` réussi, conjointement avec la version sélectionnée en exécution et une session exacte.
 
-For revision 13, the selected session's acknowledged `Runtime.enable` response
-is also an ordering barrier for every earlier context event on the raw socket.
-The sequential reducer keeps every later pre-crash context identity in the same
-bounded generation ledger through `controlled_stop`; the exact crash transition
-then revokes that complete generation and clears its active subset atomically.
-The pre-crash ledger is diagnostic authority, not an additional stop
-acknowledgement.
+Pour la révision 13, la réponse `Runtime.enable` acquittée de la session sélectionnée est également une barrière d'ordonnancement pour chaque événement de contexte antérieur sur le socket brut. Le réducteur séquentiel conserve chaque identité de contexte pré-crash ultérieure dans le même registre de génération borné à travers `controlled_stop` ; la transition de crash exacte révoque alors cette génération complète et efface son sous-ensemble actif de façon atomique. Le registre pré-crash constitue une autorité de diagnostic, et non un accusé de réception d'arrêt supplémentaire.
 
-Each inventory member records `attachmentOrigin:auto|manual`; origin is immutable
-and controls its release proof. After warm authority, deletion, redundancy,
-target/session replacement,
-scope/script mutation, crossed identity or selected `TARGET_DETACHED` before
-entry into `release_resuming` is terminal. The selected session is intentionally
-retained through the controlled stop and final same-version start.
+Chaque membre de l'inventaire enregistre `attachmentOrigin:auto|manual` ; l'origine est immuable et contrôle sa preuve de libération. Après l'autorité à chaud, la suppression, la redondance, le remplacement de cible/session, la mutation de portée/script, l'identité croisée ou un `TARGET_DETACHED` sélectionné avant l'entrée dans `release_resuming` est terminal. La session sélectionnée est intentionnellement conservée à travers l'arrêt contrôlé et le démarrage final avec la même version.
 
-## Raw same-version restart machine
+## Machine de redémarrage brut avec la même version
 
-Chromium retains one `ServiceWorkerDevToolsAgentHost` for the same browser
-context and version. On stop it keeps attached DevTools sessions and emits
-`Inspector.targetCrashed`; on restart it reuses those sessions, sets pause on
-start because the host is attached, and emits
-`Inspector.targetReloadedAfterCrash`. Revision 13 uses the exact crash event as
-an atomic context-generation boundary and the reload event as the prerequisite
-for a fresh replacement context. It never requires or permits a new selected
-`Target.attachedToTarget` between stop and start.
+Chromium conserve un `ServiceWorkerDevToolsAgentHost` pour le même contexte de navigateur et la même version. À l'arrêt, il conserve les sessions DevTools attachées et émet `Inspector.targetCrashed` ; au redémarrage, il réutilise ces sessions, définit la pause au démarrage parce que l'hôte est attaché, et émet `Inspector.targetReloadedAfterCrash`. La révision 13 utilise l'événement de crash exact comme une frontière atomique de génération de contexte et l'événement de rechargement comme la condition préalable pour un contexte remplaçant frais. Elle n'exige ni ne permet jamais un nouvel attachement sélectionné `Target.attachedToTarget` entre l'arrêt et le démarrage.
 
-One absolute `rawOperationDeadline` begins before discovery/metadata admission
-and bounds arm, convergence, optional warm-up, stop, start, correlation, probes
-and resume. Awaited phases do not reset it. Normal exact release consumes one
-separate `RAW_RELEASE_TIMEOUT_MS` deadline.
+Une `rawOperationDeadline` absolue débute avant la découverte/l'admission des métadonnées et borne l'armement, la convergence, l'échauffement facultatif, l'arrêt, le démarrage, la corrélation, les sondes et la reprise. Les phases attendues ne la réinitialisent pas. La libération exacte normale consomme une échéance distincte `RAW_RELEASE_TIMEOUT_MS`.
 
-The raw machine admits only these schema-validated events with current process,
-lease, restart, command and session identities:
+La machine brute n'admet que ces événements validés selon le schéma avec les identités actuelles de processus, bail, redémarrage, commande et session :
 
 ```text
 INITIAL_SENTINEL_FENCE_RESOLVED | PREARM_ATTACH_FENCE_RESOLVED
@@ -1305,7 +1042,7 @@ SERVICE_WORKER_DISABLED | CONTROL_DETACH_RESOLVED
 SENTINEL_FENCE_RESOLVED | DISCOVERY_DISABLED | RAW_SOCKET_CLOSED
 ```
 
-The two retired-context event payloads are exact:
+Les charges utiles des deux événements de contexte retiré sont exactes :
 
 ```text
 EXECUTION_CONTEXT_DESTROYED = {
@@ -1317,9 +1054,7 @@ EXECUTION_CONTEXT_DESTROYED = {
 EXECUTION_CONTEXTS_CLEARED = { sessionId, eventSha256 }
 ```
 
-The three bootstrap command events are emitted only after the complete
-synchronously dispatched batch has settled and its pending-command records have
-been correlated. Their normalized payloads are exact:
+Les trois événements de commande d'amorçage ne sont émis qu'après que le lot complet distribué de manière synchrone a été stabilisé et que ses enregistrements de commandes en attente ont été corrélés. Leurs charges utiles normalisées sont exactes :
 
 ```text
 RESUME_RESOLVED = {
@@ -1350,121 +1085,88 @@ TEST_PROBE_RESOLVED = {
 }
 ```
 
-The resume result schema is the exact successful empty CDP result. The identity
-result schema admits only the expected return-by-value object and no
-`exceptionDetails`; its `workerUrl` and `registrationScope` are normalized and
-must equal frozen authority, and the event's `uniqueContextId` must equal the
-frozen fresh context. The optional-test event must carry that same context. Its
-response may
-contain schema-valid `exceptionDetails`, represented only by the closed typed
-diagnostic disposition and its complete result hash. Raw RemoteObject payloads,
-exception text and caller strings never enter authority context. A response
-whose correlated pending record has another process, epoch, restart, session,
-method or parameter hash cannot instantiate one of these events.
+Le schéma de résultat de reprise est le résultat CDP vide réussi exact. Le schéma de résultat d'identité admet uniquement l'objet de retour par valeur attendu et aucun `exceptionDetails` ; ses `workerUrl` et `registrationScope` sont normalisés et doivent être égaux à l'autorité figée, et le `uniqueContextId` de l'événement doit être égal au contexte frais figé. L'événement de test facultatif doit transporter ce même contexte. Sa réponse peut contenir des `exceptionDetails` valides selon le schéma, représentés uniquement par la disposition de diagnostic typée fermée et son hachage complet de résultat. Les charges utiles brutes de RemoteObject, le texte d'exception et les chaînes de l'appelant n'entrent jamais dans le contexte d'autorité. Une réponse dont l'enregistrement en attente corrélé possède un autre processus, époque, redémarrage, session, méthode ou hachage de paramètre ne peut pas instancier l'un de ces événements.
 
-For a destroy before the crash transition, numeric and unique IDs must match the
-known selected-session context record. After the crash transition, the unique
-ID is the authority: the numeric ID remains required native diagnostic evidence
-but cannot substitute for, derive or override the unique ID. A missing native
-unique ID, numeric fallback or mismatched known pair is protocol failure.
+Pour une destruction avant la transition de crash, les identifiants numériques et uniques doivent correspondre à l'enregistrement de contexte de session sélectionnée connu. Après la transition de crash, l'identifiant unique constitue l'autorité : l'identifiant numérique demeure une preuve de diagnostic native requise mais ne peut se substituer à l'identifiant unique, en dériver ou l'écraser. Un identifiant unique natif manquant, un repli numérique ou une paire connue discordante constitue un échec de protocole.
 
-Registration/version/target/context events update immutable latest maps only
-through XState actions. Named `isCurrentProcess`, `isCurrentLease`,
-`isCurrentRestart`, `isCurrentCommand`, `isExactAuthority`,
-`isSelectedPersistentSession`, `isCurrentContextGeneration` and
-`isFreshPostReloadContext` guards reject stale, revoked or crossed evidence.
-Guarded `always` transitions evaluate retained partial proofs; promise completion
-itself never transitions the actor.
+Les événements d'enregistrement/version/cible/contexte mettent à jour les cartes les plus récentes immuables uniquement via des actions XState. Les gardes nommées `isCurrentProcess`, `isCurrentLease`, `isCurrentRestart`, `isCurrentCommand`, `isExactAuthority`, `isSelectedPersistentSession`, `isCurrentContextGeneration` et `isFreshPostReloadContext` rejettent les preuves périmées, révoquées ou croisées. Les transitions `always` gardées évaluent les preuves partielles conservées ; l'achèvement de promesse lui-même ne fait jamais transiter l'acteur.
 
-`sentinel_fencing` is the raw actor's sole initial node. Its entry sends the
-initial page-only sentinel query. Every later initialization command is issued
-only by the preceding acknowledged transition below; no shell loop or promise
-chain may skip, reorder or duplicate those states.
+`sentinel_fencing` est l'unique nœud initial de l'acteur brut. Son entrée envoie la requête initiale de sentinelle réservée aux pages. Chaque commande d'initialisation ultérieure n'est émise que par la transition acquittée précédente ci-dessous ; aucune boucle de shell ni chaîne de promesses ne peut sauter, réordonner ou dupliquer ces états.
 
-| XState state                                                                 | Event / guard                                                                                         | Next state                 | Effect                                                                                                      |
-| ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `sentinel_fencing`                                                           | current `INITIAL_SENTINEL_FENCE_RESOLVED` with exactly one valid sentinel                             | `prearm_attach_fencing`    | freeze sentinel; send exact service-worker-only target fence                                                |
-| `prearm_attach_fencing`                                                      | current `PREARM_ATTACH_FENCE_RESOLVED` with zero attached workers                                     | `discovery_enabling`       | retain zero-attachment proof; send exact filtered discovery-enable                                          |
-| `prearm_attach_fencing`                                                      | current fence contains any attached worker                                                            | `failed_releasing`         | retain profile-contamination failure; never arm auto-attach                                                 |
-| `discovery_enabling`                                                         | current `DISCOVERY_ACKED`                                                                             | `auto_attach_arming`       | retain reply; send exact root auto-attach arm                                                               |
-| `auto_attach_arming`                                                         | current worker target/attachment event before arm reply                                               | `auto_attach_arming`       | normalize and retain bounded inventory; install observers on every attached worker                          |
-| `auto_attach_arming`                                                         | current `AUTO_ATTACH_ACKED`                                                                           | `control_attaching`        | retain arm reply; send one flattened attach to frozen sentinel                                              |
-| `control_attaching`                                                          | current worker attachment or observer-enable reply                                                    | `control_attaching`        | retain identity-bound partial observer proof                                                                |
-| `control_attaching`                                                          | current `CONTROL_ATTACH_RESOLVED` for the sentinel                                                    | `service_worker_enabling`  | freeze control session; send `ServiceWorker.enable` on it                                                   |
-| `service_worker_enabling`                                                    | current metadata, target, attachment or observer-enable event                                         | `service_worker_enabling`  | retain bounded maps/inventory and correlated observer proofs                                                |
-| `service_worker_enabling`                                                    | current `SERVICE_WORKER_ENABLED`                                                                      | `converging`               | retain enable reply; send exact convergence fence                                                           |
-| any initialization state                                                     | duplicate/out-of-order acknowledgement, malformed identity or unexpected selected attachment          | `failed_releasing`         | retain protocol failure; perform exact release                                                              |
-| `converging`                                                                 | current metadata/target/attachment, observer-enable, detach or convergence-resume reply               | `converging`               | update maps/inventory; observe every related session; resume older paused sessions only after both enables  |
-| `converging`                                                                 | current fence and exact convergence                                                                   | `warm_authority_acquiring` | freeze selected authority and preserve its pre-fence observer proofs                                        |
-| `warm_authority_acquiring`                                                   | current selected attachment, version or observer-enable reply                                         | `warm_authority_acquiring` | retain guarded partial warm-authority proof only                                                            |
-| `warm_authority_acquiring`                                                   | selected running with exact observed unpaused session and both observer replies                       | `warm_authority_ready`     | freeze persistent target/session/origin; send no command                                                    |
-| `warm_authority_acquiring`                                                   | selected starting or running with exact observed paused session and both observer replies             | `warm_existing_resuming`   | send one correlated warm-up resume                                                                          |
-| `warm_existing_resuming`                                                     | current warm-up resume response or selected starting/running version                                  | `warm_existing_resuming`   | retain exact partial proof only                                                                             |
-| `warm_existing_resuming`                                                     | guarded `always`: resume reply, selected running and observer replies                                 | `warm_authority_ready`     | freeze persistent target/session/origin                                                                     |
-| `warm_authority_acquiring`                                                   | selected starting or running with exact target ID but without exact session                           | `warmup_target_fencing`    | mark `warmupStarted=false`; send exact filtered target fence                                                |
-| `warm_authority_acquiring`                                                   | selected stopped                                                                                      | `warmup_starting`          | mark `warmupStarted=true`; send exactly one warm-up `startWorker`                                           |
-| `warmup_starting`                                                            | current `WARMUP_START_RESOLVED`, auto-attachment or version event                                     | `warmup_starting`          | retain partial warm-up proofs only                                                                          |
-| `warmup_starting`                                                            | guarded `always`: successful start reply, selected starting or running, and exact target ID           | `warmup_target_fencing`    | send exact filtered target fence                                                                            |
-| `warmup_target_fencing`                                                      | current auto-attachment or version event before fence reply                                           | `warmup_target_fencing`    | retain guarded race evidence                                                                                |
-| `warmup_target_fencing`                                                      | current `WARMUP_TARGET_FENCE_RESOLVED` and exact auto session exists                                  | `warmup_observing`         | freeze that auto session; send missing observer enables only                                                |
-| `warmup_target_fencing`                                                      | current fence and no exact session                                                                    | `warmup_manual_attaching`  | send one exact flattened attach to frozen target                                                            |
-| `warmup_manual_attaching`                                                    | first current selected `TARGET_ATTACHED` while manual command is pending                              | `warmup_manual_attaching`  | retain one provisional session without assigning origin                                                     |
-| `warmup_manual_attaching`                                                    | different or second current selected `TARGET_ATTACHED`                                                | `failed_releasing`         | retain auto/manual race; release every known session                                                        |
-| `warmup_manual_attaching`                                                    | current `WARMUP_ATTACH_RESOLVED` matching zero/one provisional session and no competitor              | `warmup_observing`         | freeze manual session; send observer enables                                                                |
-| `warmup_manual_attaching`                                                    | current attach response conflicts with provisional session                                            | `failed_releasing`         | retain auto/manual race; release every known session                                                        |
-| `warmup_observing`                                                           | current observer reply, matching attachment or selected version event                                 | `warmup_observing`         | retain exact partial proofs only                                                                            |
-| `warmup_observing`                                                           | guarded `always`: both replies, unpaused session, selected running and any required start reply       | `warm_authority_ready`     | freeze persistent target/session/origin; discard warm-up as proof                                           |
-| `warmup_observing`                                                           | guarded `always`: both replies and selected session paused                                            | `warmup_resuming`          | send one correlated warm-up resume                                                                          |
-| `warmup_resuming`                                                            | current `WARMUP_RESUME_RESOLVED` or selected running version                                          | `warmup_resuming`          | retain exact partial proof only                                                                             |
-| `warmup_resuming`                                                            | guarded `always`: resume reply, selected running, both observer replies and any required start reply  | `warm_authority_ready`     | freeze persistent target/session/origin; discard warm-up as proof                                           |
-| `warm_authority_ready`                                                       | guarded entry                                                                                         | `controlled_stop`          | send one `stopWorker({versionId})`; never detach selected session                                           |
-| `controlled_stop`                                                            | current stop response or same-version activated/stopped update, in either order                       | `controlled_stop`          | retain exact partial proofs only                                                                            |
-| `controlled_stop`                                                            | current selected context created before the crash proof                                               | `controlled_stop`          | append its unique ID to the bounded pre-crash generation ledger; complete no stop proof                     |
-| `controlled_stop`                                                            | current exact `Inspector.targetCrashed` on the selected target/session                                | `controlled_stop`          | atomically freeze crash, increment context generation, revoke every pre-crash context and clear authority   |
-| `controlled_stop`                                                            | current destroy before atomic revocation with exact known numeric/unique context identity             | `controlled_stop`          | retire active authority but retain its pre-crash record for the atomic crash tombstone                      |
-| `controlled_stop`                                                            | current destroy after atomic revocation with valid bounded unique ID                                  | `controlled_stop`          | update bounded retired evidence; append an unknown ID to the post-crash tombstone set and hash              |
-| `controlled_stop`                                                            | current contexts-cleared before or after atomic revocation                                            | `controlled_stop`          | update bounded retired evidence only; complete no proof and select no transition                            |
-| `controlled_stop`                                                            | context created after atomic revocation or duplicate crash                                            | `failed_releasing`         | retain continuity failure; preserve revoked authority                                                       |
-| `controlled_stop`                                                            | guarded `always`: stop reply, stopped version, crash/revocation proof and same selected session       | `replacement_starting`     | increment restart generation; send one `startWorker({scopeURL})`                                            |
-| `replacement_starting`                                                       | current start response, same-session reload or first same-version starting/running update             | `replacement_starting`     | retain exact partial proofs; after reload re-enable Runtime; first valid version update completes one proof |
-| `replacement_starting`                                                       | later exact same-version starting/running update, with absent or exact frozen target                  | `replacement_starting`     | exact duplicate is a no-op; otherwise refresh metadata only, never allocate another proof                   |
-| `replacement_starting`                                                       | current Runtime reply and first fresh context with exact script origin after the retained reload      | `replacement_starting`     | require absence from both tombstone sets; bind it to the incremented generation and freeze it               |
-| `replacement_starting`                                                       | context before reload, wrong/scope-derived origin, tombstoned/reused ID or second replacement context | `failed_releasing`         | retain continuity failure; publish no bootstrap receipt                                                     |
-| `replacement_starting`                                                       | current selected contexts-cleared after exact reload and before any fresh context                     | `replacement_starting`     | update bounded retired evidence only; complete no proof and preserve the open context-admission window      |
-| `replacement_starting`                                                       | current selected destroy with valid bounded unique ID in that same window                             | `replacement_starting`     | update evidence; append/hash post-crash tombstone if new; preserve the open context-admission window        |
-| `replacement_starting`                                                       | destroy/clear before reload, after fresh context or on another session                                | `failed_releasing`         | revoke replacement authority; outside the narrow safe window the event has no generation discriminator      |
-| `replacement_starting`                                                       | guarded `always`: start reply, reload, same-version starting/running, Runtime reply and fresh context | `resuming`                 | synchronously dispatch sole resume, identity, then optional-test command bytes without awaiting replies     |
-| `resuming`                                                                   | canonical exact `RESUME_RESOLVED` from the validated batch                                            | `identity_probing`         | retain the authoritative resume receipt, command ID and result hash                                         |
-| `resuming`                                                                   | resume rejection, wrong method/session/parameters, malformed result or crossed command ID             | `failed_releasing`         | retain protocol failure; do not accept later evaluation receipts as authority                               |
-| `identity_probing`                                                           | canonical exact `IDENTITY_PROBE_RESOLVED` from the validated batch                                    | `test_probe_deciding`      | retain identity proof and exact command/result hashes; compute the batch hash when no test is configured    |
-| `identity_probing`                                                           | current response has mismatch, rejection or `exceptionDetails`                                        | `failed_releasing`         | record application diagnostic when applicable; emit `IDENTITY_PROOF_FAILED`; release resumed worker         |
-| `test_probe_deciding`                                                        | guarded `always`: no test configured and all resume/identity/running/hash proofs retained             | `bootstrap_proved`         | freeze private restart receipt with exact-null test fields                                                  |
-| `test_probe_deciding`                                                        | guarded `always`: test probe configured                                                               | `test_probing`             | await canonical reduction of the already batch-settled optional-test receipt                                |
-| `test_probing`                                                               | current `TEST_PROBE_RESOLVED` without protocol failure                                                | `test_probing`             | retain completion/result hash, compute batch hash; emit diagnostic for exception/rejection                  |
-| `test_probing`                                                               | guarded `always`: resume, identity, test, running and batch-hash proofs retained                      | `bootstrap_proved`         | freeze private restart receipt                                                                              |
-| any of `resuming`, `identity_probing`, `test_probe_deciding`, `test_probing` | current exact selected-version `starting`/`running` metadata                                          | same state                 | retain idempotently; allow only monotonic `starting -> running`, keeping `running` sticky                   |
-| any of those four batch states                                               | selected-version identity/status/target drift or `running -> starting`                                | `failed_releasing`         | retain continuity failure; never wait for another metadata event                                            |
-| any of those four batch states                                               | duplicate or out-of-canonical-order resume/identity/test response event                               | `failed_releasing`         | retain protocol failure; response arrival order can never select a transition                               |
-| any operational state                                                        | `APPLICATION_DIAGNOSTIC_RECORDED`                                                                     | same operational state     | forward to absorbing outer blocked verdict; issue no transition command                                     |
-| any operational state                                                        | diagnostic-record-only `EVIDENCE_OVERFLOW_RECORDED`                                                   | same operational state     | forward blocked verdict; retain counters/hash only; preserve cleanup                                        |
-| any operational state                                                        | authority-map, attachment or operational-command overflow                                             | `failed_releasing`         | freeze bounded structures; disarm through cleanup reserve; normal release is impossible                     |
-| `bootstrap_proved`                                                           | guarded `always`                                                                                      | `release_resuming`         | create one release deadline and preserve full attachment inventory                                          |
-| any non-final state                                                          | protocol failure or timeout                                                                           | `failed_releasing`         | retain failure; perform exact release                                                                       |
-| any acquisition/restart/probe state outside `release_*`                      | selected detach or continuity failure                                                                 | `failed_releasing`         | retain failure; perform exact release                                                                       |
+| État XState                                                           | Événement / garde                                                                                         | État suivant               | Effet                                                                                                        |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `sentinel_fencing`                                                    | `INITIAL_SENTINEL_FENCE_RESOLVED` actuel avec exactement une sentinelle valide                            | `prearm_attach_fencing`    | figer la sentinelle ; envoyer la barrière exacte de cibles réservée aux services workers                     |
+| `prearm_attach_fencing`                                               | `PREARM_ATTACH_FENCE_RESOLVED` actuel avec zéro worker attaché                                            | `discovery_enabling`       | conserver la preuve de zéro attachement ; envoyer l'activation filtrée exacte de la découverte               |
+| `prearm_attach_fencing`                                               | la barrière actuelle contient un worker attaché quelconque                                                | `failed_releasing`         | conserver l'échec de contamination du profil ; ne jamais armer l'auto-attachement                            |
+| `discovery_enabling`                                                  | `DISCOVERY_ACKED` actuel                                                                                  | `auto_attach_arming`       | conserver la réponse ; envoyer l'armement exact de l'auto-attachement racine                                 |
+| `auto_attach_arming`                                                  | événement actuel de cible/attachement de worker avant la réponse d'armement                               | `auto_attach_arming`       | normaliser et conserver l'inventaire borné ; installer des observateurs sur chaque worker attaché            |
+| `auto_attach_arming`                                                  | `AUTO_ATTACH_ACKED` actuel                                                                                | `control_attaching`        | conserver la réponse d'armement ; envoyer un attachement aplati vers la sentinelle figée                     |
+| `control_attaching`                                                   | attachement actuel de worker ou réponse d'activation d'observateur                                        | `control_attaching`        | conserver la preuve partielle d'observateur liée à l'identité                                                |
+| `control_attaching`                                                   | `CONTROL_ATTACH_RESOLVED` actuel pour la sentinelle                                                       | `service_worker_enabling`  | figer la session de contrôle ; envoyer `ServiceWorker.enable` dessus                                         |
+| `service_worker_enabling`                                             | événement actuel de métadonnées, cible, attachement ou activation d'observateur                           | `service_worker_enabling`  | conserver les cartes/inventaire bornés et les preuves d'observateurs corrélées                               |
+| `service_worker_enabling`                                             | `SERVICE_WORKER_ENABLED` actuel                                                                           | `converging`               | conserver la réponse d'activation ; envoyer la barrière de convergence exacte                                |
+| tout état d'initialisation                                            | acquittement dupliqué/hors-ordre, identité malformée ou attachement sélectionné inattendu                 | `failed_releasing`         | conserver l'échec de protocole ; effectuer la libération exacte                                              |
+| `converging`                                                          | métadonnées/cible/attachement actuel, activation d'observateur, détachement ou réponse de reprise         | `converging`               | mettre à jour cartes/inventaire ; observer chaque session liée ; reprendre les anciennes sessions en pause   |
+| `converging`                                                          | barrière actuelle et convergence exacte                                                                   | `warm_authority_acquiring` | figer l'autorité sélectionnée et préserver ses preuves d'observateur pré-barrière                            |
+| `warm_authority_acquiring`                                            | attachement sélectionné, version ou réponse d'activation d'observateur actuel                             | `warm_authority_acquiring` | conserver uniquement la preuve partielle gardée d'autorité à chaud                                           |
+| `warm_authority_acquiring`                                            | sélectionné en exécution avec session observée non en pause exacte et les deux réponses d'observateurs    | `warm_authority_ready`     | figer cible/session/origine persistantes ; n'envoyer aucune commande                                         |
+| `warm_authority_acquiring`                                            | sélectionné en démarrage ou exécution avec session observée en pause exacte et les deux réponses          | `warm_existing_resuming`   | envoyer une reprise d'échauffement corrélée                                                                  |
+| `warm_existing_resuming`                                              | réponse actuelle de reprise d'échauffement ou version sélectionnée starting/running                       | `warm_existing_resuming`   | conserver uniquement la preuve partielle exacte                                                              |
+| `warm_existing_resuming`                                              | `always` gardé : réponse de reprise, sélectionné en exécution et réponses d'observateurs                  | `warm_authority_ready`     | figer cible/session/origine persistantes                                                                     |
+| `warm_authority_acquiring`                                            | sélectionné en démarrage ou exécution avec identifiant exact de cible mais sans session exacte            | `warmup_target_fencing`    | marquer `warmupStarted=false` ; envoyer la barrière de cibles filtrée exacte                                 |
+| `warm_authority_acquiring`                                            | sélectionné à l'arrêt                                                                                     | `warmup_starting`          | marquer `warmupStarted=true` ; envoyer exactement un `startWorker` d'échauffement                            |
+| `warmup_starting`                                                     | `WARMUP_START_RESOLVED` actuel, événement d'auto-attachement ou de version                                | `warmup_starting`          | conserver uniquement les preuves partielles d'échauffement                                                   |
+| `warmup_starting`                                                     | `always` gardé : réponse de démarrage réussie, sélectionné starting ou running, et identifiant de cible   | `warmup_target_fencing`    | envoyer la barrière de cibles filtrée exacte                                                                 |
+| `warmup_target_fencing`                                               | événement actuel d'auto-attachement ou de version avant la réponse de barrière                            | `warmup_target_fencing`    | conserver la preuve gardée de concurrence                                                                    |
+| `warmup_target_fencing`                                               | `WARMUP_TARGET_FENCE_RESOLVED` actuel et la session auto exacte existe                                    | `warmup_observing`         | figer cette session auto ; envoyer uniquement les activations d'observateurs manquantes                      |
+| `warmup_target_fencing`                                               | barrière actuelle et aucune session exacte                                                                | `warmup_manual_attaching`  | envoyer un attachement aplati exact vers la cible figée                                                      |
+| `warmup_manual_attaching`                                             | premier `TARGET_ATTACHED` sélectionné actuel pendant que la commande manuelle est en attente              | `warmup_manual_attaching`  | conserver une session provisoire sans assigner d'origine                                                     |
+| `warmup_manual_attaching`                                             | `TARGET_ATTACHED` sélectionné actuel différent ou secondaire                                              | `failed_releasing`         | conserver la concurrence auto/manuelle ; libérer chaque session connue                                       |
+| `warmup_manual_attaching`                                             | `WARMUP_ATTACH_RESOLVED` actuel correspondant à zéro/une session provisoire et aucun concurrent           | `warmup_observing`         | figer la session manuelle ; envoyer les activations d'observateurs                                           |
+| `warmup_manual_attaching`                                             | la réponse d'attachement actuelle entre en conflit avec la session provisoire                             | `failed_releasing`         | conserver la concurrence auto/manuelle ; libérer chaque session connue                                       |
+| `warmup_observing`                                                    | réponse d'observateur actuelle, attachement correspondant ou événement de version sélectionnée            | `warmup_observing`         | conserver uniquement les preuves partielles exactes                                                          |
+| `warmup_observing`                                                    | `always` gardé : deux réponses, session non en pause, sélectionné en exécution et réponse requise         | `warm_authority_ready`     | figer cible/session/origine persistantes ; écarter l'échauffement comme preuve                               |
+| `warmup_observing`                                                    | `always` gardé : deux réponses et session sélectionnée en pause                                           | `warmup_resuming`          | envoyer une reprise d'échauffement corrélée                                                                  |
+| `warmup_resuming`                                                     | `WARMUP_RESUME_RESOLVED` actuel ou version sélectionnée en exécution                                      | `warmup_resuming`          | conserver uniquement la preuve partielle exacte                                                              |
+| `warmup_resuming`                                                     | `always` gardé : réponse de reprise, sélectionné running, deux réponses et réponse de démarrage           | `warm_authority_ready`     | figer cible/session/origine persistantes ; écarter l'échauffement comme preuve                               |
+| `warm_authority_ready`                                                | entrée gardée                                                                                             | `controlled_stop`          | envoyer un `stopWorker({versionId})` ; ne jamais détacher la session sélectionnée                            |
+| `controlled_stop`                                                     | réponse d'arrêt actuelle ou mise à jour de même version activated/stopped, dans un ordre quelconque       | `controlled_stop`          | conserver uniquement les preuves partielles exactes                                                          |
+| `controlled_stop`                                                     | contexte sélectionné actuel créé avant la preuve de crash                                                 | `controlled_stop`          | ajouter son identifiant unique au registre borné pré-crash ; ne compléter aucune preuve d'arrêt              |
+| `controlled_stop`                                                     | `Inspector.targetCrashed` exact actuel sur la cible/session sélectionnée                                  | `controlled_stop`          | figer atomiquement le crash, incrémenter la génération, révoquer tout contexte pré-crash et vider l'autorité |
+| `controlled_stop`                                                     | destruction actuelle avant révocation atomique avec identité numérique/unique connue exacte               | `controlled_stop`          | retirer l'autorité active mais conserver son enregistrement pré-crash pour le tombstone de crash atomique    |
+| `controlled_stop`                                                     | destruction actuelle après révocation atomique avec identifiant unique borné valide                       | `controlled_stop`          | mettre à jour les preuves retirées bornées ; ajouter un identifiant inconnu aux tombstones post-crash        |
+| `controlled_stop`                                                     | vidage de contextes actuel avant ou après révocation atomique                                             | `controlled_stop`          | mettre à jour les preuves retirées bornées uniquement ; ne compléter aucune preuve ni transition             |
+| `controlled_stop`                                                     | contexte créé après révocation atomique ou crash dupliqué                                                 | `failed_releasing`         | conserver l'échec de continuité ; préserver l'autorité révoquée                                              |
+| `controlled_stop`                                                     | `always` gardé : réponse d'arrêt, version arrêtée, preuve crash/révocation et même session sélectionnée   | `replacement_starting`     | incrémenter la génération de redémarrage ; envoyer un `startWorker({scopeURL})`                              |
+| `replacement_starting`                                                | réponse de démarrage actuelle, rechargement même session ou première mise à jour starting/running         | `replacement_starting`     | conserver preuves partielles ; après rechargement réactiver Runtime ; première mise à jour valide complète   |
+| `replacement_starting`                                                | mise à jour ultérieure starting/running exacte avec même version, avec cible absente ou figée             | `replacement_starting`     | le doublon exact est sans effet ; sinon rafraîchir métadonnées uniquement, ne jamais allouer d'autre preuve  |
+| `replacement_starting`                                                | réponse Runtime actuelle et premier contexte frais avec origine script exacte après rechargement          | `replacement_starting`     | exiger l'absence des deux ensembles de tombstones ; le lier à la génération incrémentée et le figer          |
+| `replacement_starting`                                                | contexte avant rechargement, origine dérivée/erronée, identifiant réutilisé ou second contexte remplaçant | `failed_releasing`         | conserver l'échec de continuité ; ne publier aucun reçu d'amorçage                                           |
+| `replacement_starting`                                                | vidage de contextes sélectionné actuel après rechargement exact et avant tout contexte frais              | `replacement_starting`     | mettre à jour preuves retirées bornées uniquement ; préserver la fenêtre ouverte d'admission de contexte     |
+| `replacement_starting`                                                | destruction sélectionnée actuelle avec identifiant unique borné valide dans cette même fenêtre            | `replacement_starting`     | mettre à jour preuves ; ajouter/hacher tombstone post-crash si nouveau ; préserver la fenêtre d'admission    |
+| `replacement_starting`                                                | destruction/vidage avant rechargement, après contexte frais ou sur une autre session                      | `failed_releasing`         | révoquer l'autorité remplaçante ; hors de la fenêtre étroite l'événement n'a pas de discriminateur fiable    |
+| `replacement_starting`                                                | `always` gardé : réponse start, reload, starting/running même version, réponse Runtime et contexte frais  | `resuming`                 | distribuer de façon synchrone reprise, identité puis commandes de test facultatif sans attendre de réponses  |
+| `resuming`                                                            | `RESUME_RESOLVED` exact canonique issu du lot validé                                                      | `identity_probing`         | conserver le reçu de reprise faisant autorité, l'identifiant de commande et le hachage de résultat           |
+| `resuming`                                                            | rejet de reprise, mauvaise méthode/session/paramètres, résultat malformé ou identifiant croisé            | `failed_releasing`         | conserver l'échec de protocole ; ne pas accepter les reçus d'évaluation ultérieurs comme autorité            |
+| `identity_probing`                                                    | `IDENTITY_PROBE_RESOLVED` exact canonique issu du lot validé                                              | `test_probe_deciding`      | conserver la preuve d'identité et les hachages exacts commande/résultat ; calculer le hachage de lot         |
+| `identity_probing`                                                    | la réponse actuelle présente une discordance, un rejet ou `exceptionDetails`                              | `failed_releasing`         | enregistrer le diagnostic applicatif le cas échéant ; émettre `IDENTITY_PROOF_FAILED` ; libérer le worker    |
+| `test_probe_deciding`                                                 | `always` gardé : aucun test configuré et toutes les preuves de reprise/identité/running/hachage acquises  | `bootstrap_proved`         | figer le reçu privé de redémarrage avec les champs de test exactement à null                                 |
+| `test_probe_deciding`                                                 | `always` gardé : sonde de test configurée                                                                 | `test_probing`             | attendre la réduction canonique du reçu de test facultatif déjà stabilisé par lot                            |
+| `test_probing`                                                        | `TEST_PROBE_RESOLVED` actuel sans échec de protocole                                                      | `test_probing`             | conserver hachage complétion/résultat, calculer hachage lot ; émettre diagnostic pour exception/rejet        |
+| `test_probing`                                                        | `always` gardé : preuves de reprise, identité, test, exécution et hachage de lot acquises                 | `bootstrap_proved`         | figer le reçu privé de redémarrage                                                                           |
+| `resuming`, `identity_probing`, `test_probe_deciding`, `test_probing` | métadonnées actuelles exactes de la version sélectionnée `starting`/`running`                             | même état                  | conserver de manière idempotente ; autoriser uniquement le passage monotone `starting -> running`            |
+| l'un quelconque de ces quatre états de lot                            | dérive d'identité/statut/cible de la version sélectionnée ou `running -> starting`                        | `failed_releasing`         | conserver l'échec de continuité ; ne jamais attendre un autre événement de métadonnées                       |
+| l'un quelconque de ces quatre états de lot                            | événement de réponse de reprise/identité/test dupliqué ou hors ordre canonique                            | `failed_releasing`         | conserver l'échec de protocole ; l'ordre d'arrivée des réponses ne peut jamais sélectionner une transition   |
+| tout état opérationnel                                                | `APPLICATION_DIAGNOSTIC_RECORDED`                                                                         | même état opérationnel     | transmettre vers le verdict bloqué externe absorbant ; n'émettre aucune commande de transition               |
+| tout état opérationnel                                                | `EVIDENCE_OVERFLOW_RECORDED` de diagnostic uniquement                                                     | même état opérationnel     | transmettre le verdict bloqué ; conserver compteurs/hachage uniquement ; préserver le nettoyage              |
+| tout état opérationnel                                                | dépassement de carte d'autorité, d'attachement ou de commande opérationnelle                              | `failed_releasing`         | figer les structures bornées ; désarmer via la réserve de nettoyage ; la libération normale est impossible   |
+| `bootstrap_proved`                                                    | `always` gardé                                                                                            | `release_resuming`         | créer une échéance de libération et préserver l'inventaire complet d'attachements                            |
+| tout état non final                                                   | échec de protocole ou timeout                                                                             | `failed_releasing`         | conserver l'échec ; effectuer la libération exacte                                                           |
+| tout état d'acquisition/redémarrage/sonde en dehors de `release_*`    | détachement sélectionné ou échec de continuité                                                            | `failed_releasing`         | conserver l'échec ; effectuer la libération exacte                                                           |
 
-The stop proof requires only positive native facts: the successful `stopWorker`
-response, the selected version `activated/stopped` and exact
-`Inspector.targetCrashed` on the retained selected target/session. Reducing that
-crash event atomically revokes every pre-crash context and completes the
-crash/revocation proof; no Runtime context-destroyed or contexts-cleared event is
-required or awaited. The final start proof requires the successful `startWorker`
-response, `Inspector.targetReloadedAfterCrash` on the same target/session IDs,
-the same version ID in `starting` or `running`, and exactly one fresh context
-created after that reload. A selected attach/detach, changed target/session/version
-or pre-reload/revoked/second context is terminal; unrelated attachments remain
-blocking and cleanup-owned.
+La preuve d'arrêt n'exige que des faits natifs positifs : la réponse réussie à `stopWorker`, la version sélectionnée `activated/stopped` et l'`Inspector.targetCrashed` exact sur la cible/session sélectionnée conservée. La réduction de cet événement de crash révoque de façon atomique chaque contexte pré-crash et complète la preuve de crash/révocation ; aucun événement de contexte détruit ou contextes vidés de Runtime n'est exigé ni attendu. La preuve finale de démarrage exige la réponse réussie à `startWorker`, `Inspector.targetReloadedAfterCrash` sur les mêmes identifiants de cible/session, le même identifiant de version en `starting` ou `running`, et exactement un contexte frais créé après ce rechargement. Un attachement/détachement sélectionné, une modification de cible/session/version ou un contexte pré-rechargement/révoqué/secondaire est terminal ; les attachements sans rapport restent bloquants et pris en charge par le nettoyage.
 
-Replacement correlation freezes:
+La corrélation de remplacement fige :
 
 ```text
 (processGeneration, leaseEpoch, restartGeneration,
@@ -1480,66 +1182,17 @@ Replacement correlation freezes:
  bootstrapCommandBatchSha256)
 ```
 
-`revokedUniqueContextIdsSha256` is SHA-256 over RFC 8785 JCS of the sorted,
-normalized cumulative tombstone IDs immediately after the atomic crash action.
-It commits the private revocation set without exposing those IDs in the public
-receipt.
+`revokedUniqueContextIdsSha256` est le SHA-256 sur le JCS RFC 8785 des identifiants cumulatifs de tombstones normalisés et triés immédiatement après l'action de crash atomique. Il engage l'ensemble de révocation privé sans exposer ces identifiants dans le reçu public.
 
-`postCrashDestroyedUniqueContextIdsSha256` is initialized in that same atomic
-crash action as the SHA-256 of JCS `[]`, then recomputed over the sorted,
-normalized post-crash destroyed-ID set on every valid new ID. It is frozen into
-the replacement correlation before the first fresh context is admitted and
-commits the second private tombstone set without exposing its IDs.
+`postCrashDestroyedUniqueContextIdsSha256` est initialisé dans cette même action de crash atomique comme le SHA-256 du JCS `[]`, puis recalculé sur l'ensemble d'identifiants détruits post-crash normalisé et trié à chaque nouvel identifiant valide. Il est figé dans la corrélation de remplacement avant que le premier contexte frais ne soit admis et engage le second ensemble de tombstones privé sans exposer ses identifiants.
 
-`Runtime.executionContextCreated.context.uniqueId` must be non-empty UTF-8 of at
-most 512 bytes with no NUL, CR or LF, matching the global ID bound. Numeric
-`contextId` is diagnostic only.
-The event is admissible only after the exact reload has been reduced, on the
-retained session, in the incremented `contextGeneration`, and when its
-`uniqueContextId` is absent from both `revokedUniqueContextIds` and
-`postCrashDestroyedUniqueContextIds`. The first admissible post-reload context
-must also carry `context.origin === frozen scriptURL`; the
-root scope, with or without its trailing slash, is not an admissible substitute.
-That native field corroborates event identity but never replaces the fixed
-URL/scope identity probe. The context is single-assignment through resume and
-raw release; any pre-reload context, mismatched origin, reused revoked ID or
-second admissible context event is terminal. A destroy/clear reduced while still
-in `controlled_stop` after the crash may update retired-generation evidence
-only for contexts-cleared; a valid destroy additionally tombstones its native
-unique ID. In `replacement_starting`, the same selected-session safe-window
-rules apply only after exact reload and before the first fresh context.
-Everywhere else the lifecycle event is terminal because it carries no
-trustworthy context-generation discriminator.
-Event hashes are SHA-256 over RFC 8785 JCS of the complete schema-validated
-parameters.
+`Runtime.executionContextCreated.context.uniqueId` doit être de l'UTF-8 non vide d'au plus 512 octets sans NUL, CR ou LF, correspondant à la limite globale d'identifiant. Le `contextId` numérique est uniquement diagnostique. L'événement n'est admissible qu'après que le rechargement exact a été réduit, sur la session conservée, dans la `contextGeneration` incrémentée, et lorsque son `uniqueContextId` est absent à la fois de `revokedUniqueContextIds` et de `postCrashDestroyedUniqueContextIds`. Le premier contexte post-rechargement admissible doit également porter `context.origin === frozen scriptURL` ; la portée racine, avec ou sans sa barre oblique finale, n'est pas un substitut admissible. Ce champ natif corrobore l'identité de l'événement mais ne remplace jamais la sonde d'identité d'URL/portée fixe. Le contexte est à affectation unique à travers la reprise et la libération brute ; tout contexte pré-rechargement, origine discordante, identifiant révoqué réutilisé ou second événement de contexte admissible est terminal. Une destruction ou un vidage réduit alors qu'il est toujours dans `controlled_stop` après le crash ne peut mettre à jour les preuves de génération retirée que pour les contextes vidés ; une destruction valide consigne en outre son identifiant unique natif comme tombstone. Dans `replacement_starting`, les mêmes règles de fenêtre sécurisée sur la session sélectionnée s'appliquent uniquement après le rechargement exact et avant le premier contexte frais. Partout ailleurs, l'événement de cycle de vie est terminal car il ne transporte aucun discriminateur fiable de génération de contexte. Les hachages d'événements sont le SHA-256 sur le JCS RFC 8785 des paramètres complets validés selon le schéma.
 
-The context authority map retains the bounded `uniqueContextId`, generation,
-session identity, `originMatchesScriptURL:true` and complete event hash; it does
-not duplicate the full origin URL. Origin equality is checked against the frozen
-script URL before mutation, so the 2,048-byte context-entry budget remains
-closed.
+La carte d'autorité de contexte conserve le `uniqueContextId` borné, la génération, l'identité de session, `originMatchesScriptURL:true` et le hachage d'événement complet ; elle ne duplique pas l'URL d'origine complète. L'égalité d'origine est vérifiée par rapport à l'URL de script figée avant la mutation, de sorte que le budget de 2 048 octets par entrée de contexte reste clos.
 
-The sole resume is synchronously dispatched first on the exact selected session
-with method `Runtime.runIfWaitingForDebugger` and exact params `{}`. The fixed
-identity evaluation and then optional test evaluation are synchronously
-dispatched immediately afterward, without awaiting the resume promise, with
-`uniqueContextId:<frozen>`, `awaitPromise:true`, `returnByValue:true`,
-`includeCommandLineAPI:false` and `silent:false`; `contextId` is forbidden. The
-fixed identity expression returns only `globalThis.location.href` and
-`globalThis.registration.scope`, which must equal the frozen script URL and root
-scope. The optional test expression is explicit test input. For that optional
-probe, a valid protocol response with `exceptionDetails` or a rejected awaited
-result records an application diagnostic and still completes its operational
-state so release can run. An identity mismatch/rejection is both a diagnostic
-and failed authority; command/transport/schema failure is
-`OBSERVER_PROTOCOL_FAILED`. Command IDs are positive safe integers and strictly
-consecutive in resume, identity, optional-test order. `testCommandId` and
-`testResultSha256` are both exact `null` when no test probe is configured and
-both non-null otherwise. Result hashes are SHA-256 over RFC 8785 JCS of the
-complete schema-validated CDP `result` object.
+L'unique reprise est distribuée de façon synchrone en premier sur la session sélectionnée exacte avec la méthode `Runtime.runIfWaitingForDebugger` et les paramètres exacts `{}`. L'évaluation d'identité fixe puis l'évaluation de test facultatif sont distribuées de façon synchrone immédiatement après, sans attendre la promesse de reprise, avec `uniqueContextId:<frozen>`, `awaitPromise:true`, `returnByValue:true`, `includeCommandLineAPI:false` et `silent:false` ; `contextId` est interdit. L'expression d'identité fixe renvoie uniquement `globalThis.location.href` et `globalThis.registration.scope`, qui doivent être égaux à l'URL de script figée et à la portée racine. L'expression de test facultatif est une entrée de test explicite. Pour cette sonde facultative, une réponse de protocole valide avec `exceptionDetails` ou un résultat attendu rejeté enregistre un diagnostic applicatif et complète néanmoins son état opérationnel afin que la libération puisse s'exécuter. Une discordance ou un rejet d'identité constitue à la fois un diagnostic et un échec d'autorité ; un échec de commande/transport/schéma est `OBSERVER_PROTOCOL_FAILED`. Les identifiants de commande sont des entiers sûrs positifs et strictement consécutifs dans l'ordre reprise, identité, test facultatif. `testCommandId` et `testResultSha256` sont tous deux exactement `null` lorsqu'aucune sonde de test n'est configurée et tous deux non nuls sinon. Les hachages de résultats sont le SHA-256 sur le JCS RFC 8785 de l'objet CDP `result` complet validé selon le schéma.
 
-`bootstrapCommandBatchSha256` is single-assignment after all canonical command
-events have been reduced. The normalized command proof schemas are exactly:
+`bootstrapCommandBatchSha256` est à affectation unique après que tous les événements canoniques de commande ont été réduits. Les schémas normalisés de preuve de commande sont exactement :
 
 ```text
 ResumeCommandProofV1 = {
@@ -1559,88 +1212,52 @@ TestCommandProofV1 = {
 }
 ```
 
-When `testProbeConfigured` is false, the hash preimage is exactly
-`{schemaVersion:1, processGeneration, leaseEpoch, restartGeneration, sessionId,
-testProbeConfigured:false,
-commands:[ResumeCommandProofV1,IdentityCommandProofV1]}`. When it is true, the
-preimage is the same closed object with `testProbeConfigured:true` and
-`commands:[ResumeCommandProofV1,IdentityCommandProofV1,TestCommandProofV1]`.
-`bootstrapCommandBatchSha256` is SHA-256 over RFC 8785 JCS of the applicable
-complete object. There are no additional or omitted fields.
+Lorsque `testProbeConfigured` est faux, la préimage du hachage est exactement `{schemaVersion:1, processGeneration, leaseEpoch, restartGeneration, sessionId, testProbeConfigured:false, commands:[ResumeCommandProofV1,IdentityCommandProofV1]}`. Lorsqu'il est vrai, la préimage est le même objet fermé avec `testProbeConfigured:true` et `commands:[ResumeCommandProofV1,IdentityCommandProofV1,TestCommandProofV1]`. `bootstrapCommandBatchSha256` est le SHA-256 sur le JCS RFC 8785 de l'objet complet applicable. Il n'y a aucun champ supplémentaire ou omis.
 
-The two evaluation parameter hashes commit the complete exact
-schema-validated CDP params, including expression and frozen
-`uniqueContextId`; they are not hashes of caller-controlled summaries. The raw
-receipt retains the bounded normalized command records and their preimages.
-The public receipt exposes only the enclosing bootstrap commitment. A missing,
-duplicate, non-consecutive or differently ordered record cannot produce
-`bootstrapCommandBatchSha256` and is terminal even if every individual promise
-resolved successfully.
+Les deux hachages de paramètres d'évaluation engagent les paramètres CDP complets exacts validés selon le schéma, y compris l'expression et le `uniqueContextId` figé ; ce ne sont pas des hachages de résumés contrôlés par l'appelant. Le reçu brut conserve les enregistrements normalisés bornés de commandes et leurs préimages. Le reçu public n'expose que l'engagement d'amorçage englobant. Un enregistrement manquant, dupliqué, non consécutif ou ordonné différemment ne peut pas produire `bootstrapCommandBatchSha256` et est terminal même si chaque promesse individuelle s'est résolue avec succès.
 
-No probe value or diagnostic text selects a transition. Every foreign,
-duplicate, malformed, stale-generation or unrelated live service-worker
-attachment observed while root auto-attach is armed is blocking and
-cleanup-owned. Complete non-colliding metadata without a live attachment is
-inert.
+Aucune valeur de sonde ni texte de diagnostic ne sélectionne une transition. Tout attachement actif de service worker étranger, dupliqué, malformé, d'une génération périmée ou sans rapport observé pendant que l'auto-attachement racine est armé est bloquant et géré par le nettoyage. Des métadonnées complètes sans collision et sans attachement actif sont inertes.
 
-The selected `TARGET_DETACHED` rule is terminal only before entry into
-`release_resuming`. Inside the explicit `release_*` region, an exact current
-detach for a known inventory or control member is expected release evidence and
-is reduced only by the state-specific rows below. An unknown, crossed, duplicate
-or otherwise malformed detach remains terminal.
+La règle de `TARGET_DETACHED` sélectionné n'est terminale qu'avant l'entrée dans `release_resuming`. À l'intérieur de la région explicite `release_*`, un détachement actuel exact pour un membre d'inventaire ou de contrôle connu est une preuve de libération attendue et n'est réduit que par les lignes spécifiques à l'état ci-dessous. Un détachement inconnu, croisé, dupliqué ou par ailleurs malformé demeure terminal.
 
-## Exact raw release
+## Libération brute exacte
 
-Release keeps an append-only inventory of every auto-attached session. It remains
-open through disarm acknowledgement and an exact protocol round-trip barrier;
-elapsed time is never used as an inventory fence.
+La libération maintient un inventaire à ajout seul de chaque session auto-attachée. Elle reste ouverte à travers l'acquittement du désarmement et une barrière d'aller-retour de protocole exacte ; le temps écoulé n'est jamais utilisé comme barrière d'inventaire.
 
-Release is the final hierarchical region of `rawWorkerRestartMachine`, with these
-explicit states:
+La libération est la région hiérarchique finale de `rawWorkerRestartMachine`, avec ces états explicites :
 
-| State                                   | Event / guard                                                                                | Next state                         | Effect                                                                            |
-| --------------------------------------- | -------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------- |
-| `release_resuming`                      | entry                                                                                        | `release_resuming`                 | send one resume for every paused member lacking a prior authoritative resume      |
-| `release_resuming`                      | current `RELEASE_RESUME_RESOLVED`                                                            | `release_resuming`                 | retain exact member reply                                                         |
-| `release_resuming`                      | current `TARGET_ATTACHED`                                                                    | `release_resuming`                 | append, observe and resume if paused; mark verdict blocked                        |
-| `release_resuming`                      | current inventory `TARGET_DETACHED`                                                          | `release_resuming`                 | retain exact detach; remove live mapping                                          |
-| `release_resuming`                      | guarded `always`: every paused member resumed                                                | `release_disarming`                | send exact root `setAutoAttach(false)` once                                       |
-| `release_disarming`                     | current `TARGET_ATTACHED` before disarm reply                                                | `release_disarming`                | append, observe and resume if paused; require detach; mark verdict blocked        |
-| `release_disarming`                     | exact `TARGET_DETACHED` for inventory member                                                 | `release_disarming`                | retain member detach; remove live mapping                                         |
-| `release_disarming`                     | current `RELEASE_RESUME_RESOLVED` for late member                                            | `release_disarming`                | retain its cleanup-only resume reply                                              |
-| `release_disarming`                     | current `AUTO_ATTACH_DISARMED`                                                               | `release_attach_fencing`           | retain disarm reply; send exact service-worker `Target.getTargets` fence          |
-| `release_attach_fencing`                | current `TARGET_ATTACHED` before fence response                                              | `release_attach_fencing`           | append, observe/resume, require detach; mark verdict blocked                      |
-| `release_attach_fencing`                | current inventory detach/resume reply                                                        | `release_attach_fencing`           | retain exact cleanup proof                                                        |
-| `release_attach_fencing`                | current `RELEASE_ATTACH_FENCE_RESOLVED`                                                      | `release_attach_fencing`           | require attached targets equal exactly known live manual members; close inventory |
-| `release_attach_fencing`                | guarded `always`: fence retained, every paused member resumed and every auto member detached | `release_manual_detaching`         | send one detach for each still-live manual member                                 |
-| `release_manual_detaching`              | current `RELEASE_MANUAL_DETACH_RESOLVED`                                                     | `release_manual_detaching`         | retain exact member reply                                                         |
-| `release_manual_detaching`              | current manual-member `TARGET_DETACHED`                                                      | `release_manual_detaching`         | retain exact event; remove live mapping                                           |
-| `release_manual_detaching`              | guarded `always`: every manual reply/event retained and no member live                       | `release_zero_attached_fencing`    | send second exact service-worker target fence                                     |
-| `release_zero_attached_fencing`         | current `RELEASE_ZERO_ATTACHED_FENCE_RESOLVED` with zero attached workers                    | `release_service_worker_disabling` | send `ServiceWorker.disable` once                                                 |
-| `release_service_worker_disabling`      | current `SERVICE_WORKER_DISABLED`                                                            | `release_control_detaching`        | send exact control-session detach once                                            |
-| `release_control_detaching`             | current `CONTROL_DETACH_RESOLVED` only                                                       | `release_control_detaching`        | retain command reply                                                              |
-| `release_control_detaching`             | exact control `TARGET_DETACHED` only                                                         | `release_control_detaching`        | retain event proof                                                                |
-| `release_control_detaching`             | guarded `always`: reply and event                                                            | `release_sentinel_fencing`         | send exact page-only sentinel query                                               |
-| `release_sentinel_fencing`              | current exact `SENTINEL_FENCE_RESOLVED`                                                      | `release_discovery_disabling`      | send exact discovery-disable command                                              |
-| `release_discovery_disabling`           | current `DISCOVERY_DISABLED`                                                                 | `release_socket_closing`           | require zero pending commands; remove listeners; close socket                     |
-| `release_socket_closing`                | current `RAW_SOCKET_CLOSED`                                                                  | `released`                         | freeze raw-release receipt and return lease to `owner_none`                       |
-| any release state after inventory close | current `TARGET_ATTACHED`                                                                    | `failed_releasing`                 | retain protocol failure; resume/detach cleanup-only                               |
+| État                                  | Événement / garde                                                                   | État suivant                       | Effet                                                                                   |
+| ------------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------------------------------------------------------------- |
+| `release_resuming`                    | entrée                                                                              | `release_resuming`                 | envoyer une reprise pour chaque membre en pause sans reprise préalable faisant autorité |
+| `release_resuming`                    | `RELEASE_RESUME_RESOLVED` actuel                                                    | `release_resuming`                 | conserver la réponse exacte du membre                                                   |
+| `release_resuming`                    | `TARGET_ATTACHED` actuel                                                            | `release_resuming`                 | ajouter, observer et reprendre si en pause ; marquer le verdict bloqué                  |
+| `release_resuming`                    | `TARGET_DETACHED` actuel d'inventaire                                               | `release_resuming`                 | conserver le détachement exact ; supprimer le mapping actif                             |
+| `release_resuming`                    | `always` gardé : chaque membre en pause est repris                                  | `release_disarming`                | envoyer le `setAutoAttach(false)` racine exact une fois                                 |
+| `release_disarming`                   | `TARGET_ATTACHED` actuel avant la réponse de désarmement                            | `release_disarming`                | ajouter, observer/reprendre si en pause ; exiger détachement ; verdict bloqué           |
+| `release_disarming`                   | `TARGET_DETACHED` exact pour un membre d'inventaire                                 | `release_disarming`                | conserver le détachement du membre ; supprimer le mapping actif                         |
+| `release_disarming`                   | `RELEASE_RESUME_RESOLVED` actuel pour un membre tardif                              | `release_disarming`                | conserver sa réponse de reprise réservée au nettoyage                                   |
+| `release_disarming`                   | `AUTO_ATTACH_DISARMED` actuel                                                       | `release_attach_fencing`           | conserver réponse désarmement ; envoyer barrière exacte `Target.getTargets`             |
+| `release_attach_fencing`              | `TARGET_ATTACHED` actuel avant la réponse de barrière                               | `release_attach_fencing`           | ajouter, observer/reprendre, exiger détachement ; verdict bloqué                        |
+| `release_attach_fencing`              | détachement d'inventaire / réponse de reprise actuel                                | `release_attach_fencing`           | conserver la preuve exacte de nettoyage                                                 |
+| `release_attach_fencing`              | `RELEASE_ATTACH_FENCE_RESOLVED` actuel                                              | `release_attach_fencing`           | exiger que les cibles attachées égalent les membres manuels actifs connus ; clore       |
+| `release_attach_fencing`              | `always` gardé : barrière acquise, membres en pause repris et membres auto détachés | `release_manual_detaching`         | envoyer un détachement pour chaque membre manuel toujours actif                         |
+| `release_manual_detaching`            | `RELEASE_MANUAL_DETACH_RESOLVED` actuel                                             | `release_manual_detaching`         | conserver la réponse exacte du membre                                                   |
+| `release_manual_detaching`            | `TARGET_DETACHED` de membre manuel actuel                                           | `release_manual_detaching`         | conserver l'événement exact ; supprimer le mapping actif                                |
+| `release_manual_detaching`            | `always` gardé : chaque réponse/événement manuel acquis et aucun membre actif       | `release_zero_attached_fencing`    | envoyer la seconde barrière exacte de cibles de service worker                          |
+| `release_zero_attached_fencing`       | `RELEASE_ZERO_ATTACHED_FENCE_RESOLVED` actuel avec zéro worker attaché              | `release_service_worker_disabling` | envoyer `ServiceWorker.disable` une fois                                                |
+| `release_service_worker_disabling`    | `SERVICE_WORKER_DISABLED` actuel                                                    | `release_control_detaching`        | envoyer le détachement exact de session de contrôle une fois                            |
+| `release_control_detaching`           | `CONTROL_DETACH_RESOLVED` actuel uniquement                                         | `release_control_detaching`        | conserver la réponse de commande                                                        |
+| `release_control_detaching`           | `TARGET_DETACHED` de contrôle exact uniquement                                      | `release_control_detaching`        | conserver la preuve d'événement                                                         |
+| `release_control_detaching`           | `always` gardé : réponse et événement                                               | `release_sentinel_fencing`         | envoyer la requête exacte de sentinelle réservée aux pages                              |
+| `release_sentinel_fencing`            | `SENTINEL_FENCE_RESOLVED` exact actuel                                              | `release_discovery_disabling`      | envoyer la commande exacte de désactivation de découverte                               |
+| `release_discovery_disabling`         | `DISCOVERY_DISABLED` actuel                                                         | `release_socket_closing`           | exiger zéro commande en attente ; supprimer les écouteurs ; fermer le socket            |
+| `release_socket_closing`              | `RAW_SOCKET_CLOSED` actuel                                                          | `released`                         | figer le reçu de libération brute et renvoyer le bail à `owner_none`                    |
+| tout état de libération après clôture | `TARGET_ATTACHED` actuel                                                            | `failed_releasing`                 | conserver l'échec de protocole ; reprendre/détacher pour le nettoyage uniquement        |
 
-The first attach fence is sent only after the disarm response and uses the same
-exact service-worker-only filter as acquisition. CDP messages on the one
-WebSocket are processed sequentially: all earlier attachment callbacks are
-reduced into the inventory before the current fence response can close it. That
-response may report `attached:true` only for the exact known live manual members;
-every auto member must already be detached. After manual detaches, a second exact
-fence must report zero attached service workers. A `TARGET_ATTACHED` after the
-first response is a protocol invariant failure; cleanup resumes/detaches it if
-possible but the verdict cannot pass. A missing proof waits until the absolute
-release deadline and fails.
+La première barrière d'attachement n'est envoyée qu'après la réponse de désarmement et utilise exactement le même filtre réservé aux services workers que l'acquisition. Les messages CDP sur l'unique WebSocket sont traités séquentiellement : tous les callbacks d'attachement antérieurs sont réduits dans l'inventaire avant que la réponse de la barrière actuelle ne puisse le fermer. Cette réponse ne peut rapporter `attached:true` que pour les membres manuels actifs connus exacts ; chaque membre automatique doit déjà être détaché. Après les détachements manuels, une seconde barrière exacte doit rapporter zéro service worker attaché. Un `TARGET_ATTACHED` après la première réponse est un échec d'invariant de protocole ; le nettoyage le reprend/détache si possible mais le verdict ne peut pas réussir. Une preuve manquante attend jusqu'à l'échéance de libération absolue et échoue.
 
-1. every paused inventory member receives a correlated successful
-   `Runtime.runIfWaitingForDebugger` response; the replacement's authoritative
-   resume counts;
-2. root sends exact `Target.setAutoAttach` false without `sessionId` or filter:
+1. chaque membre d'inventaire en pause reçoit une réponse réussie corrélée de `Runtime.runIfWaitingForDebugger` ; la reprise faisant autorité du remplaçant compte ;
+2. la racine envoie un `Target.setAutoAttach` faux exact sans `sessionId` ni filtre :
 
    ```json
    {
@@ -1650,46 +1267,23 @@ release deadline and fails.
    }
    ```
 
-3. after the disarm response, root sends one exact filtered `Target.getTargets`
-   barrier; attached targets equal only known manual members and the response
-   freezes the complete inventory;
-4. exact `Target.detachedFromTarget` for every auto-attached session is retained;
-5. each manual worker session receives one explicit
-   `Target.detachFromTarget({sessionId})`, with correlated response and detach
-   event; no worker session remains mapped;
-6. a second exact service-worker target fence proves zero attached workers;
-7. the control session acknowledges `ServiceWorker.disable`;
-8. the manually attached control session receives exact detach reply and event;
-9. a fresh page-only `Target.getTargets` response proves the frozen sentinel
-   still exists, is `about:blank`, is not attached and is the sole page target
-   after fixture-created pages have been closed for a runtime handback;
-10. root acknowledges `Target.setDiscoverTargets({"discover":false})` with no
-    filter;
-11. pending command count reaches zero, listeners are removed, the raw WebSocket
-    close handshake is observed, and the lease returns to `owner_none`.
+3. après la réponse de désarmement, la racine envoie une barrière filtrée exacte `Target.getTargets` ; les cibles attachées sont égales uniquement aux membres manuels connus et la réponse fige l'inventaire complet ;
+4. le `Target.detachedFromTarget` exact pour chaque session auto-attachée est conservé ;
+5. chaque session de worker manuelle reçoit un `Target.detachFromTarget({sessionId})` explicite, avec réponse corrélée et événement de détachement ; aucune session de worker ne demeure mappée ;
+6. une seconde barrière exacte de cibles de services workers prouve zéro worker attaché ;
+7. la session de contrôle acquitte `ServiceWorker.disable` ;
+8. la session de contrôle attachée manuellement reçoit la réponse et l'événement de détachement exacts ;
+9. une réponse fraîche de `Target.getTargets` réservée aux pages prouve que la sentinelle figée existe toujours, est `about:blank`, n'est pas attachée et constitue la seule cible de page après que les pages créées par la fixture ont été fermées pour une rétrocession à l'exécution ;
+10. la racine acquitte `Target.setDiscoverTargets({"discover":false})` sans filtre ;
+11. le décompte des commandes en attente atteint zéro, les écouteurs sont supprimés, la poignée de main de fermeture du WebSocket brut est observée, et le bail retourne à `owner_none`.
 
-Disarm/fence rejection, a missing detach, post-fence attachment, pending command,
-listener leak, socket loss before receipts or close timeout makes the verdict
-failed. Cleanup still resumes/detaches what it can, but cannot create a pass.
+Le rejet de désarmement/barrière, un détachement manquant, un attachement post-barrière, une commande en attente, une fuite d'écouteur, une perte de socket avant les reçus ou un timeout de fermeture rend le verdict en échec. Le nettoyage reprend/détache toujours ce qu'il peut, mais ne peut créer un succès.
 
-For a zero-overflow eligible epoch, the raw-release receipt includes the complete
-command ledger and attachment inventory plus resume/disarm/fence/detach proofs,
-control-session release, close receipt and deadline. A failed overflow receipt
-contains only bounded records, chain digest and counters and cannot authorize a
-handoff. No empty inventory, state label or local boolean substitutes.
+Pour une époque éligible avec zéro dépassement, le reçu de libération brute inclut le registre de commandes complet et l'inventaire d'attachements plus les preuves de reprise/désarmement/barrière/détachement, la libération de la session de contrôle, le reçu de fermeture et l'échéance. Un reçu de dépassement en échec contient uniquement les enregistrements bornés, le condensat de chaîne et les compteurs et ne peut autoriser un transfert. Aucun inventaire vide, libellé d'état ou booléen local ne peut s'y substituer.
 
-## Playwright handoff and multi-epoch restart
+## Transfert Playwright et redémarrage multi-époques
 
-Only `owner_none` with a complete raw-release receipt may request the pure
-authority projection. Only `playwright_authority_ready` with the current exact
-projection receipt/hash may reserve a Playwright epoch. Projection and schema
-validation therefore finish before any lease, WebSocket or Playwright object
-exists. The lease actor then opens one tracked WebSocket implementing Playwright's
-public `ConnectOverCDPTransport` interface. It schema-parses inbound JSON objects,
-serializes outbound objects, and exposes a single-assignment close receipt. The
-transport is already open before it is passed to Playwright; no private
-Playwright module or endpoint-string overload is used. The reserve occurs before
-calling:
+Seul `owner_none` avec un reçu complet de libération brute peut demander la projection d'autorité pure. Seul `playwright_authority_ready` avec le reçu/hachage de projection exact actuel peut réserver une époque Playwright. La projection et la validation du schéma se terminent donc avant qu'aucun bail, WebSocket ou objet Playwright n'existe. L'acteur de bail ouvre alors un WebSocket suivi implémentant l'interface publique `ConnectOverCDPTransport` de Playwright. Il analyse les objets JSON entrants selon le schéma, sérialise les objets sortants et expose un reçu de fermeture à affectation unique. Le transport est déjà ouvert avant d'être transmis à Playwright ; aucun module privé de Playwright ni surcharge de chaîne d'endpoint n'est utilisé. La réservation se produit avant d'appeler :
 
 ```text
 chromium.connectOverCDP(trackedTransport, {
@@ -1699,87 +1293,42 @@ chromium.connectOverCDP(trackedTransport, {
 })
 ```
 
-The endpoint stays private to the lease actor. Connect resolution acknowledges
-Playwright's internal root auto-attach. No raw transport, raw listener or paused
-raw session may exist then. On normal release, all three current-epoch proofs are
-mandatory: resolved `browser.close()`, Playwright `disconnected`, and the tracked
-transport's WebSocket close receipt. They may arrive in any order.
+L'endpoint demeure privé pour l'acteur de bail. La résolution de connexion acquitte l'auto-attachement racine interne de Playwright. Aucun transport brut, écouteur brut ou session brute en pause ne peut exister alors. Lors d'une libération normale, l'ensemble des trois preuves de l'époque actuelle sont obligatoires : `browser.close()` résolu, `disconnected` de Playwright et le reçu de fermeture WebSocket du transport suivi. Ils peuvent arriver dans n'importe quel ordre.
 
-If `connectOverCDP` rejects before returning a Browser, the tracked transport is
-still owned by `playwright_connecting`. The actor calls its idempotent `close`,
-waits for the exact current transport close receipt and emits
-`PLAYWRIGHT_CONNECT_FAILED_CLOSED`; only then may failure cleanup acquire another
-lease. There is no impossible `browser.close()`/`disconnected` requirement when
-no Browser was returned, and a connection rejection without the tracked close
-receipt keeps the lease occupied and the verdict failed.
+Si `connectOverCDP` rejette avant de renvoyer un Browser, le transport suivi est toujours détenu par `playwright_connecting`. L'acteur appelle son `close` idempotent, attend le reçu exact de fermeture du transport actuel et émet `PLAYWRIGHT_CONNECT_FAILED_CLOSED` ; ce n'est qu'alors que le nettoyage d'échec peut acquérir un autre bail. Il n'y a pas d'exigence impossible de `browser.close()`/`disconnected` lorsqu'aucun Browser n'a été renvoyé, et un rejet de connexion sans le reçu de fermeture suivi maintient le bail occupé et le verdict en échec.
 
-Before any fixture capability is exposed, the Playwright owner installs a
-private diagnostic subgraph on the same tracked root transport using public
-Playwright CDP sessions only:
+Avant qu'une quelconque capacité de fixture ne soit exposée, le propriétaire Playwright installe un sous-graphe de diagnostic privé sur le même transport racine suivi en utilisant uniquement les sessions CDP publiques de Playwright :
 
-1. it identifies the preserved sentinel as the sole default-context
-   `about:blank` page and creates `context.newCDPSession(sentinelPage)`;
-2. that sentinel session acknowledges `ServiceWorker.enable` and retains exact
-   registration/version/error events for the frozen authority;
-3. one `browser.newBrowserCDPSession()` sends an exact filtered
-   `Target.getTargets`, identifies the sole frozen worker target, and calls
-   `Target.attachToTarget({targetId, flatten:false})`;
-4. the returned nested diagnostic session is controlled only through correlated
-   `Target.sendMessageToTarget` commands and schema-valid
-   `Target.receivedMessageFromTarget` messages on that browser CDP session; it
-   acknowledges `Inspector.enable` and `Runtime.enable`, captures
-   `Inspector.targetCrashed`, `Inspector.targetReloadedAfterCrash`,
-   `Runtime.exceptionThrown`, `Runtime.consoleAPICalled` and context events, and
-   freezes exactly one current `uniqueContextId`;
-5. a fixed identity evaluation on that unique context matches the raw authority
-   before the facade exposes any page, worker or evaluate operation.
+1. il identifie la sentinelle préservée comme l'unique page `about:blank` du contexte par défaut et crée `context.newCDPSession(sentinelPage)` ;
+2. cette session de sentinelle acquitte `ServiceWorker.enable` et conserve les événements exacts d'enregistrement/version/erreur pour l'autorité figée ;
+3. un `browser.newBrowserCDPSession()` envoie un `Target.getTargets` filtré exact, identifie l'unique cible de worker figée, et appelle `Target.attachToTarget({targetId, flatten:false})` ;
+4. la session de diagnostic imbriquée renvoyée est contrôlée uniquement par des commandes `Target.sendMessageToTarget` corrélées et des messages `Target.receivedMessageFromTarget` valides selon le schéma sur cette session CDP de navigateur ; elle acquitte `Inspector.enable` et `Runtime.enable`, capture `Inspector.targetCrashed`, `Inspector.targetReloadedAfterCrash`, `Runtime.exceptionThrown`, `Runtime.consoleAPICalled` et les événements de contexte, et fige exactement un `uniqueContextId` actuel ;
+5. une évaluation d'identité fixe sur ce contexte unique correspond à l'autorité brute avant que la façade n'expose la moindre opération de page, de worker ou d'évaluation.
 
-Playwright 1.61.1's internal `CRServiceWorker` session is never treated as a
-diagnostic observer because it does not subscribe to
-`Runtime.exceptionThrown`. The explicit nested session above is the only
-Playwright-epoch runtime diagnostic authority. An unexpected worker crash,
-reload, detach or second context during a Playwright epoch records a blocking
-diagnostic and prevents further fixture effects; the epoch proceeds only to
-release. Root-transport handoff itself exposes no fixture capability and starts
-no test effect. The model claims complete diagnostics inside each owned raw or
-Playwright epoch and pre-effect instrumentation, not continuous telemetry during
-the interval in which no root transport exists.
+La session `CRServiceWorker` interne de Playwright 1.61.1 n'est jamais traitée comme un observateur de diagnostic car elle ne souscrit pas à `Runtime.exceptionThrown`. La session imbriquée explicite ci-dessus constitue la seule autorité de diagnostic d'exécution de l'époque Playwright. Un crash, rechargement, détachement ou second contexte inattendu de worker pendant une époque Playwright enregistre un diagnostic bloquant et empêche d'autres effets de fixture ; l'époque ne se poursuit que vers la libération. Le transfert du transport racine n'expose en lui-même aucune capacité de fixture et ne démarre aucun effet de test. Le modèle revendique des diagnostics complets à l'intérieur de chaque époque brute ou Playwright détenue et une instrumentation préalable aux effets, et non une télémétrie continue pendant l'intervalle au cours duquel aucun transport racine n'existe.
 
-Handoff requires:
+Le transfert exige :
 
-1. `Browser.getVersion` matches the frozen process receipt;
-2. `browser.contexts()` exposes exactly the one default persistent context;
-3. exactly one extension service worker has the frozen script URL and native
-   URL/scope identity;
-4. the sentinel CDP session observes the same non-deleted registration, version
-   ID, scope and script as the raw restart receipt;
-5. the nested runtime diagnostic session is attached to that exact target,
-   observes exactly one current context and passes native URL/scope identity;
-6. the replacement is running and both diagnostic sessions remain attached
-   before the fixture exposes pages or evaluation.
+1. `Browser.getVersion` correspond au reçu de processus figé ;
+2. `browser.contexts()` expose exactement l'unique contexte persistant par défaut ;
+3. exactement un service worker d'extension possède l'URL de script figée et l'identité native d'URL/portée ;
+4. la session CDP de sentinelle observe le même enregistrement non supprimé, le même identifiant de version, la même portée et le même script que le reçu de redémarrage brut ;
+5. la session de diagnostic d'exécution imbriquée est attachée à cette cible exacte, observe exactement un contexte actuel et réussit l'identité native d'URL/portée ;
+6. le remplaçant est en cours d'exécution et les deux sessions de diagnostic restent attachées avant que la fixture n'expose les pages ou l'évaluation.
 
-Zero/two contexts, zero/two workers, version drift, missing observer reply,
-missing identity, connection timeout or early process exit is terminal.
+Zéro ou deux contextes, zéro ou deux workers, une dérive de version, une réponse d'observateur manquante, une identité manquante, un timeout de connexion ou une sortie précoce du processus est terminal.
 
-Normal Playwright release first closes fixture-created pages while preserving
-the sentinel, then performs this exact diagnostic teardown before
-`browser.close()`:
+La libération normale de Playwright ferme d'abord les pages créées par la fixture tout en préservant la sentinelle, puis effectue ce démontage de diagnostic exact avant `browser.close()` :
 
-1. nested `Runtime.disable` and `Inspector.disable` replies are correlated;
-2. `Target.detachFromTarget({sessionId})` reply and matching nested detach event
-   are both retained;
-3. sentinel `ServiceWorker.disable` is acknowledged;
-4. sentinel and browser CDP `detach()` promises resolve and no listener/pending
-   command remains;
-5. only then may `browser.close()` run, after which its promise, Playwright's
-   `disconnected` event and the tracked transport close receipt are all required.
+1. les réponses de `Runtime.disable` et `Inspector.disable` imbriqués sont corrélées ;
+2. la réponse de `Target.detachFromTarget({sessionId})` et l'événement de détachement imbriqué correspondant sont tous deux conservés ;
+3. le `ServiceWorker.disable` de sentinelle est acquitté ;
+4. les promesses `detach()` de sentinelle et de CDP de navigateur se résolvent et aucun écouteur/commande en attente ne subsiste ;
+5. c'est seulement alors que `browser.close()` peut s'exécuter, après quoi sa promesse, l'événement `disconnected` de Playwright et le reçu de fermeture du transport suivi sont tous requis.
 
-A naturally detached diagnostic session, a missing disable/detach proof or any
-diagnostic event after listener removal blocks the verdict and keeps cleanup
-responsible for the transport.
+Une session de diagnostic naturellement détachée, une preuve de désactivation/détachement manquante ou tout événement de diagnostic après suppression d'écouteur bloque le verdict et maintient le nettoyage responsable du transport.
 
-`restartServiceWorkerForProbe(probe?)` is a session transition, not an in-place
-Worker mutation:
+`restartServiceWorkerForProbe(probe?)` est une transition de session, et non une mutation de Worker sur place :
 
 ```text
 playwright epoch N
@@ -1793,16 +1342,9 @@ playwright epoch N
   -> detached RestartReceipt DTO
 ```
 
-The Chromium PID, profile, extension ID, registration, version and script remain
-constant. Every old `Page`, `Worker`, `CDPSession`, Browser and context handle is
-invalid after Playwright release and may not cross the epoch. The harness stores
-only detached page URLs before release; it closes all fixture-created pages,
-preserves only the private sentinel, and callers reopen the side panel to obtain
-new handles after reconnect.
+Le PID Chromium, le profil, l'identifiant d'extension, l'enregistrement, la version et le script demeurent constants. Chaque ancien descripteur (handle) `Page`, `Worker`, `CDPSession`, Browser et context est invalide après la libération Playwright et ne peut franchir l'époque. Le harnais ne stocke que les URL des pages détachées avant la libération ; il ferme toutes les pages créées par la fixture, préserve uniquement la sentinelle privée, et les appelants rouvrent le panneau latéral pour obtenir de nouveaux descripteurs après la reconnexion.
 
-The public restart result is exactly this deeply frozen, schema-validated DTO;
-all integers are non-negative safe integers and every hash is lowercase
-64-character hexadecimal:
+Le résultat public du redémarrage est exactement ce DTO profondément figé et validé selon le schéma ; tous les entiers sont des entiers sûrs non négatifs et chaque hachage est hexadécimal minuscule à 64 caractères :
 
 ```text
 RestartReceiptV1 = {
@@ -1818,248 +1360,80 @@ RestartReceiptV1 = {
 }
 ```
 
-`workerUrl` equals the exact packaged script URL.
-`authoritySha256 = SHA-256(JCS({extensionId, registrationId, versionId,
-scopeURL, scriptURL}))`.
-`bootstrapSha256 = SHA-256(JCS({processGeneration, rawLeaseEpoch,
-restartGeneration, targetId, sessionId, attachmentGeneration, attachmentOrigin,
-crashEventSha256, contextGeneration, revokedUniqueContextIdsSha256,
-postCrashDestroyedUniqueContextIdsSha256, reloadEventSha256, uniqueContextId, startCommandId,
-executionContextEventSha256, resumeCommandId, resumeResultSha256,
-identityCommandId, identityResultSha256, testCommandId, testResultSha256,
-bootstrapCommandBatchSha256}))`.
-`receiptSha256` is SHA-256 JCS of the eight preceding public fields, excluding
-itself. The preimages and full raw receipt remain private.
+`workerUrl` est égal à l'URL exacte du script packagé.
+`authoritySha256 = SHA-256(JCS({extensionId, registrationId, versionId, scopeURL, scriptURL}))`.
+`bootstrapSha256 = SHA-256(JCS({processGeneration, rawLeaseEpoch, restartGeneration, targetId, sessionId, attachmentGeneration, attachmentOrigin, crashEventSha256, contextGeneration, revokedUniqueContextIdsSha256, postCrashDestroyedUniqueContextIdsSha256, reloadEventSha256, uniqueContextId, startCommandId, executionContextEventSha256, resumeCommandId, resumeResultSha256, identityCommandId, identityResultSha256, testCommandId, testResultSha256, bootstrapCommandBatchSha256}))`.
+`receiptSha256` est le SHA-256 JCS des huit champs publics précédents, en s'excluant lui-même. Les préimages et le reçu brut complet restent privés.
 
-`evaluateInRestartedServiceWorker<T>(receipt, expression)` first parses V1, then
-compares every public field and all three hashes with the controller's one
-current private receipt. It also requires the current process generation,
-Playwright epoch, restart generation and current nested diagnostic context before
-sending `Runtime.evaluate` with that context's `uniqueContextId`,
-`awaitPromise:true` and `returnByValue:true`. Any mutation or older/newer receipt
-rejects before evaluation. The arbitrary test expression is an effect only and
-cannot transition the harness. This API proves settings and alarm persistence
-without exposing or using stale handles.
+`evaluateInRestartedServiceWorker<T>(receipt, expression)` analyse d'abord la V1, puis compare chaque champ public et les trois hachages avec le reçu privé actuel unique du contrôleur. Il exige également la génération de processus actuelle, l'époque Playwright, la génération de redémarrage et le contexte de diagnostic imbriqué actuel avant d'envoyer `Runtime.evaluate` avec le `uniqueContextId` de ce contexte, `awaitPromise:true` et `returnByValue:true`. Toute mutation ou reçu plus ancien/récent rejette avant évaluation. L'expression de test arbitraire n'est qu'un effet et ne peut pas faire transiter le harnais. Cette API prouve la persistance des réglages et des alarmes sans exposer ni utiliser de descripteurs périmés.
 
-## Global shutdown and cleanup
+## Arrêt global et nettoyage
 
-After use and diagnostic settlement, Playwright releases exactly as above. The
-machine reserves a final `shutdown_connecting` raw lease, opens one tracked
-socket, and requires a current `Browser.getVersion` response whose complete
-frozen hash equals the process endpoint receipt. Only
-`SHUTDOWN_ENDPOINT_VERIFIED` enters `shutdown_owned` and sends `Browser.close`.
-Because the process may close the socket before replying, a normal shutdown
-receipt accepts either:
+Après utilisation et stabilisation du diagnostic, Playwright se libère exactement comme ci-dessus. La machine réserve un bail brut final `shutdown_connecting`, ouvre un socket suivi, et exige une réponse actuelle `Browser.getVersion` dont le hachage complet figé est égal au reçu d'endpoint de processus. Seul `SHUTDOWN_ENDPOINT_VERIFIED` entre dans `shutdown_owned` et envoie `Browser.close`. Parce que le processus peut fermer le socket avant de répondre, un reçu d'arrêt normal accepte soit :
 
-- current `SHUTDOWN_BROWSER_CLOSE_RESOLVED`, carrying the exact process,
-  shutdown lease, transport and command IDs, followed by child exit; or
-- current `SHUTDOWN_SOCKET_CLOSED_AFTER_COMMAND`, emitted only when the tracked
-  socket's close callback is observed after the exact `Browser.close` bytes were
-  dispatched and before any child-exit event, followed by exact child exit under
-  the same deadline.
+- `SHUTDOWN_BROWSER_CLOSE_RESOLVED` actuel, transportant les identifiants exacts de processus, de bail d'arrêt, de transport et de commande, suivi de la sortie de l'enfant ; soit
+- `SHUTDOWN_SOCKET_CLOSED_AFTER_COMMAND` actuel, émis uniquement lorsque le callback de fermeture du socket suivi est observé après la distribution des octets exacts de `Browser.close` et avant tout événement de sortie d'enfant, suivi de la sortie exacte de l'enfant sous la même échéance.
 
-The socket receipt freezes command-dispatch and close monotonic timestamps and
-the complete current IDs; a generic socket close cannot instantiate it. The
-first current child-exit event is reduced together with the already-retained
-close proof. `PROCESS_EXITED` before either proof is a non-causal unexpected exit
-and enters failed profile removal. A later response, socket event or cleanup
-cannot retroactively convert it into normal shutdown.
+Le reçu de socket fige les horodatages monotones de distribution de commande et de fermeture et les identifiants actuels complets ; une fermeture de socket générique ne peut pas l'instancier. Le premier événement actuel de sortie d'enfant est réduit conjointement avec la preuve de fermeture déjà conservée. `PROCESS_EXITED` avant l'une ou l'autre preuve est une sortie inattendue non causale et entre dans la suppression de profil en échec. Une réponse ultérieure, un événement de socket ou un nettoyage ne peut rétroactivement le convertir en arrêt normal.
 
-The child `exit` event, frozen PID/process generation and absence of a replacement
-process are mandatory. Profile removal begins only after exit. Artifact
-reverification, process exit and profile removal are all required for pass.
+L'événement de `exit` de l'enfant, le PID/génération de processus figé et l'absence d'un processus remplaçant sont obligatoires. La suppression du profil ne commence qu'après la sortie. La revérification de l'artefact, la sortie du processus et la suppression du profil sont toutes requises pour le succès.
 
-`passed` is provisional until the single `VERDICT_ARCHIVED` transition. A late
-`APPLICATION_DIAGNOSTIC_RECORDED` or `EVIDENCE_OVERFLOW_RECORDED` in
-`profile_removing` or `passed` revokes eligibility and follows the explicit
-failed-archive branch. Archiving success and checking `eligible` are one guarded
-transition; no event gap can archive a blocked verdict as a pass.
+`passed` est provisoire jusqu'à l'unique transition `VERDICT_ARCHIVED`. Un `APPLICATION_DIAGNOSTIC_RECORDED` ou `EVIDENCE_OVERFLOW_RECORDED` tardif dans `profile_removing` ou `passed` révoque l'éligibilité et suit la branche explicite d'archive en échec. Archiver le succès et vérifier `eligible` constituent une transition gardée unique ; aucun intervalle d'événement ne peut archiver un verdict bloqué comme un succès.
 
-If shutdown raw acquisition or `Browser.close` fails, cleanup sends `SIGTERM`
-and then `SIGKILL` only to the owned live child under bounded deadlines. If the
-exact current child has already emitted `PROCESS_EXITED`, cleanup closes local
-transport objects, skips every connection/signal operation and transitions
-directly to profile removal while preserving the original failed verdict. Forced
-termination can archive a failed verdict, never authorize pass. Failure to prove
-exit or remove the profile stays failed and is reported with complete evidence.
+Si l'acquisition brute d'arrêt ou `Browser.close` échoue, le nettoyage envoie `SIGTERM` puis `SIGKILL` uniquement à l'enfant actif détenu sous des échéances bornées. Si l'enfant actuel exact a déjà émis `PROCESS_EXITED`, le nettoyage ferme les objets de transport locaux, ignore toute opération de connexion/signal et transite directement vers la suppression de profil tout en préservant le verdict d'échec initial. La terminaison forcée peut archiver un verdict en échec, jamais autoriser un succès. L'incapacité à prouver la sortie ou à supprimer le profil reste en échec et est signalée avec des preuves complètes.
 
-## Hostile verification obligations
+## Obligations de vérification hostile
 
-Implementation is not reviewable as complete until deterministic tests prove:
+L'implémentation ne peut être considérée comme complète pour revue tant que des tests déterministes n'ont pas prouvé :
 
-1. Playwright launch/connect before first raw release, raw acquisition while
-   Playwright owns, a second raw socket and a second Playwright connection are
-   rejected before opening a transport;
-2. `DevToolsActivePort` absent, stale, symlinked, non-regular, one/three-line,
-   whitespace/control-bearing, invalid port/path, wrong generation and child
-   exit before verification all fail closed; absence and a zero-byte regular
-   file during the polling window are retried until the deadline, then fail
-   closed;
-3. the manual argument allowlist contains one exact profile, loopback debugging,
-   sealed extension paths and deterministic mode, with no shell or passthrough;
-   raw initialization proves sentinel and zero pre-arm attachments, then
-   discovery, auto-attach, control attach and ServiceWorker enable in that exact
-   XState order, while every duplicate/out-of-order acknowledgement fails;
-4. transient initial overlapping versions and a provisional redundant version
-   wait for the exact convergence fence with zero stop/start; every paused
-   related attachment is observed/resumed once and barred from replacement
-   authority, while permanent overlap times out; permutations of Inspector and
-   Runtime enable replies before/after the fence and every older-session resume
-   reply preserve the same proof;
-5. an already-running selection and a starting selection with no raw session
-   perform no warm-up and one final start; a paused starting selection is
-   observed/resumed without deadlock; a stopped selection performs exactly one
-   non-authoritative warm-up plus one final start; all perform one controlled
-   stop and none detaches the selected session;
-6. an auto-attachment arriving while the manual attach command is pending is
-   either the one response-correlated provisional session or terminal; every
-   ordering that produces two selected sessions fails and releases both;
-7. stop response, stopped metadata and `Inspector.targetCrashed` in every
-   meaningful order cannot start the final replacement until all three proofs
-   exist on the same target/session; the exact crash atomically revokes every
-   pre-crash context; absence of destroy/clear never blocks, contexts-cleared is
-   evidence-only, and a valid post-crash destroy atomically tombstones its
-   native unique ID without authorizing progress; after leaving that state,
-   only the exact same-session post-reload/pre-context window is admissible and
-   every other occurrence is terminal;
-8. the final start accepts no new selected attachment: it requires
-   `Inspector.targetReloadedAfterCrash`, same-version metadata and then one fresh
-   context on the retained session in the incremented context generation whose
-   native `origin` equals the full frozen `scriptURL`; pre-reload context,
-   scope-derived origin, revoked-ID reuse, replacement, detach, deletion,
-   redundancy or script/scope drift is rejected;
-   the native `starting(no targetId) -> starting(exact targetId) -> running`
-   metadata sequence is idempotent after its first proof, while any identity or
-   target drift remains terminal; exact reload followed by selected-session
-   contexts-cleared and then one fresh context succeeds; exact reload followed
-   by `destroy(X)` then `create(X)` fails, while `destroy(X)` then a distinct
-   fresh context succeeds; the same lifecycle event before reload or after that
-   context is terminal;
-9. malformed/oversized/control-bearing context IDs, missing destroyed unique
-   IDs, numeric fallback, wrong native URL/scope, extra identity fields, any
-   crash-time or post-crash tombstoned ID reused after reload, retired-evidence
-   event 4,097, execution-context authority slot 4,097 and a second context
-   before raw release never publish a valid receipt;
-10. a deterministic same-session client blocks every `Runtime.evaluate` until
-    it has processed `Runtime.runIfWaitingForDebugger`: the revision-18
-    identity-first order must reproduce the finite-deadline deadlock, while the
-    revision-19 resume-first batch must synchronously expose resume, identity
-    and optional-test bytes before any reply is awaited and then settle; both
-    probes use the exact frozen `uniqueContextId`; IDs are strictly consecutive
-    in resume/identity/optional-test order with and without the optional probe;
-    out-of-order promise responses reduce canonically through explicit
-    resume/identity/optional-probe states; gaps, crossings, duplicates, wrong
-    methods/sessions/parameters/results and batch-hash drift fail closed; exact
-    selected-version `running` remains sticky when emitted before resume
-    reduction, between resume and identity, between identity and test, or after
-    the final reduction; exact duplicates are no-ops in each batch state, while
-    `running -> starting` and every authority drift are terminal in each state;
-    the raw client tests continue to prove immediate socket sends and
-    response-by-ID correlation; application warnings block only the verdict and
-    protocol failures interrupt immediately;
-11. every foreign/duplicate live attachment is blocking and release-owned, while
-    complete non-colliding metadata remains inert;
-12. release accepts attachments during `release_resuming`, disarms auto-attach,
-    closes inventory only after the exact protocol fence, and treats any
-    post-fence attachment as terminal; a sleep alone never authorizes release;
-13. missing resume, fence, auto-detach, ServiceWorker disable, discover-disable,
-    control detach, zero-pending ledger, listener disposal or raw close receipt
-    prevents Playwright handoff and pass; the exact sentinel is preserved,
-    unattached and sole page at every handback;
-14. `connectOverCDP` with zero/two contexts, zero/two exact workers or divergent
-    raw/Playwright identity fails before fixture exposure; a connection rejection
-    with no Browser still closes the tracked public transport before releasing
-    its current lease or reserving any later lease;
-15. the sentinel ServiceWorker observer and nested non-flatten Runtime/Inspector
-    observer are both installed before fixture effects; exception, unexpected
-    crash/reload, missing observer reply or second context blocks the verdict;
-16. Playwright release disables/detaches both diagnostic sessions before
-    `browser.close`, and requires browser/disconnected/transport close proofs;
-17. a runtime restart closes fixture pages, proves Playwright disconnection,
-    rejects every old handle, performs a sole-owner persistent-session raw
-    restart, reconnects with a higher epoch and accepts only exact V1 receipts;
-18. settings, onboarding snapshot, IndexedDB-visible data and the `auto-scan`
-    alarm persist across the same-process/profile runtime restart and reconnect;
-19. raw acquisition before Playwright `disconnected`, a late old-epoch event or
-    stale/mutated/self-hash-invalid receipt/evaluation cannot mutate the new epoch;
-20. process output endpoint lines are redacted before retention and every malformed
-    endpoint path, including non-canonical UUID spellings, fails admission;
-21. one restart maximum, the internal global deadline and the larger Playwright
-    timeout preserve cleanup; an already-exited child skips reconnect/signals and
-    proceeds directly to profile removal with the original failure;
-22. normal final shutdown version-checks and closes the exact child before profile
-    removal; `PROCESS_EXITED` without a preceding exact close response or causal
-    post-command socket close is rejected; forced TERM/KILL cleans an orphan but
-    makes the gate red;
-23. pre/post artifact digests, runtime diagnostics, process exit and profile
-    removal all precede provisional pass; a blocking diagnostic/protocol event in
-    every phase through `profile_removing` and between `passed` and archive can
-    produce only an archived failure;
-24. deterministic unit and machine tests prove this pending revision's complete
-    projection/error matrix, including all hostile DTO/reflection inputs and all
-    six self-consistent foreign-authority mutations, with zero reservation,
-    transport or connection on every rejection;
-25. the targeted cold-boot and retained-session raw-owner restart smoke runs
-    against the rebuilt exact production package with `--workers=1` and
-    `--repeat-each=3`; every repetition must show resume dispatch before both
-    evaluations, exact batch/receipt hashes, identity proof, selected-version
-    `running`, exact release, this pending revision's retained source-bound
-    authority DTO and no blocking diagnostic; any failure falsifies this revision;
-26. the full packaged scenario inventory then runs from the same canonical sealed
-    artifact without DEV stubs or external backend.
-27. Playwright package/browser metadata, executable preflight and exact CDP
-    product/revision/JS versions reject every drift; diagnostic, command, nested
-    message and attachment floods stay within both entry-count and canonical-byte
-    caps, emit typed overflow, complete cleanup and can never pass.
+1. le lancement/connexion Playwright avant la première libération brute, l'acquisition brute pendant que Playwright détient le bail, un second socket brut et une seconde connexion Playwright sont rejetés avant l'ouverture d'un transport ;
+2. `DevToolsActivePort` absent, périmé, lié par un lien symbolique, non régulier, sur une/trois lignes, contenant des espaces/caractères de contrôle, un port/chemin invalide, une mauvaise génération et la sortie de l'enfant avant vérification échouent tous de façon hermétique ; l'absence et un fichier régulier de zéro octet pendant la fenêtre de polling sont réessayés jusqu'à l'échéance, puis échouent hermétiquement ;
+3. la liste blanche manuelle d'arguments contient un profil exact, le débogage sur boucle locale, les chemins d'extension scellés et le mode déterministe, sans shell ni relais ; l'initialisation brute prouve la sentinelle et zéro attachement pré-armement, puis la découverte, l'auto-attachement, l'attachement de contrôle et l'activation de ServiceWorker dans cet ordre XState exact, tandis que chaque acquittement dupliqué/hors-ordre échoue ;
+4. les versions chevauchantes initiales transitoires et une version redondante provisoire attendent la barrière de convergence exacte avec zéro arrêt/démarrage ; chaque attachement lié en pause est observé/repris une fois et exclu de l'autorité de remplacement, tandis que le chevauchement permanent expire par timeout ; les permutations des réponses d'activation d'Inspector et de Runtime avant/après la barrière et chaque réponse de reprise de session plus ancienne préservent la même preuve ;
+5. une sélection déjà en cours d'exécution et une sélection en démarrage sans session brute n'effectuent aucun échauffement et un démarrage final unique ; une sélection en démarrage mise en pause est observée/reprise sans interblocage ; une sélection arrêtée effectue exactement un échauffement ne faisant pas autorité plus un démarrage final ; toutes effectuent un arrêt contrôlé et aucune ne détache la session sélectionnée ;
+6. un auto-attachement arrivant pendant que la commande d'attachement manuel est en attente est soit la seule session provisoire corrélée à la réponse, soit terminal ; tout ordonnancement produisant deux sessions sélectionnées échoue et libère les deux ;
+7. la réponse d'arrêt, les métadonnées arrêtées et `Inspector.targetCrashed` dans chaque ordre significatif ne peuvent pas démarrer le remplaçant final tant que l'ensemble des trois preuves n'existent pas sur la même cible/session ; le crash exact révoque de façon atomique chaque contexte pré-crash ; l'absence de destruction/vidage ne bloque jamais, les contextes vidés ne constituent que des preuves, et une destruction post-crash valide consigne de façon atomique son identifiant unique natif comme tombstone sans autoriser la progression ; après avoir quitté cet état, seule la fenêtre exacte même-session post-rechargement/pré-contexte est admissible et toute autre occurrence est terminale ;
+8. le démarrage final n'accepte aucun nouvel attachement sélectionné : il exige `Inspector.targetReloadedAfterCrash`, les métadonnées de même version puis un contexte frais sur la session conservée dans la génération de contexte incrémentée dont l'`origin` native est égale au `scriptURL` figé complet ; un contexte pré-rechargement, une origine dérivée de la portée, la réutilisation d'un identifiant révoqué, un remplacement, un détachement, une suppression, une redondance ou une dérive de script/portée est rejeté ; la séquence native de métadonnées `starting(no targetId) -> starting(exact targetId) -> running` est idempotente après sa première preuve, tandis que toute dérive d'identité ou de cible demeure terminale ; un rechargement exact suivi de contextes vidés sur la session sélectionnée puis d'un contexte frais réussit ; un rechargement exact suivi de `destroy(X)` puis `create(X)` échoue, tandis que `destroy(X)` puis un contexte frais distinct réussit ; le même événement de cycle de vie avant rechargement ou après ce contexte est terminal ;
+9. les identifiants de contexte malformés/surdimensionnés/contenant des caractères de contrôle, les identifiants uniques détruits manquants, le repli numérique, l'URL/portée native erronée, les champs d'identité supplémentaires, tout identifiant tombstoné lors du crash ou post-crash réutilisé après rechargement, l'événement de preuve retirée 4 097, l'emplacement d'autorité de contexte d'exécution 4 097 et un second contexte avant libération brute ne publient jamais un reçu valide ;
+10. un client déterministe sur la même session bloque chaque `Runtime.evaluate` jusqu'à ce qu'il ait traité `Runtime.runIfWaitingForDebugger` : l'ordre de la révision 18 privilégiant l'identité doit reproduire l'interblocage à échéance finie, tandis que le lot de la révision 19 privilégiant la reprise doit exposer de façon synchrone les octets de reprise, d'identité et de test facultatif avant qu'aucune réponse ne soit attendue puis se stabiliser ; les deux sondes utilisent le `uniqueContextId` figé exact ; les identifiants sont strictement consécutifs dans l'ordre reprise/identité/test facultatif avec et sans la sonde facultative ; les réponses de promesses désordonnées se réduisent canoniquement via les états explicites reprise/identité/sonde facultative ; les écarts, croisements, doublons, mauvaises méthodes/sessions/paramètres/résultats et dérives de hachage de lot échouent hermétiquement ; le statut `running` exact de la version sélectionnée reste persistant lorsqu'il est émis avant la réduction de reprise, entre reprise et identité, entre identité et test, ou après la réduction finale ; les doublons exacts sont sans effet dans chaque état de lot, tandis que `running -> starting` et toute dérive d'autorité sont terminaux dans chaque état ; les tests de client brut continuent de prouver les envois immédiats de sockets et la corrélation réponse-par-identifiant ; les avertissements applicatifs bloquent uniquement le verdict et les échecs de protocole interrompent immédiatement ;
+11. tout attachement actif étranger/dupliqué est bloquant et géré lors de la libération, tandis que les métadonnées complètes sans collision restent inertes ;
+12. la libération accepte les attachements pendant `release_resuming`, désarme l'auto-attachement, ne ferme l'inventaire qu'après la barrière de protocole exacte, et traite tout attachement post-barrière comme terminal ; un sleep seul n'autorise jamais la libération ;
+13. une reprise manquante, une barrière, un auto-détachement, une désactivation de ServiceWorker, une désactivation de découverte, un détachement de contrôle, un registre à zéro attente, la disposition d'écouteurs ou un reçu de fermeture brute empêche le transfert Playwright et le succès ; la sentinelle exacte est préservée, non attachée et unique page à chaque rétrocession ;
+14. `connectOverCDP` avec zéro/deux contextes, zéro/deux workers exacts ou une identité brute/Playwright divergente échoue avant l'exposition de fixture ; un rejet de connexion sans Browser ferme néanmoins le transport public suivi avant de libérer son bail actuel ou de réserver tout bail ultérieur ;
+15. l'observateur ServiceWorker de sentinelle et l'observateur Runtime/Inspector imbriqué non aplati sont tous deux installés avant les effets de fixture ; une exception, un crash/rechargement inattendu, une réponse d'observateur manquante ou un second contexte bloque le verdict ;
+16. la libération Playwright désactive/détache les deux sessions de diagnostic avant `browser.close()`, et exige les preuves de fermeture du navigateur/déconnexion/transport ;
+17. un redémarrage à l'exécution ferme les pages de fixture, prouve la déconnexion Playwright, rejette chaque ancien descripteur, effectue un redémarrage brut à session persistante sous propriétaire unique, reconnecte avec une époque supérieure et n'accepte que des reçus V1 exacts ;
+18. les réglages, l'instantané d'onboarding, les données visibles dans IndexedDB et l'alarme `auto-scan` persistent à travers le redémarrage d'exécution et la reconnexion avec les mêmes processus et profil ;
+19. l'acquisition brute avant le `disconnected` de Playwright, un événement tardif d'ancienne époque ou un reçu/évaluation périmé/muté/à hachage propre invalide ne peut muter la nouvelle époque ;
+20. les lignes d'endpoint de sortie de processus sont caviardées avant conservation et chaque chemin d'endpoint malformé, y compris les syntaxes non canoniques d'UUID, échoue à l'admission ;
+21. un redémarrage maximal, l'échéance globale interne et le timeout Playwright plus large préservent le nettoyage ; un enfant ayant déjà quitté ignore la reconnexion/les signaux et procède directement à la suppression du profil avec l'échec initial ;
+22. l'arrêt final normal vérifie la version et ferme l'enfant exact avant la suppression du profil ; `PROCESS_EXITED` sans réponse exacte préalable de fermeture ou fermeture causale de socket post-commande est rejeté ; un TERM/KILL forcé nettoie un orphelin mais rend la porte rouge ;
+23. les condensats d'artefacts avant/après, les diagnostics d'exécution, la sortie de processus et la suppression du profil précèdent tous le succès provisoire ; un événement de diagnostic/protocole bloquant dans chaque phase jusqu'à `profile_removing` et entre `passed` et l'archivage ne peut produire qu'un échec archivé ;
+24. des tests unitaires et de machine déterministes prouvent la matrice complète de projection/erreur de cette révision en attente, y compris toutes les entrées hostiles de DTO/réflexion et les six mutations d'autorité étrangère cohérentes en interne, avec zéro réservation, transport ou connexion sur chaque rejet ;
+25. les exécutions de smoke ciblées de démarrage à froid et de redémarrage sous propriétaire brut avec session conservée s'exécutent contre le package de production exact recompilé avec `--workers=1` et `--repeat-each=3` ; chaque répétition doit montrer la distribution de reprise avant les deux évaluations, les hachages exacts de lot/reçu, la preuve d'identité, la version sélectionnée `running`, la libération exacte, le DTO d'autorité liée à la source conservé de cette révision en attente et aucun diagnostic bloquant ; tout échec falsifie cette révision ;
+26. l'inventaire complet des scénarios packagés s'exécute ensuite à partir du même artefact scellé canonique sans stubs DEV ni backend externe ;
+27. les métadonnées de package/navigateur Playwright, la vérification préalable de l'exécutable et les versions exactes CDP produit/révision/JS rejettent toute dérive ; les flux saturants de diagnostics, commandes, messages imbriqués et attachements restent dans les limites à la fois du nombre d'entrées et des octets canoniques, émettent un dépassement typé, complètent le nettoyage et ne peuvent jamais passer en succès.
 
 ## Invariants
 
-1. The deterministic XState actors decide every state transition; I/O and text
-   produce signals only.
-2. At most one harness-created root CDP transport exists, and its kind always
-   equals the current lease state.
-3. No Playwright connection overlaps a raw restart; no raw connection overlaps
-   Playwright.
-4. The same process, profile, extension ID, registration, version and script are
-   preserved across restart epochs.
-5. Pre-bootstrap proof requires one retained selected session; exact
-   `targetCrashed` atomically revokes the complete pre-crash context generation,
-   every later destroyed unique ID is separately tombstoned, exact same-identity
-   `targetReloadedAfterCrash` precedes one fresh ID absent from both sets whose
-   native origin equals the frozen script URL. The sole resume command bytes
-   precede both probe command bytes; exact resume receipt, probe replies, batch
-   commitment and running proof complete afterward. No Runtime destroy/clear
-   event is a stop prerequisite or may restore revoked authority.
-6. Initial installation may converge; frozen authority may not mutate.
-7. Every handle and event is epoch-bound. Old handles and stale receipts are
-   unusable after release.
-8. Every raw paused session is resumed, root auto-attach is disarmed, every
-   auto-attached session is detached, ServiceWorker/discovery are disabled, the
-   control session is detached and the socket is closed before handoff.
-9. Playwright handoff is identity-checked and explicitly Runtime/Inspector
-   observed on the same transport before UI use.
-10. Endpoint capabilities are never retained in logs or public evidence.
-11. No Vite server, DEV stub, external backend, new browser process or product
-    mutation is introduced by a restart.
-12. Cleanup failure can never retain or create a pass.
-13. CI runs the canonical command with pinned Chromium and uploads complete
-    failure evidence.
-14. A current replacement-version proof is single-allocation but not
-    single-observation: repeated guarded starting/running metadata is idempotent
-    and can never fail solely because the proof already exists.
-15. Post-reload Runtime clear/destroy is admissible only before any fresh context
-    authority exists; clear is evidence-only, destroy adds its bounded unique ID
-    to the post-crash tombstone set, the window closes on first context admission,
-    and both events are terminal everywhere else outside `controlled_stop`.
-16. A paused replacement cannot enter a same-session probe-before-resume causal
-    cycle: the sole resume bytes are synchronously dispatched first, then fixed
-    identity and optional-test bytes, with no await between sends. Exact
-    consecutive command IDs, canonical resume/identity/test receipt reduction,
-    result hashes and `bootstrapCommandBatchSha256` are proven before bootstrap.
-    Exact `running` metadata is sticky across every batch state, while any
-    regression or identity drift is terminal.
+1. Les acteurs XState déterministes décident de chaque transition d'état ; les I/O et le texte ne produisent que des signaux.
+2. Au plus un transport CDP racine créé par le harnais existe, et son type est toujours égal à l'état actuel du bail.
+3. Aucune connexion Playwright ne chevauche un redémarrage brut ; aucune connexion brute ne chevauche Playwright.
+4. Les mêmes processus, profil, identifiant d'extension, enregistrement, version et script sont préservés à travers les époques de redémarrage.
+5. La preuve pré-amorçage exige une session sélectionnée conservée ; le `targetCrashed` exact révoque de façon atomique la génération complète de contexte pré-crash, chaque identifiant unique détruit ultérieurement est consigné séparément comme tombstone, le `targetReloadedAfterCrash` d'identité exacte précède un identifiant frais absent des deux ensembles dont l'origine native est égale à l'URL de script figée. Les seuls octets de commande de reprise précèdent les deux octets de commande de sonde ; le reçu exact de reprise, les réponses de sonde, l'engagement de lot et la preuve d'exécution se complètent après coup. Aucun événement de destruction/vidage de Runtime n'est une condition préalable à l'arrêt ni ne peut restaurer une autorité révoquée.
+6. L'installation initiale peut converger ; l'autorité figée ne peut pas muter.
+7. Chaque descripteur et événement est lié à une époque. Les anciens descripteurs et reçus périmés sont inutilisables après la libération.
+8. Chaque session brute en pause est reprise, l'auto-attachement racine est désarmé, chaque session auto-attachée est détachée, ServiceWorker/découverte sont désactivés, la session de contrôle est détachée et le socket est fermé avant le transfert.
+9. Le transfert Playwright fait l'objet d'un contrôle d'identité et d'une observation explicite Runtime/Inspector sur le même transport avant utilisation de l'UI.
+10. Les capacités d'endpoint ne sont jamais conservées dans les logs ou les preuves publiques.
+11. Aucun serveur Vite, stub DEV, backend externe, nouveau processus de navigateur ou mutation de produit n'est introduit par un redémarrage.
+12. Un échec de nettoyage ne peut jamais conserver ni créer un succès.
+13. La CI exécute la commande canonique avec Chromium épinglé et téléverse l'ensemble complet des preuves d'échec.
+14. Une preuve actuelle de version de remplacement est à affectation unique mais non à observation unique : des métadonnées répétées et gardées de starting/running sont idempotentes et ne peuvent jamais échouer au seul motif que la preuve existe déjà.
+15. Le vidage/destruction de Runtime post-rechargement n'est admissible qu'avant qu'une autorité de contexte frais n'existe ; le vidage ne constitue qu'une preuve, la destruction ajoute son identifiant unique borné à l'ensemble de tombstones post-crash, la fenêtre se ferme à la première admission de contexte, et les deux événements sont terminaux partout ailleurs en dehors de `controlled_stop`.
+16. Un remplaçant en pause ne peut entrer dans un cycle causal de sonde-avant-reprise sur la même session : les seuls octets de reprise sont distribués de façon synchrone en premier, puis l'identité fixe et les octets de test facultatif, sans await entre les envois. Les identifiants de commande consécutifs exacts, la réduction canonique des reçus reprise/identité/test, les hachages de résultats et `bootstrapCommandBatchSha256` sont prouvés avant l'amorçage. Les métadonnées `running` exactes sont persistantes à travers chaque état de lot, tandis que toute régression ou dérive d'identité est terminale.
 
-## Primary references
+## Références principales
 
 - <https://chromedevtools.github.io/devtools-protocol/tot/Target/#method-setAutoAttach>
 - <https://chromedevtools.github.io/devtools-protocol/tot/Inspector/>
@@ -2069,4 +1443,4 @@ Implementation is not reviewable as complete until deterministic tests prove:
 - <https://chromium.googlesource.com/chromium/src/+/d661c0dd3ab2d9b38a693e74e56d4307b0290139/content/browser/devtools/service_worker_devtools_manager.cc>
 - <https://playwright.dev/docs/api/class-browsertype#browser-type-connect-over-cdp>
 - <https://playwright.dev/docs/next/chrome-extensions#service-worker-idle-suspension-mv3>
-- local pinned Playwright 1.61.1 source lines cited in the falsification section
+- lignes sources locales épinglées de Playwright 1.61.1 citées dans la section de falsification

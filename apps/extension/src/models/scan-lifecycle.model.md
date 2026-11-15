@@ -1,29 +1,33 @@
-# Scan Lifecycle Workflow Model
+# Modèle de workflow du cycle de vie du scan
 
-Authoritative XState specification for a MissionPulse scan from request to
-persisted result. `scan-lifecycle.machine.ts` must implement this document; the
-service worker, scanner Shell, and Feed controller consume its snapshots.
+Spécification XState faisant autorité pour un scan MissionPulse, de la requête
+au résultat persisté. `scan-lifecycle.machine.ts` doit implémenter ce document ;
+le service worker, le Shell du scanner et le contrôleur du Feed consomment ses
+snapshots.
 
-## Scope and decisions
+## Périmètre et décisions
 
-Each accepted scan owns an immutable `operationId`, one `AbortController`, and
-one machine actor. The singleton service worker owns the active-operation
-lease. A concurrent start is represented by a separate rejected request actor
-whose terminal state is `busy`; it never replaces the active scan actor.
+Chaque scan accepté possède un `operationId` immuable, un `AbortController` et
+un acteur de machine d'état. Le service worker singleton détient le bail (lease)
+de l'opération active. Un démarrage concurrent est représenté par un acteur de
+requête rejetée distinct dont l'état terminal est `busy` ; il ne remplace jamais
+l'acteur de scan actif.
 
-Connector fetches and retry delays are abortable. Scoring/deduplication is pure
-Core work. Persisting and browser messaging are Shell effects. Once
-cancellation wins event ordering, the operation can only settle as
-`cancelled`; no mission, status, notification, arrival item, or completion
-message from that operation may be committed.
+Les requêtes de connecteurs (fetches) et les délais de retry sont annulables.
+Le scoring et la déduplication relèvent du travail pur du Core. La persistance et
+la messagerie du navigateur sont des effets du Shell. Dès lors que l'annulation
+l'emporte dans l'ordonnancement des événements, l'opération ne peut se stabiliser
+qu'en `cancelled` ; aucun message de mission, de statut, de notification,
+d'élément d'arrivée ou de complétion issu de cette opération ne peut être validé
+(committed).
 
-The scanner concurrency pool owns every connector task it starts. After the
-first rejection or abort it schedules no additional connector, awaits
-`Promise.allSettled` for every already-started task, then rethrows the first
-failure. `runScan` retains its mutex until that drain completes; this drained
-pool is the proof required by `ABORT_CONFIRMED`.
+Le pool de concurrence du scanner détient chaque tâche de connecteur qu'il
+démarre. Après le premier rejet ou avortement, il ne planifie aucun connecteur
+supplémentaire, attend `Promise.allSettled` pour chaque tâche déjà démarrée, puis
+relance la première défaillance. `runScan` conserve son mutex jusqu'à la fin de
+ce drainage ; ce pool drainé constitue la preuve requise par `ABORT_CONFIRMED`.
 
-## Exact state vocabulary
+## Vocabulaire exact des états
 
 ```ts
 type ScanLifecycleState =
@@ -40,9 +44,10 @@ type ScanLifecycleState =
   | 'busy';
 ```
 
-No implementation alias or UI-only state may replace these values.
+Aucun alias d'implémentation ni état exclusivement réservé à l'UI ne peut
+remplacer ces valeurs.
 
-## Context
+## Contexte
 
 ```ts
 interface ScanLifecycleContext {
@@ -66,10 +71,11 @@ interface ScanLifecycleContext {
 }
 ```
 
-`now`, operation IDs, retry delays, connector results, and connectivity are
-Shell inputs. Core guards never call time, randomness, network, or storage.
+`now`, les identifiants d'opération, les délais de retry, les résultats des
+connecteurs et la connectivité sont des entrées du Shell. Les gardes du Core ne
+font jamais appel au temps, à l'aléatoire, au réseau ou au stockage.
 
-## Versioned session checkpoint
+## Checkpoint de session versionné
 
 ```ts
 type ScanTerminalDecision =
@@ -88,26 +94,29 @@ interface ScanCheckpoint {
 }
 ```
 
-The Shell validates this structure at runtime before recovery. A completion
-stores exactly the committed result's mission IDs in canonical result order.
-Every ID is a non-empty unique string; an empty list remains the valid identity
-of a committed zero-mission success. Replay must reconstruct a one-to-one,
-ordered payload containing every checkpoint ID and no unrelated mission. If a
-durable row is missing, replay is fenced before any terminal broadcast and the
-checkpoint is retained for a later retry. Checkpoint writes and conditional
-clears share one in-process promise chain. Every state boundary enqueues its
-snapshot; terminal persistence awaits that chain, so an older active snapshot
-can never overwrite a newer terminal decision. A clear removes only the
-checkpoint whose `operationId` still matches.
+Le Shell valide cette structure à l'exécution avant toute récupération. Une
+complétion stocke exactement les identifiants de mission du résultat validé dans
+l'ordre canonique des résultats. Chaque ID est une chaîne unique non vide ; une
+liste vide demeure l'identité valide d'un succès validé à zéro mission. Le rejeu
+(replay) doit reconstruire un payload ordonné, en correspondance univoque,
+contenant chaque ID du checkpoint et aucune mission non liée. Si une ligne
+durable est manquante, le rejeu est verrouillé (fenced) avant toute diffusion
+terminale et le checkpoint est conservé pour un retry ultérieur. Les écritures de
+checkpoint et les effacements conditionnels partagent une même chaîne de promesses
+en processus. Chaque frontière d'état met son snapshot en file d'attente ; la
+persistance terminale attend cette chaîne, de sorte qu'un snapshot actif plus
+ancien ne puisse jamais écraser une décision terminale plus récente. Un effacement
+ne supprime que le checkpoint dont l'`operationId` correspond encore.
 
-Validation also enforces state invariants: only `cancelling`/`cancelled` may
-carry `cancellationRequested`, `completed` requires all connector outcomes to
-be successful, `partial` requires at least one success and one failure, and
-`persisting` requires settled connector outcomes with at least one success.
-Terminal type must match terminal state. Invalid or unknown versions are
-removed safely and never cast into a lifecycle decision.
+La validation applique également les invariants d'état : seuls
+`cancelling`/`cancelled` peuvent porter `cancellationRequested`, `completed`
+requiert que tous les résultats des connecteurs soient des succès, `partial`
+requiert au moins un succès et un échec, et `persisting` requiert des résultats
+de connecteurs stabilisés avec au moins un succès. Le type terminal doit
+correspondre à l'état terminal. Les versions invalides ou inconnues sont
+supprimées de façon sûre et ne sont jamais converties en décision de cycle de vie.
 
-## Events and emitted bridge messages
+## Événements et messages bridge émis
 
 ```ts
 type ScanLifecycleEvent =
@@ -142,30 +151,31 @@ type ScanLifecycleEvent =
   | { type: 'RESET' };
 ```
 
-The Shell projects snapshots as typed bridge messages carrying the same
-`operationId`. An accepted command receives exactly one non-terminal
-acknowledgement: `SCAN_STARTED` for `SCAN_START`, and `SCAN_CANCEL_REQUESTED`
-after `CANCEL` has been reduced and abort requested. A command rejected before
-acceptance receives `SCAN_START_REJECTED` or `SCAN_CANCEL_REJECTED` with the
-same ID plus deterministic `code`/`message`; these responses finish only the
-local command intention and never claim a runtime terminal. `SCAN_PROGRESS`
-and `SCAN_PARTIAL_RESULT` are non-terminal broadcasts. `SCAN_COMPLETE`,
-`SCAN_ERROR`, and `SCAN_CANCELLED` use one canonical terminal broadcast channel
-and are never also returned as command responses. `SCAN_BUSY` is the immediate
-rejection response of the separate rejected-start actor. The UI accepts scan
-lifecycle messages only for the ID it currently owns.
+Le Shell projette les snapshots sous forme de messages bridge typés portant le
+même `operationId`. Une commande acceptée reçoit exactement un acquittement non
+terminal : `SCAN_STARTED` pour `SCAN_START`, et `SCAN_CANCEL_REQUESTED` après
+que `CANCEL` a été réduit et l'avortement demandé. Une commande rejetée avant
+acceptation reçoit `SCAN_START_REJECTED` ou `SCAN_CANCEL_REJECTED` avec le même
+identifiant ainsi qu'un `code`/`message` déterministe ; ces réponses ne terminent
+que l'intention de commande locale et ne revendiquent jamais d'état terminal à
+l'exécution. `SCAN_PROGRESS` et `SCAN_PARTIAL_RESULT` sont des diffusions non
+terminales. `SCAN_COMPLETE`, `SCAN_ERROR` et `SCAN_CANCELLED` utilisent un
+unique canal canonique de diffusion terminale et ne sont jamais également
+renvoyés comme réponses de commande. `SCAN_BUSY` est la réponse de rejet
+immédiat de l'acteur distinct de démarrage rejeté. L'UI n'accepte les messages du
+cycle de vie du scan que pour l'ID qu'elle détient actuellement.
 
-After an `alarm` operation commits, the Shell also broadcasts the existing
-durable `MISSIONS_UPDATED` projection so an open Feed adopts the committed
-missions without claiming the alarm operation as its manual lifecycle. This
-projection is emitted after the canonical terminal broadcast; its delivery or
-failure cannot delay or rewrite that terminal, and a later secondary
-post-commit effect cannot rewrite it either.
+Après la validation d'une opération `alarm`, le Shell diffuse également la
+projection durable existante `MISSIONS_UPDATED` afin qu'un Feed ouvert adopte les
+missions validées sans revendiquer l'opération d'alarme comme son cycle de vie
+manuel. Cette projection est émise après la diffusion terminale canonique ; sa
+délivrance ou son échec ne peut pas retarder ni réécrire cette fin, et un effet
+post-commit secondaire ultérieur ne peut pas la réécrire non plus.
 
-The scanner contract consumed by the Shell is
-`runScan(..., signal?: AbortSignal): Promise<ScanResult>`. When aborted it
-rejects with a typed cancelled result; it never returns a successful empty
-result and never performs persistence itself after cancellation.
+Le contrat du scanner consommé par le Shell est
+`runScan(..., signal?: AbortSignal): Promise<ScanResult>`. En cas d'avortement,
+il rejette avec un résultat annulé typé ; il ne renvoie jamais de résultat vide
+réussi et n'effectue jamais lui-même de persistance après annulation.
 
 ## Statechart
 
@@ -222,356 +232,410 @@ stateDiagram-v2
   busy --> [*]
 ```
 
-## Guards
+## Gardes
 
-| Guard                             | Rule                                                                                                                                                          |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `leaseAvailable`                  | After bootstrap, terminal, and provisional-admission gates settle, no accepted active-operation lease exists when `START` is reduced.                         |
-| `leaseHeld`                       | Another operation ID owns the live lease.                                                                                                                     |
-| `matchingOperation`               | Event operation ID equals the actor context operation ID.                                                                                                     |
-| `connectorUnsettled`              | Named configured connector is currently `pending` or `running`; duplicate terminal results are stale.                                                         |
-| `retryAllowed`                    | Operation/connector match, connector is unsettled, failure is retryable, retry count is below `maxRetries`, network permits retry, and cancellation is false. |
-| `terminalConnectorFailure`        | Operation/connector match and unsettled, and failure is non-retryable, exhausted `maxRetries`, or retry became impossible; it must settle as `failed`.        |
-| `retryScheduledForPendingFailure` | Matching internal event names a non-terminal connector whose recorded retryable failure still has budget while online.                                        |
-| `otherRetriesPending`             | Matching event names a queued connector and, after consuming its timer, another connector remains in `retryPendingConnectorIds`.                              |
-| `lastRetryPending`                | Matching event names the final queued connector and no other retry timer remains after consumption.                                                           |
-| `hasSuccessfulConnector`          | At least one connector settled successfully, including a valid zero-mission result.                                                                           |
-| `allConnectorsFailed`             | Every configured connector has a typed failure; an unknown connector also counts as failure.                                                                  |
-| `allConnectorsSettled`            | Every configured connector is exactly `succeeded` or `failed`; no pending/running/retry entry remains.                                                        |
-| `allConnectorsSucceeded`          | Matching persistence acknowledgement arrived and every configured connector had settled successfully.                                                         |
-| `someConnectorsFailed`            | Matching persistence acknowledgement arrived, with at least one connector succeeded and at least one failed after retry exhaustion.                           |
-| `notCommitted`                    | Persistence transaction has not emitted its commit acknowledgement.                                                                                           |
-| `noCheckpoint`                    | Recovery input has no session checkpoint.                                                                                                                     |
-| `recoverableCheckpoint`           | Checkpoint state is `starting`, `scanning`, `retrying`, or `persisting`.                                                                                      |
-| `cancellingCheckpoint`            | Checkpoint state is `cancelling`.                                                                                                                             |
-| `completedCheckpoint`             | Checkpoint is terminal `completed`; analogous exact guards exist for `partial`, `failed`, and `cancelled`.                                                    |
+| Garde                             | Règle                                                                                                                                                                                                            |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `leaseAvailable`                  | Après stabilisation de l'amorçage (bootstrap), du terminal et de l'admission provisoire, aucun bail d'opération active accepté n'existe lorsque `START` est réduit.                                              |
+| `leaseHeld`                       | Un autre identifiant d'opération détient le bail en direct.                                                                                                                                                      |
+| `matchingOperation`               | L'identifiant d'opération de l'événement est égal à l'identifiant d'opération du contexte de l'acteur.                                                                                                           |
+| `connectorUnsettled`              | Le connecteur configuré désigné est actuellement `pending` ou `running` ; les résultats terminaux en double sont caducs.                                                                                         |
+| `retryAllowed`                    | L'opération/le connecteur correspond, le connecteur n'est pas stabilisé, la défaillance est rejouable, le compte de retries est inférieur à `maxRetries`, le réseau permet le retry, et l'annulation est fausse. |
+| `terminalConnectorFailure`        | L'opération/le connecteur correspond et n'est pas stabilisé, et la défaillance n'est pas rejouable, a épuisé `maxRetries`, ou le retry est devenu impossible ; il doit se stabiliser en `failed`.                |
+| `retryScheduledForPendingFailure` | L'événement interne correspondant désigne un connecteur non terminal dont la défaillance rejouable enregistrée dispose encore d'un budget en étant en ligne.                                                     |
+| `otherRetriesPending`             | L'événement correspondant désigne un connecteur en file d'attente et, après consommation de son minuteur, un autre connecteur subsiste dans `retryPendingConnectorIds`.                                          |
+| `lastRetryPending`                | L'événement correspondant désigne le dernier connecteur en file d'attente et aucun autre minuteur de retry ne subsiste après consommation.                                                                       |
+| `hasSuccessfulConnector`          | Au moins un connecteur s'est stabilisé avec succès, y compris un résultat valide à zéro mission.                                                                                                                 |
+| `allConnectorsFailed`             | Chaque connecteur configuré présente un échec typé ; un connecteur inconnu compte également comme un échec.                                                                                                      |
+| `allConnectorsSettled`            | Chaque connecteur configuré est exactement `succeeded` ou `failed` ; aucune entrée en attente, en cours ou en retry ne subsiste.                                                                                 |
+| `allConnectorsSucceeded`          | L'acquittement de persistance correspondant est arrivé et chaque connecteur configuré s'était stabilisé avec succès.                                                                                             |
+| `someConnectorsFailed`            | L'acquittement de persistance correspondant est arrivé, avec au moins un connecteur réussi et au moins un échoué après épuisement des retries.                                                                   |
+| `notCommitted`                    | La transaction de persistance n'a pas émis son acquittement de commit.                                                                                                                                           |
+| `noCheckpoint`                    | L'entrée de récupération ne comporte aucun checkpoint de session.                                                                                                                                                |
+| `recoverableCheckpoint`           | L'état du checkpoint est `starting`, `scanning`, `retrying` ou `persisting`.                                                                                                                                     |
+| `cancellingCheckpoint`            | L'état du checkpoint est `cancelling`.                                                                                                                                                                           |
+| `completedCheckpoint`             | Le checkpoint est le terminal `completed` ; des gardes exactes analogues existent pour `partial`, `failed` et `cancelled`.                                                                                       |
 
-A successful connector returning zero missions is not a failure. Parser-health
-rules may later classify that result, but they cannot rewrite this transition.
+Un connecteur réussi renvoyant zéro mission ne constitue pas un échec. Les
+règles de santé du parser (parser-health) peuvent ultérieurement classifier ce
+résultat, mais elles ne peuvent pas réécrire cette transition.
 
-## Transition table
+## Table de transition
 
-| From               | Event                      | Guard                       | To                | Effects                                                                                                                                                                                                                                                                                                                                                           |
-| ------------------ | -------------------------- | --------------------------- | ----------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `idle`             | `START`                    | `leaseAvailable`            | `starting`        | Enter the serialized provisional-admission queue, create an actor/controller, await its starting checkpoint, then atomically publish the accepted lease, launch work and return `SCAN_STARTED`. Checkpoint failure reduces typed START_FAILED, records the rejection for a waiting matching Cancel, and returns `SCAN_START_REJECTED` without a runtime terminal. |
-| `idle`             | `START`                    | `leaseHeld`                 | `busy`            | Emit `SCAN_BUSY`; do not touch active actor or return an empty success.                                                                                                                                                                                                                                                                                           |
-| `starting`         | `START_READY`              | matching                    | `scanning`        | Start included/enabled connectors with shared abort signal.                                                                                                                                                                                                                                                                                                       |
-| `starting`         | `START_FAILED`             | matching                    | `failed`          | Before acknowledgement, a starting-checkpoint failure disposes the provisional actor and returns `SCAN_START_REJECTED`; after acknowledgement, a setup failure emits the accepted operation's canonical `SCAN_ERROR`.                                                                                                                                             |
-| `starting`         | `NETWORK_OFFLINE`          | matching                    | `failed`          | Release lease and emit typed global `OFFLINE` failure before any connector.                                                                                                                                                                                                                                                                                       |
-| `starting`         | `RUNTIME_FAILED`           | matching                    | `failed`          | Record a typed runtime failure, release the lease, and emit one terminal error after quiescence.                                                                                                                                                                                                                                                                  |
-| `starting`         | `CANCEL`                   | matching                    | `cancelling`      | Request abort and return `SCAN_CANCEL_REQUESTED`; do not confirm cancellation yet.                                                                                                                                                                                                                                                                                |
-| scanning/retrying  | `CONNECTOR_STARTED`        | matching                    | same              | Mark this pending connector `running`; reject duplicate/stale start.                                                                                                                                                                                                                                                                                              |
-| scanning/retrying  | `CONNECTOR_SUCCEEDED`      | matching                    | same              | Consume the live result, mark `succeeded`, remove pending/retry entries, and internally raise `CONNECTORS_SETTLED`; guards reject it until all settle.                                                                                                                                                                                                            |
-| scanning/retrying  | `CONNECTOR_FAILED`         | `retryAllowed`              | same              | Consume the live failed attempt, increment its count, and internally raise one `RETRY_SCHEDULED` before Shell backoff.                                                                                                                                                                                                                                            |
-| scanning/retrying  | `CONNECTOR_FAILED`         | terminal failure            | same              | Consume the live terminal failure, mark `failed`, remove pending/retry entries, and internally raise `CONNECTORS_SETTLED`.                                                                                                                                                                                                                                        |
-| `scanning`         | `RETRY_SCHEDULED`          | pending failure             | `retrying`        | Add connector once to retry queue and start one abortable backoff.                                                                                                                                                                                                                                                                                                |
-| `retrying`         | `RETRY_SCHEDULED`          | pending failure             | `retrying`        | Add another connector once; preserve all existing backoffs.                                                                                                                                                                                                                                                                                                       |
-| `retrying`         | `RETRY_TIMER_FIRED`        | other retries remain        | `retrying`        | Remove this timer and start only that connector's next attempt.                                                                                                                                                                                                                                                                                                   |
-| `retrying`         | `RETRY_TIMER_FIRED`        | last retry                  | `scanning`        | Remove final timer and start only that connector's next attempt.                                                                                                                                                                                                                                                                                                  |
-| scanning/retrying  | `NETWORK_OFFLINE`          | matching                    | same              | Consume the live network signal, mark offline, settle every unfinished connector as typed `OFFLINE`, and internally raise `CONNECTORS_SETTLED`.                                                                                                                                                                                                                   |
-| scanning/retrying  | `NETWORK_ONLINE`           | matching                    | same              | Update connectivity only; never resurrect a connector or auto-start a scan.                                                                                                                                                                                                                                                                                       |
-| scanning/retrying  | `RUNTIME_FAILED`           | matching                    | `failed`          | Record a typed unexpected/offline runtime failure, release the lease, emit one terminal error after quiescence, and stop the actor.                                                                                                                                                                                                                               |
-| scanning/retrying  | `CONNECTORS_SETTLED`       | all settled, success exists | `persisting`      | Purely score/deduplicate, then begin one abortable persistence transaction.                                                                                                                                                                                                                                                                                       |
-| scanning/retrying  | `CONNECTORS_SETTLED`       | all settled, all failed     | `failed`          | Release lease; retain typed connector errors; do not persist success.                                                                                                                                                                                                                                                                                             |
-| `persisting`       | `PERSIST_SUCCEEDED`        | matching, all succeeded     | `completed`       | Mark commit; persist terminal checkpoint; claim and broadcast completion; clear checkpoint/release actor; run projections behind the admission barrier.                                                                                                                                                                                                           |
-| `persisting`       | `PERSIST_SUCCEEDED`        | matching, some failed       | `partial`         | Mark commit; persist terminal checkpoint; claim and broadcast completion; clear checkpoint/release actor; run projections behind the admission barrier.                                                                                                                                                                                                           |
-| active             | `CANCEL`                   | matching                    | `cancelling`      | Request abort of fetch/backoff/transaction and return non-terminal `SCAN_CANCEL_REQUESTED`; preserve Feed state.                                                                                                                                                                                                                                                  |
-| `cancelling`       | `ABORT_CONFIRMED`          | matching                    | `cancelled`       | Only after scanner/transaction quiescence, release lease/checkpoint, emit exactly one `SCAN_CANCELLED`, and stop actor.                                                                                                                                                                                                                                           |
-| `persisting`       | `PERSIST_FAILED`           | matching                    | `failed`          | Abort/rollback transaction, release lease, emit typed error.                                                                                                                                                                                                                                                                                                      |
-| recovery `idle`    | `SERVICE_WORKER_RESTARTED` | no checkpoint               | `idle`            | Start no actor and retain last durable missions.                                                                                                                                                                                                                                                                                                                  |
-| recovery `idle`    | `SERVICE_WORKER_RESTARTED` | active checkpoint           | `failed`          | Rehydrate old ID, settle `worker_restarted`, release stale lease, emit once, then clear checkpoint.                                                                                                                                                                                                                                                               |
-| recovery `idle`    | `SERVICE_WORKER_RESTARTED` | cancelling checkpoint       | `cancelled`       | Rehydrate old ID, emit cancellation once, release lease, then clear checkpoint.                                                                                                                                                                                                                                                                                   |
-| recovery `idle`    | `SERVICE_WORKER_RESTARTED` | terminal checkpoint         | matching terminal | Replay the matching terminal message idempotently, then clear checkpoint.                                                                                                                                                                                                                                                                                         |
-| any terminal actor | `RESET`                    | same operation settled      | actor disposed    | Dispose that actor for acknowledgement/testing; a later scan creates a new actor/ID from `idle`.                                                                                                                                                                                                                                                                  |
+| De                   | Événement                  | Garde                           | Vers                   | Effets                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | -------------------------- | ------------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `idle`               | `START`                    | `leaseAvailable`                | `starting`             | Entrer dans la file d'attente d'admission provisoire sérialisée, créer un acteur/contrôleur, attendre son checkpoint de démarrage, puis publier atomiquement le bail accepté, lancer le travail et renvoyer `SCAN_STARTED`. L'échec du checkpoint réduit `START_FAILED` typé, consigne le rejet pour un Cancel correspondant en attente, et renvoie `SCAN_START_REJECTED` sans état terminal d'exécution. |
+| `idle`               | `START`                    | `leaseHeld`                     | `busy`                 | Émettre `SCAN_BUSY` ; ne pas toucher à l'acteur actif ni renvoyer un succès vide.                                                                                                                                                                                                                                                                                                                         |
+| `starting`           | `START_READY`              | matching                        | `scanning`             | Démarrer les connecteurs inclus/activés avec le signal d'avortement partagé.                                                                                                                                                                                                                                                                                                                              |
+| `starting`           | `START_FAILED`             | matching                        | `failed`               | Avant acquittement, un échec de checkpoint de démarrage élimine l'acteur provisoire et renvoie `SCAN_START_REJECTED` ; après acquittement, un échec d'initialisation émet le `SCAN_ERROR` canonique de l'opération acceptée.                                                                                                                                                                              |
+| `starting`           | `NETWORK_OFFLINE`          | matching                        | `failed`               | Libérer le bail et émettre l'échec global typé `OFFLINE` avant tout connecteur.                                                                                                                                                                                                                                                                                                                           |
+| `starting`           | `RUNTIME_FAILED`           | matching                        | `failed`               | Consigner une défaillance d'exécution typée, libérer le bail et émettre une erreur terminale après quiescence.                                                                                                                                                                                                                                                                                            |
+| `starting`           | `CANCEL`                   | matching                        | `cancelling`           | Demander l'avortement et renvoyer `SCAN_CANCEL_REQUESTED` ; ne pas confirmer l'annulation pour l'instant.                                                                                                                                                                                                                                                                                                 |
+| scanning/retrying    | `CONNECTOR_STARTED`        | matching                        | même                   | Marquer ce connecteur en attente comme `running` ; rejeter un démarrage dupliqué/caduc.                                                                                                                                                                                                                                                                                                                   |
+| scanning/retrying    | `CONNECTOR_SUCCEEDED`      | matching                        | même                   | Consommer le résultat en direct, marquer `succeeded`, retirer les entrées en attente/retry, et lever en interne `CONNECTORS_SETTLED` ; les gardes le rejettent tant que tous ne sont pas stabilisés.                                                                                                                                                                                                      |
+| scanning/retrying    | `CONNECTOR_FAILED`         | `retryAllowed`                  | même                   | Consommer la tentative échouée en direct, incrémenter son compteur, et lever en interne un `RETRY_SCHEDULED` avant le backoff du Shell.                                                                                                                                                                                                                                                                   |
+| scanning/retrying    | `CONNECTOR_FAILED`         | échec terminal                  | même                   | Consommer la défaillance terminale en direct, marquer `failed`, retirer les entrées en attente/retry, et lever en interne `CONNECTORS_SETTLED`.                                                                                                                                                                                                                                                           |
+| `scanning`           | `RETRY_SCHEDULED`          | échec en attente                | `retrying`             | Ajouter le connecteur une fois à la file d'attente de retry et démarrer un backoff annulable.                                                                                                                                                                                                                                                                                                             |
+| `retrying`           | `RETRY_SCHEDULED`          | échec en attente                | `retrying`             | Ajouter un autre connecteur une fois ; préserver tous les backoffs existants.                                                                                                                                                                                                                                                                                                                             |
+| `retrying`           | `RETRY_TIMER_FIRED`        | d'autres retries restent        | `retrying`             | Retirer ce minuteur et démarrer uniquement la prochaine tentative de ce connecteur.                                                                                                                                                                                                                                                                                                                       |
+| `retrying`           | `RETRY_TIMER_FIRED`        | dernier retry                   | `scanning`             | Retirer le minuteur final et démarrer uniquement la prochaine tentative de ce connecteur.                                                                                                                                                                                                                                                                                                                 |
+| scanning/retrying    | `NETWORK_OFFLINE`          | matching                        | même                   | Consommer le signal réseau en direct, marquer hors ligne, stabiliser chaque connecteur inachevé en `OFFLINE` typé, et lever en interne `CONNECTORS_SETTLED`.                                                                                                                                                                                                                                              |
+| scanning/retrying    | `NETWORK_ONLINE`           | matching                        | même                   | Mettre à jour la connectivité uniquement ; ne jamais ressusciter un connecteur ni redémarrer automatiquement un scan.                                                                                                                                                                                                                                                                                     |
+| scanning/retrying    | `RUNTIME_FAILED`           | matching                        | `failed`               | Consigner une défaillance d'exécution inattendue/hors ligne typée, libérer le bail, émettre une erreur terminale après quiescence, et arrêter l'acteur.                                                                                                                                                                                                                                                   |
+| scanning/retrying    | `CONNECTORS_SETTLED`       | tous stabilisés, succès présent | `persisting`           | Calculer purement le score/déduplication, puis commencer une transaction de persistance annulable.                                                                                                                                                                                                                                                                                                        |
+| scanning/retrying    | `CONNECTORS_SETTLED`       | tous stabilisés, tous échoués   | `failed`               | Libérer le bail ; conserver les erreurs typées des connecteurs ; ne pas persister de succès.                                                                                                                                                                                                                                                                                                              |
+| `persisting`         | `PERSIST_SUCCEEDED`        | matching, tous réussis          | `completed`            | Marquer le commit ; persister le checkpoint terminal ; revendiquer et diffuser la complétion ; effacer le checkpoint / libérer l'acteur ; exécuter les projections derrière la barrière d'admission.                                                                                                                                                                                                      |
+| `persisting`         | `PERSIST_SUCCEEDED`        | matching, certains échoués      | `partial`              | Marquer le commit ; persister le checkpoint terminal ; revendiquer et diffuser la complétion ; effacer le checkpoint / libérer l'acteur ; exécuter les projections derrière la barrière d'admission.                                                                                                                                                                                                      |
+| actif                | `CANCEL`                   | matching                        | `cancelling`           | Demander l'avortement du fetch/backoff/transaction et renvoyer le non-terminal `SCAN_CANCEL_REQUESTED` ; préserver l'état du Feed.                                                                                                                                                                                                                                                                        |
+| `cancelling`         | `ABORT_CONFIRMED`          | matching                        | `cancelled`            | Uniquement après la quiescence du scanner/transaction, libérer le bail/checkpoint, émettre exactement un `SCAN_CANCELLED` et arrêter l'acteur.                                                                                                                                                                                                                                                            |
+| `persisting`         | `PERSIST_FAILED`           | matching                        | `failed`               | Avorter/annuler (rollback) la transaction, libérer le bail, émettre l'erreur typée.                                                                                                                                                                                                                                                                                                                       |
+| récupération `idle`  | `SERVICE_WORKER_RESTARTED` | aucun checkpoint                | `idle`                 | Ne démarrer aucun acteur et conserver les dernières missions durables.                                                                                                                                                                                                                                                                                                                                    |
+| récupération `idle`  | `SERVICE_WORKER_RESTARTED` | checkpoint actif                | `failed`               | Réhydrater l'ancien ID, stabiliser en `worker_restarted`, libérer le bail obsolète, émettre une fois, puis effacer le checkpoint.                                                                                                                                                                                                                                                                         |
+| récupération `idle`  | `SERVICE_WORKER_RESTARTED` | checkpoint en annulation        | `cancelled`            | Réhydrater l'ancien ID, émettre l'annulation une fois, libérer le bail, puis effacer le checkpoint.                                                                                                                                                                                                                                                                                                       |
+| récupération `idle`  | `SERVICE_WORKER_RESTARTED` | checkpoint terminal             | terminal correspondant | Rejouer le message terminal correspondant de manière idempotente, puis effacer le checkpoint.                                                                                                                                                                                                                                                                                                             |
+| tout acteur terminal | `RESET`                    | même opération stabilisée       | acteur éliminé         | Éliminer cet acteur pour acquittement/test ; un scan ultérieur crée un nouvel acteur/ID depuis `idle`.                                                                                                                                                                                                                                                                                                    |
 
-The service-worker event mailbox determines the race between `CANCEL` and
-`PERSIST_SUCCEEDED`. Whichever matching event is reduced first wins. If cancel
-wins, the transaction must abort and later commit/completion events are stale;
-if commit wins, the operation is already terminal and later cancel is rejected.
+La boîte aux lettres des événements du service worker tranche la concurrence
+(race) entre `CANCEL` et `PERSIST_SUCCEEDED`. Le premier événement correspondant
+qui est réduit l'emporte. Si l'annulation l'emporte, la transaction doit avorter
+et les événements ultérieurs de commit/complétion sont caducs (stale) ; si le
+commit l'emporte, l'opération est déjà terminale et toute annulation ultérieure
+est rejetée.
 
-## Side effects and ownership
+## Effets de bord et détention (ownership)
 
-- **Core:** XState guards/actions that update immutable context; scoring,
-  ranking, validation, and deduplication. No I/O, promises, browser globals, or
-  generated timestamps.
-- **Scanner Shell:** connector I/O, abortable retry delay, injected clock,
-  typed error conversion, and live connector/retry/network events delivered to
-  the active actor when they occur. It never persists independently of
-  `persisting`, and its result is not replayed post-hoc to reconstruct state.
-  The admitted operation passes one explicit connector-ID list to both the
-  actor and scanner; health/first-scan variants use an operation-scoped override
-  and never rewrite global settings to steer one scan.
-- **Service worker Shell:** actor/lease/controller ownership, checkpoints,
-  persistence transaction, alarms, notifications, and bridge messages.
-- **Feed controller:** owns the current UI operation ID, projects state, clears
-  cold Feed to `empty` after cancellation, and ignores stale messages.
+- **Core :** Gardes/actions XState qui mettent à jour le contexte immuable ;
+  scoring, classement, validation et déduplication. Zéro I/O, promesses,
+  variables globales du navigateur ou horodatages générés.
+- **Shell du scanner :** I/O des connecteurs, délai de retry annulable, horloge
+  injectée, conversion d'erreur typée et événements en direct de
+  connecteur/retry/réseau délivrés à l'acteur actif au fil de l'eau. Il ne
+  persiste jamais indépendamment de `persisting`, et son résultat n'est pas
+  rejoué a posteriori pour reconstruire l'état. L'opération admise transmet une
+  liste explicite d'identifiants de connecteurs à la fois à l'acteur et au
+  scanner ; les variantes de santé/premier scan utilisent une surcharge délimitée
+  à l'opération et ne réécrivent jamais les réglages globaux pour piloter un scan.
+- **Shell du service worker :** détention de l'acteur/bail/contrôleur,
+  checkpoints, transaction de persistance, alarmes, notifications et messages
+  bridge.
+- **Contrôleur du Feed :** détient l'identifiant d'opération UI actuel, projette
+  l'état, efface un Feed froid vers `empty` après annulation et ignore les
+  messages obsolètes.
 
-Semantic scoring may enrich a mission as a **non-blocking, post-terminal**
-signal. Its output can affect a deterministic score but cannot choose lifecycle
-state or terminal classification.
+Le scoring sémantique peut enrichir une mission en tant que signal **non bloquant
+et post-terminal**. Sa sortie peut affecter un score déterministe mais ne peut pas
+choisir l'état du cycle de vie ni la classification terminale.
 
-### Semantic enrichment projection
+### Projection d'enrichissement sémantique
 
-Semantic scoring (Gemini Nano) MUST NOT delay the terminal broadcast. The
-enrichment runs inside the operation's `afterTerminal` hook — strictly after
-`SCAN_COMPLETE` has been broadcast and after durable persistence (`saveMissions`)
-has settled — and before the high-score notification projection, so fused
-semantic scores participate in the notification decision.
+Le scoring sémantique (Gemini Nano) NE DOIT PAS retarder la diffusion terminale.
+L'enrichissement s'exécute au sein du hook `afterTerminal` de l'opération —
+strictement après que `SCAN_COMPLETE` a été diffusé et après que la persistance
+durable (`saveMissions`) s'est stabilisée — et avant la projection des
+notifications de scores élevés, afin que les scores sémantiques fusionnés
+participent à la décision de notification.
 
-- **Input:** the persisted, deterministically-scored missions and the resolved
-  scan profile.
-- **Guard:** the enrichment is skipped when the profile is the default profile,
-  when the operation's abort signal is aborted, or when the Prompt API is
-  unavailable. Failure is logged and swallowed; it never produces a terminal
-  event.
-- **Output:** fused `scoreBreakdown` + `semanticScore`/`semanticReason` written
-  back to IndexedDB, then projected to the side panel via a single
-  `MISSIONS_UPDATED` message (no `cold-only` projection) that the feed controller
-  merges in place without altering feed lifecycle state.
-- **Notification ordering:** the high-score notification projection runs AFTER
-  enrichment. When enrichment is skipped (default profile / no Prompt API),
-  notifications fall back to deterministic scores. This preserves pre-enrichment
-  notification semantics: a mission whose deterministic score is below the
-  threshold but whose fused semantic score exceeds it is still notified.
-- **Serialization:** the enrichment executes inside the scan-admission barrier,
-  so it cannot overlap a newer scan's persistence. A newer scan admitted after
-  the barrier releases re-runs deterministic scoring on the fresh mission set;
-  cached semantic scores are applied by its own enrichment projection.
-- **Invariants:** missions are usable with deterministic scores alone; semantic
-  enrichment is idempotent and optional; the terminal classification chosen
-  before enrichment is never revised by it.
+- **Entrée :** les missions persistées et scorées de façon déterministe ainsi que
+  le profil de scan résolu.
+- **Garde :** l'enrichissement est ignoré lorsque le profil est le profil par
+  défaut, lorsque le signal d'avortement de l'opération est avorté, ou lorsque
+  l'API Prompt est indisponible. L'échec est consigné et absorbé ; il ne produit
+  jamais d'événement terminal.
+- **Sortie :** `scoreBreakdown` fusionné + `semanticScore`/`semanticReason`
+  réécrits dans IndexedDB, puis projetés vers le side panel via un message unique
+  `MISSIONS_UPDATED` (aucune projection `cold-only`) que le contrôleur du feed
+  fusionne sur place sans altérer l'état du cycle de vie du feed.
+- **Ordonnancement des notifications :** la projection des notifications de
+  scores élevés s'exécute APRÈS l'enrichissement. Lorsque l'enrichissement est
+  ignoré (profil par défaut / absence d'API Prompt), les notifications se
+  replient sur les scores déterministes. Cela préserve la sémantique de
+  notification antérieure à l'enrichissement : une mission dont le score
+  déterministe se situe sous le seuil mais dont le score sémantique fusionné le
+  dépasse fait toujours l'objet d'une notification.
+- **Sérialisation :** l'enrichissement s'exécute à l'intérieur de la barrière
+  d'admission de scan, de sorte qu'il ne puisse pas chevaucher la persistance d'un
+  scan plus récent. Un scan plus récent admis après la levée de la barrière
+  réexécute le scoring déterministe sur le jeu de missions fraîches ; les scores
+  sémantiques mis en cache sont appliqués par sa propre projection
+  d'enrichissement.
+- **Invariants :** les missions sont utilisables avec les seuls scores
+  déterministes ; l'enrichissement sémantique est idempotent et optionnel ; la
+  classification terminale choisie avant l'enrichissement n'est jamais révisée par
+  celui-ci.
 
-## Persistence boundary
+## Frontière de persistance
 
-- A versioned minimal `ScanCheckpoint` (`operationId`, lifecycle state,
-  trigger, connector outcomes, cancellation flag, terminal decision) is written to
-  `chrome.storage.session` at state boundaries so a service-worker wake-up can
-  classify the interrupted operation.
-- The `starting` checkpoint is awaited before work begins and before the start
-  acknowledgement is returned. Provisional admissions are serialized in FIFO
-  order and are not visible through `activeScanOperation`. If this first
-  durable lease write fails, the provisional actor reduces `START_FAILED`, is
-  disposed, and the command gets typed non-terminal `SCAN_START_REJECTED`; no
-  accepted operation, canonical runtime terminal, or uncheckpointed scanner
-  work is created. The next queued Start then evaluates the real accepted lease:
-  it may attempt its own checkpoint after failure, or receives `SCAN_BUSY`
-  against the first operation only after that operation's checkpoint succeeded
-  and its lease was atomically published.
-- A Cancel that arrives while the matching Start is provisional waits the same
-  admission queue. After success it reduces `CANCEL` against the published
-  operation. After starting-checkpoint failure it receives a typed non-terminal
-  `SCAN_CANCEL_REJECTED` carrying that deterministic admission failure; it is
-  never classified `STALE_OPERATION` merely because the lease was not yet
-  publishable. If the queued Start becomes `busy`, its matching Cancel receives
-  non-terminal `SCAN_CANCEL_REJECTED / START_NOT_ACCEPTED` after that durable
-  decision rather than racing ahead as stale.
-- Later live boundary writes remain serialized and every returned Promise is
-  observed. A boundary-write failure is propagated through the active
-  operation's controlled runtime-failure path rather than becoming an
-  unhandled rejection.
-- The canonical mission write is one abortable IndexedDB transaction owned by
-  the `persisting` operation. Its Promise resolves only from `tx.oncomplete`.
-  A winning cancel calls `tx.abort()`, and `ABORT_CONFIRMED` is forbidden until
-  `tx.onabort` (or an equivalent quiescent scanner rejection) proves rollback.
-  If `tx.oncomplete` wins first, `PERSIST_SUCCEEDED` is reduced synchronously
-  before another mailbox command can cancel that operation.
-- After `PERSIST_SUCCEEDED`, terminal order is strict: enqueue and await the
-  terminal checkpoint, claim the terminal in memory, attempt its canonical
-  broadcast, conditionally clear the same checkpoint and release the actor
-  lease. Only then may `MISSIONS_UPDATED`, TJM history, connector status,
-  badge, seen/notification facts, and purge run as post-commit projections. A
-  later cancel is a no-op and cannot suppress or replace success. Projection
-  failure cannot rewrite the terminal decision. Purge itself resolves only
-  after its IndexedDB transaction `oncomplete`.
-- Releasing the terminal actor does not reopen scan admission. A separate
-  admission barrier remains closed until every post-commit projection from the
-  settled operation has resolved or been safely classified as best-effort.
-  This prevents an older scan's delayed status, badge, notification, or purge
-  write from overwriting the projections of a newly admitted scan.
-- Ephemeral controller, promises, backoff timers, and partial uncommitted
-  missions are never treated as durable.
-- The terminal checkpoint is cleared only after a terminal messaging attempt.
-  The conditional clear and projection-barrier settlement both precede
-  acceptance of a new lease; replaying terminal messaging after a worker
-  restart remains idempotent by operation ID.
-- A failed terminal save or matching clear keeps admission fenced for that
-  operation; no later start may overwrite its checkpoint. The worker retains
-  an idempotent finalization closure that re-saves the same terminal decision,
-  calls `broadcastOnce`, conditionally clears the same operation ID, and then
-  completes any still-pending post-commit projections. The next start first
-  retries this closure: it is admitted only after cleanup succeeds, otherwise
-  it receives non-terminal `SCAN_START_REJECTED`. A late Cancel observes the
-  same barrier before classifying its ID: successful retry yields the canonical
-  terminal once followed by acknowledged no-op `SCAN_CANCEL_REQUESTED`, while
-  persistent cleanup failure yields `SCAN_CANCEL_REJECTED` with
-  `CHECKPOINT_CLEANUP_PENDING`, never `STALE_OPERATION`. A recovered terminal
-  operation ID is retained in the worker's bounded settled-ID registry so a
-  matching late Cancel remains an acknowledged no-op after replay.
+- Un `ScanCheckpoint` minimal versionné (`operationId`, état du cycle de vie,
+  déclencheur, résultats des connecteurs, indicateur d'annulation, décision
+  terminale) est écrit dans `chrome.storage.session` aux frontières d'état afin
+  qu'un réveil du service worker puisse classifier l'opération interrompue.
+- Le checkpoint `starting` est attendu avant que le travail ne commence et avant
+  que l'acquittement de démarrage ne soit renvoyé. Les admissions provisoires sont
+  sérialisées dans l'ordre FIFO et ne sont pas visibles via
+  `activeScanOperation`. Si cette première écriture durable de bail échoue,
+  l'acteur provisoire réduit `START_FAILED`, est éliminé et la commande reçoit un
+  `SCAN_START_REJECTED` non terminal typé ; aucune opération acceptée, état
+  terminal d'exécution canonique ni travail de scanner sans checkpoint n'est créé.
+  Le prochain Start en file d'attente évalue alors le véritable bail accepté : il
+  peut tenter son propre checkpoint après un échec, ou reçoit `SCAN_BUSY` face à
+  la première opération uniquement après que le checkpoint de cette opération a
+  réussi et que son bail a été atomiquement publié.
+- Un Cancel qui arrive alors que le Start correspondant est provisoire attend la
+  même file d'attente d'admission. Après succès, il réduit `CANCEL` face à
+  l'opération publiée. Après échec du checkpoint de démarrage, il reçoit un
+  `SCAN_CANCEL_REJECTED` non terminal typé portant cet échec d'admission
+  déterministe ; il n'est jamais classifié `STALE_OPERATION` simplement parce que
+  le bail n'était pas encore publiable. Si le Start en file d'attente devient
+  `busy`, son Cancel correspondant reçoit le non-terminal `SCAN_CANCEL_REJECTED /
+START_NOT_ACCEPTED` après cette décision durable plutôt que de prendre de
+  vitesse le flux en tant qu'opération caduque.
+- Les écritures ultérieures aux frontières en direct restent sérialisées et chaque
+  Promise renvoyée est observée. Un échec d'écriture de frontière est propagé via
+  le chemin contrôlé de défaillance d'exécution de l'opération active plutôt que de
+  devenir un rejet non géré.
+- L'écriture canonique de mission constitue une unique transaction IndexedDB
+  annulable détenue par l'opération en cours de `persisting`. Sa Promise ne se
+  résout qu'à partir de `tx.oncomplete`. Une annulation gagnante appelle
+  `tx.abort()`, et `ABORT_CONFIRMED` est interdit tant que `tx.onabort` (ou un
+  rejet de scanner quiescent équivalent) ne prouve pas le rollback. Si
+  `tx.oncomplete` l'emporte en premier, `PERSIST_SUCCEEDED` est réduit de manière
+  synchrone avant qu'une autre commande de la boîte aux lettres ne puisse annuler
+  cette opération.
+- Après `PERSIST_SUCCEEDED`, l'ordre terminal est strict : mettre en file
+  d'attente et attendre le checkpoint terminal, revendiquer le terminal en
+  mémoire, tenter sa diffusion canonique, effacer conditionnellement ce même
+  checkpoint et libérer le bail de l'acteur. Ce n'est qu'alors que
+  `MISSIONS_UPDATED`, l'historique TJM, le statut des connecteurs, le badge, les
+  faits de consultation/notification et la purge peuvent s'exécuter en tant que
+  projections post-commit. Une annulation ultérieure est sans effet (no-op) et ne
+  peut supprimer ni remplacer le succès. L'échec d'une projection ne peut pas
+  réécrire la décision terminale. La purge elle-même ne se résout qu'après le
+  `oncomplete` de sa transaction IndexedDB.
+- La libération de l'acteur terminal ne rouvre pas l'admission de scan. Une
+  barrière d'admission distincte demeure fermée tant que chaque projection
+  post-commit de l'opération stabilisée n'a pas été résolue ou classifiée de
+  façon sûre comme au mieux (best-effort). Cela empêche l'écriture retardée de
+  statut, badge, notification ou purge d'un scan plus ancien d'écraser les
+  projections d'un scan nouvellement admis.
+- Les contrôleurs éphémères, promesses, minuteurs de backoff et missions
+  partielles non validées ne sont jamais traités comme durables.
+- Le checkpoint terminal n'est effacé qu'après une tentative de messagerie
+  terminale. L'effacement conditionnel et la stabilisation de la barrière de
+  projection précèdent tous deux l'acceptation d'un nouveau bail ; le rejeu de la
+  messagerie terminale après un redémarrage du worker demeure idempotent par
+  identifiant d'opération.
+- Un échec d'enregistrement terminal ou d'effacement correspondant maintient
+  l'admission verrouillée pour cette opération ; aucun démarrage ultérieur ne
+  peut écraser son checkpoint. Le worker conserve une fermeture (closure) de
+  finalisation idempotente qui réenregistre la même décision terminale, appelle
+  `broadcastOnce`, efface conditionnellement le même identifiant d'opération, puis
+  termine toute projection post-commit encore en attente. Le démarrage suivant
+  retente d'abord cette closure : il n'est admis qu'après la réussite du
+  nettoyage, sinon il reçoit le non-terminal `SCAN_START_REJECTED`. Un Cancel
+  tardif observe la même barrière avant de classifier son ID : une nouvelle
+  tentative réussie produit le terminal canonique une fois, suivi du no-op
+  acquitté `SCAN_CANCEL_REQUESTED`, tandis qu'un échec persistant de nettoyage
+  produit `SCAN_CANCEL_REJECTED` avec `CHECKPOINT_CLEANUP_PENDING`, jamais
+  `STALE_OPERATION`. Un identifiant d'opération terminale récupéré est conservé
+  dans le registre borné d'identifiants stabilisés du worker, de sorte qu'un
+  Cancel tardif correspondant reste un no-op acquitté après rejeu.
 
-## Permissions and offline behavior
+## Permissions et comportement hors ligne
 
-Startup validates each selected connector's build inclusion and host
-permission. Permission/session failures become connector failures and do not
-stop other connectors. A globally unavailable required browser capability can
-fail `starting`.
+Le démarrage valide l'inclusion au build et la permission d'hôte de chaque
+connecteur sélectionné. Les échecs de permission/session deviennent des échecs de
+connecteurs et n'interrompent pas les autres connecteurs. Une capacité requise du
+navigateur globalement indisponible peut faire échouer `starting`.
 
-Offline at startup produces `failed` without launching connectors. A global
-offline event during scanning cancels all in-flight/backoff work and settles
-each unfinished connector with typed `OFFLINE`; already successful connectors
-remain successful. The resulting all-settled reduction becomes `partial` when
-any connector succeeded or `failed` when all failed. A connector failure while
-still online follows its explicit retry budget. Network recovery never
-resurrects a settled connector or auto-starts a new operation.
+Un état hors ligne au démarrage produit `failed` sans lancer les connecteurs. Un
+événement hors ligne global pendant le scan annule tout travail en vol/backoff et
+stabilise chaque connecteur inachevé avec le statut typé `OFFLINE` ; les
+connecteurs déjà réussis demeurent réussis. La réduction globale stabilisée qui en
+résulte devient `partial` si au moins un connecteur a réussi, ou `failed` si tous
+ont échoué. La défaillance d'un connecteur alors qu'il est encore en ligne respecte
+son budget explicite de retry. La récupération du réseau ne ressuscite jamais un
+connecteur stabilisé et ne démarre jamais automatiquement une nouvelle opération.
 
-## Retry, cancellation, concurrency, and restart
+## Retry, annulation, concurrence et redémarrage
 
-- Retry count is per connector, capped, and cleared only by a new operation.
-- Non-retryable and exhausted failures settle immediately and can never emit a
-  retry timer. Multiple connector timers remain independently represented by
-  `retryPendingConnectorIds`.
-- Backoff and fetch consume the same `AbortSignal`; cancellation never waits
-  for an unabortable sleep. Retryable failures, retry scheduling, timer firing,
-  connector settlement, and network failure are observed by the actor live,
-  before the corresponding Shell step continues.
-- On the first connector rejection or abort, the pool stops launching new
-  connectors and drains every already-started task with `Promise.allSettled`.
-  It rethrows the first failure only after that drain, produces no unhandled
-  rejection, and retains the scanner mutex throughout cleanup.
-- One accepted active lease means one scan. Provisional Start decisions are
-  serialized before lease inspection/publication. A concurrent request waits
-  that decision, then settles as `busy` only when it can observe the accepted
-  operation; after a failed provisional checkpoint it may attempt admission
-  itself and does not alter the failed actor.
-- On service-worker recovery, a checkpoint in `starting`, `scanning`,
-  `retrying`, or `persisting` settles the old ID as `failed` with
-  `WORKER_RESTARTED`; effects are never resumed from partial memory. A
-  checkpoint in `cancelling` settles as `cancelled`. Terminal checkpoints are
-  replayed idempotently, then cleared. Completion replay reconstructs its exact
-  ordered identity from durable missions. Missing rows fence the terminal
-  attempt and retain the checkpoint; duplicate or empty checkpoint mission IDs
-  are invalid and are removed during checkpoint validation. Error/cancel replay
-  uses the persisted terminal decision.
-- Recovery is a bootstrap gate shared by manual, alarm, first-scan, and health
-  starts and by cancellation commands. No caller can create a lease, mutate
-  scan-scoped settings, or classify a Cancel as stale until the old checkpoint has been
-  reduced through `SERVICE_WORKER_RESTARTED`, its single terminal attempt has
-  completed, its actor/lease has been released, and the matching checkpoint
-  has been conditionally cleared. Concurrent starts awaiting the gate are
-  serialized by the normal lease check after recovery.
-- If recovery fails before a terminal attempt, the checkpoint is retained and
-  the next command starts one fresh serialized recovery attempt. The current
-  start/cancel receives typed non-terminal `SCAN_START_REJECTED` or
-  `SCAN_CANCEL_REJECTED`; no canonical runtime terminal is invented for an
-  operation that was never admitted. A later command may proceed after the
-  retry succeeds.
-- A browser restart with no session checkpoint starts at `idle`; durable
-  mission data remains the last committed snapshot.
+- Le compte de retries est par connecteur, plafonné, et n'est réinitialisé que
+  par une nouvelle opération.
+- Les défaillances non rejouables ou épuisées se stabilisent immédiatement et ne
+  peuvent jamais émettre de minuteur de retry. Les multiples minuteurs de
+  connecteurs restent représentés indépendamment par `retryPendingConnectorIds`.
+- Le backoff et le fetch consomment le même `AbortSignal` ; l'annulation n'attend
+  jamais une pause non annulable. Les défaillances rejouables, la planification de
+  retry, le déclenchement de minuteur, la stabilisation de connecteur et la
+  défaillance réseau sont observés en direct par l'acteur, avant que l'étape de
+  Shell correspondante ne se poursuive.
+- Au premier rejet de connecteur ou avortement, le pool cesse de lancer de
+  nouveaux connecteurs et draine chaque tâche déjà démarrée avec
+  `Promise.allSettled`. Il ne relance la première défaillance qu'après ce drainage,
+  ne produit aucun rejet non géré et conserve le mutex du scanner tout au long du
+  nettoyage.
+- Un bail actif accepté signifie un seul scan. Les décisions de Start provisoire
+  sont sérialisées avant l'inspection/publication du bail. Une requête
+  concurrente attend cette décision, puis se stabilise en `busy` uniquement
+  lorsqu'elle peut observer l'opération acceptée ; après un échec de checkpoint
+  provisoire, elle peut tenter l'admission elle-même et ne modifie pas l'acteur en
+  échec.
+- Lors de la récupération du service worker, un checkpoint en `starting`,
+  `scanning`, `retrying` ou `persisting` stabilise l'ancien identifiant en
+  `failed` avec `WORKER_RESTARTED` ; les effets ne sont jamais repris à partir
+  d'une mémoire partielle. Un checkpoint en `cancelling` se stabilise en
+  `cancelled`. Les checkpoints terminaux sont rejoués de manière idempotente, puis
+  effacés. Le rejeu de complétion reconstruit son identité ordonnée exacte à
+  partir des missions durables. Des lignes manquantes verrouillent la tentative
+  terminale et conservent le checkpoint ; les identifiants de mission de
+  checkpoint en double ou vides sont invalides et sont supprimés lors de la
+  validation du checkpoint. Le rejeu d'erreur/annulation utilise la décision
+  terminale persistée.
+- La récupération est une barrière d'amorçage partagée par les démarrages manuels,
+  par alarme, de premier scan et de santé, ainsi que par les commandes
+  d'annulation. Aucun appelant ne peut créer de bail, modifier les réglages délimités
+  au scan ou classifier un Cancel comme caduc tant que l'ancien checkpoint n'a pas
+  été réduit via `SERVICE_WORKER_RESTARTED`, que son unique tentative terminale
+  n'est pas terminée, que son acteur/bail n'a pas été libéré et que le checkpoint
+  correspondant n'a pas été conditionnellement effacé. Les démarrages concurrents
+  en attente de la barrière sont sérialisés par la vérification normale du bail
+  après récupération.
+- Si la récupération échoue avant une tentative terminale, le checkpoint est
+  conservé et la commande suivante démarre une nouvelle tentative sérialisée de
+  récupération. Le démarrage/annulation actuel reçoit le non-terminal typé
+  `SCAN_START_REJECTED` ou `SCAN_CANCEL_REJECTED` ; aucun état terminal
+  d'exécution canonique n'est inventé pour une opération qui n'a jamais été
+  admise. Une commande ultérieure peut se poursuivre après la réussite du retry.
+- Un redémarrage du navigateur sans checkpoint de session commence à `idle` ; les
+  données durables de mission demeurent le dernier snapshot validé.
 
-## Terminal states and re-entry
+## États terminaux et réentrance
 
-`completed`, `partial`, `failed`, `cancelled`, and `busy` are terminal for
-their actor and operation ID. `busy` belongs only to the rejected start actor.
-`RESET` may dispose a terminal actor for testing/UI acknowledgement, but a new
-scan always creates a new actor and ID from `idle`; no terminal actor re-enters
-`starting`. The service worker stops every accepted actor after its canonical
-terminal broadcast; every accepted terminal transition releases the modeled
-lease.
+`completed`, `partial`, `failed`, `cancelled` et `busy` sont terminaux pour leur
+acteur et leur identifiant d'opération. `busy` n'appartient qu'à l'acteur de
+démarrage rejeté. `RESET` peut éliminer un acteur terminal pour
+l'acquittement de test/UI, mais un nouveau scan crée toujours un nouvel acteur
+et identifiant depuis `idle` ; aucun acteur terminal ne réintègre `starting`. Le
+service worker arrête chaque acteur accepté après sa diffusion terminale
+canonique ; chaque transition terminale acceptée libère le bail modélisé.
 
-## Forbidden transitions
+## Transitions interdites
 
-- Active scan actor to `busy` because of another request; only the rejected
-  request actor may become `busy`.
-- `cancelling` or `cancelled` to `persisting`, `completed`, or `partial`.
-- `completed`, `partial`, `failed`, `cancelled`, or `busy` back into an active
-  state for the same operation ID.
-- Persistence or completion when every connector failed.
-- Empty mission array used as a proxy for mutex/busy success.
-- Retry beyond budget, after cancellation, or after a non-retryable error.
-- Processing any connector, persistence, or UI message for a stale operation.
-- `CONNECTORS_SETTLED` while any connector is pending, running, or queued for
-  retry.
-- Any implicit transition from error copy, progress text, toast, or AI output.
-- Returning `SCAN_COMPLETE`, `SCAN_ERROR`, or `SCAN_CANCELLED` as a
-  `SCAN_START`/`SCAN_CANCEL` command response in addition to broadcasting it.
-- Treating `SCAN_START_REJECTED` or `SCAN_CANCEL_REJECTED` as a runtime terminal,
-  or leaving the Feed's rejected local intention active after either response.
-- Letting a late `SCAN_CANCEL_REJECTED` response overwrite a matching canonical
-  terminal already claimed by the Feed; the terminal always wins this race.
-- Emitting `SCAN_CANCELLED` before scanner rejection or IndexedDB `onabort`
-  proves all cancel-sensitive work is quiescent.
-- Releasing the scanner mutex, broadcasting `SCAN_CANCELLED`, or accepting a
-  replacement lease while any previously started connector task remains
-  unsettled.
-- Starting any best-effort post-commit projection before the canonical terminal
-  decision has been checkpointed and claimed/broadcast.
-- Sending `SCAN_CANCEL` from the Feed after its matching terminal has been
-  synchronously claimed.
-- Accepting any scan start before bootstrap checkpoint recovery has completed.
-- Publishing an active lease, returning `SCAN_BUSY`, or classifying a matching
-  Cancel as stale while a starting checkpoint is still provisional.
-- Accepting a replacement scan while post-commit projections from the previous
-  committed operation are still unsettled.
-- Writing a replacement scan's starting checkpoint before a failed predecessor
-  finalization has been retried successfully; repeated terminal broadcasts are
-  forbidden even when terminal save/clear is retried.
-- Mutating temporary connector settings for a health/first scan before that
-  operation has crossed recovery and admission.
+- Passer l'acteur de scan actif à `busy` en raison d'une autre requête ; seul
+  l'acteur de requête rejetée peut devenir `busy`.
+- Passer de `cancelling` ou `cancelled` à `persisting`, `completed` ou `partial`.
+- Revenir de `completed`, `partial`, `failed`, `cancelled` ou `busy` vers un état
+  actif pour le même identifiant d'opération.
+- Persistance ou complétion lorsque chaque connecteur a échoué.
+- Utiliser un tableau de missions vide comme indicateur de succès du mutex/busy.
+- Retenter au-delà du budget, après annulation ou après une erreur non rejouable.
+- Traiter tout message de connecteur, de persistance ou d'UI pour une opération
+  caduque.
+- `CONNECTORS_SETTLED` tant qu'un connecteur est en attente, en cours ou en file
+  d'attente pour retry.
+- Toute transition implicite issue du texte d'erreur, du texte de progression,
+  d'un toast ou de la sortie de l'IA.
+- Renvoyer `SCAN_COMPLETE`, `SCAN_ERROR` ou `SCAN_CANCELLED` en tant que réponse
+  à une commande `SCAN_START`/`SCAN_CANCEL` en plus de le diffuser.
+- Traiter `SCAN_START_REJECTED` ou `SCAN_CANCEL_REJECTED` comme un état terminal
+  d'exécution, ou laisser l'intention locale rejetée du Feed active après l'une
+  ou l'autre de ces réponses.
+- Laisser une réponse tardive `SCAN_CANCEL_REJECTED` écraser un terminal
+  canonique correspondant déjà revendiqué par le Feed ; le terminal l'emporte
+  toujours sur cette concurrence.
+- Émettre `SCAN_CANCELLED` avant que le rejet du scanner ou le `onabort`
+  d'IndexedDB ne prouve que tout travail sensible à l'annulation est quiescent.
+- Libérer le mutex du scanner, diffuser `SCAN_CANCELLED` ou accepter un bail de
+  remplacement tant qu'une tâche de connecteur précédemment démarrée demeure non
+  stabilisée.
+- Démarrer toute projection post-commit au mieux avant que la décision terminale
+  canonique n'ait été enregistrée en checkpoint et revendiquée/diffusée.
+- Envoyer `SCAN_CANCEL` depuis le Feed après que son terminal correspondant a été
+  revendiqué de façon synchrone.
+- Accepter tout démarrage de scan avant que la récupération du checkpoint
+  d'amorçage ne soit terminée.
+- Publier un bail actif, renvoyer `SCAN_BUSY` ou classifier un Cancel
+  correspondant comme caduc alors qu'un checkpoint de démarrage est encore
+  provisoire.
+- Accepter un scan de remplacement alors que les projections post-commit de
+  l'opération validée précédente ne sont pas encore stabilisées.
+- Écrire le checkpoint de démarrage d'un scan de remplacement avant qu'une
+  finalisation de prédécesseur en échec n'ait été retentée avec succès ; les
+  diffusions terminales répétées sont interdites même lorsque l'enregistrement/effacement
+  terminal fait l'objet d'un retry.
+- Modifier temporairement les réglages de connecteurs pour un scan de santé/premier
+  scan avant que cette opération n'ait franchi la récupération et l'admission.
 
 ## Invariants
 
-1. The exact state set is the union declared above; aliases are forbidden.
-2. At most one live operation owns the service-worker lease/controller.
-3. Every event, bridge message, checkpoint, and persistence effect is scoped by
-   `operationId`.
-4. Cancellation is terminal and invalidates every late result.
-5. `completed`/`partial` require confirmed persistence; UI never leads storage.
-6. A partial scan requires at least one successful and one failed connector.
-7. Zero missions from a valid connector is successful, not `busy` or `failed`.
-8. An LLM never decides a transition; deterministic guards classify signals.
-9. Core remains pure and Shell owns every side effect.
-10. Every declared lifecycle event has an explicit reduction above or is
-    rejected as stale/invalid; result classification never depends on prose.
-11. Every configured connector settles exactly once as `succeeded` or
-    `failed` before persistence or terminal all-failed classification.
-12. An accepted operation emits exactly one canonical terminal broadcast; its
-    start/cancel command responses are non-terminal acknowledgements only.
-13. `cancelled` is observable only after abort quiescence. If the mission
-    transaction `oncomplete` wins first, commit is terminal and cancellation is
-    stale.
-14. Every started connector task is settled before `runScan` releases its mutex
-    or reports cancellation/error.
-15. A terminal decision is synchronously claimed before any suspendable
-    post-commit/UI projection; command-level Cancel cannot replace it.
-16. Session checkpoint writes preserve lifecycle order, and recovery completes
-    terminal attempt plus conditional clear before any new lease is accepted.
-17. A committed terminal may be visible before post-commit projections finish,
-    but scan admission remains closed until those projections settle.
-18. Recovery retries are serialized, retain pre-attempt checkpoints, and never
-    emit a terminal bridge message as a `SCAN_START`/`SCAN_CANCEL` response.
-19. Health and first-scan connector selection is operation-scoped; the actor
-    and scanner consume the same list without temporary global-settings writes.
-20. Terminal finalization is idempotently retryable: a fail-once cleanup may
-    unblock the next start, persistent failure rejects it, and `broadcastOnce`
-    preserves one canonical terminal message across every attempt.
-21. Cancel cannot classify an operation as stale while its terminal
-    finalization is retryable or in flight; it observes the same admission
-    barrier as Start before returning a non-terminal command response.
-22. Feed revalidates operation ownership and terminal claim after every awaited
-    Cancel response; a matching canonical terminal suppresses any later
-    command rejection or thrown transport error.
-23. The provisional-admission queue publishes `activeScanOperation` only after
-    the matching `starting` checkpoint succeeds. Queued Start and Cancel
-    commands observe that durable decision before classifying their response.
-24. A recovered completion is broadcast and cleared only after every non-empty,
-    unique checkpoint mission ID resolves to exactly one durable mission in the
-    checkpoint order; missing rows retain the checkpoint for retry.
+1. L'ensemble exact des états est l'union déclarée ci-dessus ; les alias sont
+   interdits.
+2. Au plus une opération active détient le bail/contrôleur du service worker.
+3. Chaque événement, message bridge, checkpoint et effet de persistance est
+   délimité par `operationId`.
+4. L'annulation est terminale et invalide tout résultat tardif.
+5. `completed`/`partial` requièrent une persistance confirmée ; l'UI ne précède
+   jamais le stockage.
+6. Un scan partiel requiert au moins un connecteur réussi et un connecteur en
+   échec.
+7. Zéro mission issue d'un connecteur valide constitue un succès, pas un état
+   `busy` ou `failed`.
+8. Un LLM ne décide jamais d'une transition ; des gardes déterministes classifient
+   les signaux.
+9. Le Core reste pur et le Shell détient chaque effet de bord.
+10. Chaque événement de cycle de vie déclaré dispose d'une réduction explicite
+    ci-dessus ou est rejeté comme caduc/invalide ; la classification des
+    résultats ne dépend jamais de la prose.
+11. Chaque connecteur configuré se stabilise exactement une fois en `succeeded`
+    ou `failed` avant la persistance ou la classification terminale en tout échoué.
+12. Une opération acceptée émet exactement une diffusion terminale canonique ; ses
+    réponses aux commandes de démarrage/annulation sont uniquement des
+    acquittements non terminaux.
+13. `cancelled` n'est observable qu'après la quiescence de l'avortement. Si le
+    `oncomplete` de la transaction de mission l'emporte en premier, le commit est
+    terminal et l'annulation est caduque.
+14. Chaque tâche de connecteur démarrée est stabilisée avant que `runScan` ne
+    libère son mutex ou ne signale une annulation/erreur.
+15. Une décision terminale est revendiquée de manière synchrone avant toute
+    projection post-commit/UI interruptible ; un Cancel au niveau commande ne peut
+    pas la remplacer.
+16. Les écritures de checkpoint de session préservent l'ordre du cycle de vie, et
+    la récupération termine la tentative terminale ainsi que l'effacement
+    conditionnel avant qu'aucun nouveau bail ne soit accepté.
+17. Un terminal validé peut être visible avant que les projections post-commit ne
+    soient achevées, mais l'admission de scan reste fermée jusqu'à ce que ces
+    projections se stabilisent.
+18. Les retries de récupération sont sérialisés, conservent les checkpoints
+    préalables à la tentative et n'émettent jamais de message bridge terminal en
+    tant que réponse à `SCAN_START`/`SCAN_CANCEL`.
+19. La sélection des connecteurs de santé et de premier scan est délimitée à
+    l'opération ; l'acteur et le scanner consomment la même liste sans écritures
+    temporaires des réglages globaux.
+20. La finalisation terminale est rejouable de manière idempotente : un nettoyage
+    qui échoue une fois peut débloquer le démarrage suivant, un échec persistant
+    le rejette, et `broadcastOnce` préserve un unique message terminal canonique à
+    travers chaque tentative.
+21. Cancel ne peut pas classifier une opération comme caduque tant que sa
+    finalisation terminale est rejouable ou en cours ; il observe la même
+    barrière d'admission que Start avant de renvoyer une réponse de commande non
+    terminale.
+22. Le Feed revalide la détention de l'opération et la revendication terminale
+    après chaque réponse Cancel attendue ; un terminal canonique correspondant
+    supprime tout rejet de commande ultérieur ou erreur de transport levée.
+23. La file d'attente d'admission provisoire ne publie `activeScanOperation`
+    qu'après la réussite du checkpoint `starting` correspondant. Les commandes
+    Start et Cancel en file d'attente observent cette décision durable avant de
+    classifier leur réponse.
+24. Une complétion récupérée n'est diffusée et effacée qu'après que chaque
+    identifiant de mission unique et non vide du checkpoint se résout en
+    exactement une mission durable dans l'ordre du checkpoint ; des lignes
+    manquantes conservent le checkpoint pour un retry.
 
-## Review checklist
+## Checklist de revue
 
-- [x] Nominal scan, zero-result success, partial result, all-failed result, and persistence failure are explicit.
-- [x] Permission/session refusal and offline exhaustion are connector/global failures as appropriate.
-- [x] Retry budget, abortable delay, cancellation at every active state, and late result rejection are explicit.
-- [x] Concurrent start returns `busy` without disturbing the active scan.
-- [x] Service-worker/browser restart behavior and checkpoint ownership are defined.
-- [x] Non-retryable/exhausted failures, multi-connector retries, offline settlement, and every restart checkpoint are reducible.
-- [x] Every terminal state rejects same-operation re-entry.
+- [x] Le scan nominal, le succès à zéro résultat, le résultat partiel, le résultat tout échoué et l'échec de persistance sont explicites.
+- [x] Le refus de permission/session et l'épuisement hors ligne constituent des échecs de connecteurs ou globaux selon le cas.
+- [x] Le budget de retry, le délai annulable, l'annulation à chaque état actif et le rejet de résultat tardif sont explicites.
+- [x] Le démarrage concurrent renvoie `busy` sans perturber le scan actif.
+- [x] Le comportement au redémarrage du service worker/navigateur et la détention des checkpoints sont définis.
+- [x] Les échecs non rejouables/épuisés, les retries multi-connecteurs, la stabilisation hors ligne et chaque checkpoint de redémarrage sont réductibles.
+- [x] Chaque état terminal rejette la réentrance pour la même opération.

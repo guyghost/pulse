@@ -1,22 +1,25 @@
-# CV Experience Model
+# Modèle d'expériences CV
 
-Source of truth for the CV tab behavior: a canonical, editable feed of
-professional experiences. The former manual cross-platform synchronization
-workflow (copy the CV to the clipboard, then open every platform) is retired.
+Source de vérité pour le comportement de l'onglet CV : un feed canonique et
+modifiable d'expériences professionnelles. L'ancien flux de synchronisation
+manuelle multi-plateformes (copier le CV dans le presse-papiers, puis ouvrir
+chaque plateforme) est abandonné.
 
-Users keep MissionPulse open while visiting a target platform themselves. A
-future in-page form assistant may propose field values from the canonical CV,
-in the style of Grammarly, but that assistant is a separate workflow and MUST
-be modeled before implementation. The CV page does not claim that this future
-assistant is already available.
+Les utilisateurs gardent MissionPulse ouvert pendant qu'ils visitent eux-mêmes
+une plateforme cible. Un futur assistant de formulaire in-page pourra proposer
+des valeurs de champs à partir du CV canonique, dans le style de Grammarly, mais
+cet assistant constitue un flux séparé et DOIT faire l'objet d'un modèle avant
+toute implémentation. La page CV ne prétend pas que ce futur assistant est déjà
+disponible.
 
-The LLM never decides a transition. It may propose field content inside a
-dedicated AI worker; the model decides whether the user can accept it and how
-it affects persisted state. **Le LLM produit des signaux ; le modèle décide.**
+Le LLM ne décide jamais d'une transition. Il peut proposer un contenu de champ au
+sein d'un worker IA dédié ; le modèle décide si l'utilisateur peut l'accepter et
+de quelle manière cela affecte l'état persisté. **Le LLM produit des signaux ; le
+modèle décide.**
 
-## Domain entity
+## Entité de domaine
 
-### Experience (canonical, persisted on `UserProfile.experiences`)
+### Experience (canonique, persistée sur `UserProfile.experiences`)
 
 ```ts
 interface Experience {
@@ -37,16 +40,16 @@ interface Experience {
 }
 ```
 
-`employmentType` is persisted independently from `company`. Legacy values are
-normalized to `null`; no IndexedDB migration is required because the profile
-normalization boundary supplies the field.
+`employmentType` est persisté indépendamment de `company`. Les valeurs historiques
+sont normalisées à `null` ; aucune migration IndexedDB n'est requise car la
+frontière de normalisation du profil fournit le champ.
 
 ## Machines
 
-The Svelte 5 runes store composes two machines sharing the canonical
-experiences list.
+Le store à base de runes Svelte 5 compose deux machines partageant la liste
+canonique des expériences.
 
-### 1. Feed machine — `feedStatus`
+### 1. Machine feed — `feedStatus`
 
 ```text
 loading ──LOAD_RESULT(ok)──► ready
@@ -56,11 +59,11 @@ ready   ──RELOAD───────────► loading
 idle/ready/error ──PROFILE_UPDATED──► ready
 ```
 
-`FeedStatus = 'loading' | 'ready' | 'error'`. `ready` with zero experiences
-renders the empty state. A load failure is terminal until the user retries or
-the page is remounted.
+`FeedStatus = 'loading' | 'ready' | 'error'`. `ready` avec zéro expérience affiche
+l'état vide. Un échec de chargement est terminal jusqu'à ce que l'utilisateur
+réessaie ou que la page soit remontée.
 
-### 2. Edit machine — `editStatus`
+### 2. Machine d'édition — `editStatus`
 
 ```text
 idle    ──NEW──────────────► adding
@@ -76,9 +79,9 @@ deleting ──DELETE_ERROR────► error
 ```
 
 `EditStatus = 'idle' | 'adding' | 'editing' | 'saving' | 'deleting' | 'error'`.
-Only one edit/delete operation may exist at a time.
+Une seule opération d'édition/suppression peut exister à la fois.
 
-## Context
+## Contexte
 
 ```ts
 interface CvExperienceContext {
@@ -92,10 +95,11 @@ interface CvExperienceContext {
 }
 ```
 
-There is no `syncStatus`, per-platform status map, last-sync timestamp, or sync
-error slot in the CV store.
+Il n'y a pas de `syncStatus`, de map de statuts par plateforme, d'horodatage de
+dernière synchronisation ou d'emplacement d'erreur de synchronisation dans le
+store CV.
 
-## Events
+## Événements
 
 ```ts
 type CvEvent =
@@ -114,12 +118,12 @@ type CvEvent =
   | { type: 'DELETE_ERROR'; message: string };
 ```
 
-`SYNC_START`, `SYNC_CANCEL`, `PREPARE_DONE`, `PLATFORM_*`, and `ALL_SETTLED`
-are not valid CV events.
+`SYNC_START`, `SYNC_CANCEL`, `PREPARE_DONE`, `PLATFORM_*` et `ALL_SETTLED` ne
+sont pas des événements CV valides.
 
-## Transition review
+## Revue des transitions
 
-| From       | NEW     | EDIT    | CANCEL  | SUBMIT  | DELETE   | PROFILE_UPDATED |
+| Depuis     | NEW     | EDIT    | CANCEL  | SUBMIT  | DELETE   | PROFILE_UPDATED |
 | ---------- | ------- | ------- | ------- | ------- | -------- | --------------- |
 | `idle`     | adding  | editing | -       | -       | deleting | ready           |
 | `adding`   | ignored | ignored | idle    | saving  | ignored  | dropped         |
@@ -128,29 +132,33 @@ are not valid CV events.
 | `deleting` | ignored | ignored | ignored | ignored | ignored  | dropped         |
 | `error`    | adding  | editing | idle    | saving  | deleting | ready           |
 
-- Nominal: load, add, edit, save, delete, LinkedIn re-import.
-- Errors: load/save/delete failures populate only their machine's error slot.
-- Cancellation: only a local add/edit session is cancellable; persistence
-  already in flight is not cancelled.
-- Retry: load uses `reload`; a retained failed draft may be submitted again;
-  delete may be requested again from `error`.
-- Permissions: LinkedIn import permissions belong to the LinkedIn import model,
-  not to the CV store. The CV store requests no host or clipboard permission.
-- Terminal states: `ready`/`idle` are successful terminals; `error` is a stable
-  recoverable terminal. No background platform-opening operation survives the
-  page.
+- Nominal : chargement, ajout, édition, sauvegarde, suppression, ré-import LinkedIn.
+- Erreurs : les échecs de chargement/sauvegarde/suppression renseignent uniquement
+  le slot d'erreur de leur propre machine.
+- Annulation : seule une session locale d'ajout/édition peut être annulée ; la
+  persistance déjà en cours n'est pas annulée.
+- Nouvelle tentative : le chargement utilise `reload` ; un brouillon conservé en
+  échec peut être soumis à nouveau ; la suppression peut être redemandée depuis
+  `error`.
+- Permissions : les permissions d'import LinkedIn relèvent du modèle d'import
+  LinkedIn, non du store CV. Le store CV ne demande aucune permission d'hôte ou
+  de presse-papiers.
+- États terminaux : `ready`/`idle` sont des états terminaux nominaux ; `error`
+  est un état terminal stable et récupérable. Aucune opération d'ouverture de
+  plateforme en arrière-plan ne survit à la page.
 
 ## Side effects
 
-- `loadExperiences()` reads `UserProfile.experiences` through the profile bridge.
-- `saveExperiences(experiences)` persists the complete normalized list through
-  the profile bridge.
-- The store never calls `navigator.clipboard`, never opens an external URL, and
-  never enumerates connector targets.
-- LinkedIn import remains owned by `linkedin-import.model.md`; its
-  `PROFILE_UPDATED` message is applied only when no edit/save/delete is active.
+- `loadExperiences()` lit `UserProfile.experiences` via le bridge de profil.
+- `saveExperiences(experiences)` persiste la liste normalisée complète via le
+  bridge de profil.
+- Le store n'appelle jamais `navigator.clipboard`, n'ouvre jamais d'URL externe et
+  n'énumère jamais les connecteurs cibles.
+- L'import LinkedIn reste géré par `linkedin-import.model.md` ; son message
+  `PROFILE_UPDATED` n'est appliqué que lorsqu'aucune édition/sauvegarde/suppression
+  n'est active.
 
-## Public API
+## API publique
 
 ```ts
 createCvExperienceStore(deps): {
@@ -181,38 +189,41 @@ interface CvExperienceDeps {
 }
 ```
 
-## UI projection
+## Projection UI
 
-- `CvPage` renders the page header, LinkedIn import action, optional profile
-  navigation, offline notice, and `ExperienceFeed`.
-- The manual "Synchronisation du CV" card and its "Synchroniser" button are
-  absent in every feed/edit/network state.
-- Adding or editing an experience is disabled only by the edit machine, never by
-  a removed synchronization state.
-- Copy must describe the CV as the canonical local source without promising
-  automatic propagation to connected platforms.
+- `CvPage` affiche l'en-tête de page, l'action d'import LinkedIn, la navigation
+  optionnelle vers le profil, la notification hors ligne et `ExperienceFeed`.
+- La carte manuelle « Synchronisation du CV » et son bouton « Synchroniser » sont
+  absents quel que soit l'état de feed/édition/réseau.
+- L'ajout ou l'édition d'une expérience n'est désactivé que par la machine
+  d'édition, jamais par un état de synchronisation supprimé.
+- La copy doit décrire le CV comme la source locale canonique sans promettre de
+  propagation automatique vers les plateformes connectées.
 
 ## Invariants
 
-1. At most one edit session exists.
-2. `saving` and `deleting` reject re-entrant events until they settle.
-3. `PROFILE_UPDATED` is dropped during adding/editing/saving/deleting and is
-   accepted only from idle/error.
-4. `positionIndex` is gapless and unique after every save/delete.
-5. An experience with `isCurrent: true` has `endDate === null`.
-6. `employmentType` never mutates `company` and does not affect deduplication.
-7. The CV page and store have no manual clipboard/platform synchronization
-   capability, hidden or visible.
-8. The CV facade exposes profile load/save only; it has no connector catalogue,
-   clipboard writer, or external-tab opener.
-9. Future in-page assistance cannot be implemented as an implicit replacement:
-   its states, permissions, page injection, user acceptance, errors, retries,
-   and terminal states require their own model first.
+1. Il existe au plus une session d'édition à la fois.
+2. `saving` et `deleting` rejettent les événements réentrants jusqu'à leur
+   stabilisation.
+3. `PROFILE_UPDATED` est ignoré pendant l'ajout/l'édition/la sauvegarde/la
+   suppression et n'est accepté que depuis idle/error.
+4. `positionIndex` est sans discontinuité et unique après chaque sauvegarde/suppression.
+5. Une expérience avec `isCurrent: true` a `endDate === null`.
+6. `employmentType` ne modifie jamais `company` et n'affecte pas la déduplication.
+7. La page CV et son store n'ont aucune capacité de synchronisation manuelle vers
+   le presse-papiers ou les plateformes, qu'elle soit cachée ou visible.
+8. La façade CV expose uniquement le chargement/la sauvegarde du profil ; elle
+   n'a pas de catalogue de connecteurs, d'écriture dans le presse-papiers ni
+   d'ouverture d'onglets externes.
+9. La future assistance in-page ne peut pas être implémentée comme un remplacement
+   implicite : ses états, permissions, injection de page, acceptation par
+   l'utilisateur, erreurs, retries et états terminaux nécessitent d'abord leur
+   propre modèle.
 
-## Pure helpers retained
+## Helpers purs conservés
 
-- `mergeExperiences(current, incoming)` — dedup + controlled supplement.
-- `recomputePositionIndex(experiences)` — gapless ordering.
-- `normalizeExperience(draft)` — trims and enforces `isCurrent ↔ endDate`.
+- `mergeExperiences(current, incoming)` — déduplication + complément contrôlé.
+- `recomputePositionIndex(experiences)` — ordonnancement sans discontinuité.
+- `normalizeExperience(draft)` — nettoie et applique `isCurrent ↔ endDate`.
 
-The retired `buildPlatformPayloads` helper is not part of the CV domain API.
+Le helper retiré `buildPlatformPayloads` ne fait pas partie de l'API de domaine du CV.

@@ -1,54 +1,34 @@
-# DB Migration Model
+# Modèle de migration de la base de données
 
-Source of truth for the IndexedDB lifecycle and the applicative data migration
-of MissionPulse. This model is the Task 5b contract. It supersedes the former
-DB4/data1 description and must be reviewed before implementation.
+Source de vérité pour le cycle de vie d'IndexedDB et la migration applicative des données de MissionPulse. Ce modèle constitue le contrat de la tâche 5b. Il remplace l'ancienne description DB4/data1 et doit faire l'objet d'une revue avant implémentation.
 
-Status: **Task 5b target, dormant at the release boundary.** The tracked opener
-and independent handle ownership are implemented today. The Startup Barrier is
-not active: `runMigrations()` deduplicates only its own migration callers,
-business `openDB()` callers do not await it, and the background launch remains
-fire-and-forget. Sections that describe admission, leases, publication or
-startup readiness are therefore target behavior, not a claim about the current
-runtime. Every current business owner must still release its independently
-delivered handle on success, error, abort and synchronous setup failure. The
-current migration startup owner installs one release-once guard immediately
-after `openStartupDB()` succeeds. That owner covers stored-data-version reads,
-data migration, verification, quarantine decision and every terminal/error
-exit. It may release before opening the independent quarantine handle, but the
-outer `finally` remains authoritative and a second release is forbidden.
+Statut : **Cible de la tâche 5b, dormante à la frontière de release.** L'ouvreur tracé (tracked opener) et la détention indépendante de poignée (handle ownership) sont implémentés aujourd'hui. La barrière de démarrage (Startup Barrier) n'est pas active : `runMigrations()` ne déduplique que ses propres appelants de migration, les appelants métier de `openDB()` ne l'attendent pas (await), et le lancement en arrière-plan demeure en mode « fire-and-forget ». Les sections décrivant l'admission, les baux (leases), la publication ou l'état prêt au démarrage (startup readiness) représentent donc un comportement cible, et non une affirmation sur le runtime actuel. Chaque propriétaire métier actuel doit toujours libérer sa poignée délivrée indépendamment en cas de succès, d'erreur, d'interruption (abort) ou d'échec synchrone d'initialisation. Le propriétaire actuel du démarrage de migration installe un guard de libération unique (release-once guard) immédiatement après le succès de `openStartupDB()`. Ce propriétaire couvre les lectures de la version des données stockées, la migration des données, la vérification, la décision de mise en quarantaine et chaque sortie terminale/d'erreur. Il peut libérer avant d'ouvrir la poignée de quarantaine indépendante, mais le `finally` externe reste autoritaire et une seconde libération est interdite.
 
-The migration subsystem is Shell code. It may call pure parsers and canonical
-builders from Core; Core never imports IndexedDB, Chrome APIs, clocks or UUID
-generation. No LLM output can choose a migration transition or repair.
+Le sous-système de migration appartient au code Shell. Il peut appeler des parseurs purs et des constructeurs canoniques issus du Core ; le Core n'importe jamais IndexedDB, les APIs Chrome, les horloges ou la génération d'UUID. Aucune sortie de LLM ne peut choisir une transition de migration ou une réparation.
 
-## Scope and release boundary
+## Périmètre et frontière de release
 
-| Axis               | Persisted by                  | Implemented baseline | Task 5b target |
-| ------------------ | ----------------------------- | -------------------- | -------------- |
-| `DB_VERSION`       | IndexedDB native schema       | 5                    | 6              |
-| `APP_DATA_VERSION` | `chrome.storage.local` marker | 2                    | 3              |
+| Axe                | Persisté par                    | Ligne de base implémentée | Cible tâche 5b |
+| ------------------ | ------------------------------- | ------------------------- | -------------- |
+| `DB_VERSION`       | Schéma natif IndexedDB          | 5                         | 6              |
+| `APP_DATA_VERSION` | Marqueur `chrome.storage.local` | 2                         | 3              |
 
-`DB_VERSION` changes only for object stores or indexes. `APP_DATA_VERSION`
-changes only for persisted record shape. Both are monotonically increasing.
-The marker for data 3 is written only after the data-v3 transaction completes.
+`DB_VERSION` change uniquement pour les object stores ou les index. `APP_DATA_VERSION` change uniquement pour la forme des enregistrements persistés. Les deux sont strictement croissants de façon monotone. Le marqueur pour data 3 n'est écrit qu'après l'achèvement de la transaction data-v3.
 
-Task 5b must support these entry points:
+La tâche 5b doit prendre en charge ces points d'entrée :
 
-- a new profile with no database and no data marker;
-- the implemented DB5/data2 baseline;
-- a structurally upgraded DB6 whose data marker is still 2 after a crash;
-- a fully current DB6/data3 no-op start;
-- a retry after an open, migration, validation or recovery failure;
-- reset preemption through `local-data-reset.model.md`.
+- un nouveau profil sans base de données et sans marqueur de données ;
+- la ligne de base DB5/data2 implémentée ;
+- une base DB6 structurellement mise à niveau dont le marqueur de données est toujours à 2 après un crash ;
+- un démarrage sans opération (no-op) sur une base DB6/data3 totalement à jour ;
+- une nouvelle tentative (retry) après un échec d'ouverture, de migration, de validation ou de récupération ;
+- la préemption par réinitialisation via `local-data-reset.model.md`.
 
-Downgrade (`stored DB > 6` or `stored data > 3`) is fail-closed and
-non-destructive. It never opens with a lower requested version.
+Le rétrogradage (downgrade) (`stored DB > 6` ou `stored data > 3`) s'effectue en repli sécurisé (fail-closed) et de manière non destructive. Il n'ouvre jamais avec une version demandée inférieure.
 
-## Structural registry
+## Registre structurel
 
-The ordered registry is append-only. Every migration receives the one active
-version-change transaction created by `indexedDB.open`:
+Le registre ordonné est en ajout seul (append-only). Chaque migration reçoit l'unique transaction active de changement de version créée par `indexedDB.open` :
 
 ```ts
 type StructuralMigration = (db: IDBDatabase, tx: IDBTransaction) => void;
@@ -63,102 +43,75 @@ request.onupgradeneeded = (event) => {
 };
 ```
 
-A structural migration must use `tx.objectStore(name)` for an existing store.
-It must not open a second transaction. Any throw aborts the whole version
-change, so DB version 6 and its stores/indexes are committed together or not at
-all.
+Une migration structurelle doit utiliser `tx.objectStore(name)` pour un store existant. Elle ne doit pas ouvrir de seconde transaction. Toute exception levée interrompt (abort) l'intégralité du changement de version, de sorte que la version 6 de la DB et ses stores/index sont validés (committed) ensemble ou pas du tout.
 
-### Exact schema after DB6
+### Schéma exact après DB6
 
-| Store                | Added | keyPath       | Index name -> keyPath                                  |
-| -------------------- | ----- | ------------- | ------------------------------------------------------ |
-| `missions`           | 1     | `id`          | `source` -> `source`; `scrapedAt` -> `scrapedAt`       |
-| `profile`            | 1     | `id`          | —                                                      |
-| `connector_status`   | 2     | `connectorId` | —                                                      |
-| `generated_assets`   | 3     | `id`          | `missionId` -> `missionId`                             |
-| `mission_tracking`   | 4     | `missionId`   | `currentStatus` -> `tracking.currentStatus`            |
-| `quarantine`         | 5     | `id`          | `originalStore` -> `originalStore`                     |
-| `tracking_meta`      | 6     | `key`         | —                                                      |
-| `tracking_mutations` | 6     | `mutationId`  | `missionId` -> `missionId`; `phase` -> `phase`         |
-| `tracking_outbox`    | 6     | `mutationId`  | `missionId` -> `missionId`; `dataEpoch` -> `dataEpoch` |
+| Store                | Ajouté | keyPath       | Nom d'index -> keyPath                                 |
+| -------------------- | ------ | ------------- | ------------------------------------------------------ |
+| `missions`           | 1      | `id`          | `source` -> `source`; `scrapedAt` -> `scrapedAt`       |
+| `profile`            | 1      | `id`          | —                                                      |
+| `connector_status`   | 2      | `connectorId` | —                                                      |
+| `generated_assets`   | 3      | `id`          | `missionId` -> `missionId`                             |
+| `mission_tracking`   | 4      | `missionId`   | `currentStatus` -> `tracking.currentStatus`            |
+| `quarantine`         | 5      | `id`          | `originalStore` -> `originalStore`                     |
+| `tracking_meta`      | 6      | `key`         | —                                                      |
+| `tracking_mutations` | 6      | `mutationId`  | `missionId` -> `missionId`; `phase` -> `phase`         |
+| `tracking_outbox`    | 6      | `mutationId`  | `missionId` -> `missionId`; `dataEpoch` -> `dataEpoch` |
 
-All indexes are non-unique. V6 deletes the v4 `currentStatus` index and creates
-it again with nested keyPath `tracking.currentStatus`. A tombstone has null
-`tracking` and is therefore absent from that index. V6 creates the three new
-stores but writes no outbox row: production connected-dashboard capability is
-disabled in Task 5b.
+Tous les index sont non uniques. V6 supprime l'index `currentStatus` de v4 et le recrée avec le keyPath imbriqué `tracking.currentStatus`. Un tombstone possède `tracking` à null et est donc absent de cet index. V6 crée les trois nouveaux stores mais n'écrit aucune ligne dans l'outbox : la capacité de dashboard connecté en production est désactivée dans la tâche 5b.
 
-The single metadata record is:
+L'enregistrement unique de métadonnées est :
 
 ```ts
 interface TrackingMetaV1 {
   key: 'tracking_meta';
   schemaVersion: 1;
-  dataEpoch: string; // injected UUID v4
-  collectionRevision: number; // safe integer, starts at 0
+  dataEpoch: string; // UUID v4 injecté
+  collectionRevision: number; // entier sécurisé, commence à 0
 }
 ```
 
-`tracking_meta` contains exactly this one row. Its epoch identifies the whole
-local dataset, not a service-worker lifetime. Envelopes, ledgers, outbox rows,
-requests and responses repeat it. Worker lifetime uses a separate
-`workerEpoch`.
+`tracking_meta` contient exactement cette unique ligne. Son epoch identifie l'ensemble du jeu de données local, et non la durée de vie d'un service worker. Les enveloppes, registres (ledgers), lignes d'outbox, requêtes et réponses la répètent. La durée de vie du worker utilise un `workerEpoch` distinct.
 
-## Central dataset-generation authority
+## Autorité centrale de génération du jeu de données
 
-`dataEpoch` is the generation of the complete local dataset, not a
-tracking-only token. The strict `tracking_meta` singleton is its canonical
-durable authority. Settings, profile, missions, scan checkpoints, generated
-assets, semantic/TJM caches, seen/favorite state and every other local writer
-are consumers of that authority even when their data lives outside IndexedDB.
+`dataEpoch` est la génération du jeu de données local complet, et non un simple token dédié au tracking. Le singleton strict `tracking_meta` en est l'autorité durable canonique. Les paramètres (settings), le profil, les missions, les points de contrôle (checkpoints) de scan, les assets générés, les caches sémantiques/TJM, l'état vu/favori et tout autre rédacteur (writer) local sont des consommateurs de cette autorité même lorsque leurs données résident en dehors d'IndexedDB.
 
-Startup publishes one correlated bootstrap only after migration and recovery:
+Le démarrage publie un bootstrap corrélé uniquement après la migration et la récupération :
 
 ```ts
 interface LocalDatasetBootstrapV1 {
   version: 1;
-  requestId: string; // UUID v4 supplied by caller
-  workerEpoch: string; // current worker UUID v4
-  dataEpoch: string; // canonical tracking_meta epoch
+  requestId: string; // UUID v4 fourni par l'appelant
+  workerEpoch: string; // UUID v4 du worker actuel
+  dataEpoch: string; // epoch canonique de tracking_meta
 }
 
 interface DatasetMutationScopeV2 {
   version: 2;
-  operationId: string; // immutable intent/operation identity
+  operationId: string; // identité immuable d'intention/opération
   dataEpoch: string;
 }
 ```
 
-Every bootstrap/load response echoes its request ID and `dataEpoch`. The panel
-must discard mixed-request or mixed-epoch loads. Every mutative bridge command
-after cutover carries `DatasetMutationScopeV2`; this includes tracking,
-settings, profile save/import/sync, scan start/cancel/finalization and any dev
-mutation path. A read may retain a compatibility projection, but **every v1
-write without an epoch fails closed after data-v3 cutover**. The worker never
-adds its current epoch to an old caller command on the caller's behalf.
+Chaque réponse de bootstrap/chargement fait écho à son ID de requête et à son `dataEpoch`. Le panneau (panel) doit rejeter les chargements issus de requêtes mixtes ou d'epochs mixtes. Chaque commande mutative du bridge après la bascule (cutover) transporte `DatasetMutationScopeV2` ; cela inclut le tracking, les paramètres, la sauvegarde/import/synchronisation de profil, le démarrage/annulation/finalisation de scan et tout chemin de mutation dev. Une lecture peut conserver une projection de compatibilité, mais **chaque écriture v1 sans epoch échoue en repli sécurisé (fail-closed) après la bascule vers data-v3**. Le worker n'ajoute jamais son epoch courante à une ancienne commande appelante au nom de celle-ci.
 
-Internal work uses a revocable lease:
+Le travail interne utilise un bail révocable :
 
 ```ts
 interface DatasetWriteLeaseV1 {
   version: 1;
-  leaseId: string; // injected UUID v4
+  leaseId: string; // UUID v4 injecté
   operationId: string;
   dataEpoch: string;
-  authorityRevision: number; // worker-local safe integer
+  authorityRevision: number; // entier sécurisé local au worker
 }
 ```
 
-The service worker owns one `DatasetEpochAuthority` and one serialized commit
-gate. Admission requires the requested epoch to equal canonical metadata and
-binds a lease to the immutable operation. Immediately before every durable
-commit, the writer enters that gate and revalidates lease ID, operation ID,
-epoch and authority revision. It holds the gate until the IDB transaction or
-Chrome-storage Promise settles. There is no async gap between revalidation and
-commit admission.
+Le service worker possède un `DatasetEpochAuthority` et une barrière d'engagement (commit gate) sérialisée. L'admission requiert que l'epoch demandée soit égale aux métadonnées canoniques et lie un bail à l'opération immuable. Immédiatement avant chaque validation durable (durable commit), le rédacteur entre dans cette porte et revalide l'ID de bail, l'ID d'opération, l'epoch et la révision d'autorité. Il retient la barrière jusqu'à ce que la transaction IDB ou la promesse de stockage Chrome se stabilise (settles). Il n'y a aucun écart asynchrone entre la revalidation et l'admission de commit.
 
-Before ordinary admission, the same object and same FIFO expose the six
-operations modeled by `dataset-write-capability.model.md`:
+Avant l'admission ordinaire, le même objet et la même file FIFO exposent les six opérations modélisées par `dataset-write-capability.model.md` :
 
 ```ts
 beginPreAdmissionCommand(claim);
@@ -169,285 +122,106 @@ reserveResetPreAdmission(request, exactAuthorityReadLeafToken);
 rehydrateResetPreAdmission(journalIdentity, exactAuthorityReadLeafToken);
 ```
 
-They are not a second authority. `issueLease/commit`, these six operations,
-`acquireResetFence`, `installResetEpoch` and `fenceFailure` all use the one
-existing `runWithGate` queue. A second mutex in a Chrome-local gate, DB adapter,
-Startup port or Reset adapter is an architecture failure.
+Elles ne constituent pas une seconde autorité. `issueLease/commit`, ces six opérations, `acquireResetFence`, `installResetEpoch` et `fenceFailure` utilisent toutes l'unique file d'attente `runWithGate` existante. Un second mutex dans une porte locale Chrome, un adaptateur DB, un port Startup ou un adaptateur Reset constitue une défaillance d'architecture.
 
-The strict command claim binds owner/workflow, stage, command, execution
-attempt, worker epoch, stage-specific nullable data epoch, authority revision,
-fence revision and one ordered bounded write plan. Each plan entry has a fresh
-write ID. Its capability repeats every correlation plus its own fresh ID and
-ordinal. The authority snapshot exposes `fenceRevision`; it advances whenever
-completion, revocation, stage/command/attempt/epoch drift, Reset, Reset epoch
-installation or startup failure fencing invalidates a scope. Worker mismatch
-rejects, while worker termination destroys that worker's exact-object registry.
+La revendication de commande stricte lie le propriétaire/workflow, l'étape (stage), la commande, la tentative d'exécution, l'epoch du worker, l'epoch de données nullable spécifique à l'étape, la révision d'autorité, la révision de barrière de protection (fence revision) et un plan d'écriture ordonné et borné. Chaque entrée du plan possède un write ID frais. Sa capacité répète chaque corrélation en plus de son propre ID frais et de son numéro d'ordre (ordinal). Le snapshot d'autorité expose `fenceRevision` ; il progresse dès qu'un achèvement, une révocation, une dérive d'étape/commande/tentative/epoch, une réinitialisation (Reset), l'installation d'une epoch de Reset ou l'isolation d'échec de démarrage invalide une portée (scope). Une discordance de worker rejette, tandis que la terminaison du worker détruit le registre d'objets exacts de ce worker.
 
-`dataEpoch:null` is accepted only when `closed_startup` has no retained epoch.
-It is an exact authority fact, not a wildcard. Reset cleanup binds exact
-nullable `previousDataEpoch`; Reset rebuild/terminal writes bind exact
-`nextDataEpoch`. Once an epoch is retained, null or a foreign epoch is rejected
-inside the FIFO before the durable adapter.
+`dataEpoch:null` n'est accepté que lorsque `closed_startup` n'a pas d'epoch retenue. C'est un fait d'autorité exact, pas un caractère générique (wildcard). Le nettoyage de Reset lie un `previousDataEpoch` nullable exact ; les écritures de reconstruction/terminales de Reset lient un `nextDataEpoch` exact. Dès qu'une epoch est retenue, null ou une epoch étrangère est rejeté à l'intérieur de la FIFO avant l'adaptateur durable.
 
-Every capability is an exact-object, one-shot token consumed before invocation
-of its registered durable adapter and before any `await`. Callers provide an
-exact data-only leaf token, never an async function. A closed build-time mapping
-resolves that token to the only adapter for the write kind; adapter modules
-cannot import or receive the authority, workflow controllers, public Settings
-or messaging. The FIFO remains held until that adapter Promise settles. A
-Reset/failure fence ahead of a commit revokes it and invokes zero adapter; a
-commit already ahead of the fence is allowed to settle. An external fence
-arriving while an adapter is pending obtains the next FIFO ticket and waits; it
-is not rejected as adapter reentrance. Completion revokes every unconsumed token
-before the workflow changes command/stage.
+Chaque capacité est un token d'objet exact à usage unique consommé avant l'invocation de son adaptateur durable enregistré et avant tout `await`. Les appelants fournissent un token feuille exact contenant uniquement des données (data-only leaf token), jamais une fonction asynchrone. Un mappage fermé défini au build-time résout ce token vers l'unique adaptateur pour le type d'écriture ; les modules adaptateurs ne peuvent pas importer ni recevoir l'autorité, les contrôleurs de workflow, les Settings publics ou la messagerie. La FIFO reste retenue jusqu'à ce que la promesse de cet adaptateur soit réglée. Une barrière de Reset/échec située avant un commit le révoque et n'invoque aucun adaptateur ; un commit déjà positionné avant la barrière est autorisé à se stabiliser. Une barrière externe arrivant pendant qu'un adaptateur est en attente obtient le ticket FIFO suivant et attend ; elle n'est pas rejetée en tant que réentrance d'adaptateur. L'achèvement révoque chaque token non consommé avant que le workflow ne change de commande/étape.
 
-Claim, capability and leaf-operation registries are worker-local, bounded and
-never evict or reuse replay evidence. The capability allocator is synchronous,
-receives no authority reference and cannot return a Promise. A dispatch-depth
-sentinel applies only to that allocator call stack: any authority call attempted
-from it is rejected **before enqueue** with
-`AUTHORITY_REENTRANCY_FORBIDDEN`, latches failure of the outer allocation and
-burns a valid returned UUID. Hostile allocator code cannot catch the inner error
-and turn the outer issue into success. The sentinel is cleared before returning
-to the event loop, so unrelated external FIFO calls remain enqueueable. Throws,
-invalid IDs and collisions remain typed; no raw JavaScript value escapes.
-Registry exhaustion is typed and does not enable a raw/no-op fallback.
+Les registres de revendications, de capacités et d'opérations feuilles sont locaux au worker, bornés et n'évictent ni ne réutilisent jamais de preuves de rejeu. L'allocateur de capacité est synchrone, ne reçoit aucune référence d'autorité et ne peut pas renvoyer de promesse. Une sentinelle de profondeur de distribution s'applique uniquement à la pile d'appels de cet allocateur : tout appel d'autorité tenté depuis celle-ci est rejeté **avant la mise en file d'attente (enqueue)** avec `AUTHORITY_REENTRANCY_FORBIDDEN`, verrouille l'échec de l'allocation externe et grille (burns) un UUID valide retourné. Un code d'allocateur hostile ne peut pas intercepter l'erreur interne pour transformer l'émission externe en succès. La sentinelle est effacée avant de revenir à la boucle d'événements, de sorte que les appels FIFO externes non liés restent admissibles en file d'attente. Les exceptions levées, les ID invalides et les collisions demeurent typés ; aucune valeur JavaScript brute ne s'échappe. L'épuisement de registre est typé et n'active pas de repli brut/no-op.
 
-The gate therefore has two and only two routes:
+La barrière ne possède donc que deux et seulement deux voies :
 
 ```text
 open business admission -> ordinary issueLease/commit
 startup/reset declared write -> exact pre-admission claim/capability/commit
 ```
 
-An ordinary lease before admission remains `ADMISSION_CLOSED`. A missing
-capability API, permissive optional adapter, direct raw write, second lock or
-`try one route then the other` fallback is invalid configuration.
+Un bail ordinaire avant admission demeure `ADMISSION_CLOSED`. Une API de capacité manquante, un adaptateur optionnel permissif, une écriture brute directe, un second verrou ou un repli de type « essayer une route puis l'autre » constitue une configuration invalide.
 
-Every unknown dependency bag, scope, opening proof, Reset request and
-failure-fence command is captured once from exact own enumerable data
-descriptors into a detached DTO. The dependency bag admits exactly the required
-`workerEpoch`/`allocateLeaseId` keys and the optional
-`initialAuthorityRevision` test seam; accessors, symbols and every other key are
-invalid configuration. Every inspection that can invoke a Proxy internal
-method, including `Array.isArray`, prototype lookup, key enumeration and
-descriptor lookup, stays inside that fail-closed capture boundary. A revoked
-Proxy therefore becomes the command's typed Authority validation error —
-`INVALID_CONFIGURATION` for the dependency bag — and never leaks a raw
-`TypeError` or changes authority state. The authority never rereads the raw
-source after capture. Its validated `workerEpoch` and allocator are likewise
-captured once at factory creation without executing a dependency getter.
+Tout sac de dépendances (dependency bag), portée, preuve d'ouverture, requête de Reset et commande de barrière d'échec inconnus sont capturés une seule fois à partir des descripteurs de données énumérables propres exacts dans un DTO détaché. Le sac de dépendances admet exactement les clés obligatoires `workerEpoch`/`allocateLeaseId` et la couture de test optionnelle `initialAuthorityRevision` ; les accesseurs, symboles et toute autre clé constituent une configuration invalide. Toute inspection susceptible d'invoquer une méthode interne de Proxy, y compris `Array.isArray`, la recherche de prototype, l'énumération de clés et la recherche de descripteur, reste à l'intérieur de cette frontière de capture en repli sécurisé (fail-closed). Un Proxy révoqué devient donc l'erreur de validation d'Autorité typée de la commande — `INVALID_CONFIGURATION` pour le sac de dépendances — et ne fait jamais fuiter de `TypeError` brut ni ne modifie l'état d'autorité. L'autorité ne relit jamais la source brute après la capture. Son `workerEpoch` validé et son allocateur sont de même capturés une fois à la création de la factory sans exécuter de getter de dépendance.
 
-`allocateLeaseId` is an injected synchronous seam guarded by the allocator-only
-dispatch-depth sentinel. Lease issuance captures the exact open admission epoch
-and revision before calling it. Any public authority call attempted from that
-same allocator stack fails synchronously with
-`AUTHORITY_REENTRANCY_FORBIDDEN` **before enqueue** and latches the outer issue
-as failed even if hostile allocator code catches the inner exception. Therefore
-no inner lease, Reset ticket, operation binding or authority mutation can occur.
-After the allocator returns, a valid fresh UUID is retained permanently for
-worker-lifetime uniqueness, then the latch, admission status, epoch and revision
-are revalidated before any lease or binding. Allocator collision also fails
-closed and no retained ID is ever recycled, including after revocation. If the
-allocator throws any other JavaScript value, including a non-Error, the outer
-issuance fails with typed `INVALID_LEASE_ID`; no raw value escapes and no outer
-lease ID or binding is retained. The sentinel ends with the synchronous call;
-unrelated external FIFO work remains enqueueable.
+`allocateLeaseId` est une couture synchrone injectée gardée par la sentinelle de profondeur de distribution réservée à l'allocateur. L'émission de bail capture l'epoch et la révision exactes d'admission ouverte avant de l'appeler. Tout appel d'autorité public tenté depuis cette même pile d'allocateur échoue de manière synchrone avec `AUTHORITY_REENTRANCY_FORBIDDEN` **avant la mise en file d'attente** et verrouille l'émission externe en échec même si un code d'allocateur hostile intercepte l'exception interne. Par conséquent, aucun bail interne, ticket de Reset, liaison d'opération ou mutation d'autorité ne peut se produire. Après le retour de l'allocateur, un UUID frais valide est conservé de façon permanente pour garantir l'unicité à l'échelle de la durée de vie du worker, puis le verrou, le statut d'admission, l'epoch et la révision sont revalidés avant tout bail ou liaison. Une collision d'allocateur échoue également en repli sécurisé et aucun ID conservé n'est jamais recyclé, y compris après révocation. Si l'allocateur lève toute autre valeur JavaScript, y compris une valeur non-Error, l'émission externe échoue avec l'erreur typée `INVALID_LEASE_ID` ; aucune valeur brute ne s'échappe et aucun ID de bail externe ni liaison n'est conservé. La sentinelle prend fin avec l'appel synchrone ; le travail FIFO externe non lié demeure admissible en file d'attente.
 
-The ordinary post-admission registries are bounded at the same worker-local
-limits reserved by Background Scheduling:
+Les registres ordinaires post-admission sont bornés selon les mêmes limites locales au worker réservées par Background Scheduling :
 
 ```text
 MAX_RETAINED_ORDINARY_OPERATIONS_PER_WORKER = 4096
 MAX_RETAINED_ORDINARY_LEASE_IDS_PER_WORKER = 32768
 ```
 
-The operation registry retains every canonical operation binding, including
-revoked bindings. The lease-ID registry retains every valid fresh allocator
-result, including an ID burned by a rejected allocator-reentrancy attempt.
-Neither registry evicts, truncates or recycles evidence. An exact canonical
-operation is looked up before capacity admission and may still return its one
-existing lease; a new operation at the operation bound invokes zero allocator
-and terminates with `OPERATION_CAPACITY_EXHAUSTED`. A new allocation at the
-lease-ID bound invokes zero allocator and terminates with
-`CORRELATION_CAPACITY_EXHAUSTED`. Either exhaustion revokes every ordinary
-lease, clears live opening/Reset proofs and permanently moves this authority
-instance to `fenced_failure`; only a fresh worker authority can reopen capacity.
-The thrown Authority error preserves the exact capacity code while the closed
-snapshot carries the bounded non-retryable authority-fence diagnostic.
+Le registre des opérations conserve chaque liaison d'opération canonique, y compris les liaisons révoquées. Le registre des ID de bail conserve chaque résultat valide et frais de l'allocateur, y compris un ID grillé par une tentative rejetée de réentrance de l'allocateur. Aucun des deux registres n'évince, ne tronque ni ne recycle les preuves. Une opération canonique exacte est recherchée avant l'admission en capacité et peut toujours renvoyer son unique bail existant ; une nouvelle opération à la limite de capacité d'opération n'invoque aucun allocateur et se termine par `OPERATION_CAPACITY_EXHAUSTED`. Une nouvelle allocation à la limite des ID de bail n'invoque aucun allocateur et se termine par `CORRELATION_CAPACITY_EXHAUSTED`. L'un ou l'autre épuisement révoque chaque bail ordinaire, efface les preuves d'ouverture/Reset vivantes et bascule définitivement cette instance d'autorité vers `fenced_failure` ; seule une autorité de worker fraîche peut rouvrir la capacité. L'erreur d'Autorité levée préserve le code de capacité exact tandis que le snapshot fermé transporte le diagnostic borné non réessayable de barrière d'autorité.
 
-Reset acquires the same gate first, closes admission, increments authority
-revision and revokes every lease before quiescence. A queued old callback can
-therefore neither commit with its old lease nor obtain a fresh lease for its old
-operation. This applies to scan mission transactions, session checkpoints,
-terminal cleanup, profile/settings writes, runtime-effect compensation, cache
-writes and background/alarm work.
+Reset acquiert cette même porte en premier, ferme l'admission, incrémente la révision d'autorité et révoque chaque bail avant la mise au repos (quiescence). Un ancien rappel en file d'attente ne peut donc ni valider avec son ancien bail, ni obtenir un nouveau bail pour son ancienne opération. Cela s'applique aux transactions de missions de scan, aux checkpoints de session, au nettoyage terminal, aux écritures de profil/paramètres, à la compensation d'effets d'exécution, aux écritures de cache et au travail en arrière-plan/alarmes.
 
-A valid Reset request binds exactly `resetId`/`previousDataEpoch`/
-`nextDataEpoch`. As soon as it takes a FIFO position, the authority enters
-`reset_pending`: no new lease may be issued, while commits already queued before
-that position retain FIFO eligibility against the still-current revision. The
-eventual token repeats the three exact identities plus `workerEpoch` and the new
-authority revision. Installation consumes that exact one-shot token and has no
-free epoch argument. A collision with `workerEpoch`, the reset ID or a non-null
-previous epoch is invalid before queuing.
+Une requête de Reset valide lie exactement `resetId`/`previousDataEpoch`/`nextDataEpoch`. Dès qu'elle prend une position FIFO, l'autorité entre dans `reset_pending` : aucun nouveau bail ne peut être émis, tandis que les commits déjà mis en file avant cette position conservent leur éligibilité FIFO par rapport à la révision encore courante. Le token éventuel répète les trois identités exactes plus `workerEpoch` et la nouvelle révision d'autorité. L'installation consomme cet unique token exact à usage unique et ne comporte aucun argument d'epoch libre. Une collision avec `workerEpoch`, l'ID de reset ou une previous epoch non nulle est invalide avant la mise en file d'attente.
 
-Before a new reset journals or acquires that gate, its model performs a
-read-only admission preflight. The central authority provides one atomic view of
-reserved-reset-journal absence, the latest-only reset receipt and canonical
-`tracking_meta.dataEpoch`. A fresh reset is admissible only when that epoch
-equals the request's previous epoch and differs from its supplied next epoch. If
-the canonical epoch already equals the same request's next epoch, preflight may
-recognize clear-before-response only when the exact receipt matches every
-original ID/epoch, `requestedAt` and committed phase, plus current DB6/data3
-authority. It performs no second destruction or live reset-fence acquisition,
-but completion still requires the exact idempotent epoch-install/admission-open
-proof.
+Avant qu'un nouveau reset ne journalise ou n'acquière cette porte, son modèle effectue un contrôle préalable (preflight) d'admission en lecture seule. L'autorité centrale fournit une vue atomique de l'absence de journal de reset réservé, de l'unique reçu de reset le plus récent et du `tracking_meta.dataEpoch` canonique. Un nouveau reset n'est admissible que lorsque cette epoch est égale à l'ancienne epoch de la requête et diffère de la nouvelle epoch fournie. Si l'epoch canonique est déjà égale à la nouvelle epoch de la même requête, le preflight ne peut reconnaître un effacement avant réponse (clear-before-response) que lorsque le reçu exact correspond à chaque ID/epoch d'origine, à `requestedAt` et à la phase validée, en plus de l'autorité DB6/data3 actuelle. Il n'effectue aucune seconde destruction ni acquisition vivante de barrière de reset, mais l'achèvement exige toujours la preuve idempotente exacte d'installation d'epoch/ouverture d'admission.
 
-The `reset_pending` owner records total initial-journal status
-`absent_proven | outcome_unknown | durable_proven`. Only exact durability may
-acquire `reset_owned`; unknown permits only the same-A FIFO resolver, while B
-remains rejected. Durable failure and retry metadata use only the model's exact
-failure/retry checkpoint capabilities. After strict journal removal, the
-dedicated `installResetEpochAndOpen` authority operation is the sole route to
-normal admission; failure keeps admission closed and retries no destructive
-effect.
+Le propriétaire de `reset_pending` enregistre le statut initial complet du journal : `absent_proven | outcome_unknown | durable_proven`. Seule une durabilité exacte peut acquérir `reset_owned` ; unknown n'autorise que le même résolveur FIFO A, tandis que B reste rejeté. Les métadonnées d'échec durable et de nouvelle tentative utilisent uniquement les capacités exactes de checkpoint d'échec/nouvelle tentative du modèle. Après la suppression stricte du journal, l'opération d'autorité dédiée `installResetEpochAndOpen` est la seule voie vers l'admission normale ; l'échec maintient l'admission fermée et ne réessaie aucun effet destructeur.
 
-That view comes only from the exact registered
-`dataset-reset/preflight-authority-read/v1` adapter while the outer FIFO position
-is held. It first inventories IndexedDB; an absent `missionpulse` database is not
-opened. A present database is opened without a target version, inspected only
-through `readonly` transactions, and its temporary central-registry handle is
-closed/unregistered in `finally` before settlement. `onupgradeneeded` aborts and
-returns `RESET_PREFLIGHT_OPEN_WOULD_UPGRADE`. The adapter performs no structure,
-data, marker, Settings or repair write and exposes no IDB object. This is the
-sole controlled pre-version opener; ordinary migration/openers remain denied.
+Cette vue provient uniquement de l'adaptateur exact enregistré `dataset-reset/preflight-authority-read/v1` tant que la position FIFO externe est détenue. Il inventorie d'abord IndexedDB ; une base de données `missionpulse` absente n'est pas ouverte. Une base de données présente est ouverte sans version cible, inspectée uniquement via des transactions `readonly`, et sa poignée temporaire du registre central est fermée/désenregistrée dans `finally` avant le règlement. `onupgradeneeded` s'interrompt et renvoie `RESET_PREFLIGHT_OPEN_WOULD_UPGRADE`. L'adaptateur n'effectue aucune écriture de structure, de données, de marqueur, de paramètres ou de réparation et n'expose aucun objet IDB. Il s'agit de l'unique ouvreur pré-version contrôlé ; les ouvreurs/migrations ordinaires restent refusés.
 
-If a new worker finds a strict Reset journal, it cannot clone the dead worker's
-reservation. `rehydrateResetPreAdmission` rereads the complete journal, receipt
-and phase-compatible physical DB authority with the distinct registered
-rehydration read adapter at one FIFO position. It rejects Reset B, a foreign
-receipt, a readable third epoch and physical state beyond the exact effect-ahead
-matrix. For `handoff_adopted` and `handoff_cleared`, it also rejects a current
-worker epoch equal to the durable source worker epoch. It then installs
-`reset_pending` and returns a new exact-object
-reservation bound to the current `workerEpoch` and revisions. Only
-`acquireResetFence` with that replacement may revoke leases/install
-`reset_owned`; no resumed Reset effect or `BOOT_FENCE_ACQUIRED` precedes it.
-Exact duplicate rehydration returns that same current-worker object.
+Si un nouveau worker trouve un journal strict de Reset, il ne peut pas cloner la réservation du worker mort. `rehydrateResetPreAdmission` relit l'intégralité du journal, du reçu et de l'autorité DB physique compatible avec la phase avec l'adaptateur distinct enregistré de lecture de réhydratation à une position FIFO. Il rejette Reset B, un reçu étranger, une troisième epoch lisible et un état physique dépassant la matrice exacte d'effets en avance. Pour `handoff_adopted` et `handoff_cleared`, il rejette également une epoch de worker courante égale à l'epoch du worker source durable. Il installe ensuite `reset_pending` et renvoie une nouvelle réservation d'objet exact liée au `workerEpoch` et aux révisions courants. Seul `acquireResetFence` avec ce remplacement peut révoquer les baux/installer `reset_owned` ; aucun effet de Reset repris ou `BOOT_FENCE_ACQUIRED` ne le précède. Une réhydratation en doublon exact renvoie ce même objet du worker courant.
 
-The receipt is the bounded Chrome-local system key
-`missionpulse.localDataResetReceipt.v1`. Reset writes and strictly reads it back
-under the same gate after Settings/alarm alignment and readiness but before the
-journal's committed checkpoint. Journal clear therefore proves that the ordered
-terminal path passed that exact receipt, even if legitimate same-epoch writes
-later make stores non-empty or change Settings/alarm state. The next reset's
-selective clear removes the old receipt before writing its own latest-only value.
+Le reçu est la clé système locale à Chrome bornée `missionpulse.localDataResetReceipt.v1`. Reset l'écrit et la relit strictement sous la même porte après l'alignement des Settings/alarmes et l'état prêt mais avant le checkpoint validé du journal. L'effacement du journal prouve donc que le chemin terminal ordonné a passé ce reçu exact, même si des écritures légitimes de même epoch rendent plus tard les stores non vides ou modifient l'état des Settings/alarmes. L'effacement sélectif du reset suivant supprime l'ancien reçu avant d'écrire sa propre valeur la plus récente.
 
-This adds one bounded Chrome-storage key, accounted for by the Settings global
-system quota reserve. It adds no IndexedDB object store, `tracking_meta` field,
-`DB_VERSION` or `APP_DATA_VERSION`; DB/meta remain DB6/data3/schemaVersion 1.
+Cela ajoute une clé bornée de stockage Chrome, prise en compte par la réserve de quota système global des Settings. Cela n'ajoute aucun object store IndexedDB, champ `tracking_meta`, `DB_VERSION` ou `APP_DATA_VERSION` ; la DB/meta restent en DB6/data3/schemaVersion 1.
 
-Reset uses the same pre-admission authority path for every write in the closed
-mapping of `local-data-reset.model.md`: journal/checkpoints, database delete,
-session clear, selective local remove, DB6 reinitialization, complete Settings
-generation-zero write, marker 3, Settings alignment writes, receipt and final
-journal removal. A physical Reset effect and its journal checkpoint always use
-different capabilities. Reinitialization specifically uses four ordered
-capabilities: DB6 transaction, Settings V2 write/read-back, marker-3
-write/read-back, then `database_reinitialized` checkpoint. Every capability has
-one exact matching data-only leaf token resolved by the closed adapter table;
-the Reset port cannot pass an arbitrary async function.
+Reset utilise le même chemin d'autorité de pré-admission pour chaque écriture du mappage fermé de `local-data-reset.model.md` : journal/checkpoints, suppression de base de données, effacement de session, suppression locale sélective, réinitialisation de DB6, écriture complète de génération zéro des Settings, marqueur 3, écritures d'alignement des Settings, reçu et suppression finale du journal. Un effet physique de Reset et son checkpoint de journal utilisent toujours des capacités différentes. La réinitialisation utilise spécifiquement quatre capacités ordonnées : transaction DB6, écriture/relecture des Settings V2, écriture/relecture du marqueur 3, puis checkpoint `database_reinitialized`. Chaque capacité possède un token feuille exact de données pures correspondant résolu par la table d'adaptateurs fermée ; le port Reset ne peut pas transmettre une fonction asynchrone arbitraire.
 
-Chrome-local settings repeat the epoch to close revision ABA across reset. The
-single normative authority is `SettingsEnvelopeV2` exported by
-`settings-persistence.contract.ts`; DB/reset code must import that contract and
-must not define or copy a smaller storage variant:
+Les paramètres locaux à Chrome répètent l'epoch pour clore les problèmes ABA de révision à travers le reset. L'unique autorité normative est `SettingsEnvelopeV2` exportée par `settings-persistence.contract.ts` ; le code DB/reset doit importer ce contrat et ne doit pas définir ou copier une variante de stockage plus restreinte :
 
 ```ts
 import type { SettingsEnvelopeV2, SettingsSnapshotV1 } from './settings-persistence.contract';
 ```
 
-The imported V2 envelope includes `version`, `dataEpoch`, `revision`,
-`generation`, `settings`, `journal` and `outcomes`. Both revision and generation
-are safe non-negative integers: revision tracks user-visible value commits;
-generation also advances for journal/ledger-only changes.
+L'enveloppe V2 importée comprend `version`, `dataEpoch`, `revision`, `generation`, `settings`, `journal` et `outcomes`. La révision et la génération sont toutes deux des entiers non négatifs sécurisés : la révision suit les validations de valeurs visibles par l'utilisateur ; la génération avance également pour les modifications portant uniquement sur le journal/registre.
 
-During data-v3 startup, a valid settings V1 record retains its revision while a
-valid unwrapped legacy record is wrapped at revision 0; both receive the
-canonical epoch and initialize `generation: 0, journal: null, outcomes: []`.
-Missing settings become validated defaults in that same complete form at
-revision/generation 0. A strict
-Settings V2 envelope is a retry no-op only when its epoch equals canonical
-metadata and the shared validator accepts its settings, journal, outcome ledger
-and causal relations; a mismatched/malformed V2 record fails closed. A settings
-CAS requires epoch, revision and generation equality, and
-compensation/reconciliation keep the same epoch. On reset, selective clear
-removes settings and reinitialization writes defaults as the complete
-`SettingsEnvelopeV2` with `nextDataEpoch`, revision/generation 0,
-`journal: null` and `outcomes: []`, then reset-owned recovery settles the shared
-journal and proves the alarm before readiness. Revision alone is never
-cross-reset identity.
-Only the fenced data-v3 startup path invokes the shared decoder with legacy
-migration allowed. After marker 3, every handler uses its V2-only policy, so a
-late legacy/missing-epoch write cannot be normalized into the fresh dataset.
+Lors du démarrage sous data-v3, un enregistrement de paramètres V1 valide conserve sa révision tandis qu'un enregistrement legacy non encapsulé valide est enveloppé à la révision 0 ; tous deux reçoivent l'epoch canonique et initialisent `generation: 0, journal: null, outcomes: []`. Les paramètres manquants deviennent des valeurs par défaut validées sous cette même forme complète à la révision/génération 0. Une enveloppe stricte Settings V2 est un no-op de nouvelle tentative uniquement lorsque son epoch est égale aux métadonnées canoniques et que le validateur partagé accepte ses paramètres, son journal, son registre de résultats (outcomes) et ses relations causales ; un enregistrement V2 discordant ou malformé échoue en repli sécurisé (fail-closed). Un CAS de paramètres exige l'égalité de l'epoch, de la révision et de la génération, et la compensation/réconciliation conserve la même epoch. Lors d'un reset, l'effacement sélectif supprime les paramètres et la réinitialisation écrit les valeurs par défaut sous la forme d'un `SettingsEnvelopeV2` complet avec `nextDataEpoch`, révision/génération 0, `journal: null` et `outcomes: []`, puis la récupération détenue par le reset règle le journal partagé et prouve l'alarme avant l'état prêt. La révision seule ne constitue jamais une identité inter-reset.
+Seul le chemin de démarrage isolé (fenced) de data-v3 invoque le décodeur partagé avec la migration legacy autorisée. Après le marqueur 3, chaque gestionnaire utilise sa politique V2 uniquement, de sorte qu'une écriture legacy tardive ou sans epoch ne peut pas être normalisée dans le jeu de données frais.
 
-`application-tracking.model.md` already carries the epoch on v2 mutations and
-rejects v1 writes; its implementation must consume the central authority's
-lease rather than inventing a tracking-local generation or gate.
-The Task 6 settings machine/contract already consume `SettingsEnvelopeV2`;
-`settings-persistence.model.md` must name that same authority before
-implementation begins. This DB/reset revision does not edit the separate model.
+`application-tracking.model.md` transporte déjà l'epoch sur les mutations v2 et rejette les écritures v1 ; son implémentation doit consommer le bail de l'autorité centrale plutôt que d'inventer une génération ou une barrière locale au tracking.
+La machine/contrat de paramètres de la tâche 6 consomme déjà `SettingsEnvelopeV2` ; `settings-persistence.model.md` doit nommer cette même autorité avant le début de l'implémentation. Cette révision DB/reset ne modifie pas le modèle distinct.
 
-The exact reset epoch broadcast payload is likewise defined only by
-`local-data-reset-epoch.contract.ts`. Reset and Settings import its strict
-parser. Settings-specific trusted-bootstrap/fence proof may wrap that payload,
-but must not add fields to or redefine the neutral schema.
+Le payload exact de diffusion de l'epoch de reset est de même défini uniquement par `local-data-reset-epoch.contract.ts`. Reset et Settings importent son parseur strict. La preuve d'isolation/bootstrap de confiance spécifique aux Settings peut encapsuler ce payload, mais ne doit pas ajouter de champs ni redéfinir le schéma neutre.
 
-## Data-v3 migration
+## Migration data-v3
 
-The applicative registry uses explicit target versions rather than array-index
-arithmetic: its entries target data 2 (profile keywords) and data 3 (tracking
-envelopes). Pending migrations are those with `targetVersion > storedVersion`,
-in ascending order. An absent marker is treated as 0, so both idempotent entries
-may run against a new empty database. The registry's greatest target must equal
-`APP_DATA_VERSION`.
+Le registre applicatif utilise des versions cibles explicites plutôt qu'une arithmétique d'indices de tableau : ses entrées ciblent data 2 (mots-clés de profil) et data 3 (enveloppes de tracking). Les migrations en attente sont celles avec `targetVersion > storedVersion`, par ordre croissant. Un marqueur absent est traité comme valant 0, de sorte que les deux entrées idempotentes peuvent s'exécuter sur une nouvelle base de données vide. La cible maximale du registre doit être égale à `APP_DATA_VERSION`.
 
-### Injected inputs
+### Entrées injectées
 
-Shell injects one `now: number` and one UUID-v4 `dataEpoch` only if a valid
-metadata row does not already exist. Re-running data v3 reuses the persisted
-epoch. Core receives these values; it never calls `Date.now()`, `new Date()`,
-`crypto.randomUUID()` or IndexedDB.
+Shell injecte un `now: number` et un `dataEpoch` UUID-v4 uniquement si une ligne de métadonnées valide n'existe pas déjà. Réexécuter data v3 réutilise l'epoch persistée. Core reçoit ces valeurs ; il n'appelle jamais `Date.now()`, `new Date()`, `crypto.randomUUID()` ou IndexedDB.
 
-### One atomic tracking transaction
+### Une transaction atomique de tracking
 
-Data v3 runs one `readwrite` transaction spanning:
+Data v3 exécute une transaction `readwrite` englobant :
 
 ```text
 mission_tracking + tracking_meta + quarantine
 ```
 
-Within that transaction it:
+Au sein de cette transaction, elle :
 
-1. reads `tracking_meta['tracking_meta']`;
-2. creates the valid singleton with `collectionRevision: 0` when absent, or
-   requires the existing row to be strictly valid;
-3. opens a cursor over `mission_tracking` and classifies each row;
-4. writes every canonical envelope or quarantine row through that same
-   transaction;
-5. completes only when the cursor and all writes complete.
+1. lit `tracking_meta['tracking_meta']` ;
+2. crée le singleton valide avec `collectionRevision: 0` lorsqu'il est absent, ou exige que la ligne existante soit strictement valide ;
+3. ouvre un curseur sur `mission_tracking` et classifie chaque ligne ;
+4. écrit chaque enveloppe canonique ou ligne de quarantaine via cette même transaction ;
+5. ne se termine que lorsque le curseur et toutes les écritures sont achevés.
 
-The classification order is exact:
+L'ordre de classification est exact :
 
-| Cursor value                                                                | Result                                         |
-| --------------------------------------------------------------------------- | ---------------------------------------------- |
-| valid `PersistedTrackingEnvelopeV2`, same epoch, key equals `missionId`     | no-op                                          |
-| envelope-shaped/schema-v2 value that is invalid, wrong-keyed or wrong-epoch | abort as critical corruption                   |
-| valid legacy `MissionTracking`, key equals canonical `missionId`            | update to revision-1 record envelope           |
-| anything else that is not envelope-shaped                                   | add one quarantine row, then `cursor.delete()` |
+| Valeur du curseur                                                                         | Résultat                                                 |
+| ----------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `PersistedTrackingEnvelopeV2` valide, même epoch, la clé est égale à `missionId`          | no-op                                                    |
+| valeur en forme d'enveloppe/schéma-v2 qui est invalide, de mauvaise clé ou mauvaise epoch | abandonner (abort) comme corruption critique             |
+| `MissionTracking` legacy valide, la clé est égale au `missionId` canonique                | mise à jour vers l'enveloppe d'enregistrement révision 1 |
+| tout autre élément qui n'a pas la forme d'une enveloppe                                   | ajouter une ligne de quarantaine, puis `cursor.delete()` |
 
-Legacy conversion writes:
+La conversion legacy écrit :
 
 ```ts
 {
@@ -464,16 +238,11 @@ Legacy conversion writes:
 }
 ```
 
-The legacy parser requires a non-empty, contiguous, transition-valid,
-time-nondecreasing history ending at `currentStatus`, bounded note and follow-up
-fields, and exact equality between `cursor.primaryKey` and `missionId`.
-`committedAt` is the final canonical history timestamp. There is no permissive
-normalization of invalid history.
+Le parseur legacy exige un historique non vide, contigu, valide en transition, non décroissant dans le temps et se terminant à `currentStatus`, des champs de note et de relance bornés, et une égalité exacte entre `cursor.primaryKey` et `missionId`. `committedAt` est le dernier horodatage canonique de l'historique. Il n'existe aucune normalisation permissive d'un historique invalide.
 
-### Primary-key quarantine
+### Quarantaine par clé primaire
 
-An invalid legacy row is identified from the cursor primary key, never from an
-untrusted `value.missionId`:
+Une ligne legacy invalide est identifiée à partir de la clé primaire du curseur, jamais à partir d'un `value.missionId` non fiable :
 
 ```ts
 interface TrackingMigrationQuarantineV1 {
@@ -488,117 +257,64 @@ interface TrackingMigrationQuarantineV1 {
 }
 ```
 
-The tuple ID preserves the typed primary key and avoids collisions from string
-coercion. The migration uses `quarantine.add(row)`, never `put`. Only
-`add.onsuccess` may queue `cursor.delete()` and continue the cursor. A
-`ConstraintError` is never prevented or normalized: identical and different
-tuple collisions both abort the entire data-v3 transaction. Existing
-quarantine evidence and every source/meta/envelope row therefore remain byte
-unchanged. Collision diagnostics keep admission fenced for explicit recovery;
-the migration never stringifies, changes the key or overwrites proof. Every
-non-colliding invalid legacy row is quarantined regardless of the generic 10%
-reject-ratio policy.
+L'ID sous forme de tuple préserve la clé primaire typée et évite les collisions dues à la coercition en chaîne. La migration utilise `quarantine.add(row)`, jamais `put`. Seul `add.onsuccess` peut mettre en file d'attente `cursor.delete()` et poursuivre le curseur. Une `ConstraintError` n'est jamais évitée ni normalisée : les collisions de tuples identiques ou différents interrompent toutes deux l'intégralité de la transaction data-v3. Les preuves de quarantaine existantes et chaque ligne source/meta/enveloppe restent donc strictement inchangées au niveau des octets. Les diagnostics de collision maintiennent l'admission fermée par barrière pour une récupération explicite ; la migration ne convertit jamais en chaîne, ne modifie pas la clé et n'écrase pas les preuves. Chaque ligne legacy invalide sans collision est mise en quarantaine, indépendamment de la politique générique de taux de rejet à 10 %.
 
-### Exact capability saga: transaction, Settings, marker 3
+### Saga exacte des capacités : transaction, Settings, marqueur 3
 
-`MIGRATE_DATA` declares exactly three ordered writes under one active Startup
-command scope:
+`MIGRATE_DATA` déclare exactement trois écritures ordonnées sous une portée de commande Startup active :
 
-1. `startup.data.tracking_v3_transaction`: the complete IndexedDB transaction
-   above. Its capability remains consumed while the authority FIFO awaits
-   `tx.oncomplete`; marker 2 remains durable.
-2. `startup.data.settings_v2_wrap`: only after transaction completion, write
-   the complete shared `SettingsEnvelopeV2` with the same migration epoch and
-   strictly read it back. Marker 2 still remains durable.
-3. `startup.data.marker3_write`: only after the Settings read-back, write
-   `APP_DATA_VERSION = 3` and strictly read marker 3 back.
+1. `startup.data.tracking_v3_transaction` : la transaction IndexedDB complète ci-dessus. Sa capacité reste consommée tant que la FIFO d'autorité attend `tx.oncomplete` ; le marqueur 2 demeure durable.
+2. `startup.data.settings_v2_wrap` : seulement après l'achèvement de la transaction, écrire le `SettingsEnvelopeV2` partagé complet avec la même epoch de migration et le relire strictement. Le marqueur 2 demeure toujours durable.
+3. `startup.data.marker3_write` : seulement après la relecture des Settings, écrire `APP_DATA_VERSION = 3` et relire strictement le marqueur 3.
 
-These are three distinct write IDs and three distinct one-shot capabilities.
-No capability covers the whole `MIGRATE_DATA` port, and none can be reused for
-the next boundary. The port completes its command scope before emitting its
-success proof. The following `WRAP_SETTINGS_ENVELOPE` Startup command performs
-the model's additional strict read-back under `allow_migration` or `v2_only`;
-it is read-only and cannot repeat write 2.
+Il s'agit de trois identifiants d'écriture distincts et de trois capacités distinctes à usage unique. Aucune capacité ne couvre l'intégralité du port `MIGRATE_DATA`, et aucune ne peut être réutilisée pour la frontière suivante. Le port termine sa portée de commande avant d'émettre sa preuve de succès. La commande Startup suivante `WRAP_SETTINGS_ENVELOPE` effectue la relecture stricte supplémentaire du modèle sous `allow_migration` ou `v2_only` ; elle est en lecture seule et ne peut pas répéter l'écriture 2.
 
-When the authority has no retained canonical epoch at claim time, the claim and
-all three capabilities carry literal `dataEpoch:null`; this is not a wildcard.
-The transaction and Settings validators still bind their durable payloads to
-the same injected/persisted migration epoch. After Reset installation, an exact
-retained pending epoch is used instead of null.
+Lorsque l'autorité n'a pas d'epoch canonique retenue au moment de la revendication, la revendication et les trois capacités portent le littéral `dataEpoch:null` ; il ne s'agit pas d'un caractère générique. Les validateurs de transaction et de Settings lient toujours leurs payloads durables à la même epoch de migration injectée/persistée. Après l'installation d'un Reset, une epoch en attente retenue exacte est utilisée au lieu de null.
 
-### Crash and retry proof
+### Preuve de crash et de nouvelle tentative
 
-| Crash point                                | Durable result                                  | Retry behavior                                                                                                    |
-| ------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
-| before/inside data-v3 transaction          | data-v2 tracking set and marker 2               | full transaction reruns                                                                                           |
-| transaction abort                          | no metadata/envelope/quarantine partial commit  | full transaction reruns                                                                                           |
-| after transaction, before settings/marker  | canonical rows + metadata, marker still 2       | new worker/attempt and fresh capabilities; rows read back as no-op, then complete Settings/marker with same epoch |
-| after Settings V2 read-back, before marker | canonical rows + complete Settings V2, marker 2 | new worker/attempt and fresh capabilities; strict read-backs precede marker 3                                     |
-| after marker write/read-back               | DB6/data3                                       | no-op verification/startup recovery; old tokens are never reused                                                  |
+| Point de crash                              | Résultat durable                                    | Comportement lors d'un retry                                                                                              |
+| ------------------------------------------- | --------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| avant/pendant la transaction data-v3        | jeu de tracking data-v2 et marqueur 2               | réexécution complète de la transaction                                                                                    |
+| abandon de transaction (abort)              | aucun commit partiel metadata/enveloppe/quarantaine | réexécution complète de la transaction                                                                                    |
+| après transaction, avant settings/marqueur  | lignes canoniques + métadonnées, marqueur tjrs à 2  | nouveau worker/tentative et capacités fraîches ; lignes relues en no-op, puis finaliser Settings/marqueur avec même epoch |
+| après relecture Settings V2, avant marqueur | lignes canoniques + Settings V2 complet, marqueur 2 | nouveau worker/tentative et capacités fraîches ; des relectures strictes précèdent le marqueur 3                          |
+| après écriture/relecture du marqueur        | DB6/data3                                           | vérification no-op/récupération au démarrage ; les anciens tokens ne sont jamais réutilisés                               |
 
-The `APP_DATA_VERSION = 3` marker is written only after `tx.oncomplete` and
-successful shared-contract validation/read-back of the complete
-`SettingsEnvelopeV2` with the same epoch, never from inside the cursor callback.
-The read-back proves exact keys, valid settings, journal/ledger validity and
-their causal consistency. A settings or marker-write failure leaves marker 2
-and is a retryable migration failure; its capability remains consumed. Retry
-uses fresh claim/write/capability identities and the completed IDB conversion
-is accepted only through strict idempotent read-back.
+Le marqueur `APP_DATA_VERSION = 3` n'est écrit qu'après `tx.oncomplete` et la validation/relecture réussies selon le contrat partagé du `SettingsEnvelopeV2` complet avec la même epoch, jamais depuis le rappel du curseur. La relecture prouve les clés exactes, des paramètres valides, la validité du journal/registre et leur cohérence causale. Un échec d'écriture de paramètres ou de marqueur laisse le marqueur à 2 et constitue un échec de migration réessayable ; sa capacité reste consommée. La nouvelle tentative utilise des identités fraîches de revendication/écriture/capacité et la conversion IDB achevée n'est acceptée que par relecture idempotente stricte.
 
-## Validation and corruption policy
+## Politique de validation et de corruption
 
-Validation is domain-sensitive; a global ratio cannot erase idempotency proof.
+La validation est sensible au domaine ; un ratio global ne peut pas effacer une preuve d'idempotence.
 
-| Domain/record                                | Invalid action                                                                   |
-| -------------------------------------------- | -------------------------------------------------------------------------------- |
-| legacy tracking during data v3               | atomic primary-key quarantine and delete                                         |
-| v2 envelope                                  | abort/fence tracking; preserve exact bytes                                       |
-| `tracking_meta`                              | abort/fence tracking; preserve exact bytes                                       |
-| mutation ledger                              | abort/fence tracking; preserve exact bytes                                       |
-| disabled outbox seam                         | isolate row in quarantine; do not alter envelope/ledger or claim remote delivery |
-| unrelated `missions` / `profile` legacy rows | existing bounded parse-on-read and generic reject-ratio quarantine policy        |
+| Domaine/enregistrement                         | Action en cas d'invalidité                                                                          |
+| ---------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| tracking legacy pendant data v3                | mise en quarantaine atomique par clé primaire et suppression                                        |
+| enveloppe v2                                   | interrompre/isoler par barrière le tracking ; préserver les octets exacts                           |
+| `tracking_meta`                                | interrompre/isoler par barrière le tracking ; préserver les octets exacts                           |
+| registre de mutations (mutation ledger)        | interrompre/isoler par barrière le tracking ; préserver les octets exacts                           |
+| couture d'outbox désactivée                    | isoler la ligne en quarantaine ; ne pas altérer enveloppe/registre ni simuler de livraison distante |
+| lignes legacy `missions` / `profile` non liées | politique existante de parsing borné à la lecture et de quarantaine générique par ratio de rejet    |
 
-Envelope/meta/ledger corruption is fail-closed because those records are
-current state, revision and at-most-once evidence. It is forbidden to delete,
-quarantine, synthesize, normalize or replay them automatically. The startup
-barrier stays fenced, diagnostics surface the exact store/key without raw user
-content, and the UI may offer the explicit coordinated local reset. That reset
-uses `previousDataEpoch: null` when strict metadata is absent or unreadable and
-still installs a global old-dataset fence before destruction.
+La corruption d'enveloppe/meta/registre s'effectue en repli sécurisé (fail-closed) car ces enregistrements constituent l'état actuel, la révision et des preuves d'exécution au plus une fois (at-most-once). Il est interdit de les supprimer, de les mettre en quarantaine, de les synthétiser, de les normaliser ou de les rejouer automatiquement. La barrière de démarrage reste fermée, les diagnostics affichent le store/la clé exacts sans contenu utilisateur brut, et l'interface utilisateur peut proposer la réinitialisation locale coordonnée et explicite. Cette réinitialisation utilise `previousDataEpoch: null` lorsque les métadonnées strictes sont absentes ou illisibles et installe tout de même une barrière globale d'ancien jeu de données avant la destruction.
 
-The generic `rejects > 10%` path applies only to non-critical stores. It never
-authorizes `deleteDatabase`. Structural/open corruption and downgrade also fail
-closed; destructive recovery belongs exclusively to a user-confirmed reset.
+Le chemin générique `rejects > 10%` s'applique uniquement aux stores non critiques. Il n'autorise jamais `deleteDatabase`. La corruption structurelle/d'ouverture et le rétrogradage (downgrade) échouent également en repli sécurisé ; la récupération destructive relève exclusivement d'un reset confirmé par l'utilisateur.
 
-Post-migration verification checks at minimum:
+La vérification post-migration contrôle au minimum :
 
-- all DB6 stores, keyPaths and exact index keyPaths;
-- exactly one strict `tracking_meta` row;
-- every envelope and ledger has the metadata epoch and a matching primary key;
-- `SettingsEnvelopeV2` has that same epoch, valid non-negative revision and
-  generation, and a shared-contract-valid journal/outcome ledger;
-- no `prepared` ledger owned by an older worker remains after startup recovery;
-- the disabled outbox is empty for Task 5b production writes;
-- the data-version marker is exactly 3 and the epoch authority is initialized
-  before admission opens.
+- tous les stores, keyPaths et keyPaths d'index exacts de DB6 ;
+- exactement une ligne `tracking_meta` stricte ;
+- chaque enveloppe et registre possède l'epoch des métadonnées et une clé primaire correspondante ;
+- `SettingsEnvelopeV2` possède cette même epoch, une révision et une génération non négatives valides, et un journal/registre de résultats valides selon le contrat partagé ;
+- aucun registre `prepared` détenu par un ancien worker ne subsiste après la récupération au démarrage ;
+- l'outbox désactivée est vide pour les écritures de production de la tâche 5b ;
+- le marqueur de version des données vaut exactement 3 et l'autorité d'epoch est initialisée avant l'ouverture de l'admission.
 
-Reset-time reinitialization strictly verifies DB6/data3, metadata collection
-revision zero and exactly zero rows in `connector_status`, `generated_assets`,
-`mission_tracking`, `missions`, `profile`, `quarantine`,
-`tracking_mutations` and `tracking_outbox`, followed by settled default Settings
-and exact alarm proof before the receipt can be written. Post-clear recognition
-does not repeat those mutable zero/default assertions: it validates the exact
-terminal receipt plus current DB6/data3 metadata authority at the same next
-epoch, allowing a later non-negative collection revision and legitimate E2
-writes. Missing/mismatched receipt, schema/version drift or wrong epoch is a
-protocol conflict, never permission to journal another destructive reset.
+La réinitialisation au moment du reset vérifie strictement DB6/data3, la révision de collection de métadonnées à zéro et exactement zéro ligne dans `connector_status`, `generated_assets`, `mission_tracking`, `missions`, `profile`, `quarantine`, `tracking_mutations` et `tracking_outbox`, suivis des Settings par défaut réglés et de la preuve exacte d'alarme avant que le reçu ne puisse être écrit. La reconnaissance post-effacement ne répète pas ces assertions mutables de zéro/valeurs par défaut : elle valide le reçu terminal exact plus l'autorité actuelle des métadonnées DB6/data3 à la même epoch suivante, autorisant une révision de collection non négative ultérieure et des écritures légitimes E2. Un reçu manquant/discordant, une dérive de schéma/version ou une mauvaise epoch constitue un conflit de protocole, jamais une permission de journaliser un autre reset destructeur.
 
-## Startup barrier
+## Barrière de démarrage (Startup barrier)
 
-All mutative bridge handlers and all internal writers await one barrier. This
-includes tracking actors/storage, scan orchestration/checkpoints, settings,
-profile, caches and background/alarm work. Side-panel code reaches the barrier
-through the service-worker bridge; it never opens IndexedDB directly.
+Tous les gestionnaires mutatifs du bridge et tous les rédacteurs internes attendent une barrière unique. Cela inclut les acteurs/le stockage de tracking, l'orchestration/checkpoints de scan, les paramètres, le profil, les caches et le travail en arrière-plan/alarmes. Le code du side panel atteint la barrière via le bridge du service worker ; il n'ouvre jamais IndexedDB directement.
 
 ```text
 checking reset journal
@@ -620,55 +336,21 @@ checking reset journal
   -> on a fresh late caller, publish only its newly correlated bootstrap
 ```
 
-Every write-bearing Startup command begins the exact bounded claim described by
-`dataset-write-capability.model.md`, consumes one capability per write, and
-supplies one exact registered data-only leaf token per write, then completes/
-revokes the scope before publishing its result event. Read-only stages create no
-dummy claim. `OPEN_EPOCH_ADMISSION` additionally requires no active
-pre-admission scope or outstanding capability/leaf operation. After it opens,
-all business writers switch exclusively to ordinary leases; there is no
-overlap/fallback window between the two routes.
+Chaque commande Startup porteuse d'écritures commence par la revendication bornée exacte décrite par `dataset-write-capability.model.md`, consomme une capacité par écriture, fournit un token feuille exact contenant uniquement des données (data-only leaf token) par écriture, puis achève/révoque la portée avant de publier son événement de résultat. Les étapes en lecture seule ne créent aucune revendication fictive. `OPEN_EPOCH_ADMISSION` exige en outre l'absence de portée de pré-admission active ou de capacité/opération feuille en cours. Après son ouverture, tous les rédacteurs métier basculent exclusivement vers les baux ordinaires ; il n'y a aucune fenêtre de chevauchement/repli entre les deux voies.
 
-Reset journal detection preempts every other stage and transfers ownership to
-the reset workflow. No opener, actor, scan, settings/profile mutation or cache
-writer can enter between migration success and prepared-ledger settlement,
-settings verification/recovery and epoch-authority publication.
+La détection d'un journal de Reset préempte toute autre étape et transfère la propriété au workflow de reset. Aucun ouvreur, acteur, scan, mutation de paramètres/profil ou rédacteur de cache ne peut s'intercaler entre le succès de migration et le règlement des registres préparés, la vérification/récupération des paramètres et la publication de l'autorité d'epoch.
 
-On a new worker, that transfer first rehydrates a replacement exact-object Reset
-reservation from the strict journal under the FIFO and then reacquires the live
-fence. The journal is durable identity, not the token itself. Reset B and every
-clone/old-worker token remain invalid, and no phase resumes before the current-
-worker fence proof.
+Sur un nouveau worker, ce transfert réhydrate d'abord une réservation de Reset d'objet exact de remplacement à partir du journal strict sous la FIFO, puis réacquiert la barrière vivante. Le journal constitue l'identité durable, et non le token lui-même. Reset B et tout token cloné/d'ancien worker demeurent invalides, et aucune phase ne reprend avant la preuve de barrière du worker actuel.
 
-Journal absence is not completion by itself. On replay of an original reset
-request after clear, the barrier exposes a read-only proof to the reset actor and
-does not begin ordinary migration/admission concurrently. Exact next epoch,
-matching latest receipt and DB6/data3 authority return recognized post-clear
-authority; Reset must still obtain the exact idempotent
-`installResetEpochAndOpen` proof before completion/success;
-exact previous-epoch proof returns fresh admission; every third epoch,
-mismatched receipt or malformed proof fails closed. A physical read failure is
-explicitly retryable, with no automatic loop and no journal written.
+L'absence de journal ne constitue pas un achèvement en soi. Lors du rejeu d'une requête de reset initiale après effacement, la barrière expose une preuve en lecture seule à l'acteur de reset et n'entame pas de migration/admission ordinaire concurrente. Une epoch suivante exacte, un reçu concordant le plus récent et l'autorité DB6/data3 renvoient une autorité post-effacement reconnue ; Reset doit toujours obtenir la preuve idempotente exacte de `installResetEpochAndOpen` avant l'achèvement/succès ; une preuve d'epoch précédente exacte renvoie une admission fraîche ; toute troisième epoch, reçu discordant ou preuve malformée échoue en repli sécurisé (fail-closed). Un échec physique de lecture est explicitement réessayable, sans boucle automatique et sans journal écrit.
 
-`wrappingSettingsEnvelope` chooses the legacy decoder policy from the stored
-marker: pre-v3 uses `allow_migration`; marker 3 uses `v2_only`. For a migration,
-the complete shared envelope is read back before marker 3 is written. Thus a
-crash after marker write restarts from strict V2 shape and still executes
-Settings recovery. Marker 3 proves shape only; it never proves runtime-effect
-alignment or admission.
+`wrappingSettingsEnvelope` choisit la politique du décodeur legacy d'après le marqueur stocké : les versions pré-v3 utilisent `allow_migration` ; le marqueur 3 utilise `v2_only`. Pour une migration, l'enveloppe partagée complète est relue avant que le marqueur 3 ne soit écrit. Ainsi, un crash après l'écriture du marqueur redémarre à partir de la forme stricte V2 et exécute toujours la récupération des Settings. Le marqueur 3 prouve uniquement la conformité de forme ; il ne prouve jamais l'alignement d'effets d'exécution ou l'admission.
 
-### Normative Settings recovery stage
+### Étape normative de récupération des Settings
 
-`recoveringSettings` invokes the shared Settings recovery barrier in startup
-mode. It requires reset-journal absence; every valid reset phase, including
-`committed`, transfers ownership to `resetOwned` before any migration/Load
-effect. It then strictly decodes under the marker-selected policy, recovers any
-Settings journal, installs a system `effects_pending` journal if `auto-scan`
-differs, applies and reads the effect, clears that journal, and rereads the
-settled envelope plus alarm under the same
-`(attemptId, workerEpoch, dataEpoch)` fence.
+`recoveringSettings` invoque la barrière partagée de récupération des Settings en mode démarrage. Elle requiert l'absence de journal de reset ; chaque phase de reset valide, y compris `committed`, transfère la propriété à `resetOwned` avant tout effet de migration/Load. Elle décode ensuite strictement selon la politique sélectionnée par le marqueur, récupère tout journal de Settings, installe un journal système `effects_pending` si `auto-scan` diffère, applique et lit l'effet, efface ce journal, et relit l'enveloppe réglée ainsi que l'alarme sous la même barrière `(attemptId, workerEpoch, dataEpoch)`.
 
-The only success event is exact-key and fully correlated:
+L'unique événement de succès comporte des clés exactes et est entièrement corrélé :
 
 ```ts
 interface StartupSettingsRecoveredV1 {
@@ -682,66 +364,29 @@ interface StartupSettingsRecoveredV1 {
 }
 ```
 
-All five identities must equal the active attempt/command, and the shared
-snapshot validator must prove `resetJournalAbsent:true`, a settled envelope
-with the same epoch/generation and exact alarm proof. A self-correlated or stale
-event is ignored. `openingAdmission` atomically opens the epoch authority only
-after DB verification, prepared-ledger recovery and this proof are all retained
-in attempt context. No lease, bootstrap or `ready` exists beforehand.
+Toutes les cinq identités doivent être égales à la tentative/commande active, et le validateur de snapshot partagé doit prouver `resetJournalAbsent:true`, une enveloppe réglée avec les mêmes epoch/génération et une preuve d'alarme exacte. Un événement auto-corrélé ou obsolète est ignoré. `openingAdmission` ouvre atomiquement l'autorité d'epoch uniquement après que la vérification DB, la récupération des registres préparés et cette preuve ont toutes été retenues dans le contexte de tentative. Aucun bail, bootstrap ou `ready` n'existe au préalable.
 
-Startup failures carry a strict `attemptId` and stage. The stage union includes
-`settings_recovery` and `failure_fence`; physical Settings/alarm failures are retryable but leave
-admission closed, while malformed matching-ID proof is fail-closed and
-non-destructive. `SETTINGS_RESET_IN_PROGRESS` is not an ordinary migration
-failure: it routes to `resetOwned`. A later explicit caller/`RETRY` creates the
-next serialized attempt; no automatic retry loop is authorized.
+Les échecs de démarrage transportent un `attemptId` strict et une étape (stage). L'union d'étapes comprend `settings_recovery` et `failure_fence` ; les échecs physiques de Settings/alarme sont réessayables mais laissent l'admission fermée, tandis qu'une preuve malformée à ID correspondant échoue en repli sécurisé (fail-closed) et de façon non destructive. `SETTINGS_RESET_IN_PROGRESS` n'est pas un échec de migration ordinaire : il est acheminé vers `resetOwned`. Un appelant explicite ultérieur ou un `RETRY` crée la tentative sérialisée suivante ; aucune boucle de nouvelle tentative automatique n'est autorisée.
 
-Once `ADMISSION_OPENED` has been retained, any publication failure first emits
-the pure correlated `FENCE_STARTUP_FAILURE` command. Its future Shell port calls
-`DatasetEpochAuthority.fenceFailure` under the central gate. `failed` and
-`RETRY` remain unreachable until `FAILURE_FENCED` strictly proves the same
-attempt/worker/epoch/open-proof, a higher authority revision, closed admission,
-all leases revoked and zero active lease. A physical or ambiguous fence failure
-stays in `failureFenceBlocked`, has no retry transition and may only transfer a
-strictly correlated Reset owner.
+Dès lors que `ADMISSION_OPENED` a été retenu, tout échec de publication émet d'abord la commande pure corrélée `FENCE_STARTUP_FAILURE`. Son futur port Shell appelle `DatasetEpochAuthority.fenceFailure` sous la porte centrale. `failed` et `RETRY` demeurent inatteignables tant que `FAILURE_FENCED` ne prouve pas strictement les mêmes tentative/worker/epoch/preuve d'ouverture, une révision d'autorité supérieure, une admission fermée, tous les baux révoqués et zéro bail actif. Un échec physique ou ambigu de barrière de protection reste dans `failureFenceBlocked`, ne possède pas de transition de retry et ne peut transférer qu'un propriétaire de Reset strictement corrélé.
 
-The authority consumes the exact `FENCE_STARTUP_FAILURE` command, including its
-bounded typed `failure`, and returns the exact deeply frozen
-`DatasetStartupFailureFenceProofV1`; a free-form string is never an authority
-cause. It retains the opening correlation privately until Reset or failure
-fencing closes it. `fenceFailure` is forbidden in `reset_pending` and
-`reset_owned` and cannot clear or replace a Reset token; Reset preemption owns
-that fence path.
+L'autorité consomme la commande exacte `FENCE_STARTUP_FAILURE`, y compris son `failure` typé et borné, et renvoie la preuve exactement et profondément gelée `DatasetStartupFailureFenceProofV1` ; une chaîne en texte libre ne constitue jamais une cause d'autorité. Elle conserve la corrélation d'ouverture de façon privée jusqu'à ce que Reset ou la barrière d'échec la ferme. `fenceFailure` est interdit dans `reset_pending` et `reset_owned` et ne peut pas effacer ou remplacer un token de Reset ; la préemption de Reset détient ce chemin de barrière.
 
-The barrier is serialized per attempt and retryable across attempts:
+La barrière est sérialisée par tentative et réessayable à travers les tentatives :
 
-1. concurrent callers join exactly one in-flight attempt;
-2. `MigrationResult { ok: false, ... }` is failure, not a resolved-ready value;
-3. any failure settles all current waiters with typed load/persist failure and
-   keeps admission fenced; if admission was already open, settlement waits for
-   the exact closure/revocation proof;
-4. the in-flight reference is cleared in `finally`;
-5. the next explicit bootstrap, load or mutation command (including scan,
-   settings and profile) starts one fresh attempt;
-6. only `openingAdmission` after exact `SETTINGS_RECOVERY_PASSED` opens lease
-   admission; the correlated bootstrap and `ready(dataEpoch, workerEpoch)` are
-   published afterward;
-7. reset request cancels/preempts retry scheduling and owns the fence until its
-   durable journal is removed.
-8. `ready` remains an active modeled service state: a duplicate request ID is
-   idempotent, while a fresh late request returns only through a new exact
-   bootstrap publication containing that request ID; no migration, recovery or
-   admission step is replayed.
-9. each pending/publication batch is capped at 64. Overflow is a typed,
-   non-mutating backpressure result. A successful publication clears pending
-   IDs and retains only the bounded last batch; an older duplicate is
-   deterministically republished instead of requiring an unbounded history.
+1. les appelants concurrents rejoignent exactement une tentative en cours ;
+2. `MigrationResult { ok: false, ... }` est un échec, et non une valeur résolue et prête ;
+3. tout échec règle tous les appelants en attente avec un échec typé de chargement/persistance et maintient l'admission fermée par barrière ; si l'admission était déjà ouverte, le règlement attend la preuve exacte de fermeture/révocation ;
+4. la référence en cours est effacée dans `finally` ;
+5. la commande explicite suivante de bootstrap, chargement ou mutation (y compris scan, paramètres et profil) démarre une tentative fraîche ;
+6. seul `openingAdmission` après le `SETTINGS_RECOVERY_PASSED` exact ouvre l'admission des baux ; le bootstrap corrélé et `ready(dataEpoch, workerEpoch)` sont publiés par la suite ;
+7. une requête de reset annule/préempte la planification de nouvelles tentatives et détient la barrière jusqu'à ce que son journal durable soit supprimé.
+8. `ready` demeure un état de service modélisé actif : un ID de requête en doublon est idempotent, tandis qu'une nouvelle requête tardive ne renvoie qu'à travers une nouvelle publication exacte de bootstrap contenant cet ID de requête ; aucune étape de migration, de récupération ou d'admission n'est rejouée.
+9. chaque lot en attente/publication est plafonné à 64. Le débordement est un résultat de contre-pression (backpressure) typé et non mutatif. Une publication réussie purge les ID en attente et conserve uniquement le dernier lot borné ; un doublon plus ancien est republié de manière déterministe au lieu d'exiger un historique non borné.
 
-A failed promise is never cached as permanent startup state. Automatic retry
-loops are forbidden: a retry is triggered by an explicit caller or reset resume
-and remains serialized.
+Une promesse en échec n'est jamais mise en cache comme état permanent de démarrage. Les boucles automatiques de retry sont interdites : une nouvelle tentative est déclenchée par un appelant explicite ou la reprise d'un reset et demeure sérialisée.
 
-## State model
+## Modèle d'états
 
 ```text
 idle
@@ -763,269 +408,111 @@ failed -- explicit RETRY --> resetGate
 active/ready/failed/failureFenceBlocked -- RESET_PREEMPTED --> resetOwned
 ```
 
-### Executable startup statechart
+### Statechart exécutable de démarrage
 
-The executable Model-gate for this workflow is split across:
+La Model-gate exécutable pour ce workflow est répartie entre :
 
-- `dataset-startup.model.md` for reviewed behavior, crash semantics and
-  invariants;
-- `dataset-startup.contract.ts` for strict events, shared proof reuse and pure
-  commands;
-- `dataset-startup.logic.ts` for guards/actions;
-- `dataset-startup.machine.ts` for the private XState v5 machine/actor and the
-  safe `dispatch(unknown)` facade.
+- `dataset-startup.model.md` pour le comportement revu, la sémantique de crash et les invariants ;
+- `dataset-startup.contract.ts` pour les événements stricts, la réutilisation partagée de preuves et les commandes pures ;
+- `dataset-startup.logic.ts` pour les guards/actions ;
+- `dataset-startup.machine.ts` pour la machine/acteur privé XState v5 et la façade sécurisée `dispatch(unknown)`.
 
-This statechart is not a runtime cutover. It imports the canonical Reset and
-Settings contracts, performs no I/O, exposes no actor `send`, and has no
-automatic retry. `startup-barrier.ts` will be the Shell adapter that executes
-its commands after the Model and Review gates pass. Its read API projects a
-deeply copied/frozen DTO; the native XState snapshot, context, machine and nodes
-never cross the façade.
+Ce statechart n'est pas une bascule (cutover) au runtime. Il importe les contrats canoniques de Reset et de Settings, n'effectue aucune I/O, n'expose aucun `send` d'acteur et n'a aucune nouvelle tentative automatique. `startup-barrier.ts` sera l'adaptateur Shell qui exécutera ses commandes une fois les barrières Model et Review franchies. Son API de lecture projette un DTO profondément copié/gelé ; le snapshot, le contexte, la machine et les nœuds natifs de XState ne traversent jamais la façade.
 
-`ready` is non-terminal and serves late callers through the publication state
-only. `downgradeBlocked` and `resetOwned` are terminal for one attempt.
-`failed` is non-terminal at subsystem level because a later explicit caller can
-create a new attempt after any required fence proof. `failureFenceBlocked`
-forbids retry and remains fail-closed.
+`ready` est non terminal et dessert les appelants tardifs par le seul état de publication. `downgradeBlocked` et `resetOwned` sont terminaux pour une tentative donnée. `failed` est non terminal au niveau du sous-système car un appelant explicite ultérieur peut créer une nouvelle tentative après toute preuve de barrière requise. `failureFenceBlocked` interdit le retry et demeure en repli sécurisé (fail-closed).
 
-The exact event union is exported by `dataset-startup.contract.ts`. It includes
-the Reset-gate clear/pending/journal outcomes, migration proofs, correlated
-Settings recovery, admission, bootstrap publication, `STEP_FAILED`, explicit
-`FAILURE_FENCED`, `RETRY` and `RESET_PREEMPTED`. Every async event carries
-attempt, worker and command identity; Settings recovery also carries
-epoch/request identity. Stale, foreign or shape-invalid events are rejected by
-the private actor facade. Unknown arrays are captured only through exact own
-descriptors, including `length`; source getters and `get` traps are never read.
+L'union exacte des événements est exportée par `dataset-startup.contract.ts`. Elle inclut les résultats d'effacement/attente/journal de Reset-gate, les preuves de migration, la récupération corrélée des Settings, l'admission, la publication de bootstrap, `STEP_FAILED`, `FAILURE_FENCED` explicite, `RETRY` et `RESET_PREEMPTED`. Chaque événement asynchrone transporte l'identité de tentative, de worker et de commande ; la récupération des Settings transporte également l'identité d'epoch/requête. Les événements obsolètes, étrangers ou invalides en forme sont rejetés par la façade privée de l'acteur. Les tableaux inconnus sont capturés uniquement via les descripteurs propres exacts, y compris `length` ; les getters sources et les pièges `get` ne sont jamais lus.
 
-Cancellation is owned only by coordinated reset. A normal migration cannot be
-cancelled halfway and reported ready; IndexedDB transaction abort or completion
-decides its durable result.
+L'annulation est détenue uniquement par un reset coordonné. Une migration normale ne peut pas être annulée à mi-chemin et signalée comme prête ; l'interruption (abort) ou l'achèvement de la transaction IndexedDB décide de son résultat durable.
 
 ## Invariants
 
 1. `DB_VERSION === STRUCTURAL_MIGRATIONS.length === 6`.
-2. Data-migration targets are exactly `[2, 3]`, and their greatest target equals
-   `APP_DATA_VERSION === 3`; registry length is not used as a version.
-3. The v6 structural function receives `(db, tx)` and uses that exact upgrade
-   transaction for existing-store index replacement.
-4. A structural throw leaves no partial DB6 schema.
-5. Data-v3 tracking conversion, metadata creation and legacy quarantine are one
-   atomic transaction.
-6. Quarantine identity comes from `cursor.primaryKey`, never corrupt payload;
-   insertion uses `add`, and any tuple collision aborts the transaction rather
-   than overwriting evidence.
-7. Invalid legacy tracking is quarantined; invalid v2 envelope/meta/ledger is
-   preserved and fences admission.
-8. The data marker advances only after its migration transaction completes.
-9. A DB6/data2 retry reuses the metadata epoch and performs no second semantic
-   conversion.
-10. One central opener currently owns every IndexedDB handle and closes it on
-    `versionchange` and reset. Each delivered handle belongs to exactly one
-    reserved owner: startup and business callers never receive the same
-    `IDBDatabase` object, and two independent business callers never share one
-    delivered handle. Releasing one owner therefore cannot close a connection
-    still used by another workflow. The future Task 5b Startup Barrier will
-    deduplicate complete startup attempts above the opener; it is dormant.
-    `runMigrations()` currently deduplicates migration callers only and is not a
-    business-admission barrier.
-11. Task 5b startup readiness means migration, validation, epoch load, old prepared
-    settlement, Settings journal recovery and exact alarm proof all succeeded.
-12. `{ ok: false }`, blocked open and downgrade can never become readiness.
-13. Failure does not poison future explicit retry. It cannot open admission;
-    after admission was opened, retry requires strict closure and lease-revocation
-    proof, while ambiguous fence outcome remains blocked.
-14. No LLM participates in schema, validation, quarantine or recovery choices.
-15. `dataEpoch` scopes the complete local dataset; every mutative message and
-    internal writer proves it through a revocable lease.
-16. The commit gate revalidates a lease immediately before commit and remains
-    held until the durable boundary settles.
-17. Settings persistence uses the sole shared `SettingsEnvelopeV2`, including
-    its generation, atomic journal and outcome ledger; revision alone never
-    authorizes a cross-reset write.
-18. Reset revokes all leases before quiescence, so an old scan/checkpoint/cache/
-    profile/settings callback performs zero post-reset write.
-19. Marker 3 proves persisted shape only; no lease/bootstrap/ready is exposed
-    before `SETTINGS_RECOVERY_PASSED` and `openingAdmission`.
-20. Every reset journal phase, including `committed`, routes to reset ownership;
-    startup never clears it or treats it as an ordinary migration failure.
-21. A journal-absent reset request is preflighted before migration/admission and
-    before reset journaling; only canonical previous-epoch proof admits a fresh
-    reset.
-22. Clear-before-response recognition requires canonical next epoch plus exact
-    latest-only receipt and current DB6/data3 metadata authority, and executes
-    zero second destructive effect even after legitimate E2 writes.
-23. Journal absence, current request UUIDs, timestamps or mutable current store/
-    Settings state alone never prove old completion; the strict original-request
-    receipt is mandatory.
-24. The receipt is written/read after Settings/alarm/readiness and before the
-    journal committed checkpoint; the checkpoint and committed broadcast precede
-    journal clear.
-25. `ready` serves every fresh late request ID through modeled bootstrap
-    publication only; duplicate IDs are idempotent and no earlier startup stage
-    is replayed.
-26. Strict unknown-array parsing reads the own `length` data descriptor and
-    rejects values above the explicit maximum before allocation, `ownKeys` or a
-    loop, then reads dense index descriptors without invoking a source getter or
-    `get` trap.
-27. Completion recognition adds one bounded Chrome-local system key but no
-    DB/meta schema and cannot change `DB_VERSION === 6` or
-    `APP_DATA_VERSION === 3`.
-28. Startup pending IDs and retained bootstraps are each bounded to 64; every
-    successful publication purges pending IDs and replaces, rather than appends
-    to, the last published batch.
-29. Lease allocation rejects any authority reentrance synchronously before
-    enqueue, latches the outer issue and creates no Reset ticket, inner lease or
-    operation binding; a valid returned UUID remains burned.
-30. Same-operation allocation reentrance cannot create a canonical inner lease,
-    and catching its inner error cannot turn the outer issue into success.
-31. Factory and allocator boundaries are fail-closed: revoked/accessor
-    dependency bags produce `INVALID_CONFIGURATION`, and every value thrown by
-    `allocateLeaseId` produces `INVALID_LEASE_ID`; neither boundary leaks a raw
-    JavaScript exception or creates an outer binding.
-32. Ordinary leases remain impossible before `OPEN_EPOCH_ADMISSION`; every
-    modeled Startup/Reset write instead carries its exact command claim and
-    one-shot capability plus its matching registered leaf token.
-33. Ordinary commits, pre-admission claim/issue/commit/complete, Reset and
-    failure fence linearize on one `DatasetEpochAuthority` FIFO.
-34. Capability consumption precedes durable adapter invocation and await; a
-    consumed/revoked capability or leaf token is never replayable.
-35. Command, stage, attempt, worker, nullable epoch, authority revision and
-    fence revision are revalidated inside the FIFO before every pre-admission
-    write.
-36. Data-v3 IDB transaction, complete Settings V2 wrap/read-back and marker-3
-    write/read-back use three ordered, distinct capabilities.
-37. Reset DB6 transaction, generation-zero Settings V2 write/read-back,
-    marker-3 write/read-back and reinitialization checkpoint use four ordered,
-    distinct capabilities.
-38. Reset/failure fence wins against every later queued capability; an earlier
-    entered durable adapter settles first and the FIFO never invents
-    cancellation. An external fence arriving during its Promise waits at the
-    next ticket and is not rejected as reentrant.
-39. Claim/capability/leaf registries are bounded without eviction. Capability-
-    allocator reentrancy is rejected before enqueue and latches outer failure;
-    throw, collision or exhaustion never enables raw/no-op fallback.
-40. Worker restart changes worker/attempt and rebuilds fresh claims/write/leaf
-    IDs. A journaled Reset additionally receives a new current-worker exact-
-    object reservation through strict FIFO rehydration before live fence
-    acquisition; only durable read-back, never an old memory token, proves
-    progress.
-41. The Reset authority preflight opener is readonly and FIFO-held: it never
-    opens an absent DB, never supplies a target version, aborts
-    `onupgradeneeded`, performs no upgrade/migration/write and proves handle
-    closure before settlement.
-42. The leaf adapter table is closed at build time. Adapter modules receive no
-    authority/controller/public Settings/messaging path, and Settings writes
-    preserve the only lock order DatasetEpoch outer -> Settings/system inner.
+2. Les cibles de migration de données sont exactement `[2, 3]`, et leur cible la plus élevée est égale à `APP_DATA_VERSION === 3` ; la longueur du registre n'est pas utilisée comme numéro de version.
+3. La fonction structurelle v6 reçoit `(db, tx)` et utilise cette transaction exacte de mise à niveau pour le remplacement d'index des stores existants.
+4. Une exception structurelle levée ne laisse aucun schéma partiel de DB6.
+5. La conversion du tracking de data-v3, la création des métadonnées et la quarantaine legacy constituent une transaction atomique unique.
+6. L'identité de quarantaine provient de `cursor.primaryKey`, jamais d'un payload corrompu ; l'insertion utilise `add`, et toute collision de tuple interrompt la transaction plutôt que d'écraser les preuves.
+7. Le tracking legacy invalide est mis en quarantaine ; une enveloppe/meta/registre v2 invalide est conservée et isole l'admission par barrière.
+8. Le marqueur de données n'avance qu'après l'achèvement de sa transaction de migration.
+9. Une nouvelle tentative DB6/data2 réutilise l'epoch des métadonnées et n'effectue aucune seconde conversion sémantique.
+10. Un ouvreur central détient actuellement chaque poignée d'IndexedDB et la ferme lors d'un `versionchange` et d'un reset. Chaque poignée délivrée appartient à exactement un propriétaire réservé : les appelants de démarrage et métier ne reçoivent jamais le même objet `IDBDatabase`, et deux appelants métier indépendants ne partagent jamais une poignée délivrée. La libération d'un propriétaire ne peut donc pas fermer une connexion encore utilisée par un autre workflow. La future barrière de démarrage (Startup Barrier) de la tâche 5b dédupliquera les tentatives complètes de démarrage au-dessus de l'ouvreur ; elle est dormante. `runMigrations()` ne déduplique actuellement que les appelants de migration et n'est pas une barrière d'admission métier.
+11. L'état prêt au démarrage de la tâche 5b signifie que la migration, la validation, le chargement de l'epoch, le règlement des anciens éléments préparés, la récupération du journal des Settings et la preuve exacte d'alarme ont tous réussi.
+12. `{ ok: false }`, une ouverture bloquée et un rétrogradage ne peuvent jamais devenir un état prêt.
+13. L'échec n'empoisonne pas une future nouvelle tentative explicite. Il ne peut pas ouvrir l'admission ; après l'ouverture de l'admission, un retry exige une preuve stricte de fermeture et de révocation des baux, tandis qu'un résultat de barrière ambigu demeure bloqué.
+14. Aucun LLM ne participe aux choix de schéma, de validation, de quarantaine ou de récupération.
+15. `dataEpoch` délimite l'ensemble du jeu de données local ; chaque message mutatif et rédacteur interne le prouve via un bail révocable.
+16. La porte d'engagement revalide un bail immédiatement avant le commit et reste retenue jusqu'à ce que la frontière durable soit stabilisée.
+17. La persistance des paramètres utilise l'unique `SettingsEnvelopeV2` partagée, y compris sa génération, son journal atomique et son registre de résultats ; la révision seule n'autorise jamais une écriture inter-reset.
+18. Reset révoque tous les baux avant la mise au repos, de sorte qu'un ancien rappel de scan/checkpoint/cache/profil/paramètres n'effectue aucune écriture post-reset.
+19. Le marqueur 3 prouve uniquement la forme persistée ; aucun bail/bootstrap/prêt n'est exposé avant `SETTINGS_RECOVERY_PASSED` et `openingAdmission`.
+20. Chaque phase de journal de reset, y compris `committed`, s'achemine vers la propriété du reset ; le démarrage ne l'efface jamais ni ne la traite comme un échec de migration ordinaire.
+21. Une requête de reset sans journal fait l'objet d'un contrôle préalable (preflight) avant la migration/admission et avant la journalisation du reset ; seule une preuve d'epoch précédente canonique autorise un nouveau reset.
+22. La reconnaissance d'effacement avant réponse exige la prochaine epoch canonique plus le reçu exact le plus récent et l'autorité de métadonnées actuelle DB6/data3, et n'exécute aucun second effet destructeur même après des écritures légitimes E2.
+23. L'absence de journal, les UUID de requête courants, les horodatages ou l'état courant mutable des stores/paramètres seuls ne prouvent jamais un achèvement antérieur ; le reçu strict de la requête d'origine est obligatoire.
+24. Le reçu est écrit/relu après les Settings/alarmes/état prêt et avant le checkpoint validé du journal ; le checkpoint et la diffusion validée précèdent l'effacement du journal.
+25. `ready` dessert chaque nouvel ID de requête tardive par la seule publication modélisée de bootstrap ; les ID en doublon sont idempotents et aucune étape antérieure de démarrage n'est rejouée.
+26. L'analyse stricte de tableaux inconnus lit le descripteur de données propre `length` et rejette les valeurs supérieures au maximum explicite avant l'allocation, `ownKeys` ou une boucle, puis lit les descripteurs d'index denses sans invoquer de getter source ni de piège `get`.
+27. La reconnaissance d'achèvement ajoute une clé système locale à Chrome bornée mais aucun schéma de DB/meta et ne peut pas modifier `DB_VERSION === 6` ou `APP_DATA_VERSION === 3`.
+28. Les ID en attente au démarrage et les bootstraps conservés sont chacun bornés à 64 ; chaque publication réussie purge les ID en attente et remplace, plutôt que d'ajouter à, le dernier lot publié.
+29. L'allocation de bail rejette toute réentrance d'autorité de manière synchrone avant la mise en file d'attente, verrouille l'émission externe et ne crée aucun ticket de Reset, bail interne ou liaison d'opération ; un UUID valide retourné demeure grillé (burned).
+30. La réentrance d'allocation pour une même opération ne peut pas créer de bail canonique interne, et l'interception de son erreur interne ne peut pas transformer l'émission externe en succès.
+31. Les frontières de factory et d'allocateur s'exécutent en repli sécurisé (fail-closed) : les sacs de dépendances révoqués/à accesseurs produisent `INVALID_CONFIGURATION`, et chaque valeur levée par `allocateLeaseId` produit `INVALID_LEASE_ID` ; aucune des deux frontières ne laisse fuiter d'exception JavaScript brute ni ne crée de liaison externe.
+32. Les baux ordinaires demeurent impossibles avant `OPEN_EPOCH_ADMISSION` ; chaque écriture modélisée de Démarrage/Reset transporte à la place sa revendication exacte de commande et sa capacité à usage unique ainsi que son token feuille enregistré correspondant.
+33. Les commits ordinaires, les revendications/émissions/commits/achèvements de pré-admission, Reset et la barrière d'échec sont linéarisés sur une file FIFO unique de `DatasetEpochAuthority`.
+34. La consommation de capacité précède l'invocation de l'adaptateur durable et le await ; une capacité ou un token feuille consommé/révoqué n'est jamais rejouable.
+35. La commande, l'étape, la tentative, le worker, l'epoch nullable, la révision d'autorité et la révision de barrière sont revalidés à l'intérieur de la FIFO avant chaque écriture de pré-admission.
+36. La transaction IDB data-v3, l'encapsulation/relecture complète de Settings V2 et l'écriture/relecture du marqueur 3 utilisent trois capacités ordonnées et distinctes.
+37. La transaction DB6 de Reset, l'écriture/relecture de génération zéro de Settings V2, l'écriture/relecture du marqueur 3 et le checkpoint de réinitialisation utilisent quatre capacités ordonnées et distinctes.
+38. La barrière de Reset/échec l'emporte sur chaque capacité mise en file ultérieurement ; un adaptateur durable entré plus tôt se stabilise en premier et la FIFO n'invente jamais d'annulation. Une barrière externe arrivant pendant sa Promise attend au ticket suivant et n'est pas rejetée comme réentrante.
+39. Les registres de revendications/capacités/feuilles sont bornés sans éviction. La réentrance de l'allocateur de capacité est rejetée avant la mise en file d'attente et verrouille l'échec externe ; une exception levée, une collision ou un épuisement n'active jamais de repli brut/no-op.
+40. Le redémarrage du worker modifie le worker/la tentative et reconstruit des ID frais de revendication/écriture/feuille. Un Reset journalisé reçoit de plus une nouvelle réservation d'objet exact du worker courant par réhydratation stricte de la FIFO avant l'acquisition de la barrière vivante ; seule la relecture durable, jamais un ancien token en mémoire, prouve la progression.
+41. L'ouvreur de preflight d'autorité de Reset est en lecture seule et retenu par la FIFO : il n'ouvre jamais une DB absente, ne fournit jamais de version cible, s'interrompt lors de `onupgradeneeded`, n'effectue aucune mise à niveau/migration/écriture et prouve la fermeture de poignée avant le règlement.
+42. La table d'adaptateurs feuilles est fermée au moment du build. Les modules d'adaptateurs ne reçoivent aucun chemin d'autorité/contrôleur/Settings publics/messagerie, et les écritures de Settings préservent l'unique ordre de verrouillage : externe DatasetEpoch -> interne Settings/système.
 
-## Review checklist before implementation
+## Liste de contrôle de revue avant implémentation
 
-- nominal: new DB and DB5/data2 both reach DB6/data3 with one fresh epoch;
-- no-op: DB6/data3 changes no persisted row;
-- malformed legacy: each primary key is quarantined atomically;
-- quarantine tuple absent succeeds; identical/different collisions and
-  `ConstraintError` abort with source/meta/envelopes/quarantine unchanged;
-- critical corruption: exact envelope/meta/ledger bytes remain and admission is
-  fenced;
-- crash: every point in the crash table converges without a second revision;
-- blocked/versionchange: handles close, timeout surfaces failure, retry is fresh;
-- reset: every journal phase, including `committed`, preempts migration and no
-  old/new epoch is admitted until reset finalization;
-- reset replay after journal clear: same original next epoch plus exact
-  terminal receipt and DB6/data3 authority returns recognized post-clear
-  authority, then exact idempotent admission-open proof returns success with no
-  journal, delete, clear, reinitialize or broadcast, including after same-epoch
-  data/Settings/alarm writes; open failure stays closed/recoverable, and foreign
-  epoch or mismatched receipt fails closed;
-- receipt ordering: bounded system quota covers latest-only put/read-back;
-  failure is retryable, conflict is fail-closed, crash before checkpoint repeats
-  receipt idempotently, and journal clear never precedes the exact receipt;
-- fresh reset admission: canonical epoch must equal previous and differ from
-  next; physical preflight failure is explicit-retry only and writes no journal;
-- Reset preflight absent DB performs no open; present DB opens without target
-  version, uses readonly transactions, aborts `onupgradeneeded`, proves handle
-  close/unregister on every outcome and performs zero schema/data/marker write;
-- crash with Reset A journaled at every phase: a new worker rehydrates one fresh
-  exact-object A reservation, exact duplicate joins it, B/clone/dead-worker/
-  third-epoch/foreign-receipt/phase-incompatible facts fail without state change,
-  and no phase resumes before live fence acquisition;
-- permission/quota/marker failure: no false `ready` result;
-- concurrent callers: one attempt, one prepared recovery and one Settings
-  recovery pass, same epoch result;
-- outbox: schema exists but production writes remain exactly zero;
-- old tracking v1/v2, settings revision-0 save, scan terminal/checkpoint,
-  profile write and cache callback all perform zero writes after epoch change;
-- a writer whose lease is revoked between computation and commit fails the
-  final in-gate revalidation without opening its durable transaction;
-- an allocator that synchronously calls Reset during `issueLease` receives
-  `AUTHORITY_REENTRANCY_FORBIDDEN` before enqueue; the violation is latched on
-  the outer issue, no reset ticket/reservation or operation binding is created,
-  admission remains unchanged and a valid returned UUID is burned for worker
-  lifetime;
-- an allocator that synchronously issues the same or another operation receives
-  the same reject-before-enqueue result; no inner canonical lease can exist and
-  the outer issue fails even if the allocator catches the inner exception;
-- an allocator that throws `Error`, `undefined` or another primitive yields
-  typed `INVALID_LEASE_ID`, while a revoked/accessor dependency bag yields typed
-  `INVALID_CONFIGURATION` without executing a getter; no raw exception escapes;
-- ordinary lease pre-admission fails before allocation; an exact supported
-  Startup/Reset claim and its exact next capability/registered leaf token
-  succeed only on the shared FIFO;
-- substitute claim, command, stage, attempt, worker, nullable epoch,
-  authority/fence revision, write, capability, leaf-operation or adapter ID
-  independently; every case rejects before adapter invocation;
-- multi-write commands allocate distinct capability and leaf tokens; double
-  consume, cross-write/cross-command reuse, complete-before-commit and old-
-  worker replay perform zero write;
-- exercise capability allocator reentrancy into same write, another ordinal,
-  completion, Reset and failure fence: every inner authority call rejects before
-  enqueue, latches outer failure and burns a valid returned UUID; also cover
-  throw/invalid UUID/collision and exact registry exhaustion without eviction;
-- exercise commit/Reset and commit/failure-fence in both FIFO orders and assert
-  only the earlier position can enter its durable adapter; enqueue an external
-  Reset during a pending adapter Promise and prove it waits at the next ticket
-  without reentrancy rejection or deadlock;
-- crash/restart after data-v3 transaction, Settings V2 read-back and marker-3
-  read-back uses fresh claim/write/capability/leaf IDs and never opens admission
-  early;
-- architecture checks reject runtime adapter injection and prove every
-  allowlisted leaf module lacks authority/controller/public Settings/messaging
-  imports; Settings leaves acquire DatasetEpoch before the inner system gate;
-- revoked Proxies at the scope, opening-proof, lease, Reset-request,
-  failure-command and nested-failure boundaries yield their exact typed
-  Authority validation errors, never a raw exception or state change;
-- settings V1/bare/missing input becomes the exact shared envelope with
-  `generation:0`, `journal:null` and `outcomes:[]`; malformed
-  generation/journal/outcomes or a wrong epoch fail closed, and v1 writes
-  without epoch fail closed after cutover;
-- no `ADMISSION_OPENED`, lease, bootstrap or `ready` is accepted before an exact
-  same-attempt/worker/epoch/request/command Settings snapshot and alarm proof;
-- a `settings_recovery` physical failure is typed/retryable but never automatic;
-  malformed matching-ID proof fails closed, while `SETTINGS_RESET_IN_PROGRESS`
-  transfers to `resetOwned`.
+- nominal : une nouvelle DB et DB5/data2 atteignent toutes deux DB6/data3 avec une epoch fraîche ;
+- no-op : DB6/data3 ne modifie aucune ligne persistée ;
+- legacy malformé : chaque clé primaire est mise en quarantaine de façon atomique ;
+- tuple de quarantaine absent réussit ; les collisions identiques/différentes et `ConstraintError` s'interrompent avec source/meta/enveloppes/quarantaine inchangées ;
+- corruption critique : les octets exacts d'enveloppe/meta/registre demeurent et l'admission est fermée par barrière ;
+- crash : chaque point du tableau de crash converge sans seconde révision ;
+- bloqué/versionchange : les poignées se ferment, le timeout remonte l'échec, la nouvelle tentative est fraîche ;
+- reset : chaque phase de journal, y compris `committed`, préempte la migration et aucune ancienne/nouvelle epoch n'est admise jusqu'à la finalisation du reset ;
+- rejeu de reset après effacement du journal : même nouvelle epoch d'origine plus reçu terminal exact et autorité DB6/data3 renvoie une autorité post-effacement reconnue, puis une preuve idempotente exacte d'ouverture d'admission renvoie un succès sans journal, suppression, effacement, réinitialisation ou diffusion, y compris après des écritures de données/Settings/alarmes de même epoch ; l'échec d'ouverture reste fermé/récupérable, et une epoch étrangère ou un reçu discordant échoue en repli sécurisé ;
+- ordonnancement des reçus : le quota système borné couvre l'écriture/relecture de la valeur la plus récente uniquement ; l'échec est réessayable, le conflit s'effectue en repli sécurisé, un crash avant le checkpoint répète le reçu de manière idempotente, et l'effacement du journal ne précède jamais le reçu exact ;
+- admission fraîche de reset : l'epoch canonique doit être égale à la précédente et différer de la suivante ; l'échec physique de preflight est à nouvelle tentative explicite uniquement et n'écrit aucun journal ;
+- preflight de Reset sur DB absente n'effectue aucune ouverture ; une DB présente s'ouvre sans version cible, utilise des transactions en lecture seule, s'interrompt lors de `onupgradeneeded`, prouve la fermeture/le désenregistrement de la poignée sur chaque résultat et n'effectue aucune écriture de schéma/données/marqueur ;
+- crash avec Reset A journalisé à chaque phase : un nouveau worker réhydrate une réservation fraîche A d'objet exact, un doublon exact la rejoint, les faits B/clone/worker mort/troisième epoch/reçu étranger/incompatibles avec la phase échouent sans changement d'état, et aucune phase ne reprend avant l'acquisition de la barrière vivante ;
+- échec de permission/quota/marqueur : aucun faux résultat `ready` ;
+- appelants concurrents : une tentative, une passe de récupération préparée et une passe de récupération de Settings, même résultat d'epoch ;
+- outbox : le schéma existe mais les écritures de production restent strictement nulles ;
+- ancien tracking v1/v2, sauvegarde de paramètres révision 0, scan terminal/checkpoint, écriture de profil et rappel de cache effectuent tous zéro écriture après un changement d'epoch ;
+- un rédacteur dont le bail est révoqué entre le calcul et le commit échoue à la revalidation finale dans la porte sans ouvrir sa transaction durable ;
+- un allocateur qui appelle Reset de manière synchrone pendant `issueLease` reçoit `AUTHORITY_REENTRANCY_FORBIDDEN` avant la mise en file d'attente ; la violation est verrouillée sur l'émission externe, aucun ticket/réservation de reset ou liaison d'opération n'est créé, l'admission reste inchangée et un UUID valide retourné est grillé pour la durée de vie du worker ;
+- un allocateur qui émet de manière synchrone la même opération ou une autre reçoit le même résultat de rejet avant mise en file ; aucun bail canonique interne ne peut exister et l'émission externe échoue même si l'allocateur intercepte l'exception interne ;
+- un allocateur qui lève `Error`, `undefined` ou un autre primitif produit l'erreur typée `INVALID_LEASE_ID`, tandis qu'un sac de dépendances révoqué/à accesseurs produit `INVALID_CONFIGURATION` sans exécuter de getter ; aucune exception brute ne s'échappe ;
+- le bail ordinaire de pré-admission échoue avant l'allocation ; une revendication exacte prise en charge de Démarrage/Reset et sa capacité suivante exacte/token feuille enregistré réussissent uniquement sur la FIFO partagée ;
+- substituer indépendamment la revendication, la commande, l'étape, la tentative, le worker, l'epoch nullable, la révision d'autorité/barrière, l'écriture, la capacité, l'opération feuille ou l'ID d'adaptateur ; chaque cas rejette avant l'invocation de l'adaptateur ;
+- les commandes multi-écritures allouent des tokens de capacité et de feuille distincts ; une double consommation, une réutilisation inter-écritures/inter-commandes, un achèvement avant commit et un rejeu d'ancien worker effectuent zéro écriture ;
+- tester la réentrance de l'allocateur de capacité dans la même écriture, un autre numéro d'ordre, l'achèvement, Reset et la barrière d'échec : chaque appel d'autorité interne rejette avant la mise en file d'attente, verrouille l'échec externe et grille un UUID valide retourné ; couvrir également exception levée/UUID invalide/collision et épuisement exact du registre sans éviction ;
+- tester commit/Reset et commit/barrière d'échec dans les deux ordres FIFO et vérifier que seule la position antérieure peut entrer dans son adaptateur durable ; mettre en file d'attente un Reset externe pendant une Promise d'adaptateur en attente et prouver qu'il attend au ticket suivant sans rejet de réentrance ni interblocage (deadlock) ;
+- crash/redémarrage après la transaction data-v3, la relecture de Settings V2 et la relecture du marqueur 3 utilise des identifiants frais de revendication/écriture/capacité/feuille et n'ouvre jamais l'admission prématurément ;
+- les contrôles d'architecture rejettent l'injection d'adaptateurs au runtime et prouvent que chaque module feuille sur liste autorisée ne possède aucun import d'autorité/contrôleur/Settings publics/messagerie ; les feuilles de Settings acquièrent DatasetEpoch avant la porte système interne ;
+- les Proxies révoqués aux frontières de portée, preuve d'ouverture, bail, requête de Reset, commande d'échec et échec imbriqué produisent leurs erreurs de validation d'Autorité typées exactes, jamais d'exception brute ni de changement d'état ;
+- l'entrée Settings V1/brute/manquante devient l'enveloppe partagée exacte avec `generation:0`, `journal:null` et `outcomes:[]` ; une génération/journal/outcomes malformés ou une mauvaise epoch échouent en repli sécurisé, et les écritures v1 sans epoch échouent en repli sécurisé après la bascule ;
+- aucun `ADMISSION_OPENED`, bail, bootstrap ou `ready` n'est accepté avant un snapshot de Settings exact de même tentative/worker/epoch/requête/commande et la preuve d'alarme ;
+- un échec physique de `settings_recovery` est typé/réessayable mais jamais automatique ; une preuve malformée à ID correspondant échoue en repli sécurisé, tandis que `SETTINGS_RESET_IN_PROGRESS` transfère à `resetOwned`.
 
-### Cross-model trace R6 — startup migration without a panel
+### Trace inter-modèles R6 — migration de démarrage sans panneau
 
-For new install, DB5/data2, DB6/data2 crash and DB6/data3, remove or corrupt the
-auto-scan alarm and start two concurrent callers. They must join one attempt.
-Assert no lease/admission/bootstrap before `SETTINGS_RECOVERY_PASSED`; crash and
-explicitly retry at every system Settings-journal phase; require settled shared
-envelope plus exact alarm proof before `openingAdmission` and `ready`. A reset
-journal at every phase, especially `committed`, must route `resetOwned` without
-starting a concurrent migration or returning ordinary failure: on a new worker,
-strictly rehydrate Reset A's current-worker reservation, reject Reset B and
-acquire its live fence first. After a crash
-between journal clear and response, replay the original reset request and prove
-recognized post-clear authority from canonical next epoch plus exact latest-only
-receipt and DB6/data3 proof, then exact idempotent admission opening, after
-injecting legitimate E2 writes; assert zero second migration, deletion or
-schema write and zero success before admission proof.
+Pour une nouvelle installation, DB5/data2, crash DB6/data2 et DB6/data3, supprimer ou corrompre l'alarme d'auto-scan et démarrer deux appelants concurrents. Ils doivent rejoindre une tentative unique. Vérifier l'absence de bail/admission/bootstrap avant `SETTINGS_RECOVERY_PASSED` ; crasher et réessayer explicitement à chaque phase du journal système des Settings ; exiger une enveloppe partagée réglée ainsi qu'une preuve exacte d'alarme avant `openingAdmission` et `ready`. Un journal de reset à chaque phase, particulièrement `committed`, doit s'acheminer vers `resetOwned` sans démarrer de migration concurrente ni renvoyer d'échec ordinaire : sur un nouveau worker, réhydrater strictement la réservation de Reset A du worker courant, rejeter Reset B et acquérir sa barrière vivante en premier. Après un crash entre l'effacement du journal et la réponse, rejouer la requête de reset d'origine et prouver l'autorité post-effacement reconnue à partir de la prochaine epoch canonique plus le reçu exact le plus récent et la preuve DB6/data3, puis l'ouverture idempotente exacte d'admission, après avoir injecté des écritures légitimes E2 ; vérifier zéro seconde migration, suppression ou écriture de schéma et zéro succès avant la preuve d'admission.
 
-## Out of scope
+## Hors périmètre
 
-- remote dashboard delivery, acknowledgement, leases and conflict policy;
-- selective recovery UI for critical tracking corruption;
-- cross-device backup/restore;
-- changes to the application-tracking state machine beyond consuming the
-  barrier and epoch contract.
-- executable pre-admission capability contracts/methods and Shell wiring until
-  `dataset-write-capability.model.md` receives independent approval.
+- livraison au dashboard distant, accusé de réception, baux et politique de conflits ;
+- interface de récupération sélective pour la corruption critique du tracking ;
+- sauvegarde/restauration entre appareils ;
+- modifications de la machine à états de tracking des candidatures au-delà de la consommation de la barrière et du contrat d'epoch.
+- méthodes/contrats exécutables de capacité de pré-admission et câblage Shell tant que `dataset-write-capability.model.md` n'a pas reçu d'approbation indépendante.

@@ -1,264 +1,115 @@
-# Settings Persistence Workflow Model
+# Modèle de workflow de persistance des réglages
 
-Status: **R0A/R0B/R0D executable model implemented; R0E Shell authority contracts reviewed, runtime cutover still incomplete**.
+Statut : **Modèle exécutable R0A/R0B/R0D implémenté ; contrats d'autorité Shell R0E révisés, bascule à l'exécution (runtime cutover) toujours incomplète**.
 
-The executable model is split by responsibility:
+Le modèle exécutable est divisé par responsabilité :
 
-- [`settings-persistence.contract.ts`](./settings-persistence.contract.ts) owns exact types, canonicalization, storage/wire decoders, and the error matrix;
-- [`settings-persistence.logic.ts`](./settings-persistence.logic.ts) owns pure guards and actions;
-- [`settings-persistence.machine.ts`](./settings-persistence.machine.ts) owns the XState statechart and UI selectors.
+- [`settings-persistence.contract.ts`](./settings-persistence.contract.ts) détient les types exacts, la canonicalisation, les décodeurs de stockage/transport, et la matrice d'erreurs ;
+- [`settings-persistence.logic.ts`](./settings-persistence.logic.ts) détient les gardes et actions pures ;
+- [`settings-persistence.machine.ts`](./settings-persistence.machine.ts) détient le statechart XState et les sélecteurs UI.
 
-This document is normative for the Shell protocol that will eventually consume
-those pure model files. It is not a production implementation or a
-production-readiness proof.
+Ce document est normatif pour le protocole Shell qui consommera à terme ces fichiers de modèle purs. Il ne s'agit pas d'une implémentation de production ni d'une preuve de préparation à la production.
 
-## R0E review record — 2026-07-16
+## Relevé de revue R0E — 16-07-2026
 
-The Shell gap review covered the nominal path, malformed boundaries, retries,
-permission refusal, cancellation, worker restart, reset fencing, capacity
-exhaustion and ambiguous I/O. The following decisions are normative:
+La revue des écarts du Shell a couvert le chemin nominal, les frontières malformées, les nouvelles tentatives (retries), le refus de permission, l'annulation, le redémarrage de worker, le fencing de reset, l'épuisement de capacité et les E/S ambiguës. Les décisions suivantes sont normatives :
 
-1. The worker-local activation registry issues a detached token and consumes it
-   exactly once. Its clock and result-ID allocator are injected; it has no
-   eviction, fallback allocator or implicit ID synthesis.
-2. The extension-global storage reservation authority acquires and releases
-   reservations through the DatasetEpoch gate. Revalidation during an already
-   gated Settings write consumes the caller's exact live gate capability and
-   must not recursively acquire another Dataset lease.
-3. A negative `permissions.contains` result is not a terminal fact by itself.
-   The transaction repository repeats the contains-only check inside its live
-   gate and atomically appends the causal `not_committed` outcome before it may
-   return the correlated settled snapshot.
-4. `ABORT_SETTINGS_MUTATION` is a repository transaction. It either observes an
-   existing exact outcome, or atomically appends `cancelled`; it never infers
-   cancellation from the current settings value.
-5. An admitted mutation with neither journal nor outcome returns an exact
-   settled snapshot together with `kind:'outcome_missing'`. The executor emits
-   `RECONCILED` with that snapshot, allowing the model's existing fatal branch
-   to install `SETTINGS_OUTCOME_MISSING` without fabricating an outcome or an
-   alarm proof.
-6. Coordinator-generated recovery IDs use one bounded allocator source for at
-   most 128 attempts. Exhaustion emits no event and retains the exact command
-   for `resume()` or handoff. Every successfully admitted event is first
-   descriptor-captured into a detached graph; all UUIDs in that exact graph and
-   in the resulting public view are retained before a later allocation.
+1. Le registre d'activation local au worker émet un token détaché et le consomme exactement une fois. Son horloge et son allocateur d'ID de résultat sont injectés ; il ne possède ni éviction, ni allocateur de secours, ni synthèse implicite d'identifiants.
+2. L'autorité globale de réservation de stockage de l'extension acquiert et libère les réservations à travers la porte DatasetEpoch. La revalidation au cours d'une écriture Settings déjà sous porte consomme la capacité de porte active exacte de l'appelant et ne doit pas acquérir récursivement un autre bail Dataset.
+3. Un résultat négatif de `permissions.contains` n'est pas un fait terminal en soi. Le dépôt transactionnel réitère la vérification "contains-only" au sein de sa porte active et ajoute de manière atomique le résultat causal `not_committed` avant de pouvoir renvoyer le snapshot stabilisé corrélé.
+4. `ABORT_SETTINGS_MUTATION` est une transaction de dépôt. Soit elle observe un résultat exact existant, soit elle ajoute de manière atomique `cancelled` ; elle ne déduit jamais l'annulation à partir de la valeur courante des réglages.
+5. Une mutation admise ne possédant ni journal ni résultat renvoie un snapshot stabilisé exact accompagné de `kind:'outcome_missing'`. L'exécuteur émet `RECONCILED` avec ce snapshot, permettant à la branche fatale existante du modèle d'installer `SETTINGS_OUTCOME_MISSING` sans fabriquer de résultat ni de preuve d'alarme.
+6. Les identifiants de récupération générés par le coordinateur utilisent une source d'allocateur bornée pour au plus 128 tentatives. L'épuisement n'émet aucun événement et conserve la commande exacte pour `resume()` ou passage de relais (handoff). Chaque événement admis avec succès est d'abord capturé par descripteur dans un graphe détaché ; tous les UUID figurant dans ce graphe exact et dans la vue publique résultante sont conservés avant toute allocation ultérieure.
 
-Review conclusion: all five runtime gaps and the coordinator allocator gap are
-representable without an implicit transition. Implementation may proceed only
-against these contracts and the hostile tests derived from them.
+Conclusion de la revue : les cinq écarts d'exécution ainsi que l'écart d'allocateur du coordinateur sont représentables sans transition implicite. L'implémentation ne peut se poursuivre qu'en conformité avec ces contrats et les tests hostiles qui en dérivent.
 
-The 2026-07-16 writer inventory found direct `chrome.storage.local` mutations
-outside this authority in connector sync metadata, analytics, parser and
-connector health, alerts, profile/preferences caches, DB migration metadata,
-favorites/hidden/seen state, onboarding flags, semantic cache and TJM history.
-Until those writers are cut over, `allLocalWritersFenced:true` cannot be emitted
-honestly. The concrete authority therefore requires an exact writer-fence port
-and fails with `global_writer_cutover_incomplete` before allocating a proof when
-that port cannot prove the cutover. This remains a production blocker outside
-the bounded R0E repository implementation.
+L'inventaire des rédacteurs (writers) du 16-07-2026 a révélé des mutations directes de `chrome.storage.local` hors de cette autorité dans les métadonnées de synchronisation des connecteurs, les analytics, la santé du parseur et des connecteurs, les alertes, les caches de profils/préférences, les métadonnées de migration DB, l'état des favoris/masqués/vus, les drapeaux d'onboarding, le cache sémantique et l'historique TJM. Tant que ces rédacteurs n'auront pas basculé, `allLocalWritersFenced:true` ne pourra être émis honnêtement. L'autorité concrète exige par conséquent un port exact de fence de rédacteur et échoue avec `global_writer_cutover_incomplete` avant d'allouer une preuve lorsque ce port ne peut prouver la bascule. Cela reste un point bloquant pour la production en dehors de l'implémentation du dépôt R0E borné.
 
-## Scope and authority
+## Périmètre et autorité
 
-One protocol owns the persistent settings editable in the extension:
-`autoScan`, `scanIntervalMinutes`, `notifications`, `theme`, and
-`enabledConnectors`. The remaining `AppSettings` fields travel in every
-whole-object snapshot and write, so a field edit can never erase them.
+Un protocole unique détient les réglages persistants modifiables dans l'extension : `autoScan`, `scanIntervalMinutes`, `notifications`, `theme` et `enabledConnectors`. Les autres champs de `AppSettings` voyagent dans chaque snapshot et écriture de l'objet complet, de sorte que l'édition d'un champ ne peut jamais les effacer.
 
-The service worker is the sole settings coordinator. The side panel uses the
-typed bridge and never directly owns storage, permissions, alarms, or reset
-admission. The coordinator serializes every settings command through one queue
-and consumes the central `DatasetEpochAuthority` and commit gate defined by the
-DB/reset model. Immediately before every durable write it revalidates the
-operation lease, `dataEpoch`, envelope `revision`, envelope `generation`,
-authority revision, and reset-journal state inside that gate. It holds the gate
-until the Chrome-storage Promise settles. The only exception to ordinary reset
-journal absence is the explicitly correlated post-commit Load described below;
-that Load joins the reset finalizer and cannot write concurrently with it.
+Le service worker est l'unique coordinateur des réglages. Le side panel utilise le bridge typé et ne détient jamais directement le stockage, les permissions, les alarmes ou l'admission de reset. Le coordinateur sérialise chaque commande de réglages via une file d'attente unique et consomme l'autorité centrale `DatasetEpochAuthority` ainsi que la porte de commit définie par le modèle DB/reset. Immédiatement avant chaque écriture durable, il revalide le bail de l'opération, `dataEpoch`, la `revision` de l'enveloppe, la `generation` de l'enveloppe, la révision de l'autorité et l'état du journal de reset au sein de cette porte. Il maintient la porte jusqu'à ce que la Promise du stockage Chrome se stabilise. La seule exception à l'absence ordinaire de journal de reset est le Load post-commit explicitement corrélé décrit ci-dessous ; ce Load rejoint le finaliseur de reset et ne peut pas écrire de manière concurrente avec lui.
 
-A UI candidate may be projected while its status is `saving`. The UI may say
-`saved` only from a settled snapshot that proves all of the following together:
+Un candidat UI peut être projeté tant que son statut est `saving`. L'UI ne peut afficher `saved` qu'à partir d'un snapshot stabilisé prouvant conjointement l'ensemble des conditions suivantes :
 
-1. the current `dataEpoch` still owns the dataset;
-2. the settings envelope has no pending transaction journal;
-3. the local-data-reset journal is absent;
-4. the MissionPulse auto-scan alarm matches that envelope; and
-5. the response is correlated to the exact request and command.
+1. le `dataEpoch` actuel détient toujours le dataset ;
+2. l'enveloppe des réglages ne comporte aucun journal de transaction en attente ;
+3. le journal de réinitialisation des données locales (local-data-reset) est absent ;
+4. l'alarme d'auto-scan MissionPulse concorde avec cette enveloppe ; et
+5. la réponse est corrélée à la requête et à la commande exactes.
 
-Free text, visual state, toast state, and LLM output never select a transition.
-Typed events and pure guards do.
+Le texte libre, l'état visuel, l'état des toasts et les sorties LLM ne sélectionnent jamais de transition. Les événements typés et les gardes pures s'en chargent.
 
-## Epochs, IDs, and correlation
+## Époques, identifiants et corrélation
 
-`dataEpoch`, `workerEpoch`, `mutationId`, `requestId`, `permissionCheckId`,
-`activationId`, `activationResultId`, `storageReservationId`, `transactionId`,
-`broadcastId`, `resetId`, and proof IDs are canonical lowercase UUID v4 strings.
-Uppercase UUIDs, other UUID versions, empty strings, and reused IDs are invalid.
+`dataEpoch`, `workerEpoch`, `mutationId`, `requestId`, `permissionCheckId`, `activationId`, `activationResultId`, `storageReservationId`, `transactionId`, `broadcastId`, `resetId` et les ID de preuve sont des chaînes UUID v4 canoniques en minuscules. Les UUID en majuscules, les autres versions d'UUID, les chaînes vides et les identifiants réutilisés sont invalides.
 
-This uniqueness rule is structural and fail-closed at every durable boundary.
-For a mutation, the five base identities (`mutationId`, `permissionCheckId`,
-`activationId`, `activationResultId`, `storageReservationId`) plus any active
-`requestId` form its six-identity command set. Neither `dataEpoch` nor
-`originWorkerEpoch` may equal any member of that set, any prior failed-mutation
-identity retained by a retry, or each other. Consequently `command/v2`
-rejects a `dataEpoch` present in `baseCorrelationIds`; mutation and compare
-descriptors repeat that check; and the pending-intent decoder additionally
-rejects its `originWorkerEpoch` when it appears in mutation, retry, request,
-terminal-settlement, reservation-lease, or reservation-proof identities. No
-self-consistent digest may legitimize a crossed identity.
+Cette règle d'unicité est structurelle et en échec fermé (fail-closed) à chaque frontière durable. Pour une mutation, les cinq identités de base (`mutationId`, `permissionCheckId`, `activationId`, `activationResultId`, `storageReservationId`) combinées à tout `requestId` actif forment son ensemble de commande à six identités. Ni `dataEpoch` ni `originWorkerEpoch` ne peuvent être égaux à un membre de cet ensemble, à une identité antérieure de mutation échouée conservée par une nouvelle tentative, ou l'un à l'autre. En conséquence, `command/v2` rejette un `dataEpoch` présent dans `baseCorrelationIds` ; les descripteurs de mutation et de comparaison réitèrent cette vérification ; et le décodeur d'intention en attente rejette en outre son `originWorkerEpoch` lorsqu'il apparaît dans les identités de mutation, de retry, de requête, de stabilisation terminale, de bail de réservation ou de preuve de réservation. Aucun digest auto-cohérent ne saurait légitimer une identité croisée.
 
-The allocator never reuses an ID during one `dataEpoch`. A `mutationId` is the
-durable at-most-once identity and is unique by itself, not by
-`(mutationId, digest)`. Reusing one mutation ID with a different digest is a
-protocol violation. Every terminal mutation ID remains in the append-only
-outcome ledger for the whole epoch.
+L'allocateur ne réutilise jamais d'ID au cours d'un même `dataEpoch`. Un `mutationId` constitue l'identité durable au plus une fois (at-most-once) et est unique en lui-même, et non par `(mutationId, digest)`. Réutiliser un ID de mutation avec un digest différent constitue une violation de protocole. Chaque ID de mutation terminal demeure dans le registre de résultats en ajout seul (append-only ledger) pour toute la durée de l'époque.
 
-Each admitted mutation carries a sorted, unique `correlationIds` set (maximum
-32 UUIDs). It starts with mutation, permission, activation, activation-result
-and reservation IDs and acquires rebase, recovery, cancellation, and
-reconciliation request IDs before the corresponding command is emitted. The
-journal and terminal outcome retain those IDs, so a request ID already present
-in current or historical durable state
-cannot be reused as a later mutation/retry identity. Every response must match
-the command object currently stored in machine context, not merely a
-self-consistent event tuple.
+Chaque mutation admise porte un ensemble `correlationIds` trié et unique (maximum 32 UUIDs). Il débute avec les identifiants de mutation, de permission, d'activation, de résultat d'activation et de réservation, et acquiert les identifiants de requête de rebase, de récupération, d'annulation et de réconciliation avant l'émission de la commande correspondante. Le journal et le résultat terminal conservent ces identifiants, de sorte qu'un ID de requête déjà présent dans l'état durable courant ou historique ne peut pas être réutilisé comme identité ultérieure de mutation ou de retry. Chaque réponse doit correspondre à l'objet de commande actuellement stocké dans le contexte de la machine, et pas simplement à un tuple d'événements auto-cohérent.
 
-Command IDs are deterministic and bounded:
+Les identifiants de commande sont déterministes et bornés :
 
 ```text
 settings/<load|persist_intent|clear_intent|reserve|permission_check|write|recover|rebase|abort|reconcile>/<lowercase UUID v4>
 ```
 
-For `PERSIST_SETTINGS_PENDING_INTENT`, the UUID suffix is the exact identity of
-the deferred command stored by that revision. Distinct revisions therefore
-have distinct command IDs; an ambiguous retry of the same physical revision
-retains the same command ID byte-for-byte. Every deferred identity is fresh
-within the epoch before it may become a pending revision.
+Pour `PERSIST_SETTINGS_PENDING_INTENT`, le suffixe UUID est l'identité exacte de la commande différée stockée par cette révision. Des révisions distinctes possèdent donc des ID de commande distincts ; une nouvelle tentative ambiguë de la même révision physique conserve le même ID de commande octet par octet. Chaque identité différée est fraîche au sein de l'époque avant de pouvoir devenir une révision en attente.
 
-## Durable pending intent and cold-controller recovery
+## Intention en attente durable et reprise de contrôleur à froid
 
-The model owns one strict `SettingsPendingIntentV1` record under the logical key
-`missionpulse.settingsPendingIntent.v1`. The eventual Shell may store that record
-only in session-scoped extension storage; the model itself performs no I/O. It
-emits exactly two storage-boundary commands:
+Le modèle détient un enregistrement strict `SettingsPendingIntentV1` sous la clé logique `missionpulse.settingsPendingIntent.v1`. Le Shell éventuel ne peut stocker cet enregistrement que dans le stockage d'extension de portée session (`session`) ; le modèle lui-même n'effectue aucune E/S. Il émet exactement deux commandes de frontière de stockage :
 
-- `PERSIST_SETTINGS_PENDING_INTENT`, followed only by an exact
-  `SETTINGS_PENDING_INTENT_PERSISTED` proof with `readBackVerified:true`;
-- `CLEAR_SETTINGS_PENDING_INTENT`, followed only by an exact
-  `SETTINGS_PENDING_INTENT_CLEARED` proof with
-  `absenceReadBackVerified:true`.
+- `PERSIST_SETTINGS_PENDING_INTENT`, suivie uniquement d'une preuve exacte `SETTINGS_PENDING_INTENT_PERSISTED` avec `readBackVerified:true` ;
+- `CLEAR_SETTINGS_PENDING_INTENT`, suivie uniquement d'une preuve exacte `SETTINGS_PENDING_INTENT_CLEARED` avec `absenceReadBackVerified:true`.
 
-The pending record contains the complete mutation, original worker epoch,
-monotone safe-integer `intentRevision`, retry identity when present, exact phase,
-next command type and ID, request ID when the command is request-scoped, proofs
-already obtained, and a canonical bounded digest over every field. Exact keys,
-ordinary JSON descriptors, UUIDs, base revisions/generations, settings digests,
-origin digest, correlation IDs, command prefixes and record digest are all
-validated. No missing field is reconstructed from a value that merely looks
-equivalent.
+L'enregistrement en attente contient la mutation complète, l'époque de worker d'origine, un entier sécurisé monotone `intentRevision`, l'identité de retry le cas échéant, la phase exacte, le type et l'ID de la commande suivante, l'ID de requête lorsque la commande est de portée requête, les preuves déjà obtenues, ainsi qu'un digest canonique borné sur l'ensemble des champs. Les clés exactes, les descripteurs JSON ordinaires, les UUID, les révisions/générations de base, les digests de réglages, le digest d'origine, les identifiants de corrélation, les préfixes de commande et le digest d'enregistrement sont tous validés. Aucun champ manquant n'est reconstruit à partir d'une valeur qui semblerait simplement équivalente.
 
-An ambiguous persist/read-back emits
-`SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN`; the state and exact command
-identity remain unchanged so the executor can retry idempotently. Only revision
-1 may fail before admission, and only an exact
-`SETTINGS_PENDING_INTENT_ABSENT` proof with absence read-back may produce the
-typed recoverable `SETTINGS_STORAGE_FAILED/pending_intent` terminal. No
-reservation, permission check or Settings write has occurred in that branch.
+Une persistance ou relecture ambiguë émet `SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN` ; l'état et l'identité exacte de la commande demeurent inchangés afin que l'exécuteur puisse retenter de manière idempotente. Seule la révision 1 peut échouer avant l'admission, et seule une preuve exacte `SETTINGS_PENDING_INTENT_ABSENT` avec relecture d'absence peut produire l'état terminal typé et récupérable `SETTINGS_STORAGE_FAILED/pending_intent`. Aucune réservation, vérification de permission ou écriture de réglages n'a eu lieu dans cette branche.
 
-`MUTATE` enters `persistingIntent`. Until the exact persist/read-back proof is
-admitted, reservation is impossible. Every causal rotation creates the next
-intent revision and returns to `persistingIntent` before reservation,
-host-permission verification, write, rebase, recovery, abort or reconciliation.
-The deferred command is private context and cannot become the public command
-until the matching durable proof arrives.
+`MUTATE` entre dans `persistingIntent`. Tant que la preuve exacte de persistance/relecture n'est pas admise, la réservation est impossible. Chaque rotation causale crée la révision d'intention suivante et retourne à `persistingIntent` avant la réservation, la vérification des permissions d'hôte, l'écriture, le rebase, la récupération, l'abandon ou la réconciliation. La commande différée relève du contexte privé et ne peut devenir la commande publique tant que la preuve durable correspondante n'est pas parvenue.
 
-| Current durable identity  | Event / decision                               | Required intermediate state     | Command allowed only after proof                       |
-| ------------------------- | ---------------------------------------------- | ------------------------------- | ------------------------------------------------------ |
-| none                      | valid non-no-op mutation                       | `persistingIntent`, revision 1  | `RESERVE_SETTINGS_STORAGE`                             |
-| reservation identity      | exact reservation proof                        | `persistingIntent`, revision +1 | contains-only verification or candidate write          |
-| permission-check identity | exact contains proof                           | `persistingIntent`, revision +1 | candidate write                                        |
-| any active identity       | Cancel / retry / recovery / reconcile rotation | `persistingIntent`, revision +1 | matching abort, rebase, recovery or reconcile command  |
-| terminal causal outcome   | exact settled snapshot                         | `clearingIntent`                | no further transactional command; clear only           |
-| admitted outcome missing  | exact reconciled snapshot with no causal entry | `failed`, pending intent intact | no command; explicit reset may clear the durable fence |
+| Identité durable courante          | Événement / décision                                          | État intermédiaire requis              | Commande autorisée uniquement après preuve                                |
+| ---------------------------------- | ------------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------------------------- |
+| aucune                             | mutation valide non-no-op                                     | `persistingIntent`, révision 1         | `RESERVE_SETTINGS_STORAGE`                                                |
+| identité de réservation            | preuve de réservation exacte                                  | `persistingIntent`, révision +1        | vérification "contains-only" ou écriture candidate                        |
+| identité de contrôle de permission | preuve "contains" exacte                                      | `persistingIntent`, révision +1        | écriture candidate                                                        |
+| toute identité active              | rotation d'annulation / retry / récupération / réconciliation | `persistingIntent`, révision +1        | commande correspondante d'abandon, rebase, récupération ou réconciliation |
+| résultat causal terminal           | snapshot stabilisé exact                                      | `clearingIntent`                       | aucune autre commande transactionnelle ; effacement uniquement            |
+| résultat admis manquant            | snapshot réconcilié exact sans entrée causale                 | `failed`, intention en attente intacte | aucune commande ; un reset explicite peut effacer le fence durable        |
 
-Terminal publication is two-phase. A causal terminal outcome is first retained
-as `pendingTerminalSettlement` while the public view remains
-`terminalSettlement:null`, `saveStatus:'saving'`, and editing remains disabled.
-Only exact removal plus absence read-back publishes the cloned, deeply frozen
-`SettingsTerminalSettlementV1` and enters `saved` or `failed`. A stale revision,
-digest, worker epoch, mutation ID, command ID or proof ID cannot clear the
-record. An ambiguous cleanup may only retry the same idempotent clear; it never
-replays the candidate or changes the durable outcome.
+La publication terminale se déroule en deux phases. Un résultat terminal causal est d'abord conservé en tant que `pendingTerminalSettlement` tandis que la vue publique reste avec `terminalSettlement:null`, `saveStatus:'saving'`, et l'édition demeure désactivée. Seule la suppression exacte accompagnée de la relecture d'absence publie l'objet cloné et profondément figé `SettingsTerminalSettlementV1` et fait entrer dans `saved` ou `failed`. Une révision, un digest, une époque de worker, un ID de mutation, un ID de commande ou un ID de preuve périmé(e) ne peut pas effacer l'enregistrement. Un nettoyage ambigu ne peut que réitérer le même effacement idempotent ; il ne rejoue jamais le candidat ni ne modifie le résultat durable.
 
-`SettingsTerminalSettlementV1` contains the exact mutation, request and command
-identity, the complete ledger outcome and its optional exact error. External
-canonical convergence, an equal candidate from another mutation, broadcast,
-reload, or reset never fabricates caller-specific settlement.
+`SettingsTerminalSettlementV1` contient la mutation exacte, la requête et l'identité de commande, le résultat complet du registre et son éventuelle erreur exacte. Une convergence canonique externe, un candidat égal issu d'une autre mutation, un broadcast, un rechargement ou un reset ne fabrique jamais de règlement spécifique à l'appelant.
 
-At controller creation, a non-null cold-start input must parse as an exact
-`SettingsColdStartRecoverySeedV1`. It binds the serialized pending record,
-recovery worker epoch, fresh recovery request ID and same-epoch envelope. The
-new worker and recovery request must differ from each other and from the data
-epoch, origin worker, mutation/retry/correlation identities, proof/lease IDs,
-journal transaction/correlations and ledger correlations. Journal/outcome
-identity must match mutation bases and digests. A stored reservation proof is
-accepted only when its epoch equals the command and seed epoch and its bounded
-capacity arithmetic is internally exact. An accessor, inherited property,
-symbol, wrong epoch, stale digest, reused identity, foreign outcome or divergent
-journal fails closed in `modelError`.
+À la création du contrôleur, une entrée de démarrage à froid (cold start) non nulle doit être analysée comme un `SettingsColdStartRecoverySeedV1` exact. Elle lie l'enregistrement en attente sérialisé, l'époque du worker de récupération, un nouvel ID de requête de récupération et l'enveloppe de la même époque. Le nouveau worker et la requête de récupération doivent différer l'un de l'autre et de l'époque de données, du worker d'origine, des identités de mutation/retry/corrélation, des ID de preuve/bail, de la transaction/corrélations de journal et des corrélations de registre. L'identité du journal/résultat doit correspondre aux bases et digests de mutation. Une preuve de réservation stockée n'est acceptée que lorsque son époque est égale à l'époque de commande et de germe (seed) et que son arithmétique de capacité bornée est rigoureusement exacte en interne. Un accesseur, une propriété héritée, un symbole, une époque erronée, un digest périmé, une identité réutilisée, un résultat étranger ou un journal divergent échoue en mode fermé dans `modelError`.
 
-A valid cold controller first enters `persistingIntent`. It removes every old
-reservation proof/lease from the recovered mutation, appends the injected
-recovery request, increments `intentRevision`, and persists/read-backs that
-exact `nextCommandType:'RECONCILE_SETTINGS'` record. Only then may it enter
-`reconciling` with `RECONCILE_SETTINGS(reason:'worker_restart')`. It never emits
-reservation, permission verification or `COMPARE_AND_SETTLE_SETTINGS` from the
-seed and never replays the candidate. A crash before this rotation read-back
-leaves the previous durable revision authoritative for worker C. An exhausted
-revision fails closed before emitting a record that the cold parser cannot
-accept. Recovery may converge the global snapshot, but caller-specific
-publication still requires the exact outcome and pending-intent cleanup.
+Un contrôleur à froid valide entre d'abord dans `persistingIntent`. Il retire chaque ancienne preuve/bail de réservation de la mutation récupérée, ajoute la requête de récupération injectée, incrémente `intentRevision`, et persiste/relit cet enregistrement exact avec `nextCommandType:'RECONCILE_SETTINGS'`. Ce n'est qu'ensuite qu'il peut entrer dans `reconciling` avec `RECONCILE_SETTINGS(reason:'worker_restart')`. Il n'émet jamais de réservation, de vérification de permission ou de `COMPARE_AND_SETTLE_SETTINGS` depuis le seed et ne rejoue jamais le candidat. Un crash survenant avant la relecture de cette rotation laisse la révision durable précédente faire autorité pour le worker C. Une révision épuisée échoue en mode fermé avant d'émettre un enregistrement que le parseur à froid ne pourrait accepter. La récupération peut faire converger le snapshot global, mais la publication spécifique à l'appelant requiert toujours le résultat exact et le nettoyage de l'intention en attente.
 
-### Crash-window matrix
+### Matrice des fenêtres de crash
 
-| Crash window                                             | Durable observation by worker B        | Only legal B behavior                                  |
-| -------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------ |
-| before first session write                               | no exact record                        | no mutation admission and no caller terminal           |
-| after write, before read-back                            | unacknowledged record                  | validate/recover; never reserve from A's memory        |
-| after read-back, before deferred command                 | exact revision                         | reconcile that identity; never replay candidate write  |
-| after an in-memory causal rotation, before its read-back | previous exact revision                | resume previous durable identity, not newer memory IDs |
-| after terminal outcome, before clear                     | outcome plus pending record            | reconcile outcome, then cleanup only                   |
-| after remove, before absence read-back                   | clear outcome unknown                  | retry exact clear idempotently; no public terminal yet |
-| after absence read-back, before observer publication     | no pending record plus durable outcome | publish at most the exact causal terminal; no effects  |
+| Fenêtre de crash                                              | Observation durable par le worker B                   | Unique comportement autorisé de B                                                  |
+| ------------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| avant la première écriture en session                         | aucun enregistrement exact                            | aucune admission de mutation et aucun état terminal d'appelant                     |
+| après écriture, avant relecture                               | enregistrement non acquitté                           | valider/récupérer ; ne jamais réserver depuis la mémoire de A                      |
+| après relecture, avant commande différée                      | révision exacte                                       | réconcilier cette identité ; ne jamais rejouer l'écriture candidate                |
+| après rotation causale en mémoire, avant sa relecture         | révision exacte précédente                            | reprendre l'identité durable précédente, pas les identifiants mémoire plus récents |
+| après résultat terminal, avant effacement                     | résultat plus enregistrement en attente               | réconcilier le résultat, puis nettoyage uniquement                                 |
+| après suppression, avant relecture d'absence                  | résultat d'effacement inconnu                         | retenter l'effacement exact de manière idempotente ; pas encore de terminal public |
+| après relecture d'absence, avant publication aux observateurs | aucun enregistrement en attente plus résultat durable | publier au maximum le terminal causal exact ; aucun effet                          |
 
-The journal crash matrix is also executable against two distinct controller
-instances. For each of: before candidate journal, `effects_pending`, candidate
-alarm before outcome, `compensation_pending`,
-`compensation_effects_pending`, previous alarm before outcome, and durable
-outcome before acknowledgement, worker A is stopped and all references are
-dropped. Serialized worker B may emit only the durable recovery rotation,
-reconcile and cleanup commands. It must reach exactly one causal
-`not_committed`, `committed` or `compensated` ledger outcome and may emit zero
-reservation, permission-check or candidate-write commands.
+La matrice de crash de journal est également exécutable face à deux instances distinctes de contrôleur. Pour chacune des situations suivantes : avant journal candidat, `effects_pending`, alarme candidate avant résultat, `compensation_pending`, `compensation_effects_pending`, alarme précédente avant résultat, et résultat durable avant acquittement, le worker A est arrêté et toutes les références sont abandonnées. Le worker B sérialisé ne peut émettre que les commandes durables de rotation de récupération, de réconciliation et de nettoyage. Il doit atteindre exactement un résultat de registre causal `not_committed`, `committed` ou `compensated` et ne doit émettre aucune commande de réservation, de vérification de permission ou d'écriture candidate.
 
-Absence of session storage after a full browser restart does not identify a
-caller. Startup recovery may settle or fence the local journal and ledger, but
-must not invent a toast, Promise resolution or candidate replay for a vanished
-caller.
+L'absence de stockage de session après un redémarrage complet du navigateur n'identifie pas d'appelant. La récupération de démarrage peut stabiliser ou isoler (fence) le journal local et le registre, mais ne doit pas inventer de toast, de résolution de Promise ou de rejeu de candidat pour un appelant disparu.
 
-Every response echoes `dataEpoch`, `commandId`, and the command's request or
-mutation ID. A matching-ID malformed transaction response becomes
-`PROTOCOL_UNCERTAIN` with a fresh reconciliation request; a malformed Load
-response becomes exact `LOAD_FAILED(SETTINGS_PROTOCOL_ERROR)`. A genuinely
-stale ID or stale epoch is ignored.
+Chaque réponse fait écho à `dataEpoch`, `commandId`, et à l'ID de requête ou de mutation de la commande. Une réponse transactionnelle malformée avec un ID correspondant devient `PROTOCOL_UNCERTAIN` avec une nouvelle requête de réconciliation ; une réponse de Load malformée devient exactement `LOAD_FAILED(SETTINGS_PROTOCOL_ERROR)`. Un ID véritablement périmé ou une époque périmée est ignoré(e).
 
-Every external Settings event first exists as an untrusted
-`SettingsPersistenceRawEvent`. Shell owns only a
-`SettingsPersistenceController`; it never receives the XState actor, machine or
-an internal `.send`. Its sole write API is synchronous `dispatch(raw: unknown)`.
-The controller is created already started and exposes only an explicitly
-projected public view, public-view subscription, and `stop()`.
+Chaque événement externe de Settings existe d'abord sous la forme d'un `SettingsPersistenceRawEvent` non fiable. Le Shell détient uniquement un `SettingsPersistenceController` ; il ne reçoit jamais l'acteur XState, la machine ou un `.send` interne. Sa seule API d'écriture est l'appel synchrone `dispatch(raw: unknown)`. Le contrôleur est créé déjà démarré et n'expose qu'une vue publique explicitement projetée, une souscription à cette vue publique, et `stop()`.
 
-The public view is a domain DTO, never an XState snapshot:
+La vue publique est un DTO de domaine, jamais un snapshot XState :
 
 ```ts
 type SettingsPersistencePublicState =
@@ -296,106 +147,27 @@ interface SettingsPersistencePublicView {
 }
 ```
 
-`getSnapshot()` keeps its consumer-facing name but returns a newly projected,
-recursively cloned and deeply frozen `SettingsPersistencePublicView`.
-`subscribe(listener)` supplies the same safe DTO contract for its initial and
-subsequent notifications and returns a frozen wrapper containing only an
-idempotent `unsubscribe()`. No native subscription object escapes. The view has
-no `context`, `machine`, `_nodes`, `children`, `historyValue`, `tags`, `toJSON`,
-XState method, collection, or other actor reference. It copies only the listed
-domain fields; it never spreads or serializes the native snapshot itself.
-Consequently a consumer cannot reconstruct a rogue actor, replace or wrap the
-shared `admittedEvent` implementation, capture the normalized event during its
-live WeakSet window, or send that capability through a second actor.
+`getSnapshot()` conserve son nom destiné aux consommateurs mais retourne une `SettingsPersistencePublicView` nouvellement projetée, récursivement clonée et profondément figée. `subscribe(listener)` fournit le même contrat DTO sécurisé pour ses notifications initiales et ultérieures et renvoie une enveloppe figée contenant uniquement un `unsubscribe()` idempotent. Aucun objet natif de souscription ne s'échappe. La vue ne possède aucun `context`, `machine`, `_nodes`, `children`, `historyValue`, `tags`, `toJSON`, méthode XState, collection ou autre référence à l'acteur. Elle ne copie que les champs de domaine répertoriés ; elle ne propage (spread) ni ne sérialise jamais le snapshot natif lui-même. Par conséquent, un consommateur ne peut pas reconstruire un acteur non autorisé, remplacer ou encapsuler l'implémentation partagée de `admittedEvent`, capturer l'événement normalisé durant sa fenêtre active de WeakSet, ou envoyer cette capacité via un second acteur.
 
-Every view creation recursively copies its selected settings, command and error
-graphs before freezing them. No view field aliases actor context, commands,
-envelopes, errors, arrays, or a prior public view. JSON serialization therefore
-operates on detached values and cannot recover an internal reference. Listener
-exceptions are isolated from the actor and other listeners. Listener-triggered
-dispatch during an actor notification is rejected as `reentrant`; unsubscribe
-prevents later callbacks; `stop()` is idempotent, ends future notification and
-makes later dispatch return `inactive`. The private actor snapshot remains
-available only lexically inside controller methods, including dispatch
-normalization against the exact current context.
+Chaque création de vue copie récursivement ses réglages, commandes et graphes d'erreurs sélectionnés avant de les figer. Aucun champ de la vue n'est un alias du contexte de l'acteur, des commandes, des enveloppes, des erreurs, des tableaux ou d'une vue publique antérieure. La sérialisation JSON opère donc sur des valeurs détachées et ne peut récupérer de référence interne. Les exceptions d'écouteurs sont isolées de l'acteur et des autres écouteurs. Un dispatch déclenché par un écouteur durant une notification d'acteur est rejeté comme `reentrant` ; la désinscription empêche les rappels ultérieurs ; `stop()` est idempotent, met fin aux notifications futures et fait renvoyer `inactive` à tout dispatch ultérieur. Le snapshot privé de l'acteur demeure accessible uniquement de manière lexicale à l'intérieur des méthodes du contrôleur, y compris pour la normalisation du dispatch par rapport au contexte courant exact.
 
-Within one non-reentrant `dispatch` call, the controller reads the actor's exact
-current context, recursively descriptor-captures the raw graph once, validates
-it structurally and semantically, and deep-freezes the detached normalized
-event. Only after all those steps succeed does it add that exact object identity
-to a module-private `WeakSet`, call the private active actor's `send`
-synchronously, and delete membership in `finally`. The capability therefore
-exists only on the dynamic extent of that one send, including when an action,
-observer or send callback throws. Invalid/revoked raw input returns a rejected
-result before XState sees any event; stopped or reentrant dispatch is rejected
-without queueing.
+Au sein d'un appel `dispatch` non réentrant, le contrôleur lit le contexte courant exact de l'acteur, capture récursivement le graphe brut par descripteurs une seule fois, le valide structurellement et sémantiquement, et fige profondément l'événement normalisé détaché. Ce n'est qu'après le succès de toutes ces étapes qu'il ajoute cette identité exacte d'objet à un `WeakSet` privé au module, appelle de manière synchrone le `send` de l'acteur actif privé, et supprime l'appartenance dans un bloc `finally`. La capacité n'existe par conséquent que sur l'étendue dynamique de cet unique envoi, y compris lorsqu'une action, un observateur ou un callback d'envoi lève une exception. Une entrée brute invalide ou révoquée renvoie un résultat rejeté avant que XState ne voie le moindre événement ; un dispatch arrêté ou réentrant est rejeté sans mise en file d'attente.
 
-`normalizeSettingsPersistenceEvent(raw, context)` remains an inspectable
-capture/validation helper, but it grants no capability and never sends. A
-normalized object retained from context C, a second object normalized before a
-C -> B transition, a replay after send, a clone, Proxy, structurally identical
-object or directly fabricated `SETTINGS_CAPTURED/*` value has no live
-membership and cannot enter the actor. The machine and its actor are
-module-private. Every transition branch begins with the ephemeral membership
-predicate, including duplicate/no-op branches, fallback rejections and
-transitions that otherwise have no business guard. The predicate short-circuits
-before any business guard or action reads the alleged payload.
+`normalizeSettingsPersistenceEvent(raw, context)` demeure un assistant inspectable de capture et de validation, mais il n'accorde aucune capacité et n'émet jamais d'envoi. Un objet normalisé conservé depuis le contexte C, un second objet normalisé avant une transition C -> B, un rejeu après envoi, un clone, un Proxy, un objet structurellement identique ou une valeur `SETTINGS_CAPTURED/*` directement fabriquée ne possède aucune appartenance active et ne peut pénétrer dans l'acteur. La machine et son acteur sont privés au module. Chaque branche de transition commence par le prédicat d'appartenance éphémère, y compris les branches de doublons/no-op, les rejets de repli et les transitions qui ne disposent d'aucun autre garde métier. Le prédicat court-circuite avant que tout garde ou toute action métier ne lise le prétendu payload.
 
-Guards and actions consume the same normalized event object. They never parse,
-reflect over, or otherwise revisit the original source. In particular, a
-snapshot, error, reservation/permission/journal/fence proof, and reset payload
-is semantically decoded once at admission and the exact immutable result is
-shared by the guard and its action. A changing-descriptor Proxy can therefore
-contribute at most one coherent value: proof/snapshot A can never authorize an
-action that installs payload/snapshot B. Normalization, temporary grant and
-send form one controller call; no normalized value can be queued across an
-unrelated context transition.
+Les gardes et les actions consomment le même objet d'événement normalisé. Ils n'analysent jamais, ne reflètent jamais ni ne revisitent la source d'origine. En particulier, un snapshot, une erreur, une preuve de réservation/permission/journal/fence et un payload de reset sont décodés sémantiquement une fois lors de l'admission et le résultat immuable exact est partagé par le garde et son action. Un Proxy modifiant ses descripteurs ne peut donc fournir au plus qu'une seule valeur cohérente : la preuve/snapshot A ne peut jamais autoriser une action qui installe le payload/snapshot B. La normalisation, l'octroi temporaire et l'envoi constituent un seul appel de contrôleur ; aucune valeur normalisée ne peut être mise en file d'attente à travers une transition de contexte non liée.
 
-`RESET_EPOCH_COMMITTED` has two canonical raw shapes. The two-key shape omits
-`resetFenceProof`; the three-key shape contains a defined proof that must parse
-exactly against the captured committed payload. An own
-`resetFenceProof:undefined` key is neither absence nor a proof and is rejected
-before provenance registration.
+`RESET_EPOCH_COMMITTED` possède deux formes brutes canoniques. La forme à deux clés omet `resetFenceProof` ; la forme à trois clés contient une preuve définie qui doit s'analyser exactement face au payload commité capturé. Une clé propre `resetFenceProof:undefined` ne constitue ni une absence ni une preuve et est rejetée avant l'enregistrement de provenance.
 
-Reset imports the strict, replayable two-stage payload and its only parser from
-[`local-data-reset-epoch.contract.ts`](./local-data-reset-epoch.contract.ts).
-Settings neither redeclares that interface nor implements a second validator.
-The bridge wrapper is exactly `{type,payload,resetFenceProof?}`; `payload`
-passes the shared neutral parser inside the single event normalizer before a
-guard may inspect the returned immutable payload.
+Reset importe le payload strict et rejouable en deux étapes ainsi que son unique parseur depuis [`local-data-reset-epoch.contract.ts`](./local-data-reset-epoch.contract.ts). Settings ne redéclare pas cette interface et n'implémente pas de second validateur. L'enveloppe de bridge est exactement `{type,payload,resetFenceProof?}` ; `payload` passe par le parseur neutre partagé au sein de l'unique normaliseur d'événements avant qu'un garde ne puisse inspecter le payload immuable retourné.
 
-`RESET_EPOCH_READY_TO_COMMIT` invalidates the old projection, stores the full
-payload in `pendingReset`, and sets `loadStatus:'reset_pending'`. With no durable
-Settings intent it enters `resetPending` and emits no command. With an active
-intent it first enters `clearingIntent`, clears the exact old-epoch record, and
-enters `resetPending` only after absence read-back. It never starts a Load while
-the reset journal is pre-commit.
+`RESET_EPOCH_READY_TO_COMMIT` invalide l'ancienne projection, stocke le payload complet dans `pendingReset`, et définit `loadStatus:'reset_pending'`. En l'absence d'intention durable sur les réglages, il entre dans `resetPending` et n'émet aucune commande. En présence d'une intention active, il entre d'abord dans `clearingIntent`, efface l'enregistrement exact de l'ancienne époque, et n'entre dans `resetPending` qu'après relecture d'absence. Il ne lance jamais de Load tant que le journal de reset est antérieur au commit.
 
-Only a byte-for-byte matching `RESET_EPOCH_COMMITTED` may leave that state. A
-panel opened between broadcasts may accept `committed` without prior readiness
-only when `previousDataEpoch` matches its current epoch. The direct
-`previousDataEpoch:null` form additionally requires an exact
-`ResetFenceProofV1` issued by the trusted dataset-epoch/bootstrap boundary for
-the same durable `committed` reset and live fence. It emits exactly one Load with
-the stable `settingsBootstrapRequestId` plus
-`resetCorrelation:{resetId,nextDataEpoch}`. A duplicate readiness is a no-op; a
-duplicate committed event during that Load neither rotates the request ID nor
-emits a second command. The actor retains its previous `dataEpoch` until the
-settled E2 Load succeeds; only that terminal proof installs `nextDataEpoch`.
-If committed reset arrives directly while an old intent exists, the same exact
-clear/absence gate runs before that stable Load command is exposed.
-Ordinary Load and fresh-ID restart requests cannot replace the committed reset
-Load. A restart may only reissue the same bootstrap command in both `loading`
-and `loadError`.
-The Load joins a reset journal already checkpointed `committed`, waits for its
-final clear/admission opening, then applies the normal recovery barrier. Its
-terminal success still proves `resetJournalAbsent:true`. A matching
-`SETTINGS_RESET_IN_PROGRESS` from that same committed correlation is a protocol
-failure, not an ordinary recoverable reset error.
+Seul un `RESET_EPOCH_COMMITTED` correspondant octet par octet peut quitter cet état. Un panneau ouvert entre deux diffusions ne peut accepter `committed` sans préparation préalable que si `previousDataEpoch` concorde avec son époque actuelle. La forme directe `previousDataEpoch:null` exige en outre une preuve exacte `ResetFenceProofV1` émise par la frontière de confiance époque-dataset/bootstrap pour le même reset durable `committed` et un fence actif. Elle émet exactement un Load avec le `settingsBootstrapRequestId` stable plus `resetCorrelation:{resetId,nextDataEpoch}`. Une disponibilité en double est une opération sans effet (no-op) ; un événement commité en doublon pendant ce Load ne renouvelle pas l'ID de requête et n'émet pas de seconde commande. L'acteur conserve son `dataEpoch` précédent jusqu'à ce que le Load stabilisé E2 réussisse ; seule cette preuve terminale installe `nextDataEpoch`. Si un reset commité survient directement alors qu'une ancienne intention existe, la même porte exacte d'effacement et de relecture d'absence s'exécute avant que cette commande stable de Load ne soit exposée. Les requêtes ordinaires de Load et les requêtes de redémarrage avec de nouveaux ID ne peuvent pas remplacer le Load de reset commité. Un redémarrage ne peut que réémettre la même commande de bootstrap dans `loading` et `loadError`. Le Load rejoint un journal de reset déjà au point de contrôle `committed`, attend son effacement final et l'ouverture de l'admission, puis applique la barrière normale de récupération. Son succès terminal prouve toujours `resetJournalAbsent:true`. Un événement `SETTINGS_RESET_IN_PROGRESS` correspondant issu de cette même corrélation commitée constitue un échec de protocole, et non une erreur de reset ordinaire récupérable.
 
-## Canonical storage envelope
+## Enveloppe de stockage canonique
 
-Chrome local storage contains one atomic settings value:
+Le stockage local de Chrome contient une valeur atomique unique pour les réglages :
 
 ```ts
 interface SettingsEnvelopeV2 {
@@ -409,8 +181,7 @@ interface SettingsEnvelopeV2 {
 }
 ```
 
-This is the same `SettingsEnvelopeV2` consumed by DB migration and local reset.
-Reset initializes it exactly as:
+Il s'agit de la même `SettingsEnvelopeV2` que celle consommée par la migration DB et le reset local. Le Reset l'initialise exactement comme :
 
 ```ts
 {
@@ -424,50 +195,32 @@ Reset initializes it exactly as:
 }
 ```
 
-`revision` and `generation` are independent safe integers in
-`[0, Number.MAX_SAFE_INTEGER]`, monotonic inside one epoch only. `revision`
-advances only when the canonical settings value changes: candidate commit uses
-`baseRevision + 1`, and compensation uses `baseRevision + 2`. `generation`
-advances by exactly one on **every atomic envelope mutation**, including journal
-installation/phase changes, outcome append, journal clear, and system repair.
-Consequently a committed outcome settles at `baseGeneration + 2`, while the
-full compensation path settles at `baseGeneration + 4`.
+`revision` et `generation` sont des entiers sûrs indépendants dans `[0, Number.MAX_SAFE_INTEGER]`, monotones au sein d'une seule époque uniquement. `revision` n'avance que lorsque la valeur canonique des réglages change : le commit candidat utilise `baseRevision + 1`, et la compensation utilise `baseRevision + 2`. `generation` avance d'exactement un à **chaque mutation atomique d'enveloppe**, y compris l'installation de journal/changements de phase, l'ajout de résultat, l'effacement de journal et les réparations système. Par conséquent, un résultat commité se stabilise à `baseGeneration + 2`, tandis que le chemin complet de compensation se stabilise à `baseGeneration + 4`.
 
-Admission reserves the worst case before any write: two revisions and four
-generations must remain. Otherwise it fails closed with
-`SETTINGS_REVISION_EXHAUSTED` or `SETTINGS_GENERATION_EXHAUSTED`; no overflow,
-wraparound, partially admitted transaction, or best-effort fallback exists.
-Reset and every legacy migration initialize `generation:0`; reset-owned or
-startup alarm repair may subsequently advance generation without changing
-revision. This shared-shape change requires DB migration and local reset model
-re-review before implementation.
+L'admission réserve le cas le plus défavorable avant toute écriture : deux révisions et quatre générations doivent rester disponibles. Dans le cas contraire, elle échoue en mode fermé avec `SETTINGS_REVISION_EXHAUSTED` ou `SETTINGS_GENERATION_EXHAUSTED` ; aucun débordement, bouclage, transaction partiellement admise ou repli au mieux n'existe. Le Reset et chaque migration héritée initialisent `generation:0` ; une réparation d'alarme détenue par le reset ou au démarrage peut ensuite avancer la génération sans modifier la révision. Cette modification de structure partagée nécessite une réévaluation des modèles de migration DB et de reset local avant implémentation.
 
-Only a settled envelope (`journal === null`) may be broadcast or returned in a
-success snapshot. Intermediate envelopes remain durable but are hidden behind
-the recovery barrier.
+Seule une enveloppe stabilisée (`journal === null`) peut être diffusée ou retournée dans un snapshot de succès. Les enveloppes intermédiaires demeurent durables mais sont masquées derrière la barrière de récupération.
 
-## Canonical settings and digest
+## Réglages canoniques et digest
 
-A V2 `AppSettings` object has exactly these nine keys and no others:
+Un objet `AppSettings` V2 possède exactement ces douze clés et aucune autre :
 
-| Field                               | Canonical constraint                                   |
-| ----------------------------------- | ------------------------------------------------------ |
-| `scanIntervalMinutes`               | integer `1..1440`                                      |
-| `enabledConnectors`                 | sorted, unique IDs, all present in the build catalogue |
-| `notifications`                     | boolean                                                |
-| `autoScan`                          | boolean                                                |
-| `maxSemanticPerScan`                | integer `0..100`                                       |
-| `notificationScoreThreshold`        | integer `0..100`                                       |
-| `respectRateLimits`                 | boolean                                                |
-| `customDelayMs`                     | integer `0..60000`                                     |
-| `theme`                             | exactly `light`, `dark`, or `system`                   |
-| `classificationEnabled`             | boolean                                                |
-| `maxClassificationPerScan`          | integer `0..100`                                       |
-| `classificationConfidenceThreshold` | number `0..1`                                          |
+| Champ                               | Contrainte canonique                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------- |
+| `scanIntervalMinutes`               | entier `1..1440`                                                        |
+| `enabledConnectors`                 | identifiants triés et uniques, tous présents dans le catalogue de build |
+| `notifications`                     | booléen                                                                 |
+| `autoScan`                          | booléen                                                                 |
+| `maxSemanticPerScan`                | entier `0..100`                                                         |
+| `notificationScoreThreshold`        | entier `0..100`                                                         |
+| `respectRateLimits`                 | booléen                                                                 |
+| `customDelayMs`                     | entier `0..60000`                                                       |
+| `theme`                             | exactement `light`, `dark` ou `system`                                  |
+| `classificationEnabled`             | booléen                                                                 |
+| `maxClassificationPerScan`          | entier `0..100`                                                         |
+| `classificationConfidenceThreshold` | nombre `0..1`                                                           |
 
-`normalizeSettings` copies the object, deduplicates connector IDs, and sorts
-them. `settingsDigest` is not object-insertion-order dependent. It is the
-versioned JSON encoding of this ordered tuple:
+`normalizeSettings` copie l'objet, déduplique les identifiants de connecteurs et les trie. `settingsDigest` ne dépend pas de l'ordre d'insertion des propriétés de l'objet. Il s'agit de l'encodage JSON versionné de ce tuple ordonné :
 
 ```text
 settings/v1:[
@@ -486,13 +239,9 @@ settings/v1:[
 ]
 ```
 
-Rétrocompatibilité : un digest hérité à 9 champs (antérieur aux réglages de
-classification) reste parsable — les trois champs manquants sont alors
-rétablis à leurs valeurs par défaut (`true`, `25`, `0.7`). `settingsDigest`
-canonicalise de la même façon toute valeur absente, afin que la même
-configuration logique produise toujours un seul digest.
+Rétrocompatibilité : un digest hérité à 9 champs (antérieur aux réglages de classification) reste parsable — les trois champs manquants sont alors rétablis à leurs valeurs par défaut (`true`, `25`, `0.7`). `settingsDigest` canonicalise de la même façon toute valeur absente, afin que la même configuration logique produise toujours un seul digest.
 
-The command digest is likewise canonical:
+Le digest de commande est également canonique :
 
 ```text
 command/v2:[
@@ -507,61 +256,32 @@ command/v2:[
 ]
 ```
 
-Digest equality classifies a canonical value as `previous`, `candidate`, or
-`other`; it never proves which mutation committed. Only the outcome ledger does
-that.
+L'égalité de digest classe une valeur canonique comme `previous`, `candidate` ou `other` ; elle ne prouve jamais quelle mutation a commité. Seul le registre des résultats le fait.
 
-Settings digests are limited to 1024 UTF-8 bytes and command digests to 4096
-UTF-8 bytes. Decoding validates those bounds and the complete versioned tuple;
-an oversized or partially parseable digest is invalid, never truncated.
+Les digests de réglages sont limités à 1024 octets UTF-8 et les digests de commande à 4096 octets UTF-8. Le décodage valide ces limites ainsi que le tuple versionné complet ; un digest surdimensionné ou partiellement analysable est invalide, jamais tronqué.
 
-Every `unknown` boundary uses descriptor snapshots before reading a field. An
-accepted object has exactly the expected own string keys, prototype
-`Object.prototype` or `null`, enumerable data descriptors only, no Symbol,
-accessor, inherited, extra, or non-enumerable property. An accepted array has
-exact `Array.prototype`, the ordinary own `length`, every dense numeric index
-from `0` to `length - 1`, data descriptors only, and no hole, Symbol, accessor,
-or extra property. Decoders then consume the safe snapshot, never the source.
-A transparent Proxy can therefore contribute copied descriptor values without
-triggering its `get` trap; revoked or throwing reflection traps fail closed.
-This rule applies recursively to settings, connector/origin/correlation arrays,
-journals, outcomes, reset/permission/alarm/quota proofs, errors, and snapshots.
-Canonical digests are accepted only when the full tuple parses and re-encodes
-byte-for-byte to the original value.
+Chaque frontière `unknown` utilise des captures de descripteurs avant de lire un champ. Un objet accepté possède exactement les clés de chaînes propres attendues, le prototype `Object.prototype` ou `null`, des descripteurs de données énumérables uniquement, aucun Symbol, accesseur, propriété héritée, superflue ou non énumérable. Un tableau accepté possède exactement `Array.prototype`, la propriété propre ordinaire `length`, chaque index numérique dense de `0` à `length - 1`, des descripteurs de données uniquement, et aucun trou, Symbol, accesseur ou propriété supplémentaire. Les décodeurs consomment ensuite le snapshot sécurisé, jamais la source. Un Proxy transparent peut donc apporter des valeurs de descripteurs copiées sans déclencher sa trappe `get` ; les trappes de réflexion révoquées ou levant une exception échouent en mode fermé. Cette règle s'applique récursivement aux réglages, aux tableaux de connecteurs/origines/corrélations, aux journaux, aux résultats, aux preuves de reset/permission/alarme/quota, aux erreurs et aux snapshots. Les digests canoniques ne sont acceptés que lorsque le tuple complet est analysé et ré-encodé octet par octet vers sa valeur d'origine.
 
-## Exact legacy migration
+## Migration des formats hérités exacte
 
-`decodeSettingsStorage(unknown, epoch, catalogue, defaults, legacyPolicy)` is
-the pure storage boundary. Unknown keys are rejected in every variant.
+`decodeSettingsStorage(unknown, epoch, catalogue, defaults, legacyPolicy)` constitue la frontière de stockage pure. Les clés inconnues sont rejetées dans chaque variante.
 
-| Physical value                            | Accepted transformation                                                                  |
-| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Missing and policy `allow_migration`      | Validated defaults, revision `0`, generation `0`                                         |
-| Exact V2 with current epoch               | Use as-is after full journal/outcome/settings validation                                 |
-| Exact `{version:1, revision, settings}`   | Retain safe revision, generation `0`; nested settings must already satisfy strict rules  |
-| Exact bare nine-field current settings    | Revision/generation `0`; legacy-only connector filtering/deduplication/canonical sorting |
-| Exact bare eight-field pre-theme settings | Same transformation and `theme = system`                                                 |
-| Anything else                             | `SETTINGS_INVALID`; never substitute defaults                                            |
+| Valeur physique                               | Transformation acceptée                                                                                         |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Manquante et politique `allow_migration`      | Valeurs par défaut validées, révision `0`, génération `0`                                                       |
+| V2 exacte avec l'époque actuelle              | Utilisation telle quelle après validation complète du journal/résultats/réglages                                |
+| `{version:1, revision, settings}` exact       | Conserver la révision sûre, génération `0` ; les réglages imbriqués doivent déjà satisfaire aux règles strictes |
+| Réglages courants exacts bruts à neuf champs  | Révision/génération `0` ; filtrage/déduplication/tri canonique des connecteurs réservé au format hérité         |
+| Réglages pré-thème exacts bruts à huit champs | Même transformation et `theme = system`                                                                         |
+| Tout autre format                             | `SETTINGS_INVALID` ; ne jamais substituer par des valeurs par défaut                                            |
 
-Only the `theme` field may be defaulted, and only for the exact pre-theme bare
-shape. No other missing field is accepted. Legacy connector arrays may contain
-duplicates or IDs excluded from the current build: migration keeps first
-occurrences of included IDs, drops excluded IDs, then stores canonical sorted
-order. The strict V1/V2 forms do not receive that repair; excluded, duplicate,
-or unsorted IDs make them corrupt.
+Seul le champ `theme` peut recevoir une valeur par défaut, et uniquement pour la forme brute exacte à huit champs antérieure au thème. Aucun autre champ manquant n'est accepté. Les tableaux de connecteurs hérités peuvent contenir des doublons ou des identifiants exclus du build actuel : la migration conserve les premières occurrences des identifiants inclus, élimine les identifiants exclus, puis stocke l'ordre canonique trié. Les formes strictes V1/V2 ne bénéficient pas de cette réparation ; des identifiants exclus, dupliqués ou non triés les rendent corrompues.
 
-Migration runs under the settings queue and central reset commit gate. It wraps
-V2 atomically with the canonical epoch, `generation:0`, `journal: null`, and `outcomes: []`, then
-passes the normal alarm-alignment barrier. If the alarm differs, that barrier
-installs a system recovery journal before changing it. The data-v3 cutover
-selects `v2_only`; after cutover, a missing, bare, or V1 replacement is
-corruption from a forbidden legacy writer. A V2 envelope with a different epoch
-is never remapped: reset state determines `SETTINGS_RESET_IN_PROGRESS` versus
-corruption.
+La migration s'exécute sous la file d'attente des réglages et la porte centrale de commit de reset. Elle encapsule atomiquement la V2 avec l'époque canonique, `generation:0`, `journal: null` et `outcomes: []`, puis franchit la barrière normale d'alignement d'alarme. Si l'alarme diffère, cette barrière installe un journal de récupération système avant de la modifier. La bascule data-v3 sélectionne `v2_only` ; après la bascule, un remplacement manquant, brut ou V1 constitue une corruption imputable à un rédacteur hérité interdit. Une enveloppe V2 avec une époque différente n'est jamais réassignée : l'état du reset détermine s'il s'agit de `SETTINGS_RESET_IN_PROGRESS` ou d'une corruption.
 
-## Durable causal outcome ledger
+## Registre des résultats causaux durables
 
-Every admitted non-no-op mutation settles to one atomic proof:
+Chaque mutation non-no-op admise se stabilise sous une preuve atomique :
 
 ```ts
 interface SettingsMutationOutcomeV1 {
@@ -580,125 +300,33 @@ interface SettingsMutationOutcomeV1 {
 }
 ```
 
-The ledger is ordered by strictly increasing `settledGeneration`, contains at
-most 4096 entries, and is append-only for the entire epoch. It has no FIFO, TTL,
-LRU, or manual eviction path. Explicit local-data reset is the only operation
-that reclaims it by creating a new epoch.
+Le registre est ordonné selon des valeurs de `settledGeneration` strictement croissantes, contient au maximum 4 096 entrées, et fonctionne en ajout seul (append-only) pour l'ensemble de l'époque. Il ne possède aucun chemin d'éviction FIFO, TTL, LRU ou manuel. La réinitialisation explicite des données locales (local-data reset) est la seule opération qui le recycle en instaurant une nouvelle époque.
 
-Count alone is not the quota. The exact UTF-8 byte length of the physical
-`JSON.stringify(SettingsEnvelopeV2)` value may never exceed 1,048,576 bytes,
-and every settled envelope must remain at or below 983,040 bytes, reserving
-65,536 bytes for the largest legal journal and terminal outcome. Before
-admission the coordinator projects both worst cases using 32 correlation IDs,
-bounded digests, maximum safe counters, full previous/candidate settings, and
-the prospective outcome. It repeats that preflight inside the generation CAS
-immediately before every journal/outcome write. Count exhaustion, byte
-exhaustion, or insufficient headroom fails closed with
-`SETTINGS_LEDGER_QUOTA_EXHAUSTED`; editing remains frozen until explicit reset.
+Le nombre d'éléments ne constitue pas le quota à lui seul. La longueur exacte en octets UTF-8 de la valeur physique `JSON.stringify(SettingsEnvelopeV2)` ne doit jamais dépasser 1 048 576 octets, et chaque enveloppe stabilisée doit demeurer inférieure ou égale à 983 040 octets, réservant 65 536 octets pour le journal légal et le résultat terminal les plus volumineux. Avant l'admission, le coordinateur projette les deux cas les plus défavorables à l'aide de 32 identifiants de corrélation, des digests bornés, des compteurs sécurisés maximaux, des réglages complets précédents/candidats et du résultat prospectif. Il répète ce preflight à l'intérieur du CAS de génération immédiatement avant chaque écriture de journal/résultat. L'épuisement du nombre, l'épuisement des octets ou une marge (headroom) insuffisante échoue en mode fermé avec `SETTINGS_LEDGER_QUOTA_EXHAUSTED` ; l'édition demeure gelée jusqu'au reset explicite.
 
-Envelope headroom is only the inner bound. Before permission check or write, every
-non-no-op mutation enters `reserving` and emits `RESERVE_SETTINGS_STORAGE`.
-Under the central DatasetEpoch gate, the Shell measures the complete physical
-`chrome.storage.local` area (keys plus serialized values), rechecks the exact
-projected `settings` entry, and registers one active reservation bound to epoch,
-mutation, command digest, both base counters, reservation ID, and gate lease.
-An accepted `SettingsGlobalStorageReservationProofV1` proves that the remaining
-global bytes cover the worst journal/settlement entry plus the 65,536-byte
-system reserve. Every later permission-check/write/recovery/abort/reconcile command
-carries that proof, and the gate revalidates that its authority reservation is
-still active before any write.
+La marge de l'enveloppe n'est que la limite interne. Avant la vérification des permissions ou l'écriture, chaque mutation non-no-op entre dans `reserving` et émet `RESERVE_SETTINGS_STORAGE`. Sous la porte centrale DatasetEpoch, le Shell mesure la zone physique totale de `chrome.storage.local` (clés plus valeurs sérialisées), revérifie l'entrée projetée exacte `settings`, et enregistre une réservation active liée à l'époque, à la mutation, au digest de commande, aux deux compteurs de base, à l'ID de réservation et au bail de la porte. Une preuve acceptée `SettingsGlobalStorageReservationProofV1` prouve que les octets globaux restants couvrent l'entrée la plus défavorable de journal/règlement plus la réserve système de 65 536 octets. Chaque commande ultérieure de contrôle de permission/écriture/récupération/abandon/réconciliation porte cette preuve, et la porte revalide que sa réservation d'autorité est toujours active avant toute écriture.
 
-All `chrome.storage.local` writers, not only Settings, must use the same gate
-and preserve active reservations. A writer is admitted only if its exact
-post-write physical projection still leaves the system reserve plus every
-active Settings reservation. This includes the reset-owned latest-only receipt
-at `missionpulse.localDataResetReceipt.v1`. Its exact schema remains owned by
-the reset contract; Settings reserves 8,192 bytes for its physical key/value
-inside the 65,536-byte system reserve. The reset writer writes that receipt
-after readiness and before the durable `committed` checkpoint under the same
-fence, and the next reset may replace it only after its selective clear.
+Tous les rédacteurs de `chrome.storage.local`, et pas seulement Settings, doivent utiliser la même porte et préserver les réservations actives. Un rédacteur n'est admis que si sa projection physique exacte après écriture laisse encore la réserve système plus chaque réservation active de Settings. Cela inclut le reçu du dernier état détenu par le reset à `missionpulse.localDataResetReceipt.v1`. Son schéma exact reste détenu par le contrat de reset ; Settings réserve 8 192 octets pour sa clé/valeur physique au sein de la réserve système de 65 536 octets. Le rédacteur de reset écrit ce reçu après la préparation et avant le point de contrôle durable `committed` sous le même fence, et le reset suivant ne peut le remplacer qu'après son effacement sélectif.
 
-If the reservation cannot be acquired, the Shell returns the exact denial
-proof plus
-`SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED/mutate/recoverable/previous/known`.
-That result is pre-admission: no journal, outcome, permission, alarm, or value
-write occurred. Retry allocates a new reservation ID and repeats the full
-rebase/reservation protocol. Once granted, other writers must preserve the
-reserved terminal capacity until the mutation settles or the epoch authority
-revokes it during reset/restart recovery. No best-effort terminal write is
-allowed after a successful reservation.
+Si la réservation ne peut pas être acquise, le Shell retourne la preuve de refus exacte accompagnée de `SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED/mutate/recoverable/previous/known`. Ce résultat est antérieur à l'admission : aucune écriture de journal, de résultat, de permission, d'alarme ou de valeur n'a eu lieu. Une nouvelle tentative alloue un nouvel ID de réservation et réitère le protocole complet de rebase/réservation. Une fois accordée, les autres rédacteurs doivent préserver la capacité terminale réservée jusqu'à ce que la mutation se stabilise ou que l'autorité d'époque la révoque lors d'une récupération après reset/redémarrage. Aucune écriture terminale au mieux n'est autorisée après une réservation réussie.
 
-The concrete reservation authority exposes `acquire`, capability-bound
-`isActive`, `release`, and `assertWriteAllowed`. `acquire` runs inside
-`SettingsAtomicCommitGatePort.runExclusive(purpose:'reservation')`, proves reset
-journal absence and the exact global writer-fence capability, then reads
-`chrome.storage.local.getBytesInUse(null)` and
-`getBytesInUse('settings')`. The latter must equal the command projection's
-current Settings entry bytes. The grant equation is exact:
+L'autorité concrète de réservation expose `acquire`, `isActive` lié à une capacité, `release`, et `assertWriteAllowed`. `acquire` s'exécute à l'intérieur de `SettingsAtomicCommitGatePort.runExclusive(purpose:'reservation')`, prouve l'absence de journal de reset et la capacité exacte de fence global de rédacteur, puis lit `chrome.storage.local.getBytesInUse(null)` et `getBytesInUse('settings')`. Cette dernière doit égaler les octets de l'entrée courante de Settings selon la projection de la commande. L'équation d'octroi est exacte :
 
 ```text
 quotaBytes - bytesInUse - requiredAdditionalBytes >= 65_536
 ```
 
-Only one distinct Settings reservation may be active in the serialized
-coordinator; an exact repeat is idempotent and a crossed reuse fails closed.
-`isActive(proof, capability)` never nests a Dataset gate: it validates the
-proof against the active registry, the caller's live capability and fresh byte
-counts. `release` uses the reservation ID as its gated operation and is
-idempotent. Worker restart drops the in-memory registry, making old proofs
-inactive; recovery must reconcile rather than recreate them. Every Settings or
-non-Settings local writer must call the same authority capacity check so its
-post-write projection preserves the active reservation and system reserve.
+Une seule réservation distincte de Settings peut être active dans le coordinateur sérialisé ; une répétition exacte est idempotente et une réutilisation croisée échoue en mode fermé. `isActive(proof, capability)` n'imbrique jamais de porte Dataset : elle valide la preuve par rapport au registre actif, à la capacité active de l'appelant et aux décomptes d'octets frais. `release` utilise l'ID de réservation comme opération sous porte et est idempotente. Le redémarrage du worker abandonne le registre en mémoire, rendant les anciennes preuves inactives ; la récupération doit réconcilier plutôt que les recréer. Chaque rédacteur local, qu'il concerne Settings ou non, doit appeler la même vérification de capacité d'autorité afin que sa projection après écriture préserve la réservation active et la réserve système.
 
-The uniqueness key is `mutationId` alone. A duplicate command with the same
-complete identity returns its recorded settlement after recovery. The same ID
-with a different command/value/base identity, or any historical correlation ID
-reused by a new mutation/retry, is `SETTINGS_PROTOCOL_ERROR`. An active journal
-and a terminal outcome may never contain the same mutation ID, and correlation
-IDs are globally unique across active journal and outcomes.
+La clé d'unicité est `mutationId` seul. Une commande en double possédant la même identité complète retourne son règlement enregistré après récupération. Le même ID avec une identité différente de commande/valeur/base, ou tout ID de corrélation historique réutilisé par une nouvelle mutation/retry, constitue une `SETTINGS_PROTOCOL_ERROR`. Un journal actif et un résultat terminal ne doivent jamais contenir le même ID de mutation, et les identifiants de corrélation sont globalement uniques à travers le journal actif et les résultats.
 
-Reconciliation looks up the original mutation ID and requires all three
-digests (`command`, `previous`, `candidate`) to match. Value equality cannot
-manufacture an outcome. Under the queue/generation gate, reconciliation first
-returns a matching outcome, otherwise recovers a matching journal. If neither
-exists and the original write was provably never durably admitted, it atomically
-appends `not_committed` at the next generation; all late permission-check/write/abort
-commands check that outcome first and become terminal no-ops. This covers
-permission ambiguity, restart, rebase failure, and cancellation before
-admission without inventing causality. Only after that recovery-or-fence
-procedure proves that an admitted mutation has lost both journal and outcome may
-the machine produce non-recoverable `SETTINGS_OUTCOME_MISSING`. It never
-attributes success or failure from the current value. This branch does not enter
-`clearingIntent`, does not emit `CLEAR_SETTINGS_PENDING_INTENT`, and does not
-publish a terminal settlement. It keeps the exact last read-back-verified
-`SettingsPendingIntentV1` in session storage as the durable corruption fence,
-while the in-memory controller enters commandless `failed` with
-`SETTINGS_OUTCOME_MISSING`. A new worker must reload that strict pending record,
-rotate it durably with its fresh worker/request identities, and reconcile again;
-it can never bootstrap to `saved` merely because the previous worker died. Only
-an exact explicit reset transition may clear this pending fence, after which the
-normal reset absence proof and committed bootstrap gates still apply.
+La réconciliation recherche l'ID de mutation d'origine et exige la correspondance des trois digests (`command`, `previous`, `candidate`). L'égalité de valeur ne peut pas fabriquer un résultat. Sous la porte de file d'attente/génération, la réconciliation renvoie d'abord un résultat correspondant, sinon récupère un journal correspondant. Si ni l'un ni l'autre n'existe et qu'il est prouvable que l'écriture initiale n'a jamais été admise durablement, elle ajoute atomiquement `not_committed` à la génération suivante ; toutes les commandes tardives de contrôle de permission/écriture/abandon vérifient d'abord ce résultat et deviennent des no-ops terminales. Cela couvre l'ambiguïté de permission, le redémarrage, l'échec de rebase et l'annulation avant admission sans inventer de causalité. C'est uniquement après que cette procédure de récupération ou d'isolation a prouvé qu'une mutation admise a perdu à la fois son journal et son résultat que la machine peut produire l'erreur non récupérable `SETTINGS_OUTCOME_MISSING`. Elle n'attribue jamais le succès ou l'échec à partir de la valeur actuelle. Cette branche n'entre pas dans `clearingIntent`, n'émet pas `CLEAR_SETTINGS_PENDING_INTENT`, et ne publie aucun règlement terminal. Elle conserve le dernier `SettingsPendingIntentV1` vérifié par relecture dans le stockage de session en tant que barrière durable contre la corruption, tandis que le contrôleur en mémoire entre dans l'état `failed` sans commande avec `SETTINGS_OUTCOME_MISSING`. Un nouveau worker doit recharger cet enregistrement en attente strict, le faire pivoter durablement avec ses identités fraîches de worker/requête, et réconcilier à nouveau ; il ne peut jamais s'initialiser à `saved` simplement parce que le worker précédent est mort. Seule une transition de reset explicite exacte peut effacer ce fence en attente, après quoi les portes habituelles de preuve d'absence de reset et de bootstrap commité s'appliquent toujours.
 
-While that exact fatal context is installed — non-null pending intent and
-mutation, `SETTINGS_OUTCOME_MISSING/reconcile/recoverable:false`, and no command
-— it is contextually immutable. `RETRY`, `MUTATE`, `DISMISS_ERROR`, every late
-transactional callback, `CANONICAL_UPDATED`, and `SERVICE_WORKER_RESTARTED` on
-that same controller are absorbed without action: no activation or
-activation-result identity is consumed, no canonical projection,
-rejection/error field or correlation changes, no command is exposed, and every
-detached public snapshot remains deeply equal to the fatal snapshot. In
-particular, the fatal guards are evaluated before replay, capacity,
-rejected-activation, valid-retry, consumed-invalid, broadcast, restart and
-fallback branches. Only the exact reset protocol may mutate this controller.
-A genuinely new worker still creates a new controller from the strict durable
-pending seed, rotates that seed and reconciles it; a restart event cannot thaw
-the already-fatal controller. After its E2 Load settles, an activation result
-issued for E1 remains invalid by epoch, while a fresh E2 activation may start a
-new mutation normally.
+Tant que ce contexte fatal exact est installé — intention en attente et mutation non nulles, `SETTINGS_OUTCOME_MISSING/reconcile/recoverable:false`, et aucune commande —, il est contextuellement immuable. `RETRY`, `MUTATE`, `DISMISS_ERROR`, chaque callback transactionnel tardif, `CANONICAL_UPDATED` et `SERVICE_WORKER_RESTARTED` sur ce même contrôleur sont absorbés sans action : aucune identité d'activation ou de résultat d'activation n'est consommée, aucune projection canonique, champ de rejet/erreur ou corrélation ne change, aucune commande n'est exposée, et chaque snapshot public détaché demeure profondément égal au snapshot fatal. En particulier, les gardes fatales sont évaluées avant les branches de rejeu, de capacité, d'activation rejetée, de retry valide, d'invalide consommé, de broadcast, de redémarrage et de repli. Seul le protocole exact de reset peut faire muter ce contrôleur. Un worker véritablement neuf crée toujours un nouveau contrôleur à partir du germe durable strict en attente, fait pivoter ce germe et le réconcilie ; un événement de redémarrage ne peut dégeler le contrôleur déjà fatal. Après la stabilisation de son Load E2, un résultat d'activation émis pour E1 demeure invalide par époque, tandis qu'une activation E2 fraîche peut démarrer une nouvelle mutation normalement.
 
-## Durable journal and recovery barrier
+## Journal durable et barrière de récupération
 
-One serialized transaction journal lives inside the same atomic envelope:
+Un journal de transaction sérialisé réside à l'intérieur de la même enveloppe atomique :
 
 ```ts
 interface SettingsDurableJournalV1 {
@@ -718,62 +346,33 @@ interface SettingsDurableJournalV1 {
 }
 ```
 
-The phase invariants are exact:
+Les invariants de phase sont exacts :
 
-| Phase                                       | Revision           | Generation           | Recovery target                                 |
-| ------------------------------------------- | ------------------ | -------------------- | ----------------------------------------------- |
-| `effects_pending` (user)                    | `baseRevision + 1` | `baseGeneration + 1` | align candidate alarm, then append `committed`  |
-| `effects_pending` (system migration/repair) | unchanged          | `baseGeneration + 1` | align candidate alarm; no mutation outcome      |
-| `compensation_pending`                      | `baseRevision + 1` | `baseGeneration + 2` | CAS the exact previous snapshot                 |
-| `compensation_effects_pending`              | `baseRevision + 2` | `baseGeneration + 3` | align previous alarm, then append `compensated` |
+| Phase                                            | Révision           | Génération           | Cible de récupération                                   |
+| ------------------------------------------------ | ------------------ | -------------------- | ------------------------------------------------------- |
+| `effects_pending` (utilisateur)                  | `baseRevision + 1` | `baseGeneration + 1` | aligner l'alarme candidate, puis ajouter `committed`    |
+| `effects_pending` (migration/réparation système) | inchangée          | `baseGeneration + 1` | aligner l'alarme candidate ; aucun résultat de mutation |
+| `compensation_pending`                           | `baseRevision + 1` | `baseGeneration + 2` | appliquer par CAS le snapshot précédent exact           |
+| `compensation_effects_pending`                   | `baseRevision + 2` | `baseGeneration + 3` | aligner l'alarme précédente, puis ajouter `compensated` |
 
-A user journal has non-null, matching mutation/command/previous/candidate
-identity. A system journal has `mutationId`, `commandDigest`, `previousSettings`,
-and `previousDigest` all null and may only be `effects_pending`. Compensation
-phases require the exact full previous snapshot. The alarm expectation always
-matches the phase's recovery target. Each phase validator binds the decoded
-`command/v2` tuple to both base counters, both settings digests, the exact
-envelope settings/revision/generation, and an exact five-key alarm expectation.
-`RUNTIME_EFFECT_FAILED` is accepted only with a strict journal proof that the
-durable phase is already `compensation_pending` and contains its fresh
-`recoveryRequestId`.
+Un journal utilisateur possède des identités de mutation/commande/précédent/candidat non nulles et concordantes. Un journal système possède `mutationId`, `commandDigest`, `previousSettings` et `previousDigest` tous nuls et ne peut être qu'en `effects_pending`. Les phases de compensation requièrent le snapshot précédent complet et exact. L'attente d'alarme correspond toujours à la cible de récupération de la phase. Chaque validateur de phase lie le tuple `command/v2` décodé aux deux compteurs de base, aux deux digests de réglages, aux réglages/révision/génération exacts de l'enveloppe, ainsi qu'à une attente d'alarme exacte à cinq clés. `RUNTIME_EFFECT_FAILED` n'est accepté qu'avec une preuve de journal stricte attestant que la phase durable est déjà `compensation_pending` et contient son `recoveryRequestId` frais.
 
-`RECOVER_AND_LOAD_SETTINGS` is a barrier, not a storage read:
+`RECOVER_AND_LOAD_SETTINGS` est une barrière, et non une simple lecture de stockage :
 
-1. acquire the settings queue plus a current central epoch lease;
-2. prove reset-journal absence, or join the exactly correlated
-   `phase:'committed'` reset finalizer, then decode/migrate the physical value;
-3. recover any durable journal idempotently;
-4. if no journal exists but the owned alarm differs, atomically install a
-   system `effects_pending` journal and repair it;
-5. reread the exact V2 envelope and alarm under the same revision/generation;
-6. return `LOAD_SUCCEEDED` only with `journal === null`, reset journal absent,
-   and a correlated alarm proof.
+1. acquérir la file d'attente des réglages plus un bail d'époque central courant ;
+2. prouver l'absence de journal de reset, ou rejoindre le finaliseur de reset exactement corrélé `phase:'committed'`, puis décoder/migrer la valeur physique ;
+3. récupérer tout journal durable de manière idempotente ;
+4. si aucun journal n'existe mais que l'alarme détenue diffère, installer de manière atomique un journal système `effects_pending` et le réparer ;
+5. relire l'enveloppe V2 exacte et l'alarme sous la même révision/génération ;
+6. ne retourner `LOAD_SUCCEEDED` qu'avec `journal === null`, absence de journal de reset, et une preuve d'alarme corrélée.
 
-Startup, manual Load, service-worker restart during Load, Retry rebase,
-reconciliation, permission refusal, cancellation, compensation, and every
-canonical broadcast pass through this barrier before exposing a snapshot.
-Recovery commands are idempotent. A crash at any journal phase resumes that
-phase or a later one; it never exposes the intermediate revision as settled.
+Le démarrage, le Load manuel, le redémarrage du service worker pendant un Load, le rebase lors d'un Retry, la réconciliation, le refus de permission, l'annulation, la compensation et chaque broadcast canonique traversent cette barrière avant d'exposer un snapshot. Les commandes de récupération sont idempotentes. Un crash à n'importe quelle phase du journal reprend cette phase ou une phase ultérieure ; il n'expose jamais la révision intermédiaire comme étant stabilisée.
 
-Local reset does not depend on a panel Load to perform this recovery. After DB
-reinitialization, the reset owner invokes the shared Settings recovery engine
-under its live fence, aligns and proves the exact alarm for the reset-initialized
-envelope at its final settled generation (`0` when already aligned, or a higher
-safe generation after durable recovery), then checkpoints reset phase
-`settings_aligned`. The alarm proof binds exactly that generation; the earlier
-`DATABASE_REINITIALIZED` proof remains strictly generation `0`. Only after that may it deliver
-readiness, checkpoint phase `committed`, and deliver the replayable post-commit
-event. The reset journal remains until that delivery is accepted. Similarly,
-startup DB/migration must run shared Settings journal recovery plus alarm proof
-before opening admission. These requirements are cross-model signals: the DB
-migration and local reset documents/contracts must be patched and independently
-re-reviewed; this Settings model does not silently redefine their authority.
+Le reset local ne dépend pas d'un Load du panneau pour effectuer cette récupération. Après la réinitialisation de la base de données, le propriétaire du reset invoque le moteur de récupération partagé des Settings sous son fence actif, aligne et prouve l'alarme exacte pour l'enveloppe initialisée par le reset à sa génération stabilisée finale (`0` si déjà alignée, ou une génération sûre plus élevée après récupération durable), puis pose le point de contrôle de phase de reset `settings_aligned`. La preuve d'alarme lie exactement cette génération ; la preuve antérieure `DATABASE_REINITIALIZED` reste strictement fixée à la génération `0`. Ce n'est qu'après cela qu'il peut délivrer la disponibilité, poser le point de contrôle de phase `committed`, et délivrer l'événement post-commit rejouable. Le journal de reset subsiste jusqu'à ce que cette livraison soit acceptée. De même, la migration/DB de démarrage doit exécuter la récupération partagée du journal des Settings ainsi que la preuve d'alarme avant d'ouvrir l'admission. Ces exigences constituent des signaux inter-modèles : les documents et contrats de migration DB et de reset local doivent être corrigés et révisés de manière indépendante ; ce modèle de Settings ne redéfinit pas silencieusement leur autorité.
 
-## Real runtime effect contract
+## Contrat des effets d'exécution réels
 
-The only independently persisted runtime effect is the MissionPulse auto-scan
-alarm:
+Le seul effet d'exécution persisté de façon indépendante est l'alarme d'auto-scan MissionPulse :
 
 ```ts
 interface AutoScanAlarmExpectationV1 {
@@ -785,43 +384,21 @@ interface AutoScanAlarmExpectationV1 {
 }
 ```
 
-- `autoScan === true` requires the named alarm to exist with
-  `periodInMinutes === scanIntervalMinutes`;
-- `autoScan === false` requires that named alarm to be absent and therefore
-  `periodInMinutes === null`;
-- reconciliation may create, replace, or clear only `auto-scan`; it never calls
-  `chrome.alarms.clearAll()` and never touches another alarm.
+- `autoScan === true` exige que l'alarme nommée existe avec `periodInMinutes === scanIntervalMinutes` ;
+- `autoScan === false` exige que cette alarme nommée soit absente et donc que `periodInMinutes === null` ;
+- la réconciliation ne peut créer, remplacer ou effacer que `auto-scan` ; elle n'appelle jamais `chrome.alarms.clearAll()` et ne touche jamais à une autre alarme.
 
-`AutoScanAlarmProofV1` repeats the expectation and binds it to `dataEpoch`,
-envelope revision, envelope generation, settings digest, request ID, command
-ID, and a fresh proof ID. A settled `SettingsSnapshotV1` contains that proof,
-the exact V2 envelope, and `resetJournalAbsent: true`.
+`AutoScanAlarmProofV1` répète l'attente et la lie à `dataEpoch`, à la révision d'enveloppe, à la génération d'enveloppe, au digest des réglages, à l'ID de requête, à l'ID de commande et à un ID de preuve frais. Un `SettingsSnapshotV1` stabilisé contient cette preuve, l'enveloppe V2 exacte, et `resetJournalAbsent: true`.
 
-Notifications have no separate effect: each sender reads the current settled
-canonical settings immediately before deciding to send. Theme has no durable
-transaction effect or acknowledgement: each panel derives theme from its
-validated snapshot and converges through the monotonic broadcast protocol.
-Connector permissions are a pre-write proof, not a post-write effect. The old
-fictitious `NOTIFICATION_POLICY` and `THEME_PROJECTION` effects are removed.
+Les notifications n'ont aucun effet distinct : chaque expéditeur lit les réglages canoniques stabilisés courants immédiatement avant de décider d'envoyer une notification. Le thème ne possède aucun effet de transaction durable ni d'acquittement : chaque panneau dérive le thème à partir de son snapshot validé et converge via le protocole de broadcast monotone. Les permissions des connecteurs constituent une preuve préalable à l'écriture, et non un effet postérieur à l'écriture. Les anciens effets fictifs `NOTIFICATION_POLICY` et `THEME_PROJECTION` sont supprimés.
 
-## Activation registry contract
+## Contrat du registre d'activation
 
-`MUTATE` and `RETRY` do not accept a bare UI gesture flag. They require one
-exact `SettingsActivationRegistryResultV1` emitted by the worker-local
-activation registry. The result binds, as one indivisible tuple, `dataEpoch`,
-`workerEpoch`, mutation, permission-check, activation and reservation IDs, plus
-a distinct `activationResultId`. Its issuance/observation timestamps are safe
-non-negative integers, its lifetime is at most five minutes, and the consumed
-form must be observed no later than expiry.
+`MUTATE` et `RETRY` n'acceptent pas un simple drapeau de geste d'interface utilisateur. Ils requièrent un résultat exact `SettingsActivationRegistryResultV1` émis par le registre d'activation local au worker. Le résultat lie, en un tuple indivisible unique, `dataEpoch`, `workerEpoch`, les identifiants de mutation, de vérification de permission, d'activation et de réservation, plus un `activationResultId` distinct. Ses horodatages d'émission et d'observation sont des entiers sûrs non négatifs, sa durée de vie est d'au plus cinq minutes, et la forme consommée doit être observée au plus tard à l'expiration.
 
-The registry returns either `SETTINGS_ACTIVATION_CONSUMED/oneShotConsumed:true`
-or the closed rejection reasons `expired | replayed | crossed`. Both forms are
-typed signals: Settings never infers expiry or crossing from free text. Exact
-descriptor capture rejects inherited properties, symbols, accessors, sparse
-arrays, revoked proxies, mixed worker epochs and mixed correlation tuples before
-dispatch.
+Le registre retourne soit `SETTINGS_ACTIVATION_CONSUMED/oneShotConsumed:true`, soit les motifs de rejet fermés `expired | replayed | crossed`. Les deux formes sont des signaux typés : Settings ne déduit jamais l'expiration ou le croisement à partir de texte libre. La capture exacte par descripteurs rejette les propriétés héritées, les symboles, les accesseurs, les tableaux clairsemés, les proxys révoqués, les époques de workers mélangées et les tuples de corrélation mélangés avant le dispatch.
 
-The concrete Shell API is synchronous and worker-local:
+L'API concrète du Shell est synchrone et locale au worker :
 
 ```ts
 interface SettingsActivationRegistry {
@@ -830,112 +407,59 @@ interface SettingsActivationRegistry {
 }
 ```
 
-`issue` reads the injected clock exactly once, accepts a safe integer `ttlMs`
-in `1..300000`, and returns a deeply frozen token bound to the registry's
-`dataEpoch` and `workerEpoch`. `consume` descriptor-captures the supplied token,
-reads the clock once, allocates one fresh result UUID, and burns that activation
-attempt whether it is consumed, expired or crossed. A second observation is
-`replayed`. Unknown or tuple-crossed tokens are rejection-only signals and can
-never authorize a mutation. The registry retains at most 4096 issued activation
-IDs and 4096 result IDs for the worker lifetime, without TTL cleanup or LRU.
-Invalid clocks, allocator throws, non-v4/colliding result IDs and either
-capacity exhaustion fail closed with a typed registry error; no fallback ID is
-invented.
+`issue` lit l'horloge injectée exactement une fois, accepte un entier sûr `ttlMs` dans `1..300000`, et retourne un token profondément figé lié au `dataEpoch` et au `workerEpoch` du registre. `consume` capture par descripteurs le token fourni, lit l'horloge une fois, alloue un UUID de résultat frais, et brûle cette tentative d'activation qu'elle soit consommée, expirée ou croisée. Une seconde observation produit `replayed`. Les tokens inconnus ou aux tuples croisés sont des signaux de rejet pur et ne peuvent jamais autoriser une mutation. Le registre conserve au plus 4 096 ID d'activation émis et 4 096 ID de résultat pendant la durée de vie du worker, sans nettoyage TTL ni LRU. Des horloges invalides, des levées d'exceptions d'allocateur, des ID de résultat non-v4 ou en collision, ou l'épuisement de l'une ou l'autre capacité échouent en mode fermé avec une erreur de registre typée ; aucun ID de secours n'est inventé.
 
-The controller keeps paired, append-only activation/result registries for its
-worker epoch, bounded to 4096 attempts without eviction. Every admitted result
-is consumed exactly once, including no-op, excluded/invalid candidates,
-revision/generation/ledger exhaustion and rejected retry attempts. Reuse of
-either identity is `SETTINGS_ACTIVATION_REJECTED`; reaching capacity is the
-fatal `SETTINGS_ACTIVATION_CAPACITY_EXHAUSTED` and requires a fresh worker. A
-consumed identity is durably included in the mutation command digest,
-pending-intent recovery seed, journal and outcome. Therefore a crash, retry,
-Cancel or late contains result cannot transfer it to another mutation.
+Le contrôleur maintient des registres d'activation et de résultat appariés, en ajout seul, pour son époque de worker, bornés à 4 096 tentatives sans éviction. Chaque résultat admis est consommé exactement une fois, y compris les opérations sans effet (no-op), les candidats exclus ou invalides, l'épuisement de révision/génération/registre et les tentatives de retry rejetées. La réutilisation de l'une ou l'autre identité produit `SETTINGS_ACTIVATION_REJECTED` ; atteindre la capacité constitue l'erreur fatale `SETTINGS_ACTIVATION_CAPACITY_EXHAUSTED` et exige un worker frais. Une identité consommée est durablement incluse dans le digest de commande de mutation, le seed de récupération d'intention en attente, le journal et le résultat. Par conséquent, un crash, un retry, une annulation (Cancel) ou un résultat "contains" tardif ne peut pas la transférer à une autre mutation.
 
-## Permission proof and policy
+## Preuve de permission et politique
 
-The model input requires an exact, deeply copied map: its sorted keys equal the
-included connector catalogue, and every value is a sorted, unique, non-empty
-origin list. Enabling connectors checks only the newly required origin set.
+L'entrée du modèle exige une structure de correspondances (map) exacte et profondément copiée : ses clés triées correspondent au catalogue de connecteurs inclus, et chaque valeur est une liste d'origines triée, unique et non vide. L'activation des connecteurs ne vérifie que l'ensemble des origines nouvellement requises.
 
-`VERIFY_SETTINGS_HOST_PERMISSIONS` carries the full mutation identity,
-`permissionCheckId`, `activationId`, `activationResultId`, exact sorted origins,
-origin digest and storage-reservation proof. `activationId` remains a causal
-one-shot identity for the initiating UI intent; it is not transferable browser
-activation and does not authorize a prompt.
+`VERIFY_SETTINGS_HOST_PERMISSIONS` transporte l'identité complète de la mutation, `permissionCheckId`, `activationId`, `activationResultId`, les origines triées exactes, le digest d'origine et la preuve de réservation de stockage. `activationId` demeure une identité causale à usage unique pour l'intention UI initiatrice ; ce n'est pas une activation de navigateur transférable et cela n'autorise pas l'affichage d'une invite utilisateur (prompt).
 
-The only allowed browser observation is a contains-only check over mandatory
-host origins. There is no interactive request command, port, dormant branch or
-fallback in this protocol. `HOST_PERMISSIONS_VERIFIED` is accepted only with
-an exact `SettingsHostPermissionContainsProofV1` that echoes every identity and
-digest, contains the exact sorted origins, and has `containsVerified:true`.
+La seule observation de navigateur autorisée est une vérification "contains-only" sur les origines d'hôtes obligatoires. Il n'existe aucune commande de requête interactive, port, branche dormante ou repli dans ce protocole. `HOST_PERMISSIONS_VERIFIED` n'est accepté qu'avec une preuve exacte `SettingsHostPermissionContainsProofV1` qui fait écho à chaque identité et digest, contient les origines triées exactes, et présente `containsVerified:true`.
 
-A negative contains result must already be durably settled as
-`not_committed`; `HOST_PERMISSIONS_MISSING` then enters pending-intent cleanup
-with `SETTINGS_HOST_PERMISSION_MISSING/permission_check` and can never emit a
-candidate write. A thrown or otherwise ambiguous contains observation emits
-`HOST_PERMISSIONS_OUTCOME_UNKNOWN`, rotates and persists a fresh reconcile
-request, and never prompts. Future optional permission UX requires a distinct
-model and review.
+Un résultat négatif de "contains" doit déjà être durablement stabilisé sous la forme `not_committed` ; `HOST_PERMISSIONS_MISSING` entre alors dans le nettoyage d'intention en attente avec `SETTINGS_HOST_PERMISSION_MISSING/permission_check` et ne peut jamais émettre d'écriture candidate. Une observation "contains" ayant levé une exception ou étant ambiguë émet `HOST_PERMISSIONS_OUTCOME_UNKNOWN`, effectue la rotation et persiste une requête de réconciliation fraîche, sans jamais afficher d'invite. Toute future expérience utilisateur optionnelle de permission nécessitera un modèle et une revue distincts.
 
-## Commands and Shell obligations
+## Commandes et obligations du Shell
 
-The pure machine emits one immutable command; it performs no I/O.
+La machine pure émet une commande immuable ; elle n'effectue aucune E/S.
 
-| Command                            | Shell obligation                                                                                              |
-| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
-| `PERSIST_SETTINGS_PENDING_INTENT`  | Set the exact session record, read it back, and return only the matching persisted proof                      |
-| `CLEAR_SETTINGS_PENDING_INTENT`    | Remove that exact session identity, prove absence by read-back, and never change its outcome                  |
-| `RECOVER_AND_LOAD_SETTINGS`        | Strict decode/migrate, journal recovery, reset join/absence proof, alarm alignment, settled snapshot          |
-| `RESERVE_SETTINGS_STORAGE`         | Under DatasetEpoch gate, reserve exact global local-storage headroom or return the typed pre-admission denial |
-| `VERIFY_SETTINGS_HOST_PERMISSIONS` | Execute mandatory-host contains-only verification; never open an interactive permission prompt                |
-| `COMPARE_AND_SETTLE_SETTINGS`      | Validate full identity/proof, deduplicate, CAS whole settings, journal effect, settle outcome                 |
-| `RECOVER_SETTINGS_TRANSACTION`     | Resume durable compensation/effect work and return its terminal proof                                         |
-| `REBASE_SETTINGS_MUTATION`         | Pass the recovery barrier, read latest settled canonical, and reapply no write                                |
-| `ABORT_SETTINGS_MUTATION`          | Serialize against permission check/write/recovery and append `cancelled` only if this mutation cannot commit  |
-| `RECONCILE_SETTINGS`               | Recover, fence the mutation, return its exact ledger outcome plus latest settled canonical                    |
+| Commande                           | Obligation du Shell                                                                                                                  |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `PERSIST_SETTINGS_PENDING_INTENT`  | Écrire l'enregistrement exact de session, le relire, et renvoyer uniquement la preuve persistée correspondante                       |
+| `CLEAR_SETTINGS_PENDING_INTENT`    | Supprimer cette identité exacte de session, prouver l'absence par relecture, et ne jamais modifier son résultat                      |
+| `RECOVER_AND_LOAD_SETTINGS`        | Décodage/migration strict, récupération de journal, preuve de jonction/absence de reset, alignement d'alarme, snapshot stabilisé     |
+| `RESERVE_SETTINGS_STORAGE`         | Sous la porte DatasetEpoch, réserver la marge exacte de stockage local global ou retourner le refus d'admission typé                 |
+| `VERIFY_SETTINGS_HOST_PERMISSIONS` | Exécuter la vérification "contains-only" des hôtes obligatoires ; ne jamais ouvrir d'invite de permission interactive                |
+| `COMPARE_AND_SETTLE_SETTINGS`      | Valider l'identité/preuve complète, dédupliquer, CAS sur l'ensemble des réglages, effet de journal, stabiliser le résultat           |
+| `RECOVER_SETTINGS_TRANSACTION`     | Reprendre le travail durable de compensation/effet et retourner sa preuve terminale                                                  |
+| `REBASE_SETTINGS_MUTATION`         | Franchir la barrière de récupération, lire le dernier canonique stabilisé, et n'appliquer aucune écriture                            |
+| `ABORT_SETTINGS_MUTATION`          | Sérialiser face au contrôle de permission/écriture/récupération et ajouter `cancelled` uniquement si cette mutation ne peut commiter |
+| `RECONCILE_SETTINGS`               | Récupérer, isoler (fence) la mutation, retourner son résultat exact de registre plus le dernier canonique stabilisé                  |
 
-Every mutation-settling command carries `mutationId`, command digest,
-`baseRevision`, `baseGeneration`, both settings digests, and the exact sorted
-correlation IDs. After reservation, every command also carries the exact active
-global-storage reservation proof and revalidates it under the gate. Commands
-that carry full settings require those values to
-recompute exactly. `RECONCILE_SETTINGS`, `ABORT_SETTINGS_MUTATION`, and
-`RECOVER_SETTINGS_TRANSACTION` also carry and durably consume their request
-IDs. Every response is checked against the currently emitted command and both
-counters. The executor never replays an ambiguous write after restart.
+Chaque commande stabilisant une mutation transporte `mutationId`, le digest de commande, `baseRevision`, `baseGeneration`, les deux digests de réglages, et les identifiants de corrélation triés exacts. Après réservation, chaque commande transporte également la preuve exacte de réservation active de stockage global et la revalide sous la porte. Les commandes transportant les réglages complets exigent que ces valeurs soient recalculées exactement. `RECONCILE_SETTINGS`, `ABORT_SETTINGS_MUTATION` et `RECOVER_SETTINGS_TRANSACTION` transportent et consomment également durablement leurs identifiants de requête. Chaque réponse est vérifiée par rapport à la commande actuellement émise et aux deux compteurs. L'exécuteur ne rejoue jamais une écriture ambiguë après redémarrage.
 
-### Compare, effect, and compensation order
+### Ordre de comparaison, d'effet et de compensation
 
-Inside the serialized gate, `COMPARE_AND_SETTLE_SETTINGS`:
+À l'intérieur de la porte sérialisée, `COMPARE_AND_SETTLE_SETTINGS` :
 
-1. rejects a stale epoch/lease or malformed identity;
-2. returns an existing matching outcome, or fails on any identity/correlation
-   collision;
-3. recovers an existing journal before admitting another transaction;
-4. repeats exact byte/headroom and overflow preflight, then requires an exact
-   current `(baseRevision, baseGeneration)`;
-5. re-verifies required permissions immediately before commit;
-6. atomically writes the full candidate at revision `base + 1`, generation
-   `base + 1`, with `effects_pending`;
-7. applies and verifies the alarm expectation idempotently;
-8. on success, atomically appends `committed` and clears the journal at
-   generation `base + 2`;
-9. on effect failure, atomically changes the journal to
-   `compensation_pending` at generation `base + 2` before emitting a strictly
-   proved `RUNTIME_EFFECT_FAILED`;
-10. compensation CAS-writes the full previous snapshot with
-    `compensation_effects_pending` at generation `base + 3`, restores its
-    alarm, appends `compensated`, and clears the journal at generation
-    `base + 4`.
+1. rejette une époque/bail périmé(e) ou une identité malformée ;
+2. retourne un résultat correspondant existant, ou échoue sur toute collision d'identité ou de corrélation ;
+3. récupère un journal existant avant d'admettre une autre transaction ;
+4. répète le preflight exact d'octets/marge et de dépassement, puis exige un couple courant exact `(baseRevision, baseGeneration)` ;
+5. revérifie les permissions requises immédiatement avant le commit ;
+6. écrit de manière atomique le candidat complet à la révision `base + 1`, génération `base + 1`, avec `effects_pending` ;
+7. applique et vérifie l'attente d'alarme de façon idempotente ;
+8. en cas de succès, ajoute de manière atomique `committed` et efface le journal à la génération `base + 2` ;
+9. en cas d'échec de l'effet, fait passer de manière atomique le journal à `compensation_pending` à la génération `base + 2` avant d'émettre un `RUNTIME_EFFECT_FAILED` strictement prouvé ;
+10. la compensation écrit par CAS le snapshot précédent complet avec `compensation_effects_pending` à la génération `base + 3`, restaure son alarme, ajoute `compensated`, et efface le journal à la génération `base + 4`.
 
-A revision conflict appends `not_committed` but still forces reconciliation so
-the panel adopts the newer canonical snapshot. Storage/transport ambiguity also
-forces reconciliation. No error action guesses from the old panel snapshot.
+Un conflit de révision ajoute `not_committed` mais force néanmoins la réconciliation afin que le panneau adopte le snapshot canonique plus récent. L'ambiguïté de stockage/transport impose également la réconciliation. Aucune action d'erreur ne spécule à partir de l'ancien snapshot du panneau.
 
-## State, outcome, and canonical knowledge
+## État, résultat et connaissance canonique
 
-The statechart states are:
+Les états du statechart sont :
 
 ```text
 boot | modelError | resetPending | loading | loadError | saved |
@@ -943,29 +467,20 @@ persistingIntent | reserving | permissionCheck | rebasing | writing |
 compensating | cancelling | reconciling | clearingIntent | failed
 ```
 
-The context deliberately separates:
+Le contexte sépare délibérément :
 
-- `mutationOutcome`: `previous | candidate | unknown` — what this mutation's
-  durable outcome proves;
-- `canonicalKnowledge`: `known | stale | unknown` — whether a settled current
-  snapshot is known;
-- `canonicalRelation`: `previous | candidate | other | unknown` — how the
-  current value compares, without claiming causality;
-- `reconcileReason` — why recovery was entered;
-- immutable `retryIntent` — only reserved IDs before `RETRY_READY`;
-- strict `pendingIntent` plus private `deferredCommand` — the durable identity
-  and the next command blocked behind exact read-back;
-- private `pendingTerminalSettlement` and target — never projected before
-  exact absence read-back;
-- public `terminalSettlement` — cloned/frozen caller-specific settlement only
-  after cleanup;
-- `runtimeEffectError` — the original user-visible runtime failure retained
-  through compensation/restart/reconciliation;
-- full `pendingReset` — stable reset and bootstrap correlation.
+- `mutationOutcome` : `previous | candidate | unknown` — ce que prouve le résultat durable de cette mutation ;
+- `canonicalKnowledge` : `known | stale | unknown` — si un snapshot courant stabilisé est connu ;
+- `canonicalRelation` : `previous | candidate | other | unknown` — comment la valeur courante se compare, sans revendiquer de causalité ;
+- `reconcileReason` — pourquoi la récupération a été engagée ;
+- `retryIntent` immuable — uniquement les identifiants réservés avant `RETRY_READY` ;
+- `pendingIntent` strict plus `deferredCommand` privé — l'identité durable et la commande suivante bloquée derrière la relecture exacte ;
+- `pendingTerminalSettlement` privé et cible — jamais projeté avant la relecture exacte d'absence ;
+- `terminalSettlement` public — règlement spécifique à l'appelant cloné/figé uniquement après nettoyage ;
+- `runtimeEffectError` — l'échec d'exécution visible par l'utilisateur d'origine conservé à travers la compensation/le redémarrage/la réconciliation ;
+- `pendingReset` complet — reset stable et corrélation de bootstrap.
 
-Conflict sets mutation outcome to previous but canonical knowledge to unknown
-and enters reconciliation. It cannot be dismissed, converted into a no-op, or
-used as the base of a new mutation before a settled canonical snapshot arrives.
+Un conflit définit le résultat de la mutation à `previous` mais la connaissance canonique à `unknown` et entre en réconciliation. Il ne peut être ignoré (dismissed), converti en no-op, ou utilisé comme base d'une nouvelle mutation avant qu'un snapshot canonique stabilisé ne parvienne.
 
 ```mermaid
 stateDiagram-v2
@@ -1006,388 +521,223 @@ stateDiagram-v2
   reconciling --> reconciling: RECONCILE_FAILED
 ```
 
-A no-op remains `saved` and issues no command. Mutations during a nonterminal
-transaction are rejected as busy. A non-recoverable failed state is frozen and
-editing-disabled until explicit reset. Equal-generation divergent canonical
-data with an active mutation enters transaction reconciliation; with no
-mutation identity (for example numeric/quota pre-admission failure), it starts a
-correlated recovery Load and can never enter commandless `reconciling`.
+Une opération sans effet (no-op) demeure `saved` et n'émet aucune commande. Les mutations survenant pendant une transaction non terminale sont rejetées comme occupées (`busy`). Un état d'échec non récupérable est gelé et l'édition est désactivée jusqu'au reset explicite. Des données canoniques divergentes à génération égale avec une mutation active entrent en réconciliation de transaction ; sans identité de mutation (par exemple un échec numérique/quota pré-admission), cela démarre un Load de récupération corrélé et ne peut jamais entrer dans un `reconciling` sans commande.
 
-## Retry and exact cancellation
+## Nouvelle tentative et annulation exacte
 
-Retry allocates a fresh mutation ID, permission check ID, activation ID,
-activation-result ID, storage reservation ID, and rebase request ID into an
-immutable `RetryIntent`. It must first consume the exact worker-bound activation
-result; rejected results and invalid verified batches are consumed without
-emitting a rebase command. The failed mutation object
-and all of its base/digests remain unchanged while rebasing. `RETRY_READY` must
-match the current rebase command and a settled snapshot. Only then does the
-model construct a complete new `SettingMutation` from that exact snapshot,
-reapply only the retained field candidate, recompute permissions and every
-digest, and run numeric/byte admission again. The rebuilt mutation always
-returns to `persistingIntent` before reservation, permission check or write. No field from the failed
-attempt is spread into the new identity. It never writes against the failed
-base.
+Une nouvelle tentative (retry) alloue un nouvel ID de mutation, ID de vérification de permission, ID d'activation, ID de résultat d'activation, ID de réservation de stockage et ID de requête de rebase dans un `RetryIntent` immuable. Elle doit d'abord consommer le résultat d'activation exact lié au worker ; les résultats rejetés et les lots vérifiés invalides sont consommés sans émettre de commande de rebase. L'objet de mutation échoué et l'ensemble de ses bases/digests restent inchangés pendant le rebase. `RETRY_READY` doit correspondre à la commande de rebase courante et à un snapshot stabilisé. Ce n'est qu'alors que le modèle construit une nouvelle `SettingMutation` complète à partir de ce snapshot exact, réapplique uniquement le candidat de champ conservé, recalcule les permissions et chaque digest, et réexécute l'admission numérique/octets. La mutation reconstruite retourne toujours à `persistingIntent` avant la réservation, le contrôle de permission ou l'écriture. Aucun champ de la tentative échouée n'est propagé dans la nouvelle identité. Elle n'écrit jamais sur la base échouée.
 
-A matching-ID malformed rebase response emits `PROTOCOL_UNCERTAIN` for the
-current retry mutation ID. The machine correlates it to the exact
-`REBASE_SETTINGS_MUTATION` command, discards the unadmitted `RetryIntent`, and
-reconciles the retained prior failed mutation with the fresh recovery request.
-A stale prior-mutation ID or late rebase response is ignored and cannot replace
-that recovery command.
+Une réponse de rebase malformée avec un ID correspondant émet `PROTOCOL_UNCERTAIN` pour l'ID de mutation de retry courant. La machine la corrèle à la commande exacte `REBASE_SETTINGS_MUTATION`, abandonne le `RetryIntent` non admis, et réconcilie la mutation échouée antérieure conservée avec la requête de récupération fraîche. Un ID de mutation antérieur périmé ou une réponse de rebase tardive est ignoré(e) et ne peut remplacer cette commande de récupération.
 
-Cancel before `RETRY_READY` clears the persisted rebase intent, then returns to
-the settled snapshot; no abort is sent because the new mutation was never admitted.
-Late `RETRY_READY` is ignored. Once permission-check/write begins, Cancel instead
-uses the durable handshake below.
+Une annulation (Cancel) avant `RETRY_READY` efface l'intention de rebase persistée, puis retourne au snapshot stabilisé ; aucun abandon n'est envoyé car la nouvelle mutation n'a jamais été admise. Un `RETRY_READY` tardif est ignoré. Dès lors que la vérification de permission ou l'écriture commence, Cancel utilise à la place le protocole de négociation (handshake) durable ci-dessous.
 
-Cancel is a durable handshake. `ABORT_SETTINGS_MUTATION` serializes against the
-same mutation ID and digest. If abort wins, it appends `cancelled`; all later
-rebase/write commands with that ID are terminal no-ops. `CANCEL_CONFIRMED`
-requires that ledger proof but may adopt any newer settled canonical snapshot.
-It does not require the global revision/value to equal the mutation's original
-base. Thus Cancel during rebase remains exact even when another actor committed.
+L'annulation est une négociation durable. `ABORT_SETTINGS_MUTATION` se sérialise face au même ID de mutation et au même digest. Si l'abandon l'emporte, il ajoute `cancelled` ; toutes les commandes ultérieures de rebase/écriture portant cet ID deviennent des no-ops terminales. `CANCEL_CONFIRMED` exige cette preuve de registre mais peut adopter tout snapshot canonique stabilisé plus récent. Elle n'exige pas que la révision/valeur globale soit égale à la base d'origine de la mutation. Ainsi, Cancel pendant un rebase reste exact même si un autre acteur a commité.
 
-If write may have won, Cancel enters reconciliation. A later canonical value
-equal to the candidate does not prove the cancelled mutation committed. The
-ledger outcome decides under every reconciliation reason, including
-`worker_restart`; `canonicalRelation` reports value comparison separately.
+Si l'écriture a pu l'emporter, Cancel entre en réconciliation. Une valeur canonique ultérieure égale au candidat ne prouve pas que la mutation annulée a commité. Le résultat du registre tranche sous chaque motif de réconciliation, y compris `worker_restart` ; `canonicalRelation` rapporte la comparaison des valeurs de façon distincte.
 
-## Multi-panel convergence
+## Convergence multi-panneaux
 
-After every settled envelope generation change — including outcome-ledger-only
-growth and system alarm repair — the coordinator broadcasts
-`CANONICAL_UPDATED` with a validated settled snapshot, fresh `broadcastId`, and
-fresh fallback request ID.
+Après chaque modification de génération d'enveloppe stabilisée — y compris la simple croissance du registre des résultats et la réparation d'alarme système —, le coordinateur diffuse `CANONICAL_UPDATED` avec un snapshot stabilisé validé, un `broadcastId` frais et un ID de requête de secours frais.
 
-- a stable panel adopts only a strictly higher generation, without a success
-  toast;
-- a lower generation or an identical envelope at equal generation is ignored;
-- any different canonical envelope digest at the same epoch/generation is a
-  protocol error; without a mutation it forces a correlated recovery Load,
-  while an active mutation enters reconciliation;
-- an active mutation receiving a newer or equal-divergent record enters
-  reconciliation rather than losing its projection silently;
-- a different epoch is ignored unless delivered through the strict reset
-  readiness/committed protocol.
+- un panneau stable adopte uniquement une génération strictement supérieure, sans toast de succès ;
+- une génération inférieure ou une enveloppe identique à génération égale est ignorée ;
+- tout digest d'enveloppe canonique différent pour une même époque/génération constitue une erreur de protocole ; sans mutation, cela impose un Load de récupération corrélé, tandis qu'une mutation active entre en réconciliation ;
+- une mutation active recevant un enregistrement plus récent ou divergent à génération égale entre en réconciliation plutôt que de perdre silencieusement sa projection ;
+- une époque différente est ignorée, sauf si elle est transmise via le protocole strict de disponibilité/commit de reset.
 
-Theme and toggles therefore converge monotonically across open panels. Global
-write serialization is not treated as a broadcast substitute.
+Le thème et les interrupteurs convergent ainsi de manière monotone à travers les panneaux ouverts. La sérialisation globale des écritures n'est pas traitée comme un substitut au broadcast.
 
-## Exhaustive error protocol
+## Protocole d'erreurs exhaustif
 
-Every error is an exact seven-key V1 object. `message` is bounded display/debug
-text and never controls a transition. The decoder accepts only these tuples:
+Chaque erreur est un objet V1 exact à sept clés. `message` est un texte d'affichage/débogage borné et ne contrôle jamais une transition. Le décodeur accepte uniquement ces tuples :
 
-| Code                                      | Operation(s)                                                                      | Recoverable | Mutation outcome      | Canonical knowledge |
-| ----------------------------------------- | --------------------------------------------------------------------------------- | ----------- | --------------------- | ------------------- |
-| `SETTINGS_LOAD_FAILED`                    | `load`, `rebase`                                                                  | yes         | unknown               | unknown             |
-| `SETTINGS_INVALID`                        | `load`                                                                            | no          | unknown               | unknown             |
-| `SETTINGS_INVALID`                        | `mutate`                                                                          | yes         | previous              | known               |
-| `SETTINGS_BUSY`                           | `mutate`                                                                          | yes         | unknown               | known               |
-| `SETTINGS_HOST_PERMISSION_MISSING`        | `permission_check`                                                                | yes         | previous              | known               |
-| `SETTINGS_STORAGE_FAILED`                 | `pending_intent`                                                                  | yes         | previous              | known               |
-| `SETTINGS_STORAGE_FAILED`                 | `load`, `permission_check`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | yes         | unknown               | unknown             |
-| `SETTINGS_CONFLICT`                       | `permission_check`, `save`                                                        | yes         | previous              | unknown             |
-| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `effect`                                                                          | yes         | candidate             | known               |
-| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `compensate`                                                                      | yes         | previous              | known               |
-| `SETTINGS_COMPENSATION_FAILED`            | `compensate`                                                                      | yes         | unknown               | unknown             |
-| `SETTINGS_RECONCILE_FAILED`               | `reconcile`                                                                       | yes         | unknown               | unknown             |
-| `SETTINGS_TRANSPORT_ERROR`                | `pending_intent`                                                                  | yes         | unknown               | known               |
-| `SETTINGS_TRANSPORT_ERROR`                | `load`, `permission_check`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | yes         | unknown               | unknown             |
-| `SETTINGS_PROTOCOL_ERROR`                 | `load`, `reconcile`                                                               | yes         | unknown               | unknown             |
-| `SETTINGS_WORKER_RESTARTED`               | `reconcile`                                                                       | yes         | unknown               | unknown             |
-| `SETTINGS_RESET_IN_PROGRESS`              | `load`                                                                            | yes         | unknown               | unknown             |
-| `SETTINGS_NOT_COMMITTED`                  | `reconcile`                                                                       | yes         | previous              | known               |
-| `SETTINGS_SUPERSEDED`                     | `reconcile`                                                                       | yes         | previous or candidate | known               |
-| `SETTINGS_OUTCOME_MISSING`                | `reconcile`                                                                       | no          | unknown               | known               |
-| `SETTINGS_LEDGER_QUOTA_EXHAUSTED`         | `mutate`                                                                          | no          | previous              | known               |
-| `SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED` | `mutate`                                                                          | yes         | previous              | known               |
-| `SETTINGS_GENERATION_EXHAUSTED`           | `save`                                                                            | no          | previous              | known               |
-| `SETTINGS_REVISION_EXHAUSTED`             | `save`                                                                            | no          | previous              | known               |
+| Code                                      | Opération(s)                                                                      | Récupérable | Résultat de mutation  | Connaissance canonique |
+| ----------------------------------------- | --------------------------------------------------------------------------------- | ----------- | --------------------- | ---------------------- |
+| `SETTINGS_LOAD_FAILED`                    | `load`, `rebase`                                                                  | oui         | unknown               | unknown                |
+| `SETTINGS_INVALID`                        | `load`                                                                            | non         | unknown               | unknown                |
+| `SETTINGS_INVALID`                        | `mutate`                                                                          | oui         | previous              | known                  |
+| `SETTINGS_BUSY`                           | `mutate`                                                                          | oui         | unknown               | known                  |
+| `SETTINGS_HOST_PERMISSION_MISSING`        | `permission_check`                                                                | oui         | previous              | known                  |
+| `SETTINGS_STORAGE_FAILED`                 | `pending_intent`                                                                  | oui         | previous              | known                  |
+| `SETTINGS_STORAGE_FAILED`                 | `load`, `permission_check`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | oui         | unknown               | unknown                |
+| `SETTINGS_CONFLICT`                       | `permission_check`, `save`                                                        | oui         | previous              | unknown                |
+| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `effect`                                                                          | oui         | candidate             | known                  |
+| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `compensate`                                                                      | oui         | previous              | known                  |
+| `SETTINGS_COMPENSATION_FAILED`            | `compensate`                                                                      | oui         | unknown               | unknown                |
+| `SETTINGS_RECONCILE_FAILED`               | `reconcile`                                                                       | oui         | unknown               | unknown                |
+| `SETTINGS_TRANSPORT_ERROR`                | `pending_intent`                                                                  | oui         | unknown               | known                  |
+| `SETTINGS_TRANSPORT_ERROR`                | `load`, `permission_check`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | oui         | unknown               | unknown                |
+| `SETTINGS_PROTOCOL_ERROR`                 | `load`, `reconcile`                                                               | oui         | unknown               | unknown                |
+| `SETTINGS_WORKER_RESTARTED`               | `reconcile`                                                                       | oui         | unknown               | unknown                |
+| `SETTINGS_RESET_IN_PROGRESS`              | `load`                                                                            | oui         | unknown               | unknown                |
+| `SETTINGS_NOT_COMMITTED`                  | `reconcile`                                                                       | oui         | previous              | known                  |
+| `SETTINGS_SUPERSEDED`                     | `reconcile`                                                                       | oui         | previous ou candidate | known                  |
+| `SETTINGS_OUTCOME_MISSING`                | `reconcile`                                                                       | non         | unknown               | known                  |
+| `SETTINGS_LEDGER_QUOTA_EXHAUSTED`         | `mutate`                                                                          | non         | previous              | known                  |
+| `SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED` | `mutate`                                                                          | oui         | previous              | known                  |
+| `SETTINGS_GENERATION_EXHAUSTED`           | `save`                                                                            | non         | previous              | known                  |
+| `SETTINGS_REVISION_EXHAUSTED`             | `save`                                                                            | non         | previous              | known                  |
 
-Phase guards also constrain allowed codes and operations, so sharing a code
-across operations does not broaden acceptance. `PROTOCOL_UNCERTAIN` while
-rebasing must match the active retry command and reconciles the retained prior
-mutation; while already reconciling it rotates only the matching mutation to a
-fresh request. Normal restart during `loading` or `loadError` rotates to a
-fresh recovery Load. A committed-reset Load instead permits only its same
-stable bootstrap identity. Restart during an active transaction rotates to
-reconciliation. A runtime-effect failure that is
-successfully compensated retains its original message and becomes the exact
-recoverable `SETTINGS_RUNTIME_EFFECT_FAILED/compensate/previous/known` tuple;
-it is never overwritten by generic `SETTINGS_NOT_COMMITTED`.
-`SETTINGS_CANCELLED` does not
-exist because cancellation is a positive durable outcome, not an error label.
+Les gardes de phase restreignent également les codes et opérations autorisés, de sorte que le partage d'un code entre opérations n'élargit pas l'acceptation. `PROTOCOL_UNCERTAIN` pendant un rebase doit correspondre à la commande de retry active et réconcilie la mutation antérieure conservée ; lorsqu'une réconciliation est déjà en cours, elle ne fait tourner que la mutation correspondante vers une requête fraîche. Un redémarrage normal pendant `loading` ou `loadError` pivote vers un Load de récupération frais. Un Load de reset commité autorise en revanche uniquement sa même identité de bootstrap stable. Un redémarrage pendant une transaction active pivote vers la réconciliation. Un échec d'effet d'exécution qui est compensé avec succès conserve son message d'origine et devient le tuple exact et récupérable `SETTINGS_RUNTIME_EFFECT_FAILED/compensate/previous/known` ; il n'est jamais écrasé par un générique `SETTINGS_NOT_COMMITTED`. `SETTINGS_CANCELLED` n'existe pas car l'annulation est un résultat durable positif, et non un libellé d'erreur.
 
-## UI selector and invariants
+## Sélecteur UI et invariants
 
-`selectSettingsUiStatus` is the only page-facing composition:
+`selectSettingsUiStatus` constitue la seule composition orientée vers la page :
 
-- `loading`, `reset_pending`, or load error always yields
-  `editingDisabled: true`, regardless of transaction phase;
-- settled `saved` yields `saved`;
-- recoverable terminal `failed` yields `failed`;
-- every active transaction yields `saving`;
-- unknown canonical knowledge, a non-recoverable failure, numeric exhaustion,
-  or full outcome ledger disables editing.
+- `loading`, `reset_pending` ou une erreur de chargement produit toujours `editingDisabled: true`, indépendamment de la phase de transaction ;
+- `saved` stabilisé produit `saved` ;
+- `failed` terminal récupérable produit `failed` ;
+- chaque transaction active produit `saving` ;
+- une connaissance canonique inconnue, un échec non récupérable, l'épuisement numérique ou un registre de résultats plein désactive l'édition.
 
-Inputs are deep-copied at construction: default settings, connector IDs, the
-permission-origin map object, and each origin array. External mutation cannot alter a
-guard without an event. Every adopted snapshot is recursively copied, including
-settings, journal, outcome correlation arrays, and alarm proof; later mutation
-of an event object cannot alter canonical context. Successful Load, Dismiss,
-external adoption, and reset cutover clear stale rejection metadata. Dead
-online/offline context is absent.
+Les entrées sont copiées en profondeur lors de la construction : réglages par défaut, identifiants de connecteurs, objet de structure de correspondances permissions-origines, et chaque tableau d'origines. Une mutation externe ne peut modifier un garde sans événement. Chaque snapshot adopté est récursivement copié, y compris les réglages, le journal, les tableaux de corrélation de résultats et la preuve d'alarme ; la mutation ultérieure d'un objet d'événement ne peut modifier le contexte canonique. Un Load réussi, Dismiss, une adoption externe et la bascule de reset effacent les métadonnées de rejet périmées. Le contexte mort en ligne/hors ligne est absent.
 
-The core invariants are:
+Les invariants fondamentaux sont :
 
-1. Shell commands and responses never cross `dataEpoch`; every settling CAS
-   binds both revision and generation.
-2. A settled snapshot has strict V2 storage, no transaction/reset journal, and
-   a correlated alarm proof.
-3. Mutation outcome comes only from the matching durable ledger entry.
-4. Outcome entries are unique by mutation ID, append-only, generation-ordered,
-   byte-bounded, and never evicted.
-5. Conflict, ambiguous failure, restart, and active external revision reconcile.
-6. Compensation uses the complete previous snapshot and its exact digest.
-7. Cancel answers whether this mutation committed independently from what is
-   canonical now.
-8. Reconciliation never replays the candidate write.
-9. Every envelope mutation increments generation exactly once; overflow is
-   impossible by pre-admission reservation.
-10. Every non-no-op mutation acquires and retains exact extension-global local
-    storage capacity under the DatasetEpoch gate before permission check or write.
-11. Reset readiness emits no Load; only exact committed correlation starts one,
-    and actor epoch changes only after its settled terminal Load.
-12. Same-reset `SETTINGS_RESET_IN_PROGRESS`, ordinary Load replacement, and
-    fresh-ID restart are forbidden during a committed reset Load.
-13. Every unknown object/array boundary is descriptor-snapshotted without
-    invoking property getters; each source node is captured once, the detached
-    graph is frozen, and every digest round-trips canonically.
-14. No stale/malformed payload or free text causes an implicit transition.
-15. Core remains pure; all I/O, time, UUID allocation, permissions, alarms,
-    leases, and storage stay in Shell.
-16. Only `SETTINGS_CAPTURED/*` events reach the statechart; every guard/action
-    pair consumes the same normalized payload and never reparses the raw event.
-17. Every captured-event transition branch requires an ephemeral
-    module-private identity capability before its business guard; that
-    capability exists only during the controller's synchronous private send and
-    is revoked in `finally`.
-18. Shell cannot obtain an actor, machine or `.send`; raw unknown values,
-    revoked Proxies, pre-normalized values, delayed events and replays never
-    reach XState outside atomic `dispatch(raw)`.
-19. `getSnapshot()` and `subscribe()` expose only the explicit public-view DTO;
-    no native XState snapshot, method, collection, machine, actor, context or
-    native subscription crosses the controller boundary.
-20. Every public view recursively clones selected domain values and is deeply
-    frozen. It has no mutable alias to actor context, command, settings, error,
-    envelope, array, previous view or serialization result.
-21. Observer exceptions and hostile mutation/reflection attempts cannot change
-    actor state, interrupt capability cleanup, or suppress other observers.
-22. Unsubscribe and stop are idempotent; unsubscribed/stopped observers receive
-    no later notification, nested observer dispatch is rejected, and stopped
-    dispatch is inactive.
-23. No public reference can construct another actor from the private machine or
-    wrap a shared guard to steal and consume an event during its ephemeral
-    WeakSet membership window.
-24. A non-no-op mutation cannot emit reservation before exact pending-intent
-    set plus read-back; every later causal command rotation obeys the same gate.
-25. `intentRevision` is a monotone safe integer within one pending lifecycle;
-    every emitted revision remains parseable, and stale/gapped identity,
-    digest, epoch or proof cannot advance the machine.
-26. A fresh worker durably rotates a strict cold seed before reconciliation;
-    it strips old leases and never emits a candidate write, reservation or
-    permission check from recovered memory.
-27. A caller-specific terminal stays private during `clearingIntent` and is
-    published only after exact remove plus absence read-back.
-28. External convergence may update the global canonical projection but never
-    creates `terminalSettlement` for a mutation that this controller did not
-    causally settle.
-29. Mandatory host permissions use contains-only verification. The model has
-    no interactive request command or fallback, and a negative proof produces
-    durable `not_committed` plus zero candidate write.
-30. The public terminal graph is detached, JSON-only and deeply frozen exactly
-    like every other public-view field.
-31. `SETTINGS_OUTCOME_MISSING` retains the exact durable pending intent, emits
-    no clear command or terminal settlement, survives worker recreation, and
-    can lose that fence only through the explicit reset/absence protocol. Its
-    fatal context is action-free for retry, mutate, dismiss, late callbacks,
-    `CANONICAL_UPDATED` and `SERVICE_WORKER_RESTARTED`; no activation registry
-    or public field changes before reset.
+1. Les commandes et réponses du Shell ne croisent jamais `dataEpoch` ; chaque CAS de stabilisation lie à la fois révision et génération.
+2. Un snapshot stabilisé possède un stockage V2 strict, aucun journal de transaction/reset, et une preuve d'alarme corrélée.
+3. Le résultat de la mutation provient uniquement de l'entrée correspondante du registre durable.
+4. Les entrées de résultat sont uniques par ID de mutation, en ajout seul, ordonnées par génération, bornées en octets, et ne sont jamais évincées.
+5. Le conflit, l'échec ambigu, le redémarrage et la révision externe active se réconcilient.
+6. La compensation utilise le snapshot précédent complet et son digest exact.
+7. Cancel détermine si cette mutation a commité de manière indépendante de ce qui est canonique maintenant.
+8. La réconciliation ne rejoue jamais l'écriture candidate.
+9. Chaque mutation d'enveloppe incrémente la génération exactement une fois ; le débordement est impossible grâce à la réservation préalable à l'admission.
+10. Chaque mutation non-no-op acquiert et conserve une capacité exacte de stockage local globale à l'extension sous la porte DatasetEpoch avant la vérification de permission ou l'écriture.
+11. La préparation au reset n'émet aucun Load ; seule la corrélation commitée exacte en démarre un, et l'époque de l'acteur ne change qu'après son Load terminal stabilisé.
+12. `SETTINGS_RESET_IN_PROGRESS` pour le même reset, le remplacement par un Load ordinaire et le redémarrage avec un nouvel ID sont interdits pendant un Load de reset commité.
+13. Chaque frontière objet/tableau inconnue est capturée par descripteurs sans invoquer les accesseurs de propriétés ; chaque nœud source est capturé une fois, le graphe détaché est figé, et chaque digest effectue un aller-retour canonique parfait.
+14. Aucun payload périmé ou malformé ni aucun texte libre ne provoque de transition implicite.
+15. Le Core reste pur ; toutes les E/S, le temps, l'allocation d'UUID, les permissions, les alarmes, les baux et le stockage restent dans le Shell.
+16. Seuls les événements `SETTINGS_CAPTURED/*` atteignent le statechart ; chaque paire garde/action consomme le même payload normalisé et ne réanalyse jamais l'événement brut.
+17. Chaque branche de transition sur événement capturé exige une capacité d'identité éphémère privée au module avant son garde métier ; cette capacité n'existe que pendant l'envoi synchrone privé du contrôleur et est révoquée dans un bloc `finally`.
+18. Le Shell ne peut pas obtenir d'acteur, de machine ou de `.send` ; les valeurs brutes inconnues, les proxys révoqués, les valeurs pré-normalisées, les événements retardés et les rejeux n'atteignent jamais XState en dehors d'un `dispatch(raw)` atomique.
+19. `getSnapshot()` et `subscribe()` n'exposent que le DTO explicite de vue publique ; aucun snapshot natif XState, méthode, collection, machine, acteur, contexte ou souscription native ne franchit la frontière du contrôleur.
+20. Chaque vue publique clone récursivement les valeurs de domaine sélectionnées et est profondément figée. Elle ne comporte aucun alias mutable vers le contexte de l'acteur, la commande, les réglages, l'erreur, l'enveloppe, le tableau, la vue précédente ou le résultat de sérialisation.
+21. Les exceptions d'observateurs et les tentatives hostiles de mutation/réflexion ne peuvent modifier l'état de l'acteur, interrompre le nettoyage des capacités ou supprimer d'autres observateurs.
+22. La désinscription et l'arrêt sont idempotents ; les observateurs désinscrits ou arrêtés ne reçoivent aucune notification ultérieure, le dispatch imbriqué depuis un observateur est rejeté, et le dispatch arrêté est inactif.
+23. Aucune référence publique ne peut construire un autre acteur à partir de la machine privée ou encapsuler un garde partagé pour dérober et consommer un événement pendant sa fenêtre d'appartenance WeakSet éphémère.
+24. Une mutation non-no-op ne peut émettre de réservation avant la définition exacte de l'intention en attente accompagnée de sa relecture ; chaque rotation causale ultérieure de commande obéit à la même porte.
+25. `intentRevision` est un entier sûr monotone au sein d'un cycle de vie d'intention en attente ; chaque révision émise reste analysable, et une identité, un digest, une époque ou une preuve périmé(e) ou présentant un écart ne peut faire avancer la machine.
+26. Un worker frais fait pivoter durablement un seed à froid strict avant la réconciliation ; il retire les anciens baux et n'émet jamais d'écriture candidate, de réservation ou de contrôle de permission depuis la mémoire récupérée.
+27. Un état terminal spécifique à l'appelant reste privé pendant `clearingIntent` et n'est publié qu'après suppression exacte accompagnée de relecture d'absence.
+28. La convergence externe peut mettre à jour la projection canonique globale mais ne crée jamais de `terminalSettlement` pour une mutation que ce contrôleur n'a pas stabilisée de manière causale.
+29. La gestion des permissions d'hôtes obligatoires utilise exclusivement la vérification "contains-only". Le modèle ne possède aucune commande de requête interactive ni de repli, et une preuve négative produit un `not_committed` durable ainsi que zéro écriture candidate.
+30. Le graphe terminal public est détaché, exclusivement JSON et profondément figé, exactement comme tous les autres champs de la vue publique.
+31. `SETTINGS_OUTCOME_MISSING` conserve l'intention en attente durable exacte, n'émet aucune commande d'effacement ou de règlement terminal, survit à la recréation du worker, et ne peut perdre ce fence que par le protocole explicite de reset/absence. Son contexte fatal est sans action pour retry, mutate, dismiss, les callbacks tardifs, `CANONICAL_UPDATED` et `SERVICE_WORKER_RESTARTED` ; aucun registre d'activation ou champ public ne change avant le reset.
 
-Forbidden transitions include `loading -> saved` without recovery proof,
-`writing -> saved` without `committed`, `cancelling -> saved` without
-`cancelled`, conflict/Dismiss to stale `saved`, value-equality attribution,
-journal eviction, old-epoch acceptance, readiness-triggered Load, committed
-payload mismatch, direct-null committed without exact fence proof,
-equal-generation divergence into commandless reconciliation, reservation or
-write before pending-intent read-back, terminal publication before absence
-read-back, cold-seed candidate replay, an interactive permission request, and
-any mutation from a frozen fatal state.
+Les transitions interdites incluent `loading -> saved` sans preuve de récupération, `writing -> saved` sans `committed`, `cancelling -> saved` sans `cancelled`, conflit/Dismiss vers un `saved` périmé, attribution par égalité de valeur, éviction de journal, acceptation d'ancienne époque, Load déclenché par la préparation, non-concordance de payload commité, commité direct avec valeur nulle sans preuve exacte de fence, divergence à génération égale vers une réconciliation sans commande, réservation ou écriture avant relecture de l'intention en attente, publication terminale avant relecture d'absence, rejeu de candidat depuis un seed à froid, requête de permission interactive, et toute mutation issue d'un état fatal gelé.
 
-## Review finding closure matrix
+## Matrice de clôture des conclusions de revue
 
-| Finding | Model correction                                                                                                                                                          |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1      | Atomic append-only ledger records mutation ID, full digests, revision, and outcome; reconciliation never attributes by value.                                             |
-| C2      | Durable phase journal plus startup/every-Load recovery barrier and correlated alarm proof prevent unaligned `saved`.                                                      |
-| C3      | Mutation outcome, canonical knowledge, and relation are separate; every conflict forces reconciliation before Dismiss/no-op/new mutation.                                 |
-| I1      | Cancel accepts a durable `cancelled` outcome with any newer settled canonical snapshot and invalidates late retry/write work.                                             |
-| I2      | Explicit candidate/previous/other relation, durable outcome, and stored reconciliation reason produce exact terminal knowledge.                                           |
-| I3      | Exact V2/V1/bare schemas, one permitted pre-theme default, legacy-only connector migration, safe revisions, atomic cutover, and V2-only policy are specified and decoded. |
-| I4      | Lowercase UUID v4 freshness, deterministic command IDs, exact response correlation, durable mutation deduplication, and idempotent read/recovery commands are modeled.    |
-| I5      | Exact catalogue-origin input, causal activation ID, origin digest, positive contains-only proof, and zero interactive request branch are explicit.                        |
-| I6      | Only the exact auto-scan alarm is transactional; notification/theme pseudo-effects are removed; proof and multi-panel theme convergence are typed.                        |
-| I7      | One exhaustive error tuple decoder, phase-specific operation checks, reconciliation rotation, and no orphan `SETTINGS_CANCELLED` code.                                    |
-| I8      | Worker restart rotates both initial/error Load and active transaction recovery with fresh IDs.                                                                            |
-| I9      | Validated monotonic canonical broadcasts update stable panels and reconcile active ones.                                                                                  |
-| M1      | Versioned ordered tuple digests replace representation-order-dependent equality.                                                                                          |
-| M2      | Input settings, IDs, permission map, and nested arrays are copied before use.                                                                                             |
-| M3      | Settled actions clear rejection metadata; dead `online` context is removed.                                                                                               |
-| M4      | Combined selector makes Load dominant and disables editing for unknown/fatal/quota states.                                                                                |
+| Constat | Correction apportée au modèle                                                                                                                                                                                        |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1      | Le registre en ajout seul atomique enregistre l'ID de mutation, les digests complets, la révision et le résultat ; la réconciliation n'attribue jamais par valeur.                                                   |
+| C2      | Le journal de phase durable combiné à la barrière de récupération au démarrage/chaque Load et à la preuve d'alarme corrélée empêche un `saved` non aligné.                                                           |
+| C3      | Le résultat de mutation, la connaissance canonique et la relation sont distincts ; chaque conflit impose une réconciliation avant Dismiss/no-op/nouvelle mutation.                                                   |
+| I1      | Cancel accepte un résultat durable `cancelled` avec tout snapshot canonique stabilisé plus récent et invalide le travail tardif de retry/écriture.                                                                   |
+| I2      | La relation explicite candidate/précédente/autre, le résultat durable et le motif de réconciliation stocké produisent une connaissance terminale exacte.                                                             |
+| I3      | Schémas stricts V2/V1/brut, une seule valeur par défaut pré-thème autorisée, migration de connecteurs héritée uniquement, révisions sûres, bascule atomique et politique V2 exclusive sont spécifiés et décodés.     |
+| I4      | Fraîcheur des UUID v4 en minuscules, identifiants de commande déterministes, corrélation exacte des réponses, déduplication durable des mutations et commandes de lecture/récupération idempotentes sont modélisées. |
+| I5      | Entrée exacte catalogue-origines, ID d'activation causal, digest d'origine, preuve positive "contains-only" et zéro branche de requête interactive sont explicites.                                                  |
+| I6      | Seule l'alarme exacte d'auto-scan est transactionnelle ; les pseudo-effets de notification/thème sont supprimés ; la preuve et la convergence de thème multi-panneaux sont typées.                                   |
+| I7      | Un décodeur exhaustif de tuples d'erreurs, des vérifications d'opérations spécifiques à la phase, la rotation de réconciliation et aucun code orphelin `SETTINGS_CANCELLED`.                                         |
+| I8      | Le redémarrage du worker fait pivoter à la fois le Load initial/d'erreur et la récupération de transaction active avec des ID frais.                                                                                 |
+| I9      | Les diffusions canoniques monotones validées mettent à jour les panneaux stables et réconcilient les panneaux actifs.                                                                                                |
+| M1      | Les digests de tuples ordonnés et versionnés remplacent l'égalité dépendante de l'ordre de représentation.                                                                                                           |
+| M2      | Les réglages d'entrée, les identifiants, la structure de correspondances des permissions et les tableaux imbriqués sont copiés avant utilisation.                                                                    |
+| M3      | Les actions stabilisées effacent les métadonnées de rejet ; le contexte mort `online` est supprimé.                                                                                                                  |
+| M4      | Le sélecteur combiné rend Load dominant et désactive l'édition pour les états inconnus/fatals/de quota.                                                                                                              |
 
-Review 2 closure:
+Clôture de la revue 2 :
 
-| Finding | Model correction                                                                                                                                               |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| R2.1    | `RetryIntent` reserves IDs only; the full immutable identity is rebuilt from the exact `RETRY_READY` snapshot, and pre-ready Cancel is local.                  |
-| R2.2    | Durable `cancelled` wins under every reconciliation reason, including worker restart.                                                                          |
-| R2.3    | Exact UTF-8 envelope budget, 64 KiB headroom, bounded digests/correlations, and in-gate preflight replace count-only quota.                                    |
-| R2.4    | Monotone generation covers metadata/outcome changes and drives CAS, proof, reconciliation, and broadcast convergence.                                          |
-| R2.5    | Retry permission-check origins are recomputed against the installed rebase snapshot.                                                                           |
-| R2.6    | Recovery/cancel IDs enter durable correlation sets; current-command matching and historical collision checks are explicit.                                     |
-| R2.7    | Reconciliation appends causal `not_committed` when no write was admitted; missing outcome is fatal only after recovery/fencing.                                |
-| R2.8    | Outcome decoding binds command, bases, digests, settlement counters, correlations, and exact alarm shape.                                                      |
-| R2.9    | Readiness enters `resetPending` with no Load; exact post-commit broadcast starts the stable correlated Load.                                                   |
-| R2.10   | Reset-owned recovery aligns/proves alarm before `settings_aligned`/`committed`; startup Settings recovery precedes admission. DB/reset re-review is mandatory. |
-| R2.11   | Runtime failure requires an exact `compensation_pending` journal proof containing the recovery ID.                                                             |
-| R2.12   | Successful compensation preserves the original retryable runtime cause.                                                                                        |
-| R2.13   | Snapshot adoption recursively clones nested settings, journal, outcomes, correlations, and alarm proof.                                                        |
-| R2.14   | New mutations begin with canonical relation `previous`; the canonical snapshot remains the previous settled base.                                              |
+| Constat | Correction apportée au modèle                                                                                                                                                                                  |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R2.1    | `RetryIntent` réserve uniquement les ID ; l'identité immuable complète est reconstruite à partir du snapshot exact `RETRY_READY`, et Cancel avant disponibilité est local.                                     |
+| R2.2    | `cancelled` durable l'emporte sous chaque motif de réconciliation, y compris le redémarrage du worker.                                                                                                         |
+| R2.3    | Budget d'enveloppe UTF-8 exact, marge de 64 Kio, digests/corrélations bornés et preflight sous porte remplacent le quota basé uniquement sur le décompte.                                                      |
+| R2.4    | La génération monotone couvre les modifications de métadonnées/résultats et pilote le CAS, la preuve, la réconciliation et la convergence par broadcast.                                                       |
+| R2.5    | Les origines de vérification de permission de retry sont recalculées par rapport au snapshot de rebase installé.                                                                                               |
+| R2.6    | Les identifiants de récupération/annulation entrent dans les ensembles de corrélation durables ; la correspondance de la commande courante et les vérifications de collision historique sont explicites.       |
+| R2.7    | La réconciliation ajoute le `not_committed` causal lorsqu'aucune écriture n'a été admise ; le résultat manquant n'est fatal qu'après récupération/fencing.                                                     |
+| R2.8    | Le décodage de résultat lie la commande, les bases, les digests, les compteurs de règlement, les corrélations et la structure exacte de l'alarme.                                                              |
+| R2.9    | La préparation entre dans `resetPending` sans Load ; le broadcast post-commit exact démarre le Load corrélé stable.                                                                                            |
+| R2.10   | La récupération détenue par le reset aligne/prouve l'alarme avant `settings_aligned`/`committed` ; la récupération des Settings au démarrage précède l'admission. Une nouvelle revue DB/reset est obligatoire. |
+| R2.11   | L'échec d'exécution requiert une preuve de journal exacte `compensation_pending` contenant l'ID de récupération.                                                                                               |
+| R2.12   | Une compensation réussie préserve la cause d'exécution initiale réessayable.                                                                                                                                   |
+| R2.13   | L'adoption de snapshot clone récursivement les réglages imbriqués, le journal, les résultats, les corrélations et la preuve d'alarme.                                                                          |
+| R2.14   | Les nouvelles mutations débutent avec la relation canonique `previous` ; le snapshot canonique demeure la base stabilisée précédente.                                                                          |
 
-Review 3 closure:
+Clôture de la revue 3 :
 
-| Finding       | Model correction                                                                                                                                                                                                        |
-| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1-R3         | The committed reset Load is non-replaceable, restart-stable in `loading` and `loadError`, clears correlation only after settled E2 success, and classifies same-reset `SETTINGS_RESET_IN_PROGRESS` as protocol failure. |
-| I3-R3         | Settings imports the single neutral reset payload parser; wrapper fields remain separate and the two consumers share identity-distinctness rules.                                                                       |
-| I4-R3         | Rebase `PROTOCOL_UNCERTAIN` correlates to the active retry command, then reconciles the retained prior mutation; stale/late IDs are ignored.                                                                            |
-| I5-R3         | A DatasetEpoch-gated extension-global reservation covers physical key/value bytes, all local writers, terminal Settings capacity, the reset receipt, and an exact typed pre-admission denial.                           |
-| I6-R3         | Settings/origin/command digests parse their complete tuple and must canonically round-trip; journal/outcome decoders consume those parsers.                                                                             |
-| I7-R3         | Direct committed with null previous epoch requires exact live `ResetFenceProofV1`; the actor installs the next epoch only from settled Load proof.                                                                      |
-| I8-R3         | Equal-generation divergence without a mutation starts a correlated Load instead of entering transaction reconciliation.                                                                                                 |
-| Strict-schema | Exact own data descriptors and dense ordinary arrays reject inherited, accessor, Symbol, non-enumerable, sparse, extra-key, and hostile-prototype shapes without reading getters.                                       |
+| Constat       | Correction apportée au modèle                                                                                                                                                                                                                   |
+| ------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1-R3         | Le Load de reset commité est non remplaçable, stable au redémarrage dans `loading` et `loadError`, n'efface la corrélation qu'après le succès stabilisé E2, et classe `SETTINGS_RESET_IN_PROGRESS` pour le même reset comme échec de protocole. |
+| I3-R3         | Settings importe le parseur de payload neutre unique de reset ; les champs d'enveloppe restent distincts et les deux consommateurs partagent les règles d'unicité d'identité.                                                                   |
+| I4-R3         | `PROTOCOL_UNCERTAIN` lors du rebase est corrélé à la commande de retry active, puis réconcilie la mutation précédente conservée ; les ID périmés/tardifs sont ignorés.                                                                          |
+| I5-R3         | Une réservation globale à l'extension sous porte DatasetEpoch couvre les octets physiques clés/valeurs, tous les rédacteurs locaux, la capacité terminale de Settings, le reçu de reset et un refus pré-admission typé exact.                   |
+| I6-R3         | Les digests de réglages/origines/commandes analysent leur tuple complet et doivent effectuer un aller-retour canonique parfait ; les décodeurs de journal/résultats consomment ces parseurs.                                                    |
+| I7-R3         | Le commité direct avec époque précédente nulle requiert une `ResetFenceProofV1` active exacte ; l'acteur n'installe l'époque suivante qu'à partir de la preuve de Load stabilisée.                                                              |
+| I8-R3         | La divergence à génération égale sans mutation démarre un Load corrélé au lieu d'entrer en réconciliation de transaction.                                                                                                                       |
+| Strict-schema | Des descripteurs de données propres exacts et des tableaux ordinaires denses rejettent les structures héritées, avec accesseurs, Symbol, non énumérables, clairsemées, avec clés superflues et aux prototypes hostiles sans lire de getters.    |
 
-Review 4 closure:
+Clôture de la revue 4 :
 
-| Finding | Model correction                                                                                                                                                                                                                           |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C1-R4   | One context-aware raw-event normalizer captures every source descriptor graph once, deep-freezes it, and emits only `SETTINGS_CAPTURED/*`; guards/actions share that immutable event, closing reset fence A/payload B and Load A/B TOCTOU. |
-| I2-R4   | Reset-owned alignment accepts a safe settled generation after alarm recovery while physical `DATABASE_REINITIALIZED` remains fixed at generation `0`.                                                                                      |
-| I3-R4   | The obsolete no-receipt cross-model proposal is explicitly superseded by the latest-only durable receipt protocol.                                                                                                                         |
+| Constat | Correction apportée au modèle                                                                                                                                                                                                                                                                      |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1-R4   | Un normaliseur d'événements bruts sensible au contexte capture chaque graphe de descripteurs source une fois, le fige en profondeur, et émet uniquement `SETTINGS_CAPTURED/*` ; les gardes/actions partagent cet événement immuable, fermant le TOCTOU fence de reset A / payload B et Load A / B. |
+| I2-R4   | L'alignement détenu par le reset accepte une génération stabilisée sûre après récupération d'alarme tandis que le `DATABASE_REINITIALIZED` physique reste fixé à la génération `0`.                                                                                                                |
+| I3-R4   | La proposition obsolète inter-modèles sans reçu est explicitement remplacée par le protocole de reçu durable du dernier état uniquement.                                                                                                                                                           |
 
-Review 5 attempted closure (superseded by Review 6):
+Tentative de clôture de la revue 5 (remplacée par la revue 6) :
 
-| Finding | Model correction                                                                                                                                                                                    |
-| ------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1-R5   | A durable normalizer-granted WeakSet blocked direct forged prefixes/clones but left delayed/replayed normalized objects authorized; Review 6 replaces it with an atomic dispatch-scoped capability. |
-| I1-R5   | Committed reset has exactly an absent-proof shape or a defined, exactly parsed proof shape; an own `resetFenceProof:undefined` key is rejected before the event can receive provenance.             |
+| Constat | Correction apportée au modèle                                                                                                                                                                                                        |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| C1-R5   | Un WeakSet durable accordé par le normaliseur bloquait les préfixes contrefaits directs/clones mais laissait les objets normalisés retardés/rejoués autorisés ; la revue 6 le remplace par une capacité atomique de portée dispatch. |
+| I1-R5   | Le reset commité possède exactement une forme sans preuve ou une forme de preuve définie et exactement analysée ; une clé propre `resetFenceProof:undefined` est rejetée avant que l'événement ne reçoive une provenance.            |
 
-Review 6 closure:
+Clôture de la revue 6 :
 
-| Finding | Model correction                                                                                                                                                                                                                                             |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| C1-R6   | A private auto-started controller is the only dispatch authority. It captures current context, normalizes/freezes, grants identity only around private synchronous `actor.send`, and revokes in `finally`; machine, actor and `.send` are not Shell exports. |
-| C2-R6   | Pre-normalized C/B events, delayed values, replayed events, clones and failed-send captures have no live capability. Reentrant/stopped dispatch cannot enqueue beyond the grant lifetime.                                                                    |
-| I1-R6   | Invalid and revoked raw graphs are rejected before actor dispatch without throwing; the canonical absent/exact reset-proof distinction remains unchanged.                                                                                                    |
+| Constat | Correction apportée au modèle                                                                                                                                                                                                                                                               |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1-R6   | Un contrôleur privé auto-démarré est la seule autorité de dispatch. Il capture le contexte courant, normalise/fige, accorde l'identité uniquement autour du `actor.send` synchrone privé, et révoque dans un bloc `finally` ; machine, acteur et `.send` ne sont pas exportés par le Shell. |
+| C2-R6   | Les événements C/B pré-normalisés, les valeurs retardées, les événements rejoués, les clones et les captures d'envoi échoué n'ont aucune capacité active. Un dispatch réentrant ou arrêté ne peut pas enfiler au-delà de la durée de vie de l'octroi.                                       |
+| I1-R6   | Les graphes bruts invalides et révoqués sont rejetés avant le dispatch vers l'acteur sans lever d'exception ; la distinction canonique entre preuve de reset absente ou exacte demeure inchangée.                                                                                           |
 
-Review 7 closure:
+Clôture de la revue 7 :
 
-| Finding | Model correction                                                                                                                                                                                                                                                                                         |
-| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| C1-R7   | Native XState snapshots and subscriptions never cross the façade. Each read/notification is an explicit detached deeply frozen domain DTO; machine, context, commands, `_nodes`, methods, collections and serialization aliases remain private, so no rogue actor can steal the live WeakSet capability. |
-| I1-R7   | Observer throws and hostile mutation/reflection are isolated; other observers and atomic-dispatch cleanup continue. Reentrant observer dispatch, unsubscribe and idempotent stop have explicit terminal behavior.                                                                                        |
+| Constat | Correction apportée au modèle                                                                                                                                                                                                                                                                                                                                        |
+| ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| C1-R7   | Les snapshots et souscriptions natifs XState ne franchissent jamais la façade. Chaque lecture/notification est un DTO de domaine explicite, détaché et profondément figé ; machine, contexte, commandes, `_nodes`, méthodes, collections et alias de sérialisation restent privés, de sorte qu'aucun acteur malveillant ne peut voler la capacité active du WeakSet. |
+| I1-R7   | Les exceptions d'observateurs et les mutations/réflexions hostiles sont isolées ; les autres observateurs et le nettoyage de dispatch atomique continuent. Le dispatch d'observateur réentrant, la désinscription et l'arrêt idempotent possèdent des comportements terminaux explicites.                                                                            |
 
-R0A/R0B/R0D closure prepared for final independent review:
+Clôture R0A/R0B/R0D préparée pour la revue indépendante finale :
 
-| Finding | Model correction                                                                                                                      |
-| ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| R0A-1   | Strict session pending intent, canonical digest and exact set/read-back gate every first admission and causal rotation.               |
-| R0A-2   | Cold seed validation binds worker epochs, mutation, envelope, journal/ledger and recovery request; worker B can reconcile only.       |
-| R0A-3   | Exact clear plus absence read-back is mandatory after terminal outcome; crash windows forbid effect replay.                           |
-| R0B-1   | Caller-specific terminal settlement remains private during cleanup and becomes a detached frozen public DTO only afterward.           |
-| R0B-2   | External/global convergence cannot resolve a local caller without the exact mutation outcome and cleanup proof.                       |
-| R0D-1   | Mandatory host permission handling is contains-only with `permissionCheckId`; no interactive request command or fallback exists.      |
-| R0D-2   | Positive, negative and ambiguous contains outcomes respectively rotate to write, settle `not_committed`, or rotate to reconciliation. |
+| Constat | Correction apportée au modèle                                                                                                                                                 |
+| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| R0A-1   | L'intention en attente stricte de session, le digest canonique et la porte exacte de définition/relecture contrôlent chaque première admission et rotation causale.           |
+| R0A-2   | La validation du seed à froid lie les époques de workers, la mutation, l'enveloppe, le journal/registre et la requête de récupération ; le worker B ne peut que réconcilier.  |
+| R0A-3   | L'effacement exact assorti de la relecture d'absence est obligatoire après le résultat terminal ; les fenêtres de crash interdisent le rejeu d'effet.                         |
+| R0B-1   | Le règlement terminal spécifique à l'appelant reste privé pendant le nettoyage et ne devient un DTO public détaché et figé qu'ensuite.                                        |
+| R0B-2   | La convergence externe/globale ne peut résoudre un appelant local sans le résultat de mutation exact et la preuve de nettoyage.                                               |
+| R0D-1   | La gestion des permissions d'hôte obligatoire est exclusivement en "contains-only" avec `permissionCheckId` ; aucune commande de requête interactive ni aucun repli n'existe. |
+| R0D-2   | Les résultats "contains" positifs, négatifs et ambigus basculent respectivement vers l'écriture, stabilisent `not_committed`, ou basculent vers la réconciliation.            |
 
-## Required verification before R0 approval and Shell implementation
+## Vérifications requises avant approbation R0 et implémentation Shell
 
-Independent re-review must trace the Markdown, contract, logic, and statechart
-together. The later implementation phase must first add RED tests for:
+Une nouvelle revue indépendante doit vérifier conjointement le Markdown, le contrat, la logique et le statechart. La phase d'implémentation ultérieure doit d'abord ajouter des tests ROUGES (RED tests) pour :
 
-- exact V2, V1, both bare legacy variants, unknown keys, connector migration,
-  V2-only cutover, epoch mismatch, generation `0` migration, both counter
-  maxima, and malformed nested data;
-- same-value commit by another mutation, overwritten committed value, missing
-  outcome after admission, causal pre-admission `not_committed`, mutation/
-  correlation collision, count/envelope/global byte exhaustion, exact
-  reservation/denial proofs, concurrent non-Settings writers, reset receipt
-  reserve, and no eviction;
-- crash/restart at every journal phase and Load never bypassing alarm recovery;
-- conflict then Dismiss, permission ambiguity, compensation ambiguity, and
-  protocol uncertainty while reconciling and while the current command is a
-  rebase;
-- Cancel before `RETRY_READY`, late retry response, retry permission computed
-  from the installed base, and Cancel/restart after another actor advances the
-  canonical generation;
-- stale IDs, uppercase/non-v4 UUIDs, old epochs, malformed exact errors, and
-  late responses after restart/reset;
-- readiness with an open panel emits zero Load; committed with reset journal
-  present joins finalization; direct-null requires the fence proof;
-  duplicates/restart retain the bootstrap ID; ordinary Load/fresh restart
-  cannot replace it; same-reset in-progress is protocol failure; epoch switches
-  only after settled E2;
-- monotonic ledger-only broadcasts, equal-generation envelope divergence,
-  divergence with no mutation, theme convergence, deep-clone resistance, and
-  reset/load-dominant UI status;
-- hostile prototypes, getters with zero reads, Symbols, non-enumerable and
-  extra fields, sparse/custom-prototype arrays, and digest parse/round-trip
-  failures across settings/connectors/origins/correlations/journal/outcomes/
-  proofs; changing-descriptor Proxies must prove one capture per source field,
-  zero `get` reads, reset fence A never installing payload B, and Load snapshot
-  A never becoming snapshot B between guard and action; a mechanical inventory
-  must cover all 34 captured event types and every transition branch, while
-  direct forged `SETTINGS_CAPTURED/*` values, clones, pre-normalized values,
-  delayed C/B values and replays remain inert outside atomic dispatch; one
-  genuine controller dispatch must remain accepted; send-throw cleanup must
-  revoke in `finally`; revoked raw Proxy dispatch must reject without actor
-  error; reset proof cases must cover absent, exact defined, and own-undefined
-  shapes;
-- the controller's exact public key and public-view field inventories; absence
-  of native snapshot `context`, `machine`, `_nodes`, `children`, `historyValue`,
-  `tags`, `toJSON`, functions and non-domain collections; distinct deeply
-  frozen copies from `getSnapshot` and every subscription notification; hostile
-  assignment, array mutation, `defineProperty`, reflection and serialized-copy
-  mutation must leave private epoch, command and the next transition unchanged;
-  a replay of the former leaked-machine exploit must find no actor logic,
-  implementations or guard reference from which to create a rogue actor or
-  consume the live normalized event cross-actor;
-  observer throw must not suppress another observer or capability cleanup;
-  observer-triggered nested dispatch, idempotent unsubscribe and idempotent
-  stop must follow the explicit controller results;
-- first-intent set/read-back, every persisted causal rotation, stale/gapped
-  proofs, terminal-before-clear, clear-before-absence, strict cold controller B
-  after controller A is destroyed, an exact no-outcome reconciliation that
-  destroys B then recreates C from the retained pending record without ever
-  reaching `saved` before reset, deep snapshot immutability under valid retry,
-  mutate, dismiss and late callbacks, E2 reset completion, rejection of old-E1
-  activation results and admission of a fresh E2 activation, zero candidate
-  replay, and frozen terminal settlement;
-- contains-only positive proof, negative durable `not_committed`, ambiguous
-  reconciliation, crossed activation/check/origin identities, retry freshness,
-  cancellation and a structural scan proving no interactive Settings
-  permission protocol remains.
+- V2 exacte, V1, les deux variantes brutes héritées, les clés inconnues, la migration de connecteurs, la bascule V2-only, la non-concordance d'époque, la migration en génération `0`, les deux maxima de compteurs et les données imbriquées malformées ;
+- commit de même valeur par une autre mutation, valeur commitée écrasée, résultat manquant après admission, `not_committed` pré-admission causal, collision de mutation/corrélation, épuisement du décompte/enveloppe/octets globaux, preuves exactes de réservation/refus, rédacteurs non-Settings concurrents, réserve pour reçu de reset, et absence d'éviction ;
+- crash/redémarrage à chaque phase de journal et Load ne contournant jamais la récupération d'alarme ;
+- conflit puis Dismiss, ambiguïté de permission, ambiguïté de compensation et incertitude de protocole pendant la réconciliation et lorsque la commande courante est un rebase ;
+- Cancel avant `RETRY_READY`, réponse de retry tardive, permission de retry calculée à partir de la base installée, et Cancel/redémarrage après qu'un autre acteur a avancé la génération canonique ;
+- identifiants périmés, UUID en majuscules ou non-v4, anciennes époques, erreurs exactes malformées et réponses tardives après redémarrage/reset ;
+- la disponibilité avec un panneau ouvert n'émet aucun Load ; commité avec journal de reset présent rejoint la finalisation ; direct-null exige la preuve de fence ; les doublons/redémarrages conservent l'ID de bootstrap ; le Load ordinaire/redémarrage frais ne peut pas le remplacer ; même reset en cours est un échec de protocole ; l'époque ne change qu'après E2 stabilisé ;
+- diffusions monotones sur le registre seul, divergence d'enveloppe à génération égale, divergence sans mutation, convergence de thème, résistance au clonage profond et statut UI dominé par le reset/chargement ;
+- prototypes hostiles, getters avec zéro lecture, Symbol, champs non énumérables et superflus, tableaux clairsemés/à prototype personnalisé et échecs d'analyse/aller-retour de digests à travers réglages/connecteurs/origines/corrélations/journal/résultats/preuves ; les proxys modifiant leurs descripteurs doivent prouver une capture par champ source, zéro lecture `get`, le fence de reset A n'installant jamais le payload B, et le snapshot de Load A ne devenant jamais le snapshot B entre le garde et l'action ; un inventaire mécanique doit couvrir l'ensemble des 34 types d'événements capturés et chaque branche de transition, tandis que les valeurs directes contrefaites `SETTINGS_CAPTURED/*`, clones, valeurs pré-normalisées, valeurs C/B retardées et rejeux demeurent inertes en dehors du dispatch atomique ; un dispatch authentique de contrôleur doit rester accepté ; le nettoyage lors d'une levée d'exception à l'envoi doit révoquer dans `finally` ; le dispatch d'un proxy brut révoqué doit rejeter sans erreur d'acteur ; les cas de preuve de reset doivent couvrir les formes absente, exacte définie et propre-indéfinie ;
+- les inventaires exacts de clés publiques du contrôleur et de champs de vue publique ; absence de snapshot natif `context`, `machine`, `_nodes`, `children`, `historyValue`, `tags`, `toJSON`, fonctions et collections non-domaine ; copies distinctes et profondément figées issues de `getSnapshot` et de chaque notification de souscription ; l'affectation hostile, la mutation de tableau, `defineProperty`, la réflexion et la mutation de copie sérialisée doivent laisser l'époque privée, la commande et la transition suivante inchangées ; un rejeu de l'ancien exploit de fuite de machine ne doit trouver aucune logique d'acteur, implémentation ou référence de garde à partir de laquelle créer un acteur non autorisé ou consommer l'événement normalisé actif inter-acteurs ; la levée d'exception d'un observateur ne doit pas supprimer un autre observateur ni interrompre le nettoyage des capacités ; le dispatch imbriqué déclenché par un observateur, la désinscription idempotente et l'arrêt idempotent doivent suivre les résultats explicites du contrôleur ;
+- définition/relecture de première intention, chaque rotation causale persistée, preuves périmées/à écarts, terminal avant effacement, effacement avant absence, contrôleur à froid B strict après destruction du contrôleur A, une réconciliation exacte sans résultat détruisant B puis recréant C à partir de l'enregistrement en attente conservé sans jamais atteindre `saved` avant reset, immuabilité profonde des snapshots sous retry valide, mutate, dismiss et callbacks tardifs, complétion de reset E2, rejet des anciens résultats d'activation E1 et admission d'une activation E2 fraîche, zéro rejeu de candidat et règlement terminal figé ;
+- preuve positive "contains-only", `not_committed` durable négatif, réconciliation ambiguë, identités croisées d'activation/vérification/origine, fraîcheur de retry, annulation et balayage structurel prouvant qu'aucun protocole interactif de permission de Settings ne subsiste.
 
-Only after two independent reviews approve the exact final hashes may Shell or
-runtime implementation for Task 6 begin.
+Ce n'est qu'après que deux revues indépendantes auront approuvé les empreintes (hashes) finales exactes que l'implémentation Shell ou à l'exécution pour la tâche 6 pourra débuter.

@@ -1,209 +1,63 @@
-# Sealed Candidate Transport Consumer Model
+# Modèle du consommateur de transport de candidat scellé (Sealed Candidate Transport Consumer Model)
 
-Status: **PENDING INDEPENDENT REVIEW — REVISION 12; IMPLEMENTATION FORBIDDEN**
+Statut : **EN ATTENTE DE REVUE INDÉPENDANTE — RÉVISION 12 ; IMPLÉMENTATION INTERDITE**
 
-Model version: `12`
+Version du modèle : `12`
 
 Pending content SHA-256: `a70f1f6b410f82c45e4bd3acfedbef8bb2a2bb51b417038c1911f6633d5cfd2e`
 
-The pending hash is SHA-256 of the complete UTF-8/LF bytes of this file after
-replacing only the value on the `Pending content SHA-256` line with the literal
-`__PENDING_SHA256__`. Any semantic edit requires a new hash and review.
+Le hash en attente est le SHA-256 des octets complets UTF-8/LF de ce fichier après remplacement uniquement de la valeur sur la ligne `Pending content SHA-256` par le littéral `__PENDING_SHA256__`. Toute modification sémantique exige un nouveau hash et une nouvelle revue.
 
-Revision 7 pending content hash
-`b0f66e80b73c2d9b7028c902945f8cd84a04c2fd917ca7c8c5647e859ce99aea`
-was independently rejected because it redeclared stale parent snapshot limits
-and types, treated the transient byte snapshot as if it could be loaded from
-durable readiness storage, and retained clarification-3/4 dependencies after
-the parent V2 cutover. Revision 8 imports the clarification-6 authority
-directly, retains only the stable three-ID tuple plus complete V-event hash
-after commit, and accepts only the thirteen-entry V2 scenario inventory. No
-approval transfers from revision 7.
+Le hash de contenu en attente de la révision 7 `b0f66e80b73c2d9b7028c902945f8cd84a04c2fd917ca7c8c5647e859ce99aea` a été rejeté de manière indépendante car il redéclarait des limites et des types de snapshot parents obsolètes, traitait le snapshot d'octets transitoire comme s'il pouvait être chargé depuis le stockage durable de disponibilité (readiness), et conservait des dépendances aux clarifications 3/4 après la bascule V2 du parent. La révision 8 importe directement l'autorité de la clarification 6, ne conserve que le tuple stable à trois identifiants plus le hash complet de l'événement V après commit, et n'accepte que l'inventaire de scénarios V2 à treize entrées. Aucune approbation n'est transférée depuis la révision 7.
 
-This revision also supersedes rejected revision-6 pending hash
-`e47a72c8f1f9c17365e830e3644dbd2dc755a77aaccd59ac1471eada62548c8e`,
-rejected pending hashes
-`aca997648e6072311ed69a4c544db1606fc4513534d9e4cd3b2524fc860c4820` and
-`b38f91143ce37c126c2a34c15ef390bd391cf9238149dbe276b2d4642b54d3e5`,
-rejected revision-3 hash
-`2f84cd4ac81c005a1437e7f475c119f9e84ae7a87095abff4ee05c89d89a331a`, and
-rejected revision-4 hash
-`e9d9b288c194049ec3346f08671538acb773f65f4a57b7fa9b55ad95687fd466`, and
-rejected revision-5 hash
-`b55daa5e9b8a5e3c4cbabd2c60a6b18bdfa3e342168137c96f3a7b823ede1cef`;
-no approval transfers from any prior hash. Revision 4 left the global deadline
-watcher unidentifiable after retry, left two provider subphases outside their
-persistent stage budget, and supplied no authenticated source for the dynamic
-uploader output digest. Revision 5 failed to distinguish ETag-bearing initial
-`200` requests from the valid non-ETag artifact-download `302` response.
-Revision 6 named a runner-local producer chain as if it were cross-job durable,
-referenced an undefined publication-join type, and represented GitHub run IDs
-as lossy numbers. Revision 7 consumes only the signed immutable producer
-terminal record and the producer model's exact common join type. Revision 8
-preserves those corrections.
+Cette révision remplace également le hash en attente rejeté de la révision 6 `e47a72c8f1f9c17365e830e3644dbd2dc755a77aaccd59ac1471eada62548c8e`, les hashs en attente rejetés `aca997648e6072311ed69a4c544db1606fc4513534d9e4cd3b2524fc860c4820` et `b38f91143ce37c126c2a34c15ef390bd391cf9238149dbe276b2d4642b54d3e5`, le hash rejeté de la révision 3 `2f84cd4ac81c005a1437e7f475c119f9e84ae7a87095abff4ee05c89d89a331a`, le hash rejeté de la révision 4 `e9d9b288c194049ec3346f08671538acb773f65f4a57b7fa9b55ad95687fd466`, ainsi que le hash rejeté de la révision 5 `b55daa5e9b8a5e3c4cbabd2c60a6b18bdfa3e342168137c96f3a7b823ede1cef` ; aucune approbation n'est transférée depuis un hash antérieur. La révision 4 laissait le surveillant de date limite globale (global deadline watcher) non identifiable après réessai, laissait deux sous-phases du fournisseur en dehors de leur budget d'étape persistant, et ne fournissait aucune source authentifiée pour le digest de sortie dynamique de l'uploader. La révision 5 ne parvenait pas à distinguer les requêtes initiales `200` porteuses d'ETag de la réponse valide sans ETag `302` de téléchargement d'artefact. La révision 6 nommait une chaîne de producteurs locale au runner comme si elle était durable entre plusieurs jobs, référençait un type de ralliement de publication indéfini, et représentait les identifiants de run GitHub sous forme de nombres sujets à perte de précision. La révision 7 ne consomme que l'enregistrement terminal signé immuable du producteur et le type de ralliement commun exact du modèle producteur. La révision 8 préserve ces corrections.
 
-Revision 8 was independently rejected at normalized UTF-8/LF content hash
-`0b45a13f2616dc31261a9e42f944f9b48f9ca138ab7dd29b7a1f40ded3078d30`
-because clarification 6 exposed neither complete MV3/package model authority
-tuples nor an atomic activation, and the consumer could therefore accept
-reviewed V2 evidence without proving its implementation and verification
-receipts. Revision 9 imports clarification 7 at behavior hash
-`68fcad275f84b07f050cef96e01d4dc8402be06123d4509ad792e3dd5cd7d9df`,
-requires producer revision 7 at content hash
-`4a50bdd112538e6c27a1bdd2dee9199afb4ac8cb93d0991b659ee69baeb1560d`,
-and admits only the committed joint activation carrying the complete authority
-tuple for MV3 revision 26 at behavior hash
-`da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`
-and the complete tuple for packaged-tab revision 4 at behavior hash
-`24dd339609de659497eb6e958319fe244149184137360c2dc9ca464d049486b0`
-complete authority tuples. No approval transfers from revision 8.
+La révision 8 a été rejetée de manière indépendante avec le hash de contenu normalisé UTF-8/LF `0b45a13f2616dc31261a9e42f944f9b48f9ca138ab7dd29b7a1f40ded3078d30` car la clarification 6 n'exposait ni les tuples complets d'autorité du modèle MV3/package ni une activation atomique, et le consommateur pouvait par conséquent accepter des preuves V2 revues sans prouver leurs reçus d'implémentation et de vérification. La révision 9 importe la clarification 7 avec le hash de comportement `68fcad275f84b07f050cef96e01d4dc8402be06123d4509ad792e3dd5cd7d9df`, exige la révision 7 du producteur avec le hash de contenu `4a50bdd112538e6c27a1bdd2dee9199afb4ac8cb93d0991b659ee69baeb1560d`, et n'admet que l'activation conjointe commitée portant le tuple d'autorité complet pour la révision 26 de MV3 avec le hash de comportement `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b` et le tuple complet pour la révision 4 de packaged-tab avec le hash de comportement `24dd339609de659497eb6e958319fe244149184137360c2dc9ca464d049486b0`. Aucune approbation n'est transférée depuis la révision 8.
 
-Revision 9 was independently rejected at normalized UTF-8/LF content hash
-`c44b2923cb3ce2a0ba91e4946258b97610a6531180a43c8387158cebb2ad5d10`.
-It allowed the pre-activation sandbox to depend on already verified model
-authority, preserving the review/implementation/verification bootstrap cycle,
-and relied on a producer that executed ambient-checkout bytes while activation
-proved only two model blobs. Revision 10 consumes the implemented set only for
-private verification evidence, consumes the complete verified set only through
-final activation, and requires producer revision 8's Git-object execution
-workspace proof. No approval transfers from revision 9.
+La révision 9 a été rejetée de manière indépendante avec le hash de contenu normalisé UTF-8/LF `c44b2923cb3ce2a0ba91e4946258b97610a6531180a43c8387158cebb2ad5d10`. Elle permettait à la sandbox de pré-activation de dépendre d'une autorité de modèle déjà vérifiée, préservant ainsi le cycle d'amorçage revue/implémentation/vérification, et s'appuyait sur un producteur qui exécutait des octets du checkout ambiant alors que l'activation ne prouvait que deux blobs de modèle. La révision 10 ne consomme l'ensemble implémenté que pour les preuves de vérification privées, ne consomme l'ensemble vérifié complet qu'à travers l'activation finale, et requiert la preuve d'espace de travail d'exécution par objets Git de la révision 8 du producteur. Aucune approbation n'est transférée depuis la révision 9.
 
-Revision 10 imports clarification 8 at behavior hash
-`59291b22722dbf67117f32a5ff6153da9d3885aa13e4e3574cad6898c238624f`,
-requires producer revision 8 at content hash
-`9230fb822573972143a077fa5f2d7936775268553ead12c7524b246b7f344799`, and
-admits production only through the complete
-ordered verified set containing MV3 revision 26 at behavior hash
-`da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`
-and packaged-tab revision 5 at behavior hash
-`2e8e56fd119d8fccf08f1463cc12aca7dd9ff21af3d18118212ccbad6d911cc5`.
-The pre-activation path consumes the implemented set only and emits evidence;
-no receipt or activation authority is inferred from that evidence.
+La révision 10 importe la clarification 8 avec le hash de comportement `59291b22722dbf67117f32a5ff6153da9d3885aa13e4e3574cad6898c238624f`, exige la révision 8 du producteur avec le hash de contenu `9230fb822573972143a077fa5f2d7936775268553ead12c7524b246b7f344799`, et n'admet la production qu'à travers l'ensemble vérifié ordonné complet contenant la révision 26 de MV3 avec le hash de comportement `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b` et la révision 5 de packaged-tab avec le hash de comportement `2e8e56fd119d8fccf08f1463cc12aca7dd9ff21af3d18118212ccbad6d911cc5`. Le chemin de pré-activation ne consomme que l'ensemble implémenté et émet des preuves ; aucun reçu ni autorité d'activation n'est déduit de ces preuves.
 
-Revision 10 was independently rejected at normalized UTF-8/LF content hash
-`afb672e8c1fa794d3deef7c4e436b68a515499d4ae5a77c40dadea86c4338d05`.
-It accepted producer pre/post Git recapture even though the materialized source
-and its parents stayed writable while commands ran. A producer child could
-temporarily mutate, chmod, replace or shadow source, derive the transported
-candidate, and restore expected bytes before the terminal receipt. Revision 11
-requires clarification 9 and producer revision 9's full OS-enforced
-immutable-source authority plus every ordered pre/post mount/capability command
-receipt before the first provider request. No approval transfers from revision 10.
+La révision 10 a été rejetée de manière indépendante avec le hash de contenu normalisé UTF-8/LF `afb672e8c1fa794d3deef7c4e436b68a515499d4ae5a77c40dadea86c4338d05`. Elle acceptait la recapture Git pré/post du producteur alors même que la source matérialisée et ses parents restaient accessibles en écriture pendant l'exécution des commandes. Un processus enfant du producteur pouvait temporairement modifier, faire un chmod, remplacer ou masquer (shadow) la source, dériver le candidat transporté, et restaurer les octets attendus avant le reçu terminal. La révision 11 exige la clarification 9 et l'autorité complète de source immuable garantie par l'OS de la révision 9 du producteur, ainsi que chaque reçu ordonné de commande de montage/capabilité pré/post avant la première requête auprès du fournisseur. Aucune approbation n'est transférée depuis la révision 10.
 
-Revision 11 imports clarification 9 at behavior hash
-`8df2c60e71c02c279a167b78a4fb3b24931f069327d0137d26d461451418a9a5`,
-requires producer revision 9 at content hash
-`5c37fe07586b830b188fb0b6bf128e3955ae4ac103d16e32f56a1dea2c617872`,
-and admits production only through the complete ordered verified set containing
-MV3 revision 26 at behavior hash
-`da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`
-and packaged-tab revision 6 at behavior hash
-`9b73affd0e6096ec8b2b60a1e5cffaa93633c0a5fea4cbf4d2ba91ae2c56b044`.
+La révision 11 importe la clarification 9 avec le hash de comportement `8df2c60e71c02c279a167b78a4fb3b24931f069327d0137d26d461451418a9a5`, exige la révision 9 du producteur avec le hash de contenu `5c37fe07586b830b188fb0b6bf128e3955ae4ac103d16e32f56a1dea2c617872`, et n'admet la production qu'à travers l'ensemble vérifié ordonné complet contenant la révision 26 de MV3 avec le hash de comportement `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b` et la révision 6 de packaged-tab avec le hash de comportement `9b73affd0e6096ec8b2b60a1e5cffaa93633c0a5fea4cbf4d2ba91ae2c56b044`.
 
-Revision 11 was withdrawn at normalized UTF-8/LF content hash
-`b71a879cbdccde9b2780588a302c2674f8ba1982e8619768beb87ad47b82676c`.
-It imported withdrawn clarification 9 and producer revision 9, and its current
-admission contract still selected packaged tabs revision 6. Revision 12
-preserves the complete consumer state topology, transient-byte lifetime,
-immutable-source proof, thirteen-ID V2 authority and durable three-ID/event-hash
-projection. It imports clarification 11 at normalized behavior hash
-`9afa97e0848b6c5c6540d33f38e29a409112a531f9ff2cd7124e50ef96511080`
-and producer revision 11 at normalized content hash
-`bf681ebf0a2714f77bf48bfa0e121461ce69639814c5b60fbb6dffbadab43792`,
-and admits only the six-slot verified activation containing MV3 revision 26,
-packaged tabs revision 11 and CV accessible-anchor revision 6 at their exact
-hashes. Packaged tabs revision 11 was independently approved and committed as
-`ff9164c4`. No approval transfers from revision 11, either withdrawn upstream
-model or any superseded package/CV dependency.
+La révision 11 a été retirée avec le hash de contenu normalisé UTF-8/LF `b71a879cbdccde9b2780588a302c2674f8ba1982e8619768beb87ad47b82676c`. Elle importait la clarification 9 et la révision 9 du producteur retirées, et son contrat d'admission actuel sélectionnait encore la révision 6 des packaged tabs. La révision 12 préserve la topologie complète d'états du consommateur, la durée de vie des octets transitoires, la preuve de source immuable, l'autorité V2 à treize identifiants et la projection durable à trois identifiants/hash d'événement. Elle importe la clarification 11 avec le hash de comportement normalisé `9afa97e0848b6c5c6540d33f38e29a409112a531f9ff2cd7124e50ef96511080` et la révision 11 du producteur avec le hash de contenu normalisé `bf681ebf0a2714f77bf48bfa0e121461ce69639814c5b60fbb6dffbadab43792`, et n'admet que l'activation vérifiée à six slots contenant la révision 26 de MV3, la révision 11 de packaged tabs et la révision 6 de l'ancre accessible CV à leurs hashs exacts. La révision 11 de packaged tabs a été approuvée de manière indépendante et commitée sous `ff9164c4`. Aucune approbation n'est transférée depuis la révision 11, depuis un modèle amont retiré ou depuis une dépendance de package/CV remplacée.
 
-An earlier revision-12 candidate was independently rejected at normalized
-UTF-8/LF content hash
-`2375eccc6c193db297f9d948a70d3b7d93a9be1fa5bbca95eeffd61e9c754107`.
-It imported rejected release-readiness clarification-11 hash
-`c684d808d1827f5cc7d5f688547c7da0feca30935956dcb16dc197301a461287`
-and dependent producer revision-11 hash
-`8769aa6fea28d0e1c37e416db27c30a7735bc8ec62cf2f38cbda16945e9fb1ab`,
-so its six-slot activation could not authenticate its own parent model. The
-revised consumer imports the corrected parent and producer authorities. No
-approval transfers from the rejected revision-12 candidate or either rejected
-upstream hash.
+Un candidat antérieur de la révision 12 a été rejeté de manière indépendante avec le hash de contenu normalisé UTF-8/LF `2375eccc6c193db297f9d948a70d3b7d93a9be1fa5bbca95eeffd61e9c754107`. Il importait le hash de la clarification 11 de release-readiness rejetée `c684d808d1827f5cc7d5f688547c7da0feca30935956dcb16dc197301a461287` et le hash de la révision 11 dépendante du producteur `8769aa6fea28d0e1c37e416db27c30a7735bc8ec62cf2f38cbda16945e9fb1ab`, si bien que son activation à six slots ne pouvait authentifier son propre modèle parent. Le consommateur révisé importe les autorités corrigées du parent et du producteur. Aucune approbation n'est transférée depuis le candidat rejeté de la révision 12 ou depuis l'un des hashs amont rejetés.
 
-## 1. Objective and boundary
+## 1. Objectif et périmètre
 
-This model defines the only legal package-validation consumer for an already
-uploaded `missionpulse-sealed-candidate` artifact. Success means:
+Ce modèle définit l'unique consommateur légal de validation de package pour un artefact `missionpulse-sealed-candidate` déjà téléversé. Le succès signifie :
 
-1. one exact GitHub artifact observation and downloaded blob are authenticated;
-2. its canonical seven-component transport and six-entry payload authority are
-   verified from captured bytes;
-3. one opaque verified-payload capability admits one `linux/x64` host;
-4. the proved `linux/amd64` OCI runtime emits one exact payload-verification
-   receipt; and
-5. the package-only protocol publishes one exact `ValidatedZipArtifactV1`.
+1. une observation exacte d'artefact GitHub et un blob téléchargé sont authentifiés ;
+2. son transport canonique à sept composants et son autorité de payload à six entrées sont vérifiés à partir des octets capturés ;
+3. une capabilité opaque de payload vérifié admet un hôte `linux/x64` ;
+4. l'environnement d'exécution OCI prouvé `linux/amd64` émet un reçu exact de vérification de payload ; et
+5. le protocole strictement réservé aux packages publie un `ValidatedZipArtifactV1` exact.
 
-This model consumes only `release-readiness.model.md` clarification 11 and the
-producer revision-11 refinement aligned to it. It directly imports the parent-owned
-snapshot limits, snapshot type, verified projection type, verifier and durable
-accepted-V-event record. It declares no compatibility copy, fallback limit or
-local verifier. Clarification-11 schemas, digest preimages, canonical ZIP rules,
-package journal, chronology, transient-byte lifetime and durable three-ID/hash
-projection remain normative. Approval of this consumer hash alone cannot
-satisfy any upstream model dependency.
+Ce modèle ne consomme que la clarification 11 de `release-readiness.model.md` et le raffinement de la révision 11 du producteur aligné sur celle-ci. Il importe directement les limites de snapshot détenues par le parent, le type de snapshot, le type de projection vérifiée, le vérificateur et l'enregistrement durable de l'événement V accepté. Il ne déclare aucune copie de compatibilité, limite de repli ou vérificateur local. Les schémas de la clarification 11, les préimages de digest, les règles ZIP canoniques, le journal de package, la chronologie, la durée de vie des octets transitoires et la projection durable à trois identifiants/hash restent normatifs. L'approbation de ce seul hash de consommateur ne peut satisfaire aucune dépendance de modèle amont.
 
-The candidate admitted at G0 must carry only the exact parent V2 inventory:
-`apps/extension/tests/mv3/scenarios.v2.json`, schema version `2`, the ordered
-thirteen IDs, blob SHA-256
-`b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef`
-and array JCS SHA-256
-`2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a`.
-V1 or mixed evidence has no consumer authority.
+Le candidat admis à G0 ne doit porter que l'inventaire V2 exact du parent : `apps/extension/tests/mv3/scenarios.v2.json`, version de schéma `2`, les treize identifiants ordonnés, le SHA-256 du blob `b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef` et le SHA-256 JCS du tableau `2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a`. Les preuves V1 ou mixtes n'ont aucune autorité auprès du consommateur.
 
-Out of scope and still blocking release:
+Hors périmètre et bloquant toujours la release :
 
-- creating the seal, execution image, controller bundle or transport; those are
-  specified by `sealed-candidate-transport-producer.model.md`, whose status is
-  pending independent review and implementation forbidden;
-- implementing before independent approval of exact clarification 11, producer
-  revision 11, MV3 packaged-harness revision 26, packaged-tab revision 11 and
-  CV accessible-anchor revision 6;
-- consuming any release candidate before the parent-owned joint phase has
-  committed its one atomic activation;
-- uploading/deleting/overwriting an artifact or changing its retention;
-- Chrome Web Store submission, promotion or rollback;
-- generic download, unzip or OCI-runner APIs.
+- la création du sceau (seal), de l'image d'exécution, du bundle de contrôleur ou du transport ; ceux-ci sont spécifiés par `sealed-candidate-transport-producer.model.md`, dont le statut est en attente de revue indépendante et l'implémentation interdite ;
+- l'implémentation avant l'approbation indépendante de la clarification 11 exacte, de la révision 11 du producteur, de la révision 26 du harnais packagé MV3, de la révision 11 de packaged-tab et de la révision 6 de l'ancre accessible CV ;
+- la consommation de tout candidat à la release avant que la phase conjointe détenue par le parent n'ait validé son activation atomique unique ;
+- le téléversement/suppression/écrasement d'un artefact ou la modification de sa rétention ;
+- la soumission, la promotion ou le rollback sur le Chrome Web Store ;
+- les API génériques de téléchargement, décompression ou d'exécution OCI.
 
-The consumer performs read-only provider operations. Credentials grant access,
-never release authority. No log, exit code, free text, dashboard state or LLM
-output decides a transition.
+Le consommateur effectue des opérations en lecture seule auprès du fournisseur. Les identifiants accordent un accès, jamais une autorité de release. Aucun log, code de sortie, texte libre, état de tableau de bord ou résultat de LLM ne décide d'une transition.
 
-Pre-activation verification is limited to clarification 11's phase-scoped
-`JointImplementationVerificationSandboxV1`. It consumes exactly one
-`OrderedReviewedImplementedModelAuthoritySetV1`, never a verified set or
-verification receipt. Its full immutable-source authority, closed command plan
-and resulting ordered mount/capability receipts are mandatory evidence. Pure
-guards, machines, parsers and hermetic adapters may
-be exercised against the frozen tree, but no global catalog, production
-readiness actor, provider request, consumer endpoint or artifact mutation is
-permitted. The only positive output is consumer-slot
-`JointModelVerificationEvidenceV1`, later consumed by the independent
-verification-receipt signer. Real provider/runtime/package proof occurs only
-after atomic activation and remains a separate release gate; it is not forged
-to break the model-review cycle.
+La vérification de pré-activation est limitée à la `JointImplementationVerificationSandboxV1` de la clarification 11 délimitée à cette phase. Elle consomme exactement un `OrderedReviewedImplementedModelAuthoritySetV1`, jamais un ensemble vérifié ni un reçu de vérification. Son autorité complète de source immuable, son plan de commande fermé et les reçus ordonnés de montage/capabilité qui en résultent constituent des preuves obligatoires. Les gardes pures, machines, parseurs et adaptateurs hermétiques peuvent être exercés contre l'arbre gelé, mais aucun catalogue global, acteur de disponibilité de production, requête auprès du fournisseur, point d'entrée consommateur ou mutation d'artefact n'est permis. La seule sortie positive est le `JointModelVerificationEvidenceV1` du slot consommateur, consommé plus tard par le signataire indépendant du reçu de vérification. La véritable preuve fournisseur/runtime/package n'intervient qu'après l'activation atomique et reste une porte de release distincte ; elle n'est pas forgée pour briser le cycle de revue de modèle.
 
-Every pre-activation child that loads repository code runs from the sandbox's
-recursively read-only Git source view under its closed output mounts and
-mount/capability receipt protocol. The post-activation production consumer does
-not mount Git source, the producer backing tree or the ambient checkout at all;
-it executes only the content-authorized controller/runtime bytes and captured
-sealed inputs, with package staging/report roots as explicit outputs. A
-production child that can resolve a repository source path is invalid before
-spawn.
+Chaque processus enfant de pré-activation qui charge du code du dépôt s'exécute à partir de la vue de source Git récursivement en lecture seule de la sandbox sous ses montages de sortie fermés et son protocole de reçus de montage/capabilité. Le consommateur de production post-activation ne monte pas la source Git, l'arbre de support du producteur ou le checkout ambiant du tout ; il exécute uniquement les octets du contrôleur/runtime autorisés par leur contenu et les entrées scellées capturées, avec les racines de préparation/rapport de package comme sorties explicites. Un processus enfant de production qui pourrait résoudre un chemin de source du dépôt est invalide avant son lancement.
 
-## 2. Input, output and private authority contracts
+## 2. Contrats d'entrée, de sortie et d'autorité privée
 
-The public start input contains only an authoritative readiness-actor reference,
-provider selectors and the fixed-window deadline timestamps. A caller-supplied
-`CandidateIdentityV1` or seal is forbidden:
+L'entrée publique de démarrage ne contient qu'une référence autoritaire d'acteur de disponibilité, des sélecteurs de fournisseur et les horodatages d'échéance à fenêtre fixe. Un `CandidateIdentityV1` ou un sceau fourni par l'appelant est interdit :
 
 ```ts
 interface SealedCandidateConsumeRequestV6 {
@@ -220,17 +74,11 @@ interface SealedCandidateConsumeRequestV6 {
   requestedAt: CanonicalUtcTimestamp;
   attemptDeadlineAt: CanonicalUtcTimestamp;
 }
+```
 
-`runId` and every provider/attestation/workflow-run projection of it are the
-same 1..32-byte ASCII string matching `/^(?:[1-9]\d*)$/`; comparison is
-byte-for-byte. The lossless duplicate-key-rejecting provider parser maps a raw
-canonical JSON integer lexeme directly to this string without ever constructing
-a JavaScript number; an API string must round-trip to the same grammar.
-Fractions, exponents, signs, zero and leading zeros reject. This preserves IDs
-beyond JavaScript's safe-integer range. `runAttempt` remains a positive safe
-integer. This is the exact `CanonicalPositiveDecimalString` contract in
-release-readiness clarification 11.
+`runId` et chaque projection de fournisseur/attestation/workflow-run de celui-ci sont la même chaîne ASCII de 1 à 32 octets correspondant à `/^(?:[1-9]\d*)$/` ; la comparaison se fait octet par octet. Le parseur de fournisseur sans perte rejetant les clés dupliquées mappe directement un lexème entier JSON canonique brut vers cette chaîne sans jamais construire de nombre JavaScript ; une chaîne d'API doit respecter la même grammaire lors d'un aller-retour. Les fractions, exposants, signes, le zéro et les zéros initiaux sont rejetés. Cela préserve les identifiants au-delà de la plage des entiers sûrs de JavaScript. `runAttempt` reste un entier positif sûr. C'est le contrat exact `CanonicalPositiveDecimalString` de la clarification 11 de release-readiness.
 
+```ts
 type ConsumerBoundedStage =
   | 'readiness-load'
   | 'provider-observation'
@@ -381,171 +229,49 @@ import {
 } from 'missionpulse-release-readiness-clarification-11-authority';
 ```
 
-The import is nominal and single-source: source/AST contract checks reject any
-consumer declaration named like an imported symbol, copied sixteen/twenty-key
-shape, copied field-limit map, copied aggregate number, wrapper that reimplements
-the verifier, or runtime fallback when the parent export is unavailable. The
-parent aggregate limit is exactly `1_610_612_736`, its thirteen field ceilings
-sum to `1_707_081_728`, and the consumer reads those numbers only through the
-three imported limit/witness exports.
+L'import est nominal et provient d'une source unique : les vérifications de contrat sur source/AST rejettent toute déclaration du consommateur portant le même nom qu'un symbole importé, toute copie de structure à seize/vingt clés, toute copie de carte de limites de champs, toute copie de valeur agrégée, tout wrapper réimplémentant le vérificateur ou tout repli à l'exécution lorsque l'export parent est indisponible. La limite agrégée du parent est exactement `1_610_612_736`, la somme de ses treize plafonds de champs donne `1_707_081_728`, et le consommateur ne lit ces nombres qu'à travers les trois exports de limite/témoin importés.
 
-`ConsumerProducerSourceExecutionProofV1.proofSha256` is SHA-256 of RFC 8785 JCS
-of the complete proof with only `proofSha256` omitted. It is constructed and
-frozen during G0, before any GitHub request. The consumer independently
-recomputes the parent `ImmutableGitSourceExecutionAuthorityV1` self-digest and
-requires the signed producer terminal, its complete handoff, the readiness
-seal and both workspace-completion receipts to contain the exact same production
-authority and Git commit/tree/materialization.
+`ConsumerProducerSourceExecutionProofV1.proofSha256` est le SHA-256 du JCS RFC 8785 de la preuve complète avec uniquement `proofSha256` omis. Il est construit et gelé pendant G0, avant toute requête GitHub. Le consommateur recalcule de manière indépendante le digest propre de l'`ImmutableGitSourceExecutionAuthorityV1` parente et exige que le terminal signé du producteur, son handoff complet, le sceau de readiness et les deux reçus de complétion de workspace contiennent exactement la même autorité de production et le même commit/arbre/matérialisation Git.
 
-The authority passes only when the complete source view and every addressable
-ancestor are recursively `ro,nodev,nosuid,noexec`, the backing tree/path and its
-descriptors were unavailable to children, `overlayMountCount` is zero, and the
-only writable roots are dependencies, cache, dist, browser profile and reports.
-Every writable backing root is outside source; an in-source target has an exact
-complete-tree absence proof, no tracked descendant and an empty pre-mount
-observation. A writable ancestor, extra/late/nested/overlapping mount, bind or
-overlay on any source/module/test/fixture/harness/script/model/policy/manifest/
-lock/config path, package-manager shadow or implicit output is terminal.
+L'autorité n'est validée que lorsque la vue complète des sources et chaque ancêtre adressable sont récursivement `ro,nodev,nosuid,noexec`, que l'arbre/chemin sous-jacent et ses descripteurs étaient inaccessibles aux enfants, que `overlayMountCount` est nul, et que les seules racines accessibles en écriture sont les dépendances, le cache, dist, le profil du navigateur et les rapports. Chaque racine sous-jacente accessible en écriture se situe en dehors des sources ; une cible située dans les sources dispose d'une preuve d'absence complète et exacte dans l'arbre, d'aucun descendant suivi et d'une observation pré-montage vide. Tout ancêtre accessible en écriture, tout montage supplémentaire/tardif/imbriqué/chevauchant, tout bind ou overlay sur un chemin de source/module/test/fixture/harness/script/model/policy/manifest/lock/config, tout masquage par le gestionnaire de paquets ou toute sortie implicite est terminal.
 
-Every effective, permitted, inheritable, ambient and bounding capability set is
-empty; `CAP_SYS_ADMIN` is absent, `no_new_privs` is true, and the reviewed
-seccomp/filesystem policy denies mount/remount, namespace/chroot escape and
-source write/truncate/chmod/chown/hard-link/symlink/rename/replacement. Every
-project child must also have zero privileged-service sockets or FUSE devices and
-no sudo, setuid, file-capability or helper-broker gain; any controller-owned
-Buildx adapter is validated as a separate fixed-request port that never receives
-source/backing paths or exposes its Docker capability to a child. Every
-ordered command receipt independently validates its self-digest, executable,
-argv/environment/cwd/output plan, full descendant join, and matching pre/post
-mount, capability and descriptor observations. Seal receipts are an exact
-prefix of handoff receipts, and handoff receipts are an exact prefix of terminal
-receipts. The build-producing receipt is unique and writes only the separate
-dist mount.
+Chaque ensemble de capabilités effectif, permis, héritable, ambiant et limitant est vide ; `CAP_SYS_ADMIN` est absent, `no_new_privs` est vrai, et la politique seccomp/système de fichiers revue refuse mount/remount, l'évasion de namespace/chroot et toute écriture/troncature/chmod/chown/lien physique/lien symbolique/renommage/remplacement sur les sources. Chaque enfant du projet doit également avoir zéro socket de service privilégié ou périphérique FUSE et aucun gain par sudo, setuid, capabilité de fichier ou courtier d'aide ; tout adaptateur Buildx détenu par le contrôleur est validé comme un port de requête fixe séparé qui ne reçoit jamais de chemins de source/support ni n'expose sa capabilité Docker à un enfant. Chaque reçu de commande ordonné valide indépendamment son digest propre, son plan d'exécutable/argv/environnement/cwd/sorties, le ralliement complet de ses descendants et les observations de montage, capabilités et descripteurs pré/post correspondantes. Les reçus de sceau constituent un préfixe exact des reçus de handoff, et les reçus de handoff constituent un préfixe exact des reçus terminaux. Le reçu produisant le build est unique et écrit uniquement dans le montage séparé dist.
 
-Pre/post clean Git projections are defense in depth only. A temporary
-rewrite-and-restore, same-byte rewrite, chmod-and-restore, link, symlink,
-rename, bind/overlay shadow, remount, namespace escape, backing-path access,
-missing receipt or unjoined child rejects even if the final source digest is
-identical. G0 persists only the immutable proof digest after admission; the
-complete signed terminal remains its reload authority. Without this proof the
-consumer performs no provider read, download, runtime execution or readiness
-mutation.
+Les projections Git propres pré/post ne relèvent que de la défense en profondeur. Une réécriture-et-restauration temporaire, une réécriture à l'octet identique, un chmod-et-restauration, un lien, un lien symbolique, un renommage, un masquage bind/overlay, un remontage, une évasion de namespace, un accès au chemin sous-jacent, un reçu manquant ou un enfant non rallié entraîne un rejet même si le digest final de la source est identique. G0 ne persiste que le digest immuable de la preuve après admission ; le terminal signé complet reste son autorité de rechargement. Sans cette preuve, le consommateur n'effectue aucune lecture de fournisseur, téléchargement, exécution runtime ou mutation de readiness.
 
-The consumer loads only the durable release-readiness actor context by exact
-`actorId` before any GitHub request, recomputes `releaseContextSha256` over the
-returned canonical context and requires equality with
-`expectedContextSha256`. At G0 the context contains candidate and seal but no
-snapshot, no verified projection and no accepted V event. After V it may contain
-the accepted observation and verification plus exactly one imported
-`AcceptedPayloadVerificationLocalEventV1`; that durable record contains only
-`[attestationId, verificationId, snapshotId]` and the complete `eventSha256`.
-The sixteen-field snapshot and twenty-field projection are never loadable from
-durable storage. There is no actor revision or actor-registry revision in this
-CAS contract. The loaded actor, not the public request, supplies the immutable
-candidate, seal, source commit, repository, main ref, workflow and policies.
-Positive run ID/attempt remain untrusted filters. Artifact name and transport
-format are constants:
+Le consommateur charge uniquement le contexte durable de l'acteur de release-readiness par son `actorId` exact avant toute requête GitHub, recalcule `releaseContextSha256` sur le contexte canonique renvoyé et exige l'égalité avec `expectedContextSha256`. À G0, le contexte contient le candidat et le sceau mais aucun snapshot, aucune projection vérifiée et aucun événement V accepté. Après V, il peut contenir l'observation et la vérification acceptées plus exactement un `AcceptedPayloadVerificationLocalEventV1` importé ; cet enregistrement durable ne contient que `[attestationId, verificationId, snapshotId]` et le `eventSha256` complet. Le snapshot à seize champs et la projection à vingt champs ne sont jamais chargeables depuis un stockage durable. Il n'existe aucune révision d'acteur ou de registre d'acteurs dans ce contrat CAS. L'acteur chargé, et non la requête publique, fournit le candidat immuable, le sceau, le commit source, le dépôt, la référence principale, le workflow et les politiques. Le run ID/attempt positifs restent des filtres non approuvés. Le nom de l'artefact et le format de transport sont des constantes :
 
 ```text
 missionpulse-sealed-candidate
 missionpulse-canonical-zip-v1
 ```
 
-### 2.1 Absolute request deadline and non-resetting child budgets
+### 2.1 Échéance absolue de requête et budgets enfants sans réinitialisation
 
-Before parsing `CONSUME_REQUESTED`, the fixed clock port captures one trusted
-wall-clock value and one process-monotonic nanosecond value. The request passes
-only when both timestamps are canonical, `attemptDeadlineAt - requestedAt` is
-exactly 2,700,000 ms, and the trusted wall observation is within that half-open
-interval. `workDeadlineAt` is exactly 120,000 ms before
-`attemptDeadlineAt`. The actor derives both private monotonic deadlines by
-adding only the remaining trusted-wall duration to the captured monotonic
-sample; a caller cannot supply either monotonic value.
+Avant d'analyser `CONSUME_REQUESTED`, le port d'horloge fixe capture une valeur d'horloge murale de confiance et une valeur en nanosecondes monotone au processus. La requête n'est acceptée que lorsque les deux horodatages sont canoniques, que `attemptDeadlineAt - requestedAt` est exactement égal à 2 700 000 ms, et que l'observation murale de confiance se situe dans cet intervalle semi-ouvert. `workDeadlineAt` est situé exactement 120 000 ms avant `attemptDeadlineAt`. L'acteur dérive les deux échéances monotones privées en ajoutant uniquement la durée restante de l'horloge murale de confiance à l'échantillon monotone capturé ; un appelant ne peut fournir aucune des deux valeurs monotones.
 
-`deadlineAuthorityId` is SHA-256 JCS of
-`{domain:"missionpulse.consumer-deadline-authority.v1", consumerId,
-initialAttemptId, requestedAt, attemptDeadlineAt}`. The complete
-`ConsumerDeadlineAuthorityV1` is frozen in serializable actor context. Every
-trusted wall sample updates `maxObservedWallAt = max(previous, sample)`. A
-sample below the persisted maximum on restart is rollback ambiguity and enters
-deadline cleanup without starting fresh work; it is never used to derive a
-longer deadline. Inside one process, elapsed time and deadline decisions use
-only the monotonic clock.
+`deadlineAuthorityId` est le SHA-256 JCS de `{domain:"missionpulse.consumer-deadline-authority.v1", consumerId, initialAttemptId, requestedAt, attemptDeadlineAt}`. L'autorité complète `ConsumerDeadlineAuthorityV1` est gelée dans le contexte sérialisable de l'acteur. Chaque échantillon mural de confiance met à jour `maxObservedWallAt = max(previous, sample)`. Un échantillon inférieur au maximum persisté lors d'un redémarrage constitue une ambiguïté de rollback et déclenche le nettoyage d'échéance sans démarrer de nouveau travail ; il n'est jamais utilisé pour dériver une échéance plus longue. À l'intérieur d'un processus, le temps écoulé et les décisions d'échéance n'utilisent que l'horloge monotone.
 
-Accepted request entry persists `requestDeadlineWatcher` before invoking the
-fixed `watchConsumerRequestDeadline` actor. Its `invocationId` is SHA-256 JCS of
-the deadline-authority ID, exact current attempt ID, generation and unchanged
-`workDeadlineAt`. Its receipt uses stage `request` and the same
-`deadlineAuthorityId`. The watcher remains active through ordinary states and
-`retry_wait`. An accepted retry atomically stops and joins generation N,
-updates the attempt ID, increments the safe-integer generation, persists the
-new invocation ID and starts generation N+1 against the same absolute
-`workDeadlineAt`; that replacement grants no time. After restart, the same
-persisted generation is recreated without extension. A request timeout is
-accepted only from that exact private watcher; a child timeout is accepted only
-from the exact `activeInvocation`. A stage `request` receipt can therefore be
-authenticated even when no child is active. The watcher is stopped in a
-terminal state. Per-child timers use their exact `ConsumerBoundedStage`.
+L'entrée de requête acceptée persiste `requestDeadlineWatcher` avant d'invoquer l'acteur fixe `watchConsumerRequestDeadline`. Son `invocationId` est le SHA-256 JCS de l'ID d'autorité d'échéance, de l'ID de tentative courante exact, de la génération et de `workDeadlineAt` inchangé. Son reçu utilise l'étape `request` et le même `deadlineAuthorityId`. Le surveillant reste actif à travers les états ordinaires et `retry_wait`. Un réessai accepté arrête et rallie atomiquement la génération N, met à jour l'ID de tentative, incrémente la génération en entier sûr, persiste le nouvel ID d'invocation et démarre la génération N+1 contre la même échéance absolue `workDeadlineAt` ; ce remplacement n'accorde aucun temps supplémentaire. Après redémarrage, la même génération persistée est recréée sans extension. Un timeout de requête n'est accepté que depuis ce surveillant privé exact ; un timeout d'enfant n'est accepté que depuis l'`activeInvocation` exacte. Un reçu d'étape `request` peut ainsi être authentifié même lorsqu'aucun enfant n'est actif. Le surveillant est arrêté dans un état terminal. Les minuteurs par enfant utilisent leur `ConsumerBoundedStage` exacte.
 
-After `SERVICE_RESTARTED`, an unknown active child is conservatively charged
-its complete persisted `allocatedBudgetMs`, not an unprovable wall-clock
-estimate, then cleared. Only then may a process-local monotonic deadline be
-derived from the unchanged remaining absolute duration. Restart, retry, a new
-child, CAS conflict, cancellation or recovery can shorten but never replace
-either absolute deadline.
+Après `SERVICE_RESTARTED`, un enfant actif inconnu se voit prudemment imputer la totalité de son budget alloué persisté `allocatedBudgetMs`, et non une estimation non prouvable de l'horloge murale, puis est effacé. Ce n'est qu'alors qu'une échéance monotone locale au processus peut être dérivée de la durée absolue restante inchangée. Un redémarrage, un réessai, un nouvel enfant, un conflit CAS, une annulation ou une récupération peut raccourcir mais jamais remplacer l'une ou l'autre échéance absolue.
 
-All twelve `stageConsumedMs` keys are present exactly once, initialize to safe
-integer zero and can only increase by bounded safe-integer milliseconds.
-`activeInvocation` is single-assignment while a child is live; a second child
-cannot reserve a budget concurrently.
+Les douze clés de `stageConsumedMs` sont présentes exactement une fois, s'initialisent à l'entier sûr zéro et ne peuvent augmenter que par des millisecondes bornées en entiers sûrs. `activeInvocation` est à assignation unique tant qu'un enfant est actif ; un second enfant ne peut réserver un budget simultanément.
 
-Before invoking a child, the actor persists `activeInvocation`, including its
-exact `allocatedBudgetMs`, and assigns the smaller of:
+Avant d'invoquer un enfant, l'acteur persiste `activeInvocation`, y compris son allocation exacte `allocatedBudgetMs`, et assigne la plus petite valeur entre :
 
-1. the stage's exact remaining cumulative budget
-   `CONSUMER_DEADLINES.stageMs[stage] - stageConsumedMs[stage]`; and
-2. the remaining work-deadline duration for ordinary stages, or remaining hard
-   attempt duration for `cleanup`.
+1. le budget cumulé restant exact de l'étape `CONSUMER_DEADLINES.stageMs[stage] - stageConsumedMs[stage]` ; et
+2. la durée restante de l'échéance de travail pour les étapes ordinaires, ou la durée restante absolue de tentative pour `cleanup`.
 
-On an ordinary result, failure or cancellation it atomically charges
-`min(allocatedBudgetMs, ceil(monotonicElapsedNs / 1_000_000))` to that stage and
-clears `activeInvocation` before another child can start. Any positive elapsed
-interval costs at least one millisecond. Restart charges the full allocation as
-specified above. Budgets are cumulative for the complete request: retrying a
-provider read, restarting Docker, re-entering package recovery or handling a
-CAS conflict does not reset a stage counter. Initial API reads, the
-credentialed download-redirect response, every response body and every ETag
-revalidation are included in `provider-observation`; only the credentialless
-redirected transport body is included in `transport-download`; process startup,
-stdin, stdout/stderr and join are included in `oci-runtime`; every journal
-scan/CAS/recovery action is included in its package stage. No unbounded helper
-or detached child exists outside a named budget.
+Lors d'un résultat ordinaire, d'un échec ou d'une annulation, il impute atomiquement `min(allocatedBudgetMs, ceil(monotonicElapsedNs / 1_000_000))` à cette étape et efface `activeInvocation` avant qu'un autre enfant ne puisse démarrer. Tout intervalle écoulé positif coûte au moins une milliseconde. Le redémarrage impute l'allocation complète comme spécifié ci-dessus. Les budgets sont cumulatifs pour la requête complète : réessayer une lecture auprès du fournisseur, redémarrer Docker, réentrer dans la récupération de package ou gérer un conflit CAS ne réinitialise pas un compteur d'étape. Les lectures initiales d'API, la réponse de redirection de téléchargement avec identifiants, chaque corps de réponse et chaque revalidation d'ETag sont inclus dans `provider-observation` ; seul le corps du transport redirigé sans identifiants est inclus dans `transport-download` ; le démarrage du processus, stdin, stdout/stderr et le ralliement sont inclus dans `oci-runtime` ; chaque action d'analyse/CAS/récupération de journal est incluse dans son étape de package. Aucun helper non borné ni enfant détaché n'existe en dehors d'un budget nommé.
 
-Ordinary work may never consume the 120,000 ms cleanup reserve. Expiry of a
-stage budget or the work deadline produces the exact private
-`DEADLINE_EXCEEDED` event below and enters the same one-shot cleanup protocol as
-operator cancellation. Cleanup itself is capped by both its remaining
-cumulative 120,000 ms budget and the hard attempt deadline. If cleanup cannot
-prove a terminal disposition before either bound, the actor rejects with
-`CLEANUP_AMBIGUOUS`; it never claims `cancelled`. A process kill at the hard
-deadline is classified only by the restart matrix, never as a fabricated
-timeout result.
+Le travail ordinaire ne peut jamais consommer la réserve de nettoyage de 120 000 ms. L'expiration d'un budget d'étape ou de l'échéance de travail produit l'événement privé exact `DEADLINE_EXCEEDED` ci-dessous et entre dans le même protocole de nettoyage one-shot qu'une annulation par l'opérateur. Le nettoyage lui-même est plafonné à la fois par son budget cumulé restant de 120 000 ms et par l'échéance absolue de tentative. Si le nettoyage ne peut prouver une disposition terminale avant l'une de ces bornes, l'acteur rejette avec `CLEANUP_AMBIGUOUS` ; il ne revendique jamais `cancelled`. L'arrêt brutal du processus (kill) à l'échéance stricte n'est classifié que par la matrice de redémarrage, jamais comme un faux résultat de timeout fabriqué.
 
-Cancellation-time readiness CAS work is a nested non-child operation whose
-same monotonic interval is atomically charged to both `cleanup` and
-`readiness-commit`; cancellation-time journal observation/recovery is charged
-the same way to both `cleanup` and `package-recovery`. Before either operation,
-its allowance is the smallest remaining value across both counters and the hard
-deadline. The single `activeInvocation` remains the cleanup actor; no second
-child or timer is created. Moving work under cleanup therefore cannot recover a
-spent stage allowance.
+Le travail CAS de disponibilité au moment de l'annulation est une opération imbriquée sans enfant dont le même intervalle monotone est atomiquement imputé à la fois à `cleanup` et à `readiness-commit` ; l'observation/récupération de journal au moment de l'annulation est imputée de la même façon à `cleanup` et à `package-recovery`. Avant chaque opération, son allocation correspond à la plus petite valeur restante entre les deux compteurs et l'échéance stricte. L'`activeInvocation` unique reste l'acteur de nettoyage ; aucun second enfant ni minuteur n'est créé. Déplacer du travail sous le nettoyage ne peut donc récupérer une allocation d'étape épuisée.
 
-If the initial trusted observation is already at or after `workDeadlineAt`, the
-request is rejected directly as `DEADLINE_EXCEEDED`: no child, workspace,
-capability or cleanup actor exists yet. Malformed chronology is
-`INVALID_REQUEST`, not a timeout.
+Si l'observation de confiance initiale se situe déjà à ou après `workDeadlineAt`, la requête est rejetée directement avec `DEADLINE_EXCEEDED` : aucun enfant, espace de travail, capabilité ou acteur de nettoyage n'existe encore. Une chronologie malformée constitue une `INVALID_REQUEST`, pas un timeout.
 
-The only successful terminal output is:
+La seule sortie terminale réussie est :
 
 ```ts
 interface SealedCandidateConsumerSuccessV1 {
@@ -563,15 +289,7 @@ interface SealedCandidateConsumerSuccessV1 {
 }
 ```
 
-Serializable consumer context stores identities and receipts only. Captured
-bytes, open descriptors, the byte snapshot and capabilities live only in an
-actor-owned private record. The snapshot is assembled once from those exact
-captured bytes for V ingestion; it is never reconstructed from paths or stored
-as resumable consumer authority. The private record exists only from final
-postflight assembly through reducer/CAS acknowledgement and is synchronously
-cleared on success, rejection, cancellation, timeout or cleanup. It is never
-serialized into a saga snapshot, readiness context, journal, diagnostic,
-handoff or success result.
+Le contexte sérialisable du consommateur stocke uniquement les identités et les reçus. Les octets capturés, les descripteurs ouverts, le snapshot d'octets et les capabilités ne vivent que dans un enregistrement privé détenu par l'acteur. Le snapshot est assemblé une fois à partir de ces octets capturés exacts pour l'ingestion V ; il n'est jamais reconstruit depuis des chemins ni stocké en tant qu'autorité de consommateur pouvant reprendre son exécution. L'enregistrement privé n'existe qu'entre l'assemblage post-vol final et l'accusé de réception du réducteur/CAS et est effacé de façon synchrone en cas de succès, rejet, annulation, timeout ou nettoyage. Il n'est jamais sérialisé dans un snapshot de saga, un contexte de disponibilité, un journal, un diagnostic, une passation ou un résultat de succès.
 
 ```ts
 interface TransientPayloadVerificationRecordV1 {
@@ -600,24 +318,15 @@ declare function executeVerifiedOciRuntime(
 ): Promise<ReleaseExecutionPayloadVerificationV1>;
 ```
 
-Those are the only runtime boundary signatures. Neither accepts raw DTOs,
-paths, byte buffers, Docker ports, callbacks, options, overloads, optional
-arguments, environment fallbacks or test hooks. No exported constructor,
-issuer, `mint`, registrar, brand or registry accessor may exist.
+Ce sont les seules signatures des frontières d'exécution. Aucune n'accepte de DTO bruts, chemins, tampons d'octets, ports Docker, rappels, options, surcharges, arguments optionnels, replis d'environnement ou hooks de test. Aucun constructeur exporté, émetteur, `mint`, registre, marque (brand) ou accesseur de registre ne peut exister.
 
-Each boundary is implemented as an ordinary non-`async` wrapper with a
-synchronous admission prologue; only after the required host check and private
-registry deletion may it construct/return the Promise for later asynchronous
-verification or Docker work. Moving either consumption below an `await` is a
-model violation.
+Chaque frontière est implémentée comme un wrapper ordinaire non `async` avec un prologue d'admission synchrone ; ce n'est qu'après la vérification d'hôte requise et la suppression du registre privé qu'il peut construire/retourner la Promise pour la vérification asynchrone ultérieure ou le travail Docker. Déplacer l'une de ces consommations sous un `await` est une violation du modèle.
 
-Capability registration is a private machine effect in the same authority
-module that owns its `WeakSet`/`WeakMap`. It is reachable only after the full
-transport and payload-authority guards pass; it is not a callable API.
+L'enregistrement de capabilité est un effet privé de la machine dans le même module d'autorité qui possède ses `WeakSet`/`WeakMap`. Il n'est accessible qu'après le passage complet des gardes de transport et d'autorité de payload ; ce n'est pas une API appelable.
 
-## 3. Exact states and events
+## 3. États et événements exacts
 
-The implementation must be one XState v5 machine with these exact states:
+L'implémentation doit être une unique machine XState v5 avec ces états exacts :
 
 ```ts
 type SealedCandidateConsumerState =
@@ -642,9 +351,9 @@ type SealedCandidateConsumerState =
   | 'cancelled';
 ```
 
-Terminal states are exactly `package_validated`, `rejected` and `cancelled`.
+Les états terminaux sont exactement `package_validated`, `rejected` et `cancelled`.
 
-External callers may send only:
+Les appelants externes peuvent envoyer uniquement :
 
 ```ts
 type PublicConsumerEvent =
@@ -713,18 +422,9 @@ type ConsumerCleanupDispositionV1 =
     };
 ```
 
-`cancelId` matches `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`. On the first accepted
-cancel, `cleanupInvocationId` is frozen as SHA-256 JCS of
-`{domain:"missionpulse.consumer-cleanup-invocation.v1", consumerId, attemptId,
-cancelId, requestedAt}`. An exact duplicate means byte-identical canonical JCS
-for the complete `CANCEL_REQUESTED` event; matching only `cancelId` is
-insufficient. A deadline cleanup ID instead hashes the same domain plus
-`consumerId`, `attemptId`, the complete deadline receipt and literal trigger
-`deadline`. Exactly one frozen `ConsumerCleanupInvocationV1` binds that ID to
-the state-derived plan and current readiness context hash; neither trigger may
-replace the plan after entry.
+`cancelId` correspond à `[A-Za-z0-9][A-Za-z0-9._:-]{0,127}`. Lors de la première annulation acceptée, `cleanupInvocationId` est gelé sous forme de SHA-256 JCS de `{domain:"missionpulse.consumer-cleanup-invocation.v1", consumerId, attemptId, cancelId, requestedAt}`. Un doublon exact correspond au JCS canonique identique octet par octet pour l'événement `CANCEL_REQUESTED` complet ; faire correspondre uniquement `cancelId` est insuffisant. Un ID de nettoyage d'échéance hache à la place le même domaine plus `consumerId`, `attemptId`, le reçu d'échéance complet et le déclencheur littéral `deadline`. Exactement un `ConsumerCleanupInvocationV1` gelé lie cet ID au plan dérivé de l'état et au hash du contexte de readiness actuel ; aucun déclencheur ne peut remplacer le plan après l'entrée.
 
-Private child actors alone may emit:
+Les acteurs enfants privés seuls peuvent émettre :
 
 ```ts
 type PrivateConsumerEvent =
@@ -763,160 +463,83 @@ type PrivateConsumerEvent =
     };
 ```
 
-A structurally identical private event from a caller is rejected as
-`UNAUTHORIZED_INTERNAL_EVENT` with no mutation.
+Un événement privé structurellement identique provenant d'un appelant est rejeté sous `UNAUTHORIZED_INTERNAL_EVENT` sans mutation.
 
-## 4. Normative transition table
+## 4. Table normative des transitions
 
-| From                                                           | Event                                                                     | Guard and atomic effect                                                                                                                        | To                            |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
-| `created`                                                      | valid but work-expired `CONSUME_REQUESTED`                                | persist exact deadline error; create no child/workspace/capability                                                                             | `rejected`                    |
-| `created`                                                      | `CONSUME_REQUESTED`                                                       | validate/freeze actor reference and selectors; invoke exact durable actor load                                                                 | `loading_readiness_actor`     |
-| `loading_readiness_actor`                                      | `READINESS_ACTOR_LOADED`                                                  | require exact context SHA-256/state and G0 snapshot; freeze actor-owned candidate+seal authority; create absent workspace                      | `observing_provider`          |
-| `observing_provider`                                           | `PROVIDER_OBSERVATION_CAPTURED`                                           | validate one terminal producer publication join, initial provider epoch and credentialed redirect response under the provider budget           | `downloading_transport`       |
-| `downloading_transport`                                        | `TRANSPORT_DOWNLOAD_CAPTURED`                                             | retain one complete bounded credentialless buffer and recomputed digest                                                                        | `revalidating_provider`       |
-| `revalidating_provider`                                        | `PROVIDER_EPOCH_REVALIDATED`                                              | reissue exactly the frozen ETag-bearing status-200 request set under a second cumulative provider-budget invocation; exclude the 302 redirect  | `verifying_attestation`       |
-| `verifying_attestation`                                        | `ATTESTATION_VERIFIED`                                                    | verify Sigstore and workflow; freeze exact transport observation                                                                               | `verifying_transport`         |
-| `verifying_transport`                                          | `TRANSPORT_VERIFIED`                                                      | verify canonical ZIP; safe-extract; retain open descriptors/snapshots                                                                          | `verifying_payload_authority` |
-| `verifying_payload_authority`                                  | `PAYLOAD_AUTHORITY_VERIFIED`                                              | cross-bind all payload bytes; derive/recapture controller authority; atomically register one frozen opaque payload token and private record    | `capability_ready`            |
-| `capability_ready`                                             | XState guarded `always`                                                   | require private payload registration only                                                                                                      | `admitting_host`              |
-| `admitting_host`                                               | `HOST_ADMITTED`                                                           | validate exact invocation result and persist bounded host-admission receipt only                                                               | `runtime_executing`           |
-| `runtime_executing`                                            | `RUNTIME_VERIFIED`                                                        | validate/cross-bind result; assemble exact byte snapshot; CAS-ingest exact `RELEASE_PAYLOAD_VERIFIED_INGESTED` into the same readiness actor   | `payload_verified`            |
-| `payload_verified`                                             | XState guarded `always`                                                   | require durable exact receipts; reserve journal strictly after verification; invoke package-only actor                                         | `package_validating`          |
-| `package_validating`                                           | `PACKAGE_VALIDATED`                                                       | require published journal plus artifact/catalog CAS                                                                                            | `package_validated`           |
-| `package_validating`                                           | `PACKAGE_RECOVERY_REQUIRED`                                               | stop ordinary work; capture exact local recovery observation                                                                                   | `package_recovering`          |
-| `package_recovering`                                           | `PACKAGE_RECOVERED`                                                       | apply the unique observed package recovery transition                                                                                          | `package_validated`           |
-| `loading_readiness_actor`, provider/download/attestation state | retryable `STAGE_FAILED`                                                  | close/discard every partial resource; persist typed error                                                                                      | `retry_wait`                  |
-| `retry_wait`                                                   | `RETRY_REQUESTED`                                                         | same actor/run; fresh attempt ID; no live resource/effect; rotate the persisted watcher generation without changing its deadline; reload actor | `loading_readiness_actor`     |
-| any active nonterminal state except `created`/`cancelling`     | first `CANCEL_REQUESTED`                                                  | persist immutable cancel identity; derive/freeze section 6 cleanup plan; enter the one bounded cleanup invocation exactly once                 | `cancelling`                  |
-| any active nonterminal state except `created`/`cancelling`     | `DEADLINE_EXCEEDED`                                                       | validate exact current invocation/stage/deadline; persist typed error; derive/freeze the same one-shot cleanup plan                            | `cancelling`                  |
-| `cancelling`                                                   | exact duplicate `CANCEL_REQUESTED`                                        | internal no-op; preserve state/context; do not reenter and do not invoke cleanup again                                                         | `cancelling`                  |
-| `cancelling`                                                   | different `CANCEL_REQUESTED`                                              | reject `CANCELLATION_ALREADY_STARTED`; preserve state/context; no cleanup effect                                                               | `cancelling`                  |
-| `cancelling`                                                   | `CLEANUP_SUCCEEDED(private-clean/post-v-blocked/journal-cleaned-blocked)` | prove the exact section 6 durable disposition plus no live authority or ambiguous owned output                                                 | `cancelled`                   |
-| `cancelling`                                                   | `CLEANUP_SUCCEEDED(publication-completed)`                                | validate already-durable published journal/artifact; cancellation cannot override publication                                                  | `package_validated`           |
-| any nonterminal state except `cancelling`                      | nonretryable `STAGE_FAILED`                                               | revoke authority, close descriptors, persist typed failure                                                                                     | `rejected`                    |
-| `cancelling`                                                   | `CLEANUP_FAILED`                                                          | persist cleanup ambiguity; never claim cancellation                                                                                            | `rejected`                    |
-| any state                                                      | `SERVICE_RESTARTED`                                                       | apply the exhaustive restart matrix in section 6                                                                                               | state-specific                |
+| Depuis                                                           | Événement                                                                 | Garde et effet atomique                                                                                                                                                                | Vers                          |
+| ---------------------------------------------------------------- | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------- |
+| `created`                                                        | `CONSUME_REQUESTED` valide mais délai de travail expiré                   | persister l'erreur exacte d'échéance ; ne créer aucun enfant/espace de travail/capabilité                                                                                              | `rejected`                    |
+| `created`                                                        | `CONSUME_REQUESTED`                                                       | valider/geler la référence d'acteur et les sélecteurs ; invoquer le chargement durable exact de l'acteur                                                                               | `loading_readiness_actor`     |
+| `loading_readiness_actor`                                        | `READINESS_ACTOR_LOADED`                                                  | exiger le SHA-256 de contexte/état exact et le snapshot G0 ; geler l'autorité candidat+sceau détenue par l'acteur ; créer l'espace de travail absent                                   | `observing_provider`          |
+| `observing_provider`                                             | `PROVIDER_OBSERVATION_CAPTURED`                                           | valider un ralliement de publication terminal du producteur, l'époque initiale du fournisseur et la réponse de redirection avec identifiants sous le budget du fournisseur             | `downloading_transport`       |
+| `downloading_transport`                                          | `TRANSPORT_DOWNLOAD_CAPTURED`                                             | conserver un tampon complet borné sans identifiants et le digest recalculé                                                                                                             | `revalidating_provider`       |
+| `revalidating_provider`                                          | `PROVIDER_EPOCH_REVALIDATED`                                              | réémettre exactement l'ensemble gelé de requêtes statut-200 porteuses d'ETag sous une seconde invocation cumulée du budget fournisseur ; exclure la redirection 302                    | `verifying_attestation`       |
+| `verifying_attestation`                                          | `ATTESTATION_VERIFIED`                                                    | vérifier Sigstore et le workflow ; geler l'observation exacte du transport                                                                                                             | `verifying_transport`         |
+| `verifying_transport`                                            | `TRANSPORT_VERIFIED`                                                      | vérifier le ZIP canonique ; extraire en mode sécurisé ; conserver les descripteurs ouverts/snapshots                                                                                   | `verifying_payload_authority` |
+| `verifying_payload_authority`                                    | `PAYLOAD_AUTHORITY_VERIFIED`                                              | lier de manière croisée tous les octets du payload ; dériver/recapturer l'autorité de contrôleur ; enregistrer atomiquement un token opaque de payload gelé et un enregistrement privé | `capability_ready`            |
+| `capability_ready`                                               | XState gardé `always`                                                     | requérir uniquement l'enregistrement privé du payload                                                                                                                                  | `admitting_host`              |
+| `admitting_host`                                                 | `HOST_ADMITTED`                                                           | valider le résultat d'invocation exact et persister uniquement le reçu borné d'admission d'hôte                                                                                        | `runtime_executing`           |
+| `runtime_executing`                                              | `RUNTIME_VERIFIED`                                                        | valider/lier de façon croisée le résultat ; assembler le snapshot exact d'octets ; ingérer par CAS `RELEASE_PAYLOAD_VERIFIED_INGESTED` exact dans le même acteur de readiness          | `payload_verified`            |
+| `payload_verified`                                               | XState gardé `always`                                                     | exiger des reçus exacts durables ; réserver le journal strictement après la vérification ; invoquer l'acteur réservé aux packages                                                      | `package_validating`          |
+| `package_validating`                                             | `PACKAGE_VALIDATED`                                                       | exiger le journal publié plus le CAS artefact/catalogue                                                                                                                                | `package_validated`           |
+| `package_validating`                                             | `PACKAGE_RECOVERY_REQUIRED`                                               | arrêter le travail ordinaire ; capturer l'observation exacte de récupération locale                                                                                                    | `package_recovering`          |
+| `package_recovering`                                             | `PACKAGE_RECOVERED`                                                       | appliquer l'unique transition de récupération de package observée                                                                                                                      | `package_validated`           |
+| `loading_readiness_actor`, état fournisseur/download/attestation | `STAGE_FAILED` réessayable                                                | fermer/abandonner chaque ressource partielle ; persister l'erreur typée                                                                                                                | `retry_wait`                  |
+| `retry_wait`                                                     | `RETRY_REQUESTED`                                                         | même acteur/run ; ID de tentative neuf ; aucune ressource/effet actif ; faire tourner la génération du surveillant persisté sans changer son échéance ; recharger l'acteur             | `loading_readiness_actor`     |
+| tout état actif non terminal sauf `created`/`cancelling`         | premier `CANCEL_REQUESTED`                                                | persister l'identité d'annulation immuable ; dériver/geler le plan de nettoyage de la section 6 ; entrer dans l'unique invocation de nettoyage bornée exactement une fois              | `cancelling`                  |
+| tout état actif non terminal sauf `created`/`cancelling`         | `DEADLINE_EXCEEDED`                                                       | valider l'invocation/étape/échéance courante exacte ; persister l'erreur typée ; dériver/geler le même plan de nettoyage one-shot                                                      | `cancelling`                  |
+| `cancelling`                                                     | doublon exact `CANCEL_REQUESTED`                                          | no-op interne ; préserver l'état/contexte ; ne pas réentrer et ne pas réinvoquer le nettoyage                                                                                          | `cancelling`                  |
+| `cancelling`                                                     | `CANCEL_REQUESTED` différent                                              | rejeter `CANCELLATION_ALREADY_STARTED` ; préserver l'état/contexte ; aucun effet de nettoyage                                                                                          | `cancelling`                  |
+| `cancelling`                                                     | `CLEANUP_SUCCEEDED(private-clean/post-v-blocked/journal-cleaned-blocked)` | prouver la disposition durable exacte de la section 6 et l'absence d'autorité active ou de sortie possédée ambiguë                                                                     | `cancelled`                   |
+| `cancelling`                                                     | `CLEANUP_SUCCEEDED(publication-completed)`                                | valider le journal/artefact publié déjà durable ; l'annulation ne peut supplanter la publication                                                                                       | `package_validated`           |
+| tout état non terminal sauf `cancelling`                         | `STAGE_FAILED` non réessayable                                            | révoquer l'autorité, fermer les descripteurs, persister l'échec typé                                                                                                                   | `rejected`                    |
+| `cancelling`                                                     | `CLEANUP_FAILED`                                                          | persister l'ambiguïté de nettoyage ; ne jamais revendiquer l'annulation                                                                                                                | `rejected`                    |
+| tout état                                                        | `SERVICE_RESTARTED`                                                       | appliquer la matrice de redémarrage exhaustive de la section 6                                                                                                                         | spécifique à l'état           |
 
-Every state/event pair not listed rejects with no mutation. There is no wildcard
-success transition. Private success events must match the exact invoked child
-actor and attempt ID.
+Chaque paire état/événement non répertoriée est rejetée sans mutation. Il n'y a aucune transition de succès générique (wildcard). Les événements privés de succès doivent correspondre à l'acteur enfant invoqué exact et à l'identifiant de tentative.
 
-State-entry invocation order is normative and not an event effect:
+L'ordre d'invocation à l'entrée dans l'état est normatif et ne constitue pas un effet d'événement :
 
-- every child-owning work-state entry first persists its cumulative stage
-  allocation and starts exactly one actor-owned monotonic deadline timer
-  correlated to the child invocation ID. `observing_provider` and
-  `revalidating_provider` are separate invocations charging the same cumulative
-  `provider-observation` counter. Timer expiry aborts/joins that child and alone
-  may emit the private `DEADLINE_EXCEEDED`; a stale, public or wrong-stage
-  receipt rejects;
-- entering `admitting_host` invokes the fixed admission actor; its synchronous
-  prologue performs host check and payload-token deletion before any Promise;
-- entering `runtime_executing` invokes the fixed runtime actor; its synchronous
-  prologue deletes admission before any Promise or Docker access;
-- entering `cancelling` from the first accepted cancel invokes exactly one
-  cleanup actor bound to the frozen `ConsumerCleanupInvocationV1`; a deadline
-  invokes that same actor shape. Entry stops the work-deadline watcher; the
-  cleanup timer alone enforces the hard deadline. An internal duplicate transition has
-  `reenter: false`, schedules no action and cannot spawn it again;
-- `HOST_ADMITTED` and `RUNTIME_VERIFIED` validate and persist only completed
-  invocation results. They cannot perform or replay either prologue;
-- `CLEANUP_SUCCEEDED` and `CLEANUP_FAILED` validate the exact current trigger,
-  plan, context hash, `cleanupInvocationId`, attempt and invoked child. Their
-  handlers consume a result only; they cannot start, repeat or broaden cleanup.
+- chaque entrée dans un état de travail possédant un enfant commence par persister son allocation d'étape cumulée et démarre exactement un minuteur d'échéance monotone détenu par l'acteur et corrélé à l'ID d'invocation de l'enfant. `observing_provider` et `revalidating_provider` sont des invocations distinctes imputant le même compteur cumulé `provider-observation`. L'expiration du minuteur abandonne/rallie cet enfant et est seule autorisée à émettre le `DEADLINE_EXCEEDED` privé ; un reçu périmé, public ou d'une mauvaise étape est rejeté ;
+- l'entrée dans `admitting_host` invoque l'acteur d'admission fixe ; son prologue synchrone effectue la vérification de l'hôte et la suppression du token de payload avant toute Promise ;
+- l'entrée dans `runtime_executing` invoque l'acteur d'exécution fixe ; son prologue synchrone supprime l'admission avant toute Promise ou accès à Docker ;
+- l'entrée dans `cancelling` depuis la première annulation acceptée invoque exactement un acteur de nettoyage lié au `ConsumerCleanupInvocationV1` gelé ; une échéance invoque cette même forme d'acteur. L'entrée arrête le surveillant d'échéance de travail ; le minuteur de nettoyage applique seul l'échéance stricte. Une transition interne dupliquée a `reenter: false`, ne planifie aucune action et ne peut pas le relancer ;
+- `HOST_ADMITTED` et `RUNTIME_VERIFIED` valident et persistent uniquement les résultats d'invocation complétés. Ils ne peuvent ni exécuter ni rejouer l'un ou l'autre prologue ;
+- `CLEANUP_SUCCEEDED` et `CLEANUP_FAILED` valident le déclencheur courant exact, le plan, le hash de contexte, `cleanupInvocationId`, la tentative et l'enfant invoqué. Leurs gestionnaires consomment un résultat uniquement ; ils ne peuvent ni démarrer, ni répéter, ni élargir le nettoyage.
 
-## 5. Guards and ordered verification
+## 5. Gardes et vérification ordonnée
 
-### G0 — authoritative readiness actor and S-before-V order
+### G0 — acteur de readiness autoritaire et ordre S-avant-V
 
-- Load one durable release-readiness actor by the exact public `actorId`; require
-  `readActor(actorId)` to return one context. Recompute
-  `releaseContextSha256(context)` and require exact equality with the public
-  `expectedContextSha256` before accepting it. This is the real actor CAS
-  identity; no registry revision, actor revision or separately supplied actor
-  digest participates.
-- Require state `rc_built`, `pendingRestart === null`, one valid immutable
-  candidate and one valid final seal. Transport observation, payload
-  verification, package journal and artifact must still be null.
-- Require the candidate, audit, seal and packaged-MV3 receipt to name only the
-  parent-imported V2 inventory path/schema, both exact hashes and the exact
-  ordered thirteen IDs, executed and passed once each with zero skip, failure,
-  retry or diagnostic. V1/mixed evidence rejects before the producer-terminal
-  or GitHub request.
-- Require candidate, audit and packaged-MV3 receipt to repeat byte-identical
-  fixed-index `mv3HarnessModelAuthority` and
-  `packagedTabScenariosModelAuthority` projections plus
-  `jointModelActivationSha256`. The identities must exactly equal
-  `REQUIRED_MV3_HARNESS_MODEL_V26`, `REQUIRED_PACKAGED_TAB_MODEL_V11` and the
-  CV slot must exactly equal `REQUIRED_CV_ACCESSIBLE_ANCHOR_MODEL_V6`.
-- Load the complete joint activation from the controller-global catalog, verify
-  its self-digest/CAS revision/source commit/tree, and require its embedded
-  `OrderedReviewedImplementedVerifiedModelAuthoritySetV1` to validate its exact
-  JCS preimage, six-slot order and reviewed/implemented projections. The
-  candidate/audit/gate values must equal fixed-index projections from that set;
-  they cannot replace it. The activation loads all eighteen receipt blobs and
-  recomputes all six raw and normalized model blobs using
-  `JOINT_MODEL_BLOB_RULES_V1`. It must bind clarification 11 at exact behavior
-  hash
-  `9afa97e0848b6c5c6540d33f38e29a409112a531f9ff2cd7124e50ef96511080`,
-  producer revision 11 at exact content hash
-  `bf681ebf0a2714f77bf48bfa0e121461ce69639814c5b60fbb6dffbadab43792`,
-  consumer revision-12 authority and both V2 inventory digests. Its complete
-  verification command-receipt array and set
-  digest must validate against its immutable-source verification authority;
-  writable source/ancestor or mount/capability drift blocks activation. Receipt signatures are verified only under the
-  activation's controller-global external-receipt policy digest; tuple/caller
-  keys are forbidden. Review, implementation, evidence or verification without
-  final atomic activation is terminal before any provider request.
-- Require the signed producer terminal to contain producer revision 11 at
-  content hash
-  `bf681ebf0a2714f77bf48bfa0e121461ce69639814c5b60fbb6dffbadab43792`,
-  its exact Git execution-workspace materialization, full production immutable-source
-  authority, local-handoff completion receipt and terminal completion receipt.
-  Recompute their exact JCS digests and construct one
-  `ConsumerProducerSourceExecutionProofV1`. Seal, handoff and terminal command
-  arrays must form exact prefix extensions and every command must bind the same
-  read-only source/ancestors, zero-overlay topology, five-root output allowlist,
-  empty capability sets, inherited seccomp/filesystem policy and matching
-  pre/post mount/capability observations. Reject ambient checkout/backing bytes,
-  writable source/ancestor, tracked-path shadow, chmod/link/symlink/rename,
-  mount/remount/namespace escape, modified/untracked source, missing receipt or
-  detached descendant before the first GitHub request. A green build, clean
-  post-run projection, seal or provider upload without this OS execution proof
-  is terminal.
-- Any source-execution proof failure yields
-  `PRODUCER_SOURCE_EXECUTION_INVALID` with retry class `never`, preserves the
-  loaded readiness actor byte-for-byte and starts no GitHub/provider child.
-- The loaded candidate and seal are the only downstream identity authority. The
-  request cannot supply, replace or narrow either value.
-- Event ownership and order are exact:
+- Charger un acteur de release-readiness durable par l'`actorId` public exact ; exiger que `readActor(actorId)` renvoie un contexte. Recalculer `releaseContextSha256(context)` et exiger l'égalité exacte avec l'`expectedContextSha256` public avant de l'accepter. C'est l'identité CAS réelle de l'acteur ; aucune révision de registre, révision d'acteur ou digest d'acteur fourni séparément n'y participe.
+- Exiger l'état `rc_built`, `pendingRestart === null`, un candidat immuable valide et un sceau final valide. L'observation du transport, la vérification du payload, le journal de package et l'artefact doivent encore être nuls.
+- Exiger que le candidat, l'audit, le sceau et le reçu packagé-MV3 ne nomment que le chemin/schéma d'inventaire V2 importé du parent, les deux hashs exacts et les treize identifiants ordonnés exacts, exécutés et réussis une fois chacun avec zéro saut, échec, réessai ou diagnostic. Les preuves V1 ou mixtes sont rejetées avant le terminal du producteur ou la requête GitHub.
+- Exiger que le candidat, l'audit et le reçu packagé-MV3 répètent à l'octet identique les projections à indice fixe `mv3HarnessModelAuthority` et `packagedTabScenariosModelAuthority` plus `jointModelActivationSha256`. Les identités doivent être exactement égales à `REQUIRED_MV3_HARNESS_MODEL_V26`, `REQUIRED_PACKAGED_TAB_MODEL_V11` et le slot CV doit être exactement égal à `REQUIRED_CV_ACCESSIBLE_ANCHOR_MODEL_V6`.
+- Charger l'activation conjointe complète depuis le catalogue global au contrôleur, vérifier son digest propre/révision CAS/commit source/arbre, et exiger que son `OrderedReviewedImplementedVerifiedModelAuthoritySetV1` intégré valide sa préimage JCS exacte, son ordre à six slots et ses projections revues/implémentées. Les valeurs du candidat/audit/porte doivent être égales aux projections à indice fixe de cet ensemble ; elles ne peuvent le remplacer. L'activation charge l'ensemble des dix-huit blobs de reçus et recalcule l'ensemble des six blobs de modèles bruts et normalisés en utilisant `JOINT_MODEL_BLOB_RULES_V1`. Elle doit lier la clarification 11 au hash de comportement exact `9afa97e0848b6c5c6540d33f38e29a409112a531f9ff2cd7124e50ef96511080`, la révision 11 du producteur au hash de contenu exact `bf681ebf0a2714f77bf48bfa0e121461ce69639814c5b60fbb6dffbadab43792`, l'autorité de la révision 12 du consommateur et les deux digests de l'inventaire V2. Son tableau complet de reçus de commande de vérification et le digest de l'ensemble doivent se valider contre son autorité de vérification à source immuable ; une source/ancêtre accessible en écriture ou une dérive de montage/capabilité bloque l'activation. Les signatures de reçus ne sont vérifiées que sous le digest de politique externe de reçus global au contrôleur de l'activation ; les clés de tuple/appelant sont interdites. Une revue, implémentation, preuve ou vérification sans activation atomique finale est terminale avant toute requête auprès du fournisseur.
+- Exiger que le terminal signé du producteur contienne la révision 11 du producteur avec le hash de contenu `bf681ebf0a2714f77bf48bfa0e121461ce69639814c5b60fbb6dffbadab43792`, sa matérialisation exacte de l'espace de travail d'exécution Git, l'autorité complète de source immuable de production, le reçu de complétion du handoff local et le reçu de complétion terminal. Recalculer leurs digests JCS exacts et construire un `ConsumerProducerSourceExecutionProofV1`. Les tableaux de commandes de sceau, handoff et terminal doivent former des extensions de préfixe exactes et chaque commande doit lier les mêmes sources/ancêtres en lecture seule, la topologie sans overlay, la liste blanche des cinq racines de sortie, des ensembles de capabilités vides, la politique seccomp/système de fichiers héritée et les observations de montage/capabilité pré/post correspondantes. Rejeter les octets du checkout ambiant/support, toute source/ancêtre accessible en écriture, le masquage de chemin suivi, chmod/lien/lien symbolique/renommage, montage/remontage/évasion de namespace, source modifiée/non suivie, reçu manquant ou descendant détaché avant la première requête GitHub. Un build au vert, une projection post-run propre, un sceau ou un téléversement chez le fournisseur sans cette preuve d'exécution de l'OS est terminal.
+- Tout échec de preuve d'exécution de source du producteur produit `PRODUCER_SOURCE_EXECUTION_INVALID` avec la classe de réessai `never`, préserve l'acteur de readiness chargé à l'octet identique et ne démarre aucun enfant GitHub/fournisseur.
+- Le candidat chargé et le sceau constituent l'unique autorité d'identité en aval. La requête ne peut ni fournir, ni remplacer, ni restreindre l'une ou l'autre valeur.
+- La propriété des événements et leur ordonnancement sont exacts :
 
 ```text
-producer emits immutable TestedDistSealV1
-  -> release-readiness controller CAS-ingests RC_SEAL_INGESTED into audited actor
-  -> reducer validates the seal and commits actor state rc_built
-  -> producer completes transport attestation/upload
-  -> consumer loads that exact rc_built actor/context SHA-256
-  -> consumer verifies downloaded transport and runtime
-  -> consumer readiness adapter CAS-ingests RELEASE_PAYLOAD_VERIFIED_INGESTED
-     with the exact observation+verification+byte snapshot into the same actor
-  -> reducer remains rc_built with both values single-assigned
-  -> package journal reservation may begin
+le producteur émet l'immuable TestedDistSealV1
+  -> le contrôleur de release-readiness ingère par CAS RC_SEAL_INGESTED dans l'acteur audité
+  -> le réducteur valide le sceau et valide l'état de l'acteur rc_built
+  -> le producteur complète l'attestation/téléversement du transport
+  -> le consommateur charge cet acteur exact rc_built et son SHA-256 de contexte
+  -> le consommateur vérifie le transport téléchargé et l'environnement d'exécution (runtime)
+  -> l'adaptateur de readiness du consommateur ingère par CAS RELEASE_PAYLOAD_VERIFIED_INGESTED
+     avec l'observation exacte + vérification + snapshot d'octets dans le même acteur
+  -> le réducteur reste rc_built avec les deux valeurs assignées une seule fois
+  -> la réservation du journal de package peut débuter
 ```
 
-The producer never directly mutates readiness state, and the consumer never
-emits `RC_SEAL_INGESTED`. Both reducer events are submitted through the
-release-readiness controller. `RELEASE_PAYLOAD_VERIFIED_INGESTED` is illegal
-until the durable `RC_SEAL_INGESTED` result has been loaded and matched.
+Le producteur ne modifie jamais directement l'état de readiness, et le consommateur n'émet jamais `RC_SEAL_INGESTED`. Les deux événements du réducteur sont soumis via le contrôleur de release-readiness. `RELEASE_PAYLOAD_VERIFIED_INGESTED` est illégal tant que le résultat durable de `RC_SEAL_INGESTED` n'a pas été chargé et mis en correspondance.
 
-### Closed signed-handoff and policy projection
+### Projection fermée du handoff signé et de la politique
 
-The consumer introduces no new producer receipt. It reuses the producer model's
-exact `ProducerTerminalRecordV1`, its signed
-`ProducerTerminalPublicationReceiptV1`, complete `ProducerTerminalEnvelopeV1`
-and common `ArtifactPublicationJoinV1`, then constructs this
-release-readiness-compatible private projection:
+Le consommateur n'introduit aucun nouveau reçu de producteur. Il réutilise le `ProducerTerminalRecordV1` exact du modèle producteur, son `ProducerTerminalPublicationReceiptV1` signé, l'`ProducerTerminalEnvelopeV1` complète et l'`ArtifactPublicationJoinV1` commune, puis construit cette projection privée compatible avec la release-readiness :
 
 ```ts
 interface ProviderArtifactFactsV1 {
@@ -946,196 +569,57 @@ interface ClosedTransportHandoffV1 {
 }
 ```
 
-`signedAttestation` is the sole **GitHub/Sigstore-signed** handoff component; it
-is derived only after Sigstore verification from the existing
-`GitHubTransportAttestationV1`. After G0 loads the actor and before any GitHub
-request, the consumer's fixed producer-terminal adapter derives the sole URI
-from `candidate.producerTerminalReadAuthority`, the actor ID and the request's
-canonical run ID/attempt. It performs exactly one direct credentialless GET,
-follows no redirect, validates the candidate-frozen origin/TLS SPKI/media type,
-streams no more than 25,165,824 bytes, and requires exact Content-Length, ETag
-`"sha256:{recordSha256}"` and immutable cache control. No caller URI, path,
-record, snapshot, receipt or join is accepted.
+`signedAttestation` est le seul composant de handoff **signé par GitHub/Sigstore** ; il est dérivé uniquement après la vérification Sigstore depuis le `GitHubTransportAttestationV1` existant. Après que G0 a chargé l'acteur et avant toute requête GitHub, l'adaptateur fixe de terminal du producteur du consommateur dérive l'unique URI depuis `candidate.producerTerminalReadAuthority`, l'ID de l'acteur et le run ID/tentative canonique de la requête. Il effectue exactement un GET direct sans identifiants, ne suit aucune redirection, valide l'origine gelée/TLS SPKI/type de média du candidat, ne lit pas plus de 25 165 824 octets, et exige un Content-Length exact, l'ETag `"sha256:{recordSha256}"` et un contrôle de cache immuable. Aucun URI, chemin, enregistrement, snapshot, reçu ou ralliement fourni par l'appelant n'est accepté.
 
-URI construction substitutes the actor ID using the authority's exact
-`rfc3986-uppercase-percent-v1` rule, substitutes run ID as its unchanged
-canonical positive-decimal bytes, and substitutes run attempt as canonical
-positive decimal ASCII. It rejects slash injection, lowercase percent hex,
-double encoding, normalization, query, fragment, userinfo, alternate port or
-any non-template path before the request is sent.
+La construction de l'URI substitue l'ID de l'acteur en utilisant la règle exacte `rfc3986-uppercase-percent-v1` de l'autorité, substitue le run ID sous ses octets décimaux positifs canoniques inchangés, et substitue la tentative de run sous forme de décimal ASCII positif canonique. Elle rejette l'injection de barres obliques (slashes), les hexadécimaux de pourcentage en minuscules, le double encodage, la normalisation, les requêtes (query), les fragments, les informations d'utilisateur (userinfo), les ports alternatifs ou tout chemin hors modèle avant l'envoi de la requête.
 
-The adapter rejects duplicate JSON keys and requires the response bytes to be
-exact RFC 8785 JCS of one `ProducerTerminalRecordV1`. It recomputes the record
-self-digest; verifies the publication receipt self-digest, domain-separated
-Ed25519 signature and immutable URI under the exact candidate-bound receipt
-key; requires its catalog-port policy digest to equal the candidate-bound read
-authority; decodes and byte-recomputes the complete terminal envelope; and validates
-its complete gapless immutable snapshot sequence/hash chain. The unique last
-snapshot must be `uploaded_digest_verified`; its sole artifact and the
-envelope's common `ArtifactPublicationJoinV1` must be exact-JCS-equal. Actor,
-release, source commit, repository, workflow, job, canonical run ID, attempt,
-rc-built context digest, seal-ingestion receipt and every correlation field
-must equal G0/request authority. The envelope's complete `ProducerHandoffV1`
-must pass its self-digest and controller/transport/readiness guards, equal every
-chain handoff digest, and equal the publication join's handoff digest. Its
-candidate, audit and seal digest fields must equal the complete exact values
-already loaded from the G0 readiness actor; no handoff-carried duplicate bytes
-exist. Its complete constructor and rc-seal receipts must verify under the
-candidate-frozen catalog keys and form the exact audited-context to
-rc-built-context CAS chain loaded by G0. The complete terminal disposition
-receipt must verify under the same keys, equal the terminal snapshot's digest,
-prove active_for_consumer/producer-upload-joined with both remote effects
-confirmed, and contain no readiness mutation. A runner-local saga directory,
-GitHub step output, terminal snapshot without this signed record, partial chain or
-independently supplied join has zero consumer authority.
+L'adaptateur rejette les clés JSON dupliquées et exige que les octets de réponse soient le JCS RFC 8785 exact d'un `ProducerTerminalRecordV1`. Il recalcule le digest propre de l'enregistrement ; vérifie le digest propre du reçu de publication, la signature Ed25519 à séparation de domaine et l'URI immuable sous la clé de reçu exacte liée au candidat ; exige que le digest de politique de port de catalogue soit égal à l'autorité de lecture liée au candidat ; décode et recalcule octet par octet l'enveloppe terminale complète ; et valide sa séquence complète et sans trou de snapshots immuables / chaîne de hashs. L'unique dernier snapshot doit être `uploaded_digest_verified` ; son unique artefact et l'`ArtifactPublicationJoinV1` commune de l'enveloppe doivent être égaux selon le JCS exact. L'acteur, la release, le commit source, le dépôt, le workflow, le job, le run ID canonique, la tentative, le digest de contexte rc-built, le reçu d'ingestion de sceau et chaque champ de corrélation doivent être égaux à l'autorité G0/requête. Le `ProducerHandoffV1` complet de l'enveloppe doit passer son propre digest et ses gardes contrôleur/transport/readiness, être égal à chaque digest de handoff de la chaîne, et être égal au digest de handoff du ralliement de publication. Ses champs de digest de candidat, d'audit et de sceau doivent être égaux aux valeurs exactes complètes déjà chargées depuis l'acteur de readiness G0 ; aucun octet dupliqué transporté par le handoff n'existe. Ses reçus complets de constructeur et de sceau rc doivent se vérifier sous les clés de catalogue gelées du candidat et former la chaîne CAS exacte du contexte audité au contexte rc-built chargée par G0. Le reçu complet de disposition terminale doit se vérifier sous les mêmes clés, être égal au digest du snapshot terminal, prouver active_for_consumer/producer-upload-joined avec les deux effets distants confirmés, et ne contenir aucune mutation de readiness. Un répertoire de saga local au runner, une sortie d'étape GitHub, un snapshot terminal sans cet enregistrement signé, une chaîne partielle ou un ralliement fourni indépendamment n'a aucune autorité auprès du consommateur.
 
-The join's `actionOutput.artifactDigest` is the only authority for the dynamic
-uploader output digest; its equality with local transport, signed subject and
-the producer's captured bytes was already closed by the producer guard, and the
-consumer revalidates the complete join rather than trusting that field.
+Le champ `actionOutput.artifactDigest` du ralliement est l'unique autorité pour le digest dynamique de sortie de l'uploader ; son égalité avec le transport local, le sujet signé et les octets capturés du producteur a déjà été fermée par la garde du producteur, et le consommateur revalide le ralliement complet plutôt que de se fier à ce champ.
 
-The policy and workflow hashes come only from the G0 candidate. Fresh provider
-artifact facts come only from the authenticated REST response, and the
-downloaded digest comes only from captured bytes. The tuple is frozen only
-after the signed attestation, signed durable producer terminal record/join,
-policy, fresh provider facts and downloaded bytes agree on subject digest,
-canonical run ID/attempt and head SHA.
-It is private, non-persisted transition authority and adds no field to
-`SealedCandidateTransportObservationV1`. That observation's
-`uploaderOutputDigest` is projected exactly from the validated producer join,
-never from REST or from policy.
+Les hashs de politique et de workflow proviennent uniquement du candidat G0. Les faits d'artefact frais du fournisseur proviennent uniquement de la réponse REST authentifiée, et le digest téléchargé provient uniquement des octets capturés. Le tuple n'est gelé qu'après que l'attestation signée, l'enregistrement terminal/ralliement signé durable du producteur, la politique, les faits frais du fournisseur et les octets téléchargés concordent sur le digest du sujet, le run ID/tentative canonique et le head SHA.
+C'est une autorité de transition privée et non persistée, qui n'ajoute aucun champ à `SealedCandidateTransportObservationV1`. L'`uploaderOutputDigest` de cette observation est projeté exactement à partir du ralliement validé du producteur, jamais depuis REST ni depuis la politique.
 
-The authority boundary is explicit: GitHub's artifact REST representation does
-not expose uploader job ID, run attempt, direct-upload mode or requested
-retention input. The consumer neither reads nor infers those fields from that
-representation. Run attempt and signer workflow come from the verified signed
-attestation plus independently authenticated run-attempt metadata. The
-`archive:false`, `overwrite:false`, `retention-days:30`, pinned uploader and
-ordered producing job topology come from the exact candidate-bound workflow
-policy. API `created_at`/`expires_at` remain observed provider facts and are
-never reverse-translated into requested retention. No job-ID claim is inferred,
-and dynamic action output is never synthesized from policy, matching
-release-readiness clarification 11.
+La frontière d'autorité est explicite : la représentation REST de l'artefact par GitHub n'expose pas l'ID de job de l'uploader, la tentative de run, le mode de téléversement direct ou l'entrée de rétention demandée. Le consommateur ne lit ni ne déduit ces champs à partir de cette représentation. La tentative de run et le workflow du signataire proviennent de l'attestation signée vérifiée plus des métadonnées de tentative de run authentifiées indépendamment. Les entrées `archive:false`, `overwrite:false`, `retention-days:30`, l'uploader épinglé et la topologie ordonnée des jobs de production proviennent de la politique exacte de workflow liée au candidat. Les dates `created_at`/`expires_at` de l'API restent des faits observés du fournisseur et ne sont jamais rétro-traduites en rétention demandée. Aucune affirmation d'ID de job n'est déduite, et la sortie d'action dynamique n'est jamais synthétisée depuis la politique, conformément à la clarification 11 de release-readiness.
 
-### G1 — exact GitHub observation
+### G1 — observation GitHub exacte
 
-- The first `provider-observation` invocation performs the one exact
-  candidate-authorized producer-terminal GET and validates the complete signed
-  record/envelope/chain/join above. That immutable release-control response is
-  not a GitHub provider-epoch member and is never re-fetched or ETag-revalidated
-  inside this attempt. Only then does the same cumulative invocation perform
-  every initial GitHub first-party read, including the credentialed
-  artifact-download request and its single redirect response. Only after all
-  bounded operations pass may `PROVIDER_OBSERVATION_CAPTURED` enter
-  `downloading_transport`.
-- Every first-party request uses exactly origin `https://api.github.com`, HTTPS
-  default port, `Accept: application/vnd.github+json`,
-  `X-GitHub-Api-Version: 2026-03-10`, `redirect: manual`, and no cookies or
-  ambient proxy. Owner/repository/path segments are canonical percent-encoded;
-  userinfo, fragments, alternate ports/origins and GraphQL are forbidden.
-- The read-only token is captured once from the fixed CI secret channel and may
-  have only repository `actions:read`, `attestations:read` and `contents:read`.
-  `Authorization: Bearer <token>` is sent only to exact origin
-  `https://api.github.com`; the token is never placed in a URL, redirect,
-  context, receipt, log or download-origin request. `Set-Cookie` rejects and no
-  cookie jar exists.
-- Fetch run-attempt metadata only from
-  `/repos/{owner}/{repo}/actions/runs/{runId}/attempts/{runAttempt}` and workflow
-  bytes only from
-  `/repos/{owner}/{repo}/contents/.github/workflows/ci.yml?ref={headSha}`;
-  require the returned regular blob bytes and Git blob identity to match the G0
-  candidate's embedded workflow blob/digest. Fetch exactly page 1 of
-  `/repos/{owner}/{repo}/actions/runs/{runId}/artifacts?name=missionpulse-sealed-candidate&per_page=100&page=1&direction=asc`.
-  Require `total_count === 1`, one array entry and no `Link rel="next"`; a second
-  page is ambiguity, not a continuation.
-- Fetch exactly page 1 of
-  `/repos/{owner}/{repo}/attestations/sha256:{transportDigest}?predicate_type=provenance&per_page=100`
-  with no `before`/`after` cursor. Require no next link and exactly one bundle
-  that later passes G3; zero, multiple or cursor-bearing responses reject.
-- Every status-`200` provider JSON/blob response must carry one bounded
-  syntactically valid `ETag`. Capture the exact ETag bytes and freeze the exact
-  ordered set of those ETag-bearing request descriptors. After download,
-  `revalidating_provider` starts a new persisted invocation charged to the same
-  cumulative `provider-observation` counter, reissues exactly that frozen set
-  with each descriptor's exact `If-None-Match`, and requires `304` with no
-  representation body. The credentialed artifact-download request whose
-  required initial result is `302` is not in that set, is never assigned an
-  ETag, and is not reissued. Only the exact
-  `PROVIDER_EPOCH_REVALIDATED` result may enter G3. A missing/extra/reordered
-  descriptor, 200, changed/missing ETag, endpoint/query drift or mixed
-  initial/revalidation result rejects the whole observation epoch.
-- Independently require run-attempt metadata for the requested repository,
-  workflow path, `runId`, `runAttempt`, head SHA, main ref and successful
-  conclusion. This authenticates the requested run attempt; it is not treated
-  as an artifact field.
-- Select exactly one REST artifact whose exposed fields match literal name,
-  `workflow_run.id == runId`, `workflow_run.head_sha == headSha`, repository
-  IDs, nonexpired status, exact canonical artifact ID/digest/byte count and
-  creation/expiry chronology. Zero/multiple matches reject; order is never a
-  tie-break. No artifact-job or artifact-attempt predicate exists.
-- Select exactly one applicable attestation by authenticated subject name and
-  digest. Zero/multiple applicable bundles reject.
+- La première invocation de `provider-observation` effectue l'unique GET de terminal du producteur autorisé par le candidat et valide l'enregistrement signé/enveloppe/chaîne/ralliement complet ci-dessus. Cette réponse immuable de contrôle de release n'est pas membre de l'époque du fournisseur GitHub et n'est jamais ré-extraite ni revalidée par ETag lors de cette tentative. Ce n'est qu'alors que la même invocation cumulée effectue chaque lecture de première partie GitHub initiale, y compris la requête de téléchargement d'artefact avec identifiants et son unique réponse de redirection. Ce n'est qu'après le succès de toutes les opérations bornées que `PROVIDER_OBSERVATION_CAPTURED` peut entrer dans `downloading_transport`.
+- Chaque requête de première partie utilise exactement l'origine `https://api.github.com`, le port HTTPS par défaut, `Accept: application/vnd.github+json`, `X-GitHub-Api-Version: 2026-03-10`, `redirect: manual`, et aucun cookie ni proxy ambiant. Les segments owner/repo/path sont canoniquement encodés en pourcentages ; les informations d'utilisateur, fragments, ports/origines alternatifs et GraphQL sont interdits.
+- Le token en lecture seule est capturé une seule fois depuis le canal secret fixe de CI et ne peut posséder que les portées de dépôt `actions:read`, `attestations:read` et `contents:read`. `Authorization: Bearer <token>` est envoyé uniquement à l'origine exacte `https://api.github.com` ; le token n'est jamais placé dans une URL, une redirection, un contexte, un reçu, un log ou une requête vers l'origine de téléchargement. `Set-Cookie` provoque un rejet et aucun gestionnaire de cookies n'existe.
+- Extraire les métadonnées de tentative de run uniquement depuis `/repos/{owner}/{repo}/actions/runs/{runId}/attempts/{runAttempt}` et les octets du workflow uniquement depuis `/repos/{owner}/{repo}/contents/.github/workflows/ci.yml?ref={headSha}` ; exiger que les octets du blob régulier renvoyé et l'identité du blob Git correspondent au blob/digest de workflow intégré du candidat G0. Extraire exactement la page 1 de `/repos/{owner}/{repo}/actions/runs/{runId}/artifacts?name=missionpulse-sealed-candidate&per_page=100&page=1&direction=asc`. Exiger `total_count === 1`, une seule entrée dans le tableau et aucun `Link rel="next"` ; une deuxième page est une ambiguïté, pas une continuation.
+- Extraire exactement la page 1 de `/repos/{owner}/{repo}/attestations/sha256:{transportDigest}?predicate_type=provenance&per_page=100` sans curseur `before`/`after`. Exiger l'absence de lien suivant et exactement un bundle passant ultérieurement G3 ; zéro, plusieurs ou des réponses avec curseur provoquent un rejet.
+- Chaque réponse JSON/blob du fournisseur avec un statut `200` doit porter un `ETag` borné et syntaxiquement valide. Capturer les octets exacts de l'ETag et geler l'ensemble ordonné exact de ces descripteurs de requêtes portant un ETag. Après le téléchargement, `revalidating_provider` démarre une nouvelle invocation persistée imputée au même compteur cumulé `provider-observation`, réémet exactement cet ensemble gelé avec l'`If-None-Match` exact de chaque descripteur, et exige `304` sans corps de représentation. La requête de téléchargement d'artefact avec identifiants dont le résultat initial requis est `302` ne fait pas partie de cet ensemble, ne se voit jamais attribuer d'ETag, et n'est pas réémise. Seul le résultat exact `PROVIDER_EPOCH_REVALIDATED` peut entrer dans G3. Un descripteur manquant/superflu/réordonné, un 200, un ETag modifié/manquant, une dérive d'endpoint/query ou un résultat mixte initial/revalidation rejette l'époque d'observation entière.
+- Exiger indépendamment les métadonnées de tentative de run pour le dépôt, chemin de workflow, `runId`, `runAttempt`, head SHA, ref principale demandés et une conclusion avec succès. Cela authentifie la tentative de run demandée ; elle n'est pas traitée comme un champ d'artefact.
+- Sélectionner exactement un artefact REST dont les champs exposés correspondent au nom littéral, `workflow_run.id == runId`, `workflow_run.head_sha == headSha`, aux ID de dépôt, au statut non expiré, à l'identifiant d'artefact/digest/nombre d'octets canoniques exacts et à la chronologie création/expiration. Zéro ou plusieurs correspondances provoquent un rejet ; l'ordre ne sert jamais à départager. Aucun prédicat artefact-job ou artefact-tentative n'existe.
+- Sélectionner exactement une attestation applicable par nom de sujet authentifié et digest. Zéro ou plusieurs bundles applicables provoquent un rejet.
 
-### G2 — exact downloaded blob
+### G2 — blob téléchargé exact
 
-- During the first `provider-observation` invocation, request exactly
-  `https://api.github.com/repos/{owner}/{repo}/actions/artifacts/{artifactId}/zip`
-  with the first-party headers above and manual redirects. Require exactly one
-  `302` with one `Location` and no body used as authority.
-- `downloading_transport` then canonicalizes that captured single `Location`
-  once. Require HTTPS, port 443/default, no
-  userinfo/fragment, a DNS hostname rather than an IP literal, and no loopback,
-  link-local, private, multicast or metadata-address resolution. Pin the public
-  resolution for the connection and require TLS hostname plus connected remote
-  address to match. Record the exact full URL and exact origin; patterns,
-  suffixes and caller allowlists are not origin authority.
-- Perform exactly one credentialless `GET` to that exact full URL with
-  `redirect: manual`. Send no Authorization, Cookie, Proxy-Authorization,
-  GitHub token or first-party ETag. Require status `200`; any second Location,
-  redirect or origin change rejects.
-- Read one response body to EOF into one buffer bounded by
-  `maxSealedCandidateTransportBytes`; declared length, if present, must agree.
-- No range concatenation, resume, transparent repack, pathname reopen or second
-  download may replace captured bytes.
-- Recomputed SHA-256 must equal the single normalized GitHub
-  `sha256:<64 lowercase hex>` digest.
+- Pendant la première invocation de `provider-observation`, demander exactement `https://api.github.com/repos/{owner}/{repo}/actions/artifacts/{artifactId}/zip` avec les en-têtes de première partie ci-dessus et redirections manuelles. Exiger exactement un `302` avec un `Location` et aucun corps utilisé comme autorité.
+- `downloading_transport` canonise ensuite cet unique `Location` capturé. Exiger HTTPS, port 443/par défaut, aucun userinfo/fragment, un nom d'hôte DNS plutôt qu'une adresse IP littérale, et aucune résolution d'adresse loopback, link-local, privée, multicast ou de métadonnées. Figer la résolution publique pour la connexion et exiger que le nom d'hôte TLS ainsi que l'adresse distante connectée correspondent. Enregistrer l'URL complète exacte et l'origine exacte ; les motifs, suffixes et listes blanches d'appelants ne constituent pas une autorité d'origine.
+- Effectuer exactement un `GET` sans identifiants vers cette URL complète exacte avec `redirect: manual`. N'envoyer aucun Authorization, Cookie, Proxy-Authorization, token GitHub ou ETag de première partie. Exiger le statut `200` ; tout second Location, redirection ou changement d'origine provoque un rejet.
+- Lire un corps de réponse jusqu'à EOF dans un unique tampon borné par `maxSealedCandidateTransportBytes` ; la longueur déclarée, si présente, doit concorder.
+- Aucune concaténation de plages, reprise, réempaquetage transparent, réouverture de chemin ou second téléchargement ne peut remplacer les octets capturés.
+- Le SHA-256 recalculé doit être égal au digest unique normalisé de GitHub `sha256:<64 caractères hexadécimaux en minuscules>`.
 
-### G3 — attestation and workflow authority
+### G3 — attestation et autorité du workflow
 
-- Strictly parse the complete bounded Sigstore bundle; recompute RFC 8785 JCS
-  and its digest.
-- Verify DSSE signature, certificate chain, pinned trusted root, transparency
-  proof and inclusion material through the candidate's exact policy.
-- Derive repository, main ref, workflow path/ref/SHA, run, attempt and head SHA
-  from authenticated claims, never unverified projections.
-- Require SLSA predicate type `https://slsa.dev/provenance/v1`; infer no absent
-  job ID and attribute no run-attempt field to REST artifact metadata.
-- Revalidate the producer publication join and require exact equality of
-  attested subject, its handoff/controller/captured pre-upload digest,
-  `producerPublicationJoin.actionOutput.artifactDigest`, fresh GitHub artifact
-  digest and downloaded digest. Policy proves upload inputs but cannot supply or
-  synthesize that dynamic action output.
-- Re-read the complete workflow blob at `headSha`; strictly rederive exact job
-  permissions, step order/inputs/env and exhaustive literal SHA40 `uses`
-  inventory. Reject tags, branches, short SHAs, expressions, local actions,
-  Docker/services, reusable workflows, matrices or extra privileged steps.
-- From that policy projection alone, require the pinned upload action and exact
-  `archive:false`, `overwrite:false`, `retention-days:30`, single literal path
-  and `if-no-files-found:error` inputs. Provider creation/expiry times cannot
-  substitute for this proof.
-- Construct `ClosedTransportHandoffV1` only after signed subject digest,
-  terminal producer publication join/action output, fresh provider artifact
-  digest, downloaded digest, source commit, run ID and the independently
-  authenticated signed run-attempt projection all cross-bind.
+- Analyser strictement le bundle Sigstore borné complet ; recalculer le JCS RFC 8785 et son digest.
+- Vérifier la signature DSSE, la chaîne de certificats, la racine de confiance épinglée, la preuve de transparence et le matériel d'inclusion à travers la politique exacte du candidat.
+- Dériver le dépôt, la référence principale, le chemin/ref/SHA du workflow, le run, la tentative et le head SHA à partir des revendications authentifiées, jamais de projections non vérifiées.
+- Exiger le type de prédicat SLSA `https://slsa.dev/provenance/v1` ; ne déduire aucun ID de job absent et n'attribuer aucun champ de tentative de run aux métadonnées de l'artefact REST.
+- Revalider le ralliement de publication du producteur et exiger l'égalité exacte du sujet attesté, de son digest avant téléversement handoff/contrôleur/capturé, de `producerPublicationJoin.actionOutput.artifactDigest`, du digest d'artefact GitHub frais et du digest téléchargé. La politique prouve les entrées de téléversement mais ne peut fournir ni synthétiser cette sortie d'action dynamique.
+- Relire le blob de workflow complet à `headSha` ; redériver strictement les permissions exactes du job, l'ordre des étapes/entrées/environnement et l'inventaire exhaustif des `uses` littéraux de SHA40. Rejeter les tags, branches, SHA courts, expressions, actions locales, Docker/services, workflows réutilisables, matrices ou étapes privilégiées supplémentaires.
+- À partir de cette seule projection de politique, exiger l'action de téléversement épinglée et les entrées exactes `archive:false`, `overwrite:false`, `retention-days:30`, un chemin littéral unique et `if-no-files-found:error`. Les dates de création/expiration du fournisseur ne peuvent se substituer à cette preuve.
+- Construire `ClosedTransportHandoffV1` seulement après que le digest du sujet signé, le ralliement de publication/sortie d'action terminal du producteur, le digest d'artefact frais du fournisseur, le digest téléchargé, le commit source, le run ID et la projection signée de tentative de run authentifiée indépendamment sont tous liés de manière croisée.
 
-No ZIP parsing or extraction occurs before G3 passes.
+Aucune analyse de ZIP ni extraction n'a lieu avant la validation de G3.
 
-### G4 — canonical transport and seal
+### G4 — transport canonique et sceau
 
-- Verify the complete canonical non-ZIP64 ZIP contract from the captured buffer:
-  exact headers, offsets, UTF-8 names, STORE method, order, timestamp, modes,
-  CRCs/sizes and no extras, comments, descriptors or trailing bytes.
-- Require exactly these seven logical top-level components:
+- Vérifier le contrat ZIP canonique complet non-ZIP64 à partir du tampon capturé : en-têtes exacts, décalages (offsets), noms UTF-8, méthode STORE, ordre, horodatage, modes, CRCs/tailles et aucun extra, commentaire, descripteur ou octet superflu en fin de fichier.
+- Exiger exactement ces sept composants logiques de premier niveau :
 
 ```text
 tested-dist-seal.json
@@ -1147,94 +631,42 @@ build-provenance.json
 release-execution-image.oci.tar
 ```
 
-- Safe-extract into a fresh private root with descriptor-relative no-follow
-  operations. Reject traversal, duplicate/colliding paths, aliases, hard links,
-  symlinks, special objects and extra roots.
-- Verify exact bounded JCS seal bytes, self-digest, identity, chronology and
-  complete prior gates. The JCS bytes and all candidate/seal fields must equal
-  the G0 readiness snapshot's exact seal and candidate; internally consistent
-  alternate candidate/seal bytes reject.
-- Require the seal's exact six-entry non-self inventory to match metadata,
-  provenance, `dist`, controller bundle, execution authority and OCI archive
-  byte-for-byte; bind the same bytes in the transport ZIP receipt.
+- Extraire en mode sécurisé dans une racine privée vierge avec des opérations relatives aux descripteurs sans suivi de liens symboliques (no-follow). Rejeter la traversée de répertoires, les chemins en doublon/collision, les alias, les liens physiques, les liens symboliques, les objets spéciaux et les racines superflues.
+- Vérifier les octets exacts du sceau JCS borné, son digest propre, son identité, sa chronologie et l'ensemble des portes préalables complètes. Les octets JCS et tous les champs de candidat/sceau doivent être égaux au sceau et candidat exacts du snapshot de readiness G0 ; des octets de candidat/sceau alternatifs cohérents en interne sont rejetés.
+- Exiger que l'inventaire exact à six entrées non auto-référencé du sceau corresponde aux métadonnées, à la provenance, à `dist`, au bundle de contrôleur, à l'autorité d'exécution et à l'archive OCI à l'octet près ; lier ces mêmes octets dans le reçu du ZIP de transport.
 
-### G5 — payload and controller execution authority
+### G5 — payload et autorité d'exécution du contrôleur
 
-- Verify canonical BuildKit metadata and SLSA provenance against exact recipe,
-  context, materials and proved OCI manifest.
-- Cross-bind `ReleaseExecutionAuthorityV1` to candidate/source, controller source
-  inventory, invocation policy, Python runtime/effective objects and full OCI
-  graph.
-- Open the OCI tar no-follow, capture it once and verify unique index, manifest,
-  config, ordered layers/diff IDs, root inventory, annotations and
-  `linux/amd64` platform from that buffer.
-- Authenticate exactly five evidence files: metadata, provenance, transported
-  execution authority, seal and transport ZIP receipt.
-- Derive clarification-3 `verificationId`, then controller authority JCS and
-  `authoritySha256` without a digest cycle. Exclusively create/recapture the
-  derived sixth evidence file and require exactly six regular evidence files.
-- Retain every source descriptor and exact identity/byte/tree snapshot through
-  host admission, Docker child completion and postflight.
+- Vérifier les métadonnées canoniques de BuildKit et la provenance SLSA par rapport à la recette, au contexte, aux matériaux exacts et au manifest OCI prouvé.
+- Lier de façon croisée `ReleaseExecutionAuthorityV1` au candidat/source, à l'inventaire source du contrôleur, à la politique d'invocation, aux objets effectifs/runtime Python et au graphe OCI complet.
+- Ouvrir le tar OCI en mode no-follow, le capturer une seule fois et vérifier l'index unique, le manifest, la configuration, les couches/diff IDs ordonnés, l'inventaire racine, les annotations et la plateforme `linux/amd64` à partir de ce tampon.
+- Authentifier exactement cinq fichiers de preuve : métadonnées, provenance, autorité d'exécution transportée, sceau et reçu du ZIP de transport.
+- Dériver le `verificationId` de la clarification 3, puis le JCS de l'autorité du contrôleur et `authoritySha256` sans cycle de digest. Créer/recapturer exclusivement le sixième fichier de preuve dérivé et exiger exactement six fichiers de preuve réguliers.
+- Conserver chaque descripteur source et snapshot exact d'identité/octets/arbre à travers l'admission de l'hôte, la complétion de l'enfant Docker et le post-vol.
 
-Only after G1–G5 pass may the private state transition register one
-`VerifiedTransportPayloadCapabilityV1`.
+Ce n'est qu'après la validation de G1 à G5 que la transition d'état privée peut enregistrer une `VerifiedTransportPayloadCapabilityV1`.
 
-### G6 — host admission and one-shot capability
+### G6 — admission de l'hôte et capabilité one-shot
 
-- Entering `admitting_host` invokes only the fixed production admission actor.
-  Its non-async synchronous prologue checks
-  `process.platform === "linux"` and `process.arch === "x64"` before inspecting
-  token identity, proxy, getter, private record or candidate bytes.
-- After that host check, the same synchronous prologue requires the exact live
-  token in both private registries and deletes it from both before constructing
-  or awaiting any Promise and before any success/failure return.
-- Re-derive/reverify controller authority and all descriptor snapshots during
-  admission; a raw record transfer is forbidden.
-- Register exactly one frozen one-shot host admission in a second private
-  `WeakSet`/`WeakMap` pair.
-- `HOST_ADMITTED` is only the invocation's private completion result. Its
-  handler validates actor/attempt, authority digest and registered-admission
-  identity and persists the bounded host-admission receipt only. Entry into the
-  resulting `runtime_executing` state invokes runtime; this event does not
-  perform host check, payload-token lookup/consumption, admission creation or
-  runtime work.
+- L'entrée dans `admitting_host` invoque uniquement l'acteur d'admission de production fixe. Son prologue synchrone non asynchrone vérifie `process.platform === "linux"` et `process.arch === "x64"` avant d'examiner l'identité du token, le proxy, le getter, l'enregistrement privé ou les octets du candidat.
+- Après cette vérification d'hôte, le même prologue synchrone exige le token actif exact dans les deux registres privés et le supprime de ces deux registres avant de construire ou d'attendre (await) toute Promise et avant tout retour de succès ou d'échec.
+- Redériver/revérifier l'autorité du contrôleur et tous les snapshots de descripteurs pendant l'admission ; un transfert d'enregistrement brut est interdit.
+- Enregistrer exactement une admission d'hôte one-shot gelée dans une seconde paire `WeakSet`/`WeakMap` privée.
+- `HOST_ADMITTED` est uniquement le résultat privé de complétion de l'invocation. Son gestionnaire valide l'acteur/tentative, le digest d'autorité et l'identité d'admission enregistrée, et persiste uniquement le reçu borné d'admission d'hôte. L'entrée dans l'état `runtime_executing` qui en résulte invoque le runtime ; cet événement n'effectue pas la vérification d'hôte, la consultation/consommation du token de payload, la création d'admission ou le travail runtime.
 
-### G7 — OCI runtime and receipt
+### G7 — exécution OCI et reçu
 
-- Entering `runtime_executing` invokes only the fixed production runtime actor.
-  Its non-async synchronous prologue requires and deletes the exact admission
-  from both private registries before constructing/awaiting any Promise and
-  before inspection, load or other Docker access.
-- Feed captured OCI bytes to `docker load` over stdin; never pass/reopen its path
-  and never pull.
-- Require exact local tag `missionpulse-release-runtime:sealed-candidate`, then
-  re-inspect `linux/amd64` and execute only
-  `missionpulse-release-runtime@sha256:<manifestSha256>` with `--pull=never`.
-- Enforce read-only root, no network, all capabilities dropped, no new
-  privileges, UID/GID 65532, bounded PIDs, bounded hardened tmpfs mounts and
-  only three descriptor-derived read-only inputs.
-- Derive mount sources only from retained `/proc/<hostPid>/fd/<fd>` handles;
-  revalidate descriptor identities and full snapshots immediately before child
-  start and after completion.
-- Accept one strict bounded `ReleaseExecutionPayloadVerificationV1` only if its
-  self-digest, clarification-3 ID, `controllerExecutionAuthoritySha256` and every
-  payload/runtime digest equal captured authority. Extra stdout/stderr,
-  wrong exit/signal or drift rejects.
-- `RUNTIME_VERIFIED` is only the invocation's private completion result. Its
-  handler validates/cross-binds and persists the receipt; it never consumes an
-  admission or starts Docker.
+- L'entrée dans `runtime_executing` invoque uniquement l'acteur d'exécution de production fixe. Son prologue synchrone non asynchrone exige et supprime l'admission exacte des deux registres privés avant de construire/attendre toute Promise et avant tout examen, chargement ou autre accès à Docker.
+- Transmettre les octets OCI capturés à `docker load` via stdin ; ne jamais passer/rouvrir son chemin et ne jamais faire de pull.
+- Exiger le tag local exact `missionpulse-release-runtime:sealed-candidate`, puis réexaminer `linux/amd64` et exécuter uniquement `missionpulse-release-runtime@sha256:<manifestSha256>` avec `--pull=never`.
+- Imposer une racine en lecture seule, aucun accès réseau, toutes les capabilités abandonnées, pas de nouveaux privilèges, UID/GID 65532, des PID bornés, des montages tmpfs durcis et bornés, et uniquement trois entrées en lecture seule dérivées de descripteurs.
+- Dériver les sources de montage uniquement depuis les handles `/proc/<hostPid>/fd/<fd>` conservés ; revalider les identités de descripteurs et les snapshots complets immédiatement avant le démarrage de l'enfant et après sa complétion.
+- N'accepter une `ReleaseExecutionPayloadVerificationV1` stricte et bornée que si son digest propre, son identifiant de clarification 3, son `controllerExecutionAuthoritySha256` et chaque digest payload/runtime sont égaux à l'autorité capturée. Tout stdout/stderr supplémentaire, mauvais code de sortie/signal ou dérive provoque un rejet.
+- `RUNTIME_VERIFIED` est uniquement le résultat privé de complétion de l'invocation. Son gestionnaire valide/lie de manière croisée et persiste le reçu ; il ne consomme jamais d'admission ni ne démarre Docker.
 
-### G8 — durable ingestion and package-only validation
+### G8 — ingestion durable et validation réservée aux packages
 
-- Before V, assemble exactly one `ReleasePayloadByteSnapshotV1` from the
-  still-open, postflight-revalidated private byte record. No path reopen,
-  alternate serialization or receipt synthesis is permitted. Parse with the
-  imported parent limits and call only the imported
-  `verifyPayloadByteSnapshot`; the result must be the imported exact
-  `VerifiedReleasePayloadProjectionV1`. Freeze the snapshot, projection and
-  imported accepted-event record in one private
-  `TransientPayloadVerificationRecordV1`. The exact snapshot is carried with
-  the observation and verification as one event:
+- Avant V, assembler exactement un `ReleasePayloadByteSnapshotV1` à partir de l'enregistrement d'octets privé toujours ouvert et revalidé au post-vol. Aucune réouverture de chemin, sérialisation alternative ou synthèse de reçu n'est autorisée. Analyser avec les limites parentes importées et appeler uniquement le `verifyPayloadByteSnapshot` importé ; le résultat doit être la `VerifiedReleasePayloadProjectionV1` exacte importée. Geler le snapshot, la projection et l'enregistrement d'événement accepté importé dans un unique `TransientPayloadVerificationRecordV1` privé. Le snapshot exact est transporté avec l'observation et la vérification sous un seul événement :
 
 ```ts
 interface CommitActorRequestV1 {
@@ -1244,45 +676,15 @@ interface CommitActorRequestV1 {
 }
 ```
 
-- Submit that exact event to the G0 actor. The readiness reducer validates the
-  snapshot plus both receipts through the same imported parent verifier,
-  derives the next context, and commits through the existing
-  `CommitActorRequestV1` CAS with the exact
-  `actorId + expectedContextSha256`. Only a successful durable commit may enter
-  `payload_verified`. The returned context is rehashed as
-  `readinessContextSha256`; it must retain observation, verification and exactly
-  the imported `AcceptedPayloadVerificationLocalEventV1` whose stable tuple is
-  `[attestationId, verificationId, snapshotId]` and whose `eventSha256` covers
-  the complete canonical V event including every transient snapshot byte. It
-  must retain neither snapshot nor verified projection. The consumer then
-  clears its private transient record. No actor/registry revision exists in
-  this protocol.
-- On `ACTOR_CAS_CONFLICT`, re-read only the same `actorId` and recompute its
-  context SHA-256. Accept only (a) the same candidate, seal and `rc_built` state
-  with both V fields still null and no pending restart, then resubmit the
-  byte-identical event under that fresh `expectedContextSha256`, or (b) the
-  byte-identical already-accepted event/receipts, treated by the reducer as an
-  idempotent acknowledgement. Any other context, state or bytes reject as
-  `READINESS_CAS_CONFLICT`; provider and Docker effects are never replayed.
-- On exact already-accepted acknowledgement after CAS conflict, the durable
-  observation, verification, stable three-ID tuple and full event hash must
-  match the private event byte-for-byte; neither missing durable IDs/hash nor a
-  durable snapshot/projection can be accepted. The private transient record is
-  then cleared without rerunning provider, OCI or byte-verification effects.
-- Require `observedAt <= verifiedAt < packageJournal.reserved.at` and artifact
-  expiry after verification.
-- Run only the existing exclusive-lock, no-follow snapshot, normalization, twin
-  canonical ZIP, safe extraction, sidecar/JCS, no-replace publication, journal
-  and catalog-CAS protocol.
-- Never install, build, bump version, edit manifest, resolve connectors or
-  mutate tested `dist`.
-- Success requires journal phase `published` and one exact
-  `ValidatedZipArtifactV1`; after every journal/artifact CAS, the consumer
-  replaces its current context SHA-256 with the returned context hash. The
-  success value carries the final published context hash. Command exit alone
-  has no authority.
+- Soumettre cet événement exact à l'acteur G0. Le réducteur de readiness valide le snapshot ainsi que les deux reçus à travers le même vérificateur parent importé, dérive le contexte suivant, et commite via le CAS `CommitActorRequestV1` existant avec l'`actorId + expectedContextSha256` exact. Seul un commit durable réussi peut entrer dans `payload_verified`. Le contexte renvoyé est rehaché sous `readinessContextSha256` ; il doit conserver l'observation, la vérification et exactement l'`AcceptedPayloadVerificationLocalEventV1` importé dont le tuple stable est `[attestationId, verificationId, snapshotId]` et dont l'`eventSha256` couvre l'événement V canonique complet, y compris chaque octet du snapshot transitoire. Il ne doit conserver ni le snapshot ni la projection vérifiée. Le consommateur efface ensuite son enregistrement transitoire privé. Aucune révision d'acteur/registre n'existe dans ce protocole.
+- Lors d'un `ACTOR_CAS_CONFLICT`, relire uniquement le même `actorId` et recalculer son SHA-256 de contexte. N'accepter que (a) le même candidat, sceau et état `rc_built` avec les deux champs V toujours nuls et aucun redémarrage en attente, puis resoumettre l'événement identique octet par octet sous ce nouvel `expectedContextSha256`, ou (b) l'événement/reçus déjà acceptés identiques octet par octet, traités par le réducteur comme un accusé de réception idempotent. Tout autre contexte, état ou octet entraîne un rejet sous `READINESS_CAS_CONFLICT` ; les effets fournisseur et Docker ne sont jamais rejoués.
+- Lors d'un accusé de réception exact déjà accepté après un conflit CAS, l'observation durable, la vérification, le tuple stable à trois ID et le hash d'événement complet doivent correspondre à l'événement privé octet par octet ; ni des ID/hash durables manquants ni un snapshot/projection durable ne peuvent être acceptés. L'enregistrement transitoire privé est ensuite effacé sans réexécuter les effets de fournisseur, d'OCI ou de vérification d'octets.
+- Exiger `observedAt <= verifiedAt < packageJournal.reserved.at` et l'expiration de l'artefact après la vérification.
+- Exécuter uniquement le protocole existant de verrou exclusif, snapshot no-follow, normalisation, double ZIP canonique, extraction sécurisée, sidecar/JCS, publication sans remplacement, journal et CAS de catalogue.
+- Ne jamais installer, construire, incrémenter la version, éditer le manifest, résoudre les connecteurs ou muter le `dist` testé.
+- Le succès exige la phase de journal `published` et un `ValidatedZipArtifactV1` exact ; après chaque CAS de journal/artefact, le consommateur remplace son SHA-256 de contexte courant par le hash de contexte retourné. La valeur de succès transporte le hash de contexte publié final. Le code de sortie de commande seul n'a aucune autorité.
 
-## 6. Errors, retries, cancellation and restart
+## 6. Erreurs, réessais, annulation et redémarrage
 
 ```ts
 type SealedCandidateConsumerErrorCode =
@@ -1326,138 +728,75 @@ interface SealedCandidateConsumerErrorV1 {
 }
 ```
 
-Only `READINESS_STORE_UNAVAILABLE`, `PROVIDER_UNAVAILABLE`,
-`DOWNLOAD_INTERRUPTED`, or `EPHEMERAL_AUTHORITY_LOST` in one of the explicit
-pre-authority restart rows below may derive `fresh-read-attempt`. Retry is never
-automatic and requires: same actor/run, new attempt ID, no capability, Docker,
-receipt or package effect, and proven cleanup of every partial resource. It
-restarts at `loading_readiness_actor`; candidate, seal, bytes and provider
-projections are all reloaded rather than reused.
+Seuls `READINESS_STORE_UNAVAILABLE`, `PROVIDER_UNAVAILABLE`, `DOWNLOAD_INTERRUPTED`, ou `EPHEMERAL_AUTHORITY_LOST` dans l'une des lignes explicites de redémarrage pré-autorité ci-dessous peuvent dériver `fresh-read-attempt`. Le réessai n'est jamais automatique et requiert : le même acteur/run, un nouvel ID de tentative, aucun effet de capabilité, Docker, reçu ou package, et le nettoyage prouvé de chaque ressource partielle. Il redémarre à `loading_readiness_actor` ; le candidat, le sceau, les octets et les projections du fournisseur sont tous rechargés plutôt que réutilisés.
 
-Every ambiguity, digest/signature/canonical failure, unsupported host,
-capability replay, runtime failure or package failure is nonretryable in the
-actor. `DEADLINE_EXCEEDED` and `POST_V_PRE_JOURNAL_CRASH` are always
-nonretryable for that request/candidate. Package journal recovery is not retry
-and never reruns provider or Docker effects.
+Toute ambiguïté, échec de digest/signature/canonique, hôte non supporté, rejeu de capabilité, échec d'exécution ou échec de package est non réessayable dans l'acteur. `DEADLINE_EXCEEDED` et `POST_V_PRE_JOURNAL_CRASH` sont toujours non réessayables pour cette requête/candidat. La récupération du journal de package ne constitue pas un réessai et ne réexécute jamais les effets de fournisseur ou Docker.
 
-### One-shot cancellation and deadline cleanup matrix
+### Matrice de nettoyage one-shot lors d'annulation et d'échéance
 
-The first valid cancel in any nonterminal state except `cancelling`, or the
-first exact deadline event, atomically freezes one cleanup trigger and plan,
-then enters `cancelling`. The state-to-plan mapping is closed:
+La première annulation valide dans tout état non terminal sauf `cancelling`, ou le premier événement d'échéance exact, gèle atomiquement un déclencheur et un plan de nettoyage, puis entre dans `cancelling`. Le mapping d'état vers plan est fermé :
 
-| Consumer state when trigger commits                                                                                  | Frozen plan         |
-| -------------------------------------------------------------------------------------------------------------------- | ------------------- |
-| `loading_readiness_actor` through `runtime_executing`, before the `RUNTIME_VERIFIED` handler commits V; `retry_wait` | `private-only`      |
-| `payload_verified`                                                                                                   | `invalidate-post-v` |
-| `package_validating` or `package_recovering`, regardless of the actor's last locally cached J projection             | `reconcile-journal` |
+| État du consommateur lorsque le déclencheur commite                                                                                  | Plan gelé           |
+| ------------------------------------------------------------------------------------------------------------------------------------ | ------------------- |
+| de `loading_readiness_actor` jusqu'à `runtime_executing`, avant que le gestionnaire de `RUNTIME_VERIFIED` ne valide V ; `retry_wait` | `private-only`      |
+| `payload_verified`                                                                                                                   | `invalidate-post-v` |
+| `package_validating` ou `package_recovering`, quelle que soit la dernière projection J mise en cache localement par l'acteur         | `reconcile-journal` |
 
-No trigger is accepted from `created` or a terminal state because no request
-identity/deadline authority exists there. The single cleanup actor first
-stops and joins the current child, charges its final elapsed budget, revokes
-both capability registries, closes descriptors and rereads the exact readiness
-actor before any path deletion or readiness mutation. The child itself is one
-closed invoked XState actor with the following finite transition matrix; it
-does not reenter parent `cancelling`, recursively invoke itself or start
-provider/Docker work:
+Aucun déclencheur n'est accepté depuis `created` ou un état terminal car aucune autorité d'identité de requête/échéance n'y existe. L'unique acteur de nettoyage commence par arrêter et rallier l'enfant actuel, impute son budget final écoulé, révoque les deux registres de capabilités, ferme les descripteurs et relit l'acteur de readiness exact avant toute suppression de chemin ou mutation de readiness. L'enfant lui-même est un unique acteur XState invoqué et fermé avec la matrice de transition finie suivante ; il ne réentre pas dans le `cancelling` parent, ne s'invoque pas récursivement et ne démarre aucun travail fournisseur/Docker :
 
-| Plan / durable actor observation                                                 | Mandatory effect and proof before result                               | Disposition                     |
-| -------------------------------------------------------------------------------- | ---------------------------------------------------------------------- | ------------------------------- |
-| `private-only`; no actor loaded                                                  | prove no V, J, package path or local child effect                      | `private-clean`                 |
-| `private-only`; exact G0 actor still has V/J/artifact null                       | same context hash, close/remove only private pre-V resources           | `private-clean`                 |
-| `private-only`; any V, J or artifact appears                                     | no mutation; durable effect boundary is unexplained                    | `CLEANUP_FAILED`                |
-| `invalidate-post-v`; exact V is durable and J/artifact are null                  | CAS-ingest the exact invalidation below and reread blocked actor       | `post-v-blocked`                |
-| `reconcile-journal`; exact V is durable and J is null                            | same exact post-V invalidation CAS                                     | `post-v-blocked`                |
-| `reconcile-journal`; J is nonterminal                                            | run only the existing observed journal-recovery protocol to one end    | continue inside this invocation |
-| `reconcile-journal`; J is `cleaned`, artifact null                               | CAS-ingest exact invalidation; reread blocked actor preserving clean J | `journal-cleaned-blocked`       |
-| `reconcile-journal`; J is `published` with exact durable artifact/catalog CAS    | revalidate complete published context; perform no cleanup mutation     | `publication-completed`         |
-| any plan; foreign/divergent actor, V, J, artifact, context or catalog projection | no mutation or deletion                                                | `CLEANUP_FAILED`                |
+| Plan / observation durable de l'acteur                                                     | Effet obligatoire et preuve avant résultat                                                | Disposition                     |
+| ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------- | ------------------------------- |
+| `private-only` ; aucun acteur chargé                                                       | prouver l'absence d'effet V, J, de chemin de package ou d'enfant local                    | `private-clean`                 |
+| `private-only` ; l'acteur G0 exact a toujours V/J/artefact nuls                            | même hash de contexte, fermer/supprimer uniquement les ressources privées pré-V           | `private-clean`                 |
+| `private-only` ; tout V, J ou artefact apparaît                                            | aucune mutation ; la frontière d'effet durable est inexpliquée                            | `CLEANUP_FAILED`                |
+| `invalidate-post-v` ; V exact est durable et J/artefact sont nuls                          | ingérer par CAS l'invalidation exacte ci-dessous et relire l'acteur bloqué                | `post-v-blocked`                |
+| `reconcile-journal` ; V exact est durable et J est null                                    | même CAS d'invalidation post-V exact                                                      | `post-v-blocked`                |
+| `reconcile-journal` ; J est non terminal                                                   | exécuter uniquement le protocole existant de récupération de journal jusqu'au bout        | continuer dans cette invocation |
+| `reconcile-journal` ; J est `cleaned`, artefact null                                       | ingérer par CAS l'invalidation exacte ; relire l'acteur bloqué en préservant le J nettoyé | `journal-cleaned-blocked`       |
+| `reconcile-journal` ; J est `published` avec le CAS durable exact artefact/catalogue       | revalider le contexte complet publié ; n'effectuer aucune mutation de nettoyage           | `publication-completed`         |
+| tout plan ; acteur, V, J, artefact, contexte ou projection de catalogue étranger/divergent | aucune mutation ni suppression                                                            | `CLEANUP_FAILED`                |
 
-Journal recovery is bounded by the existing maximum journal history and permits
-only the unique next transition already authorized by
-`SERVICE_RESTARTED -> LOCAL_RELEASE_OBSERVATION_INGESTED`. It may observe or
-complete cleanup, or recognize an already completed publication. It may not
-resume ordinary package construction. If recovery observes publication, the
-parent enters `package_validated`: a late cancel or deadline cannot relabel an
-already durable artifact as cancelled. If recovery reaches `cleaned`, the
-candidate is blocked before `cancelled`; no live nonterminal journal remains.
+La récupération du journal est bornée par l'historique maximal existant du journal et n'autorise que l'unique transition suivante déjà autorisée par `SERVICE_RESTARTED -> LOCAL_RELEASE_OBSERVATION_INGESTED`. Elle peut observer ou compléter le nettoyage, ou reconnaître une publication déjà complétée. Elle ne peut reprendre la construction ordinaire du package. Si la récupération observe la publication, le parent entre dans `package_validated` : une annulation tardive ou une échéance ne peut ré-étiqueter comme annulé un artefact déjà durable. Si la récupération atteint `cleaned`, le candidat est bloqué avant `cancelled` ; aucun journal non terminal actif ne subsiste.
 
-The post-V invalidation is one exact `LOCAL_EVIDENCE_INVALIDATED` event with
-existing code `LOCAL_GATE_INVALID`, stage
-`consumer-cancelled-post-v` or `consumer-deadline-post-v`, the current release
-ID and `cleanupInvocationId` as its correlated evidence digest. It is submitted
-through the readiness controller using the exact current
-`actorId + expectedContextSha256`. Success requires a reread proving state
-`blocked`, byte-identical candidate/seal/V receipts, unchanged null or cleaned
-J as applicable, null artifact and the accepted invalidation event digest. An
-actor CAS conflict permits only a reread of the same actor and either the exact
-already-accepted invalidation or one byte-identical resubmission while the same
-precondition still holds. A newly appeared J, publication, replacement,
-different error or receipt is ambiguity, not authority to broaden the plan.
+L'invalidation post-V est un événement exact `LOCAL_EVIDENCE_INVALIDATED` avec le code existant `LOCAL_GATE_INVALID`, l'étape `consumer-cancelled-post-v` ou `consumer-deadline-post-v`, l'ID de release courant et `cleanupInvocationId` comme digest de preuve corrélé. Il est soumis via le contrôleur de readiness en utilisant l'`actorId + expectedContextSha256` courant exact. Le succès exige une relecture prouvant l'état `blocked`, des reçus de candidat/sceau/V identiques octet par octet, un J inchangé null ou nettoyé selon le cas, un artefact null et le digest de l'événement d'invalidation accepté. Un conflit CAS de l'acteur n'autorise qu'une relecture du même acteur et soit l'invalidation exacte déjà acceptée, soit une resoumission identique octet par octet tant que la même précondition reste vraie. Un J nouvellement apparu, une publication, un remplacement, une erreur différente ou un reçu différent constitue une ambiguïté, pas une autorité pour élargir le plan.
 
-Only `private-clean`, `post-v-blocked`, or `journal-cleaned-blocked` may enter
-`cancelled`. Thus neither a single-assigned V nor a nonterminal J is orphaned in
-an apparently cancellable `rc_built` actor. The later fresh-candidate protocols
-remain those in the post-V section below; cleanup never invents a candidate or
-catalog abandonment.
+Seuls `private-clean`, `post-v-blocked` ou `journal-cleaned-blocked` peuvent entrer dans `cancelled`. Ainsi, ni un V assigné une seule fois ni un J non terminal ne se trouve orphelin dans un acteur `rc_built` en apparence annulable. Les protocoles ultérieurs de nouveau candidat restent ceux de la section post-V ci-dessous ; le nettoyage n'invente jamais un abandon de candidat ou de catalogue.
 
-A byte-identical operator cancel redelivery in `cancelling` is an internal
-no-op without state reentry. Any other cancel is rejected as
-`CANCELLATION_ALREADY_STARTED` without changing context, stopping another child
-or emitting another cleanup effect. Generic `STAGE_FAILED` handling excludes
-`cancelling`; only the correlated cleanup result can leave it. Deadline expiry,
-restart, ambiguous cleanup or exhaustion of the reserved cleanup budget yields
-`rejected/CLEANUP_AMBIGUOUS`, never `cancelled`.
+Une nouvelle livraison d'annulation d'opérateur identique octet par octet dans `cancelling` est un no-op interne sans réentrée dans l'état. Toute autre annulation est rejetée sous `CANCELLATION_ALREADY_STARTED` sans modifier le contexte, arrêter un autre enfant ou émettre un autre effet de nettoyage. La gestion générique de `STAGE_FAILED` exclut `cancelling` ; seul le résultat de nettoyage corrélé peut en sortir. L'expiration de l'échéance, un redémarrage, un nettoyage ambigu ou l'épuisement du budget de nettoyage réservé produit `rejected/CLEANUP_AMBIGUOUS`, jamais `cancelled`.
 
-Before applying a restart row, the actor charges the persisted active
-invocation's full allocation, advances `maxObservedWallAt`, and recomputes only
-the remaining non-extending process-monotonic budget. A wall sample below the
-persisted maximum is deadline ambiguity and cannot start fresh work. The five
-`retry_wait` targets below are legal only while both the work deadline and
-corresponding cumulative stage budget remain. Otherwise restart enters the same
-deadline cleanup plan; an already expired hard deadline can only yield the
-row's fail-closed durable classification, never fresh work or `cancelled`.
+Avant d'appliquer une ligne de redémarrage, l'acteur impute l'allocation complète de l'invocation active persistée, avance `maxObservedWallAt`, et recalcule uniquement le budget monotone au processus restant sans extension. Un échantillon d'horloge murale inférieur au maximum persisté est une ambiguïté d'échéance et ne peut démarrer de nouveau travail. Les cinq cibles `retry_wait` ci-dessous ne sont légales que tant que l'échéance de travail et le budget d'étape cumulé correspondant subsistent. Sinon, le redémarrage entre dans le même plan de nettoyage d'échéance ; une échéance stricte déjà expirée ne peut que produire la classification durable fail-closed de la ligne, jamais un travail neuf ou `cancelled`.
 
-Restart handling is exhaustive:
+La gestion du redémarrage est exhaustive :
 
-| Persisted state               | Target               | Exact restart effect                                                                                                                  |
-| ----------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
-| `created`                     | `created`            | exact no-op; no request or authority exists                                                                                           |
-| `loading_readiness_actor`     | `retry_wait`         | cancel lost read actor; record retryable `EPHEMERAL_AUTHORITY_LOST`; retain actor/run selectors only                                  |
-| `observing_provider`          | `retry_wait`         | cancel API actor; discard envelope/ETags; record retryable `EPHEMERAL_AUTHORITY_LOST`                                                 |
-| `downloading_transport`       | `retry_wait`         | abort stream; discard all partial bytes/redirect facts; record retryable `EPHEMERAL_AUTHORITY_LOST`                                   |
-| `revalidating_provider`       | `retry_wait`         | cancel revalidation; discard downloaded buffer and complete observation epoch; record retryable `EPHEMERAL_AUTHORITY_LOST`            |
-| `verifying_attestation`       | `retry_wait`         | cancel verifier; discard unaccepted buffer/envelope; record retryable `EPHEMERAL_AUTHORITY_LOST`                                      |
-| `verifying_transport`         | `rejected`           | close/discard extraction descriptors/root; record nonretryable `EPHEMERAL_AUTHORITY_LOST`                                             |
-| `verifying_payload_authority` | `rejected`           | close all retained descriptors and derived temporary authority; record nonretryable `EPHEMERAL_AUTHORITY_LOST`                        |
-| `capability_ready`            | `rejected`           | revoke payload token/record; close descriptors; never reconstruct capability                                                          |
-| `admitting_host`              | `rejected`           | revoke any surviving payload/admission record; admission outcome is unknown and never replayed                                        |
-| `runtime_executing`           | `rejected`           | treat Docker outcome as unknown; if V is already durable while J is null, record `POST_V_PRE_JOURNAL_CRASH`; otherwise never ingest V |
-| `payload_verified`            | `rejected`           | V is durable but J is null; record `POST_V_PRE_JOURNAL_CRASH`, abandon this candidate and never resume or rerun runtime               |
-| `package_validating`, J null  | `rejected`           | V is durable but first journal reservation was not; record `POST_V_PRE_JOURNAL_CRASH` and abandon this candidate                      |
-| `package_validating`, J set   | `package_recovering` | do not rerun provider/runtime; invoke exact readiness `SERVICE_RESTARTED -> LOCAL_RELEASE_OBSERVATION_INGESTED` journal protocol      |
-| `package_recovering`, J null  | `rejected`           | impossible under a valid entry; fail closed as `POST_V_PRE_JOURNAL_CRASH` rather than synthesize recovery authority                   |
-| `package_recovering`, J set   | `package_recovering` | renew only the correlated local observation protocol; apply no package effect before observed unique recovery                         |
-| `retry_wait`                  | `retry_wait`         | exact no-op; user must request a fresh attempt                                                                                        |
-| `cancelling`                  | `rejected`           | cancellation outcome/cleanup is unknown; record `CLEANUP_AMBIGUOUS`, never infer cancelled                                            |
-| `package_validated`           | `package_validated`  | exact terminal no-op                                                                                                                  |
-| `rejected`                    | `rejected`           | exact terminal no-op                                                                                                                  |
-| `cancelled`                   | `cancelled`          | exact terminal no-op                                                                                                                  |
+| État persisté                  | Cible                | Effet de redémarrage exact                                                                                                                               |
+| ------------------------------ | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `created`                      | `created`            | no-op exact ; aucune requête ni autorité n'existe                                                                                                        |
+| `loading_readiness_actor`      | `retry_wait`         | annuler l'acteur de lecture perdu ; consigner `EPHEMERAL_AUTHORITY_LOST` réessayable ; conserver uniquement les sélecteurs acteur/run                    |
+| `observing_provider`           | `retry_wait`         | annuler l'acteur API ; abandonner enveloppe/ETags ; consigner `EPHEMERAL_AUTHORITY_LOST` réessayable                                                     |
+| `downloading_transport`        | `retry_wait`         | abandonner le flux ; jeter tous les octets partiels/faits de redirection ; consigner `EPHEMERAL_AUTHORITY_LOST` réessayable                              |
+| `revalidating_provider`        | `retry_wait`         | annuler la revalidation ; abandonner le tampon téléchargé et l'époque d'observation complète ; consigner `EPHEMERAL_AUTHORITY_LOST` réessayable          |
+| `verifying_attestation`        | `retry_wait`         | annuler le vérificateur ; abandonner le tampon/enveloppe non accepté ; consigner `EPHEMERAL_AUTHORITY_LOST` réessayable                                  |
+| `verifying_transport`          | `rejected`           | fermer/abandonner les descripteurs/racine d'extraction ; consigner `EPHEMERAL_AUTHORITY_LOST` non réessayable                                            |
+| `verifying_payload_authority`  | `rejected`           | fermer tous les descripteurs conservés et l'autorité temporaire dérivée ; consigner `EPHEMERAL_AUTHORITY_LOST` non réessayable                           |
+| `capability_ready`             | `rejected`           | révoquer le token/enregistrement de payload ; fermer les descripteurs ; ne jamais reconstruire la capabilité                                             |
+| `admitting_host`               | `rejected`           | révoquer tout enregistrement de payload/admission survivant ; le résultat d'admission est inconnu et jamais rejoué                                       |
+| `runtime_executing`            | `rejected`           | traiter le résultat Docker comme inconnu ; si V est déjà durable tant que J est null, consigner `POST_V_PRE_JOURNAL_CRASH` ; sinon ne jamais ingérer V   |
+| `payload_verified`             | `rejected`           | V est durable mais J est null ; consigner `POST_V_PRE_JOURNAL_CRASH`, abandonner ce candidat et ne jamais reprendre ni réexécuter le runtime             |
+| `package_validating`, J null   | `rejected`           | V est durable mais la première réservation de journal ne l'était pas ; consigner `POST_V_PRE_JOURNAL_CRASH` et abandonner ce candidat                    |
+| `package_validating`, J défini | `package_recovering` | ne pas réexécuter le fournisseur/runtime ; invoquer le protocole exact de journal de readiness `SERVICE_RESTARTED -> LOCAL_RELEASE_OBSERVATION_INGESTED` |
+| `package_recovering`, J null   | `rejected`           | impossible sous une entrée valide ; fail-closed sous `POST_V_PRE_JOURNAL_CRASH` plutôt que de synthétiser une autorité de récupération                   |
+| `package_recovering`, J défini | `package_recovering` | renouveler uniquement le protocole d'observation locale corrélé ; n'appliquer aucun effet de package avant la récupération unique observée               |
+| `retry_wait`                   | `retry_wait`         | no-op exact ; l'utilisateur doit demander une nouvelle tentative                                                                                         |
+| `cancelling`                   | `rejected`           | issue d'annulation/nettoyage inconnue ; consigner `CLEANUP_AMBIGUOUS`, ne jamais déduire l'état annulé                                                   |
+| `package_validated`            | `package_validated`  | no-op terminal exact                                                                                                                                     |
+| `rejected`                     | `rejected`           | no-op terminal exact                                                                                                                                     |
+| `cancelled`                    | `cancelled`          | no-op terminal exact                                                                                                                                     |
 
-No restart row reconstructs downloaded bytes, descriptors, a capability or an
-admission. The paired guarded `package_validating` and `package_recovering` rows
-are mutually exclusive and exhaustive on the durable readiness actor's
-`packageJournal` value. A valid `PACKAGE_RECOVERY_REQUIRED` entry already
-implies nonnull J; the null row is the fail-closed persistence-corruption case.
+Aucune ligne de redémarrage ne reconstruit les octets téléchargés, les descripteurs, une capabilité ou une admission. Les paires de lignes gardées `package_validating` et `package_recovering` s'excluent mutuellement et sont exhaustives sur la valeur de `packageJournal` de l'acteur de readiness durable. Une entrée valide `PACKAGE_RECOVERY_REQUIRED` implique déjà un J non nul ; la ligne nulle est le cas de corruption de persistance en fail-closed.
 
-### Post-V/pre-journal crash abandonment and replacement
+### Abandon et remplacement en cas de crash post-V/pré-journal
 
-A crash after the V actor CAS commits and before the first
-`PACKAGE_JOURNAL_INGESTED` commit is an irrevocable boundary for that candidate,
-including the subwindow where the consumer still persisted
-`runtime_executing`, already persisted `payload_verified`, or entered
-`package_validating` without a journal. After restart, the durable readiness
-residue is exactly:
+Un crash intervenant après que le CAS d'acteur V commite et avant le premier commit de `PACKAGE_JOURNAL_INGESTED` constitue une frontière irrévocable pour ce candidat, y compris la sous-fenêtre où le consommateur persistait encore `runtime_executing`, persistait déjà `payload_verified`, ou entrait dans `package_validating` sans journal. Après redémarrage, le résidu durable de readiness est exactement :
 
 ```ts
 interface PostVPreJournalReadinessResidueV1 {
@@ -1478,231 +817,117 @@ interface PostVPreJournalReadinessResidueV1 {
 }
 ```
 
-The consumer durably enters `rejected/POST_V_PRE_JOURNAL_CRASH`, cleans only its
-unambiguous private paths, and never reopens provider bytes, reruns Docker,
-re-emits V, creates J for the old candidate or treats the event digest as byte
-authority. The readiness residue remains `rc_built` until the controller
-explicitly applies one of the following existing release-readiness protocols:
+Le consommateur entre durablement dans `rejected/POST_V_PRE_JOURNAL_CRASH`, nettoie uniquement ses chemins privés non ambigus, et ne rouvre jamais les octets du fournisseur, ne réexécute pas Docker, ne réémet pas V, ne crée pas J pour l'ancien candidat et ne traite pas le digest d'événement comme une autorité d'octets. Le résidu de readiness reste `rc_built` jusqu'à ce que le contrôleur applique explicitement l'un des protocoles de release-readiness existants suivants :
 
-1. **In-actor replacement.** Ingest `LOCAL_EVIDENCE_INVALIDATED` with a typed
-   `ReleaseReadinessError` using existing code `LOCAL_GATE_INVALID`, stage
-   `consumer-post-v-pre-journal-crash`, the old `releaseId` and the correlated
-   evidence hash. This moves `rc_built -> blocked` while preserving the old V
-   receipts. Then submit `NEW_CANDIDATE_INGESTED` only with a fresh candidate,
-   complete audit and catalog revision. With J null and a different namespace,
-   the replacement closure is `no_journal`; reusing the unpublished old
-   namespace additionally requires the exact correlated restart observation
-   proving both staging and final paths absent. The actor-context CAS uses
-   `actorId + expectedContextSha256`, and the same transaction performs the
-   catalog CAS, archives the complete old context, abandons its active
-   reservation, reserves the new identity, clears current seal/V/J/artifact and
-   returns to `audited`.
-2. **Distinct new actor.** First ingest the same
-   `LOCAL_EVIDENCE_INVALIDATED` so the old actor is durably blocked, then reserve
-   a genuinely new release ID and different globally available namespace
-   through the ordinary atomic actor factory/catalog CAS. The old actor and its
-   reservation remain immutable evidence; no field or receipt is copied into
-   the new actor.
+1. **Remplacement intra-acteur (In-actor replacement).** Ingérer `LOCAL_EVIDENCE_INVALIDATED` avec une `ReleaseReadinessError` typée en utilisant le code existant `LOCAL_GATE_INVALID`, l'étape `consumer-post-v-pre-journal-crash`, l'ancien `releaseId` et le hash de preuve corrélé. Cela fait passer `rc_built -> blocked` tout en préservant les anciens reçus V. Soumettre ensuite `NEW_CANDIDATE_INGESTED` uniquement avec un candidat frais, un audit complet et une révision de catalogue. Avec J null et un espace de noms différent, la clôture de remplacement est `no_journal` ; réutiliser l'ancien espace de noms non publié exige en outre l'observation de redémarrage corrélée exacte prouvant l'absence des chemins de staging et finaux. Le CAS de contexte d'acteur utilise `actorId + expectedContextSha256`, et la même transaction effectue le CAS de catalogue, archive le contexte ancien complet, abandonne sa réservation active, réserve la nouvelle identité, efface le sceau/V/J/artefact actuels et retourne à `audited`.
+2. **Nouvel acteur distinct (Distinct new actor).** Ingérer d'abord le même `LOCAL_EVIDENCE_INVALIDATED` afin que l'ancien acteur soit durablement bloqué, puis réserver un ID de release authentiquement nouveau et un espace de noms globalement disponible différent via le CAS ordinaire atomique de fabrique d'acteur/catalogue. L'ancien acteur et sa réservation restent des preuves immuables ; aucun champ ni reçu n'est copié dans le nouvel acteur.
 
-Either path requires a new clean candidate/audit, final seal, transport and
-consumer pass. Neither path resumes the abandoned candidate. Any attempt to
-replace directly from `rc_built`, discard the single-assigned V receipts, reuse
-a published namespace, bypass closure proof or mutate the old actor is rejected.
+Chaque chemin exige un nouveau candidat/audit propre, un sceau final, un transport et une passe complète du consommateur. Aucun des deux chemins ne reprend le candidat abandonné. Toute tentative de remplacer directement depuis `rc_built`, de jeter les reçus V assignés une seule fois, de réutiliser un espace de noms publié, de contourner la preuve de fermeture ou de modifier l'ancien acteur est rejetée.
 
-## 7. Fail-closed hostile matrix
+## 7. Matrice hostile fail-closed
 
-| Hostile or ambiguous case                                                          | Must reject before                  |
-| ---------------------------------------------------------------------------------- | ----------------------------------- |
-| caller-supplied candidate/seal or readiness context SHA-256/state mismatch         | first GitHub request                |
-| `RELEASE_PAYLOAD_VERIFIED_INGESTED` before durable `RC_SEAL_INGESTED`/`rc_built`   | readiness mutation                  |
-| missing/extra/noncanonical/bounds-breaking payload byte snapshot field             | readiness mutation                  |
-| second nonidentical cancel or exact duplicate that reenters/spawns cleanup         | second cleanup effect               |
-| extended/replaced deadline, stale watcher generation, reset/undercharged stage     | child invocation                    |
-| cancel/deadline after V that skips durable invalidation or J recovery              | `cancelled`                         |
-| REST artifact projection invents job, run-attempt, direct mode or requested TTL    | handoff authority                   |
-| missing/divergent producer terminal join or uploader digest inferred from REST     | handoff authority                   |
-| zero/multiple artifacts or attestations; changing pagination                       | download authority                  |
-| redirect API call or ETag revalidation outside cumulative provider budget          | download authority                  |
-| page 2/cursor, missing/changing ETag, mixed observation epoch                      | attestation verification            |
-| alternate API origin/version/path/query, automatic redirect or ambient proxy       | provider response use               |
-| API credential on redirect target, cookie, second redirect/origin or private IP    | download body read                  |
-| forged API projection with valid repository/run tuple                              | ZIP parsing                         |
-| invalid DSSE/chain/root/transparency proof                                         | ZIP parsing                         |
-| alternate workflow/ref/blob; mutable/unlisted action; injected privileged step     | ZIP parsing                         |
-| artifact/uploader/attestation/download digest divergence                           | ZIP parsing                         |
-| partial/resumed/repacked/second download                                           | ZIP parsing                         |
-| duplicate, traversal, Unicode/case collision, link, special or extra ZIP object    | extraction completion               |
-| byte-different “equivalent” JSON/JCS                                               | capability registration             |
-| changed seal or any of six payload entries                                         | capability registration             |
-| alternate metadata/provenance/controller/authority with recomputed local digests   | capability registration             |
-| extra/missing OCI object, multiple manifest, wrong platform/annotation/layer graph | capability registration             |
-| raw DTO, cast, forged brand, proxy, getter or environment bypass                   | token record access                 |
-| non-Linux or non-x64 host                                                          | token/proxy/getter/candidate access |
-| forged `HOST_ADMITTED` used to trigger host check/token consume/admission creation | token record access                 |
-| second token/admission use                                                         | Docker access                       |
-| forged `RUNTIME_VERIFIED` used to consume admission/start Docker                   | Docker access                       |
-| caller Docker port/callback/options/second argument/test hook                      | Docker access                       |
-| OCI path reopen, tag-only/config-digest reference, pull or different local graph   | controller start                    |
-| descriptor close/reuse/swap, symlink retarget, same-size mutation                  | controller start or success         |
-| Python/env/loader injection, writable root/mount, Docker socket, excess privilege  | controller start                    |
-| extra stdout/stderr, wrong exit/signal or forged receipt                           | receipt ingestion                   |
-| package start before durable runtime proof                                         | first package write                 |
-| restart after durable V but before first J tries to resume the abandoned candidate | first resumed provider/package work |
-| rebuild/install/bump/edit or ambiguous journal recovery                            | artifact publication                |
+| Cas hostile ou ambigu                                                                                     | Doit rejeter avant                         |
+| --------------------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| candidat/sceau fourni par l'appelant ou discordance d'état/SHA-256 de contexte de readiness               | première requête GitHub                    |
+| `RELEASE_PAYLOAD_VERIFIED_INGESTED` avant `RC_SEAL_INGESTED`/`rc_built` durable                           | mutation de readiness                      |
+| champ de snapshot d'octets de payload manquant/superflu/non canonique/hors bornes                         | mutation de readiness                      |
+| seconde annulation non identique ou doublon exact qui réentre/relance le nettoyage                        | second effet de nettoyage                  |
+| échéance prolongée/remplacée, génération de surveillant périmée, étape réinitialisée/sous-imputée         | invocation d'enfant                        |
+| annulation/échéance après V qui omet l'invalidation durable ou la récupération de J                       | `cancelled`                                |
+| la projection d'artefact REST invente job, tentative de run, mode direct ou TTL demandé                   | autorité de handoff                        |
+| ralliement terminal du producteur manquant/divergent ou digest d'uploader déduit de REST                  | autorité de handoff                        |
+| zéro ou plusieurs artefacts ou attestations ; changement de pagination                                    | autorité de téléchargement                 |
+| appel d'API de redirection ou revalidation d'ETag hors du budget cumulé du fournisseur                    | autorité de téléchargement                 |
+| page 2/curseur, ETag manquant/changeant, époque d'observation mixte                                       | vérification d'attestation                 |
+| origine/version/chemin/requête d'API alternatifs, redirection automatique ou proxy ambiant                | utilisation de réponse fournisseur         |
+| identifiant d'API sur la cible de redirection, cookie, seconde redirection/origine ou IP privée           | lecture du corps téléchargé                |
+| projection d'API forgée avec tuple dépôt/run valide                                                       | analyse de ZIP                             |
+| preuve DSSE/chaîne/racine/transparence invalide                                                           | analyse de ZIP                             |
+| workflow/ref/blob alternatif ; action modifiable/non répertoriée ; étape privilégiée injectée             | analyse de ZIP                             |
+| divergence de digest d'artefact/uploader/attestation/téléchargement                                       | analyse de ZIP                             |
+| téléchargement partiel/repris/réempaqueté/second                                                          | analyse de ZIP                             |
+| objet ZIP dupliqué, en traversée, en collision Unicode/casse, lien, spécial ou superflu                   | complétion d'extraction                    |
+| JSON/JCS "équivalent" mais différent en octets                                                            | enregistrement de capabilité               |
+| sceau modifié ou l'une quelconque des six entrées de payload modifiée                                     | enregistrement de capabilité               |
+| métadonnées/provenance/contrôleur/autorité alternatifs avec digests locaux recalculés                     | enregistrement de capabilité               |
+| objet OCI superflu/manquant, manifest multiple, mauvaise plateforme/annotation/graphe de couches          | enregistrement de capabilité               |
+| DTO brut, cast, fausse marque (brand), proxy, getter ou contournement d'environnement                     | accès à l'enregistrement de token          |
+| hôte non-Linux ou non-x64                                                                                 | accès token/proxy/getter/candidat          |
+| faux `HOST_ADMITTED` utilisé pour déclencher vérification hôte/consommation token/création admission      | accès à l'enregistrement de token          |
+| seconde utilisation de token/admission                                                                    | accès à Docker                             |
+| faux `RUNTIME_VERIFIED` utilisé pour consommer l'admission/démarrer Docker                                | accès à Docker                             |
+| port/callback/options/second argument/hook de test Docker fourni par l'appelant                           | accès à Docker                             |
+| réouverture de chemin OCI, référence par tag uniquement/digest de config, pull ou graphe local différent  | démarrage du contrôleur                    |
+| fermeture/réutilisation/échange de descripteur, reciblage de lien symbolique, mutation à taille identique | démarrage contrôleur ou succès             |
+| injection Python/env/chargeur, racine/montage accessible en écriture, socket Docker, privilège excessif   | démarrage du contrôleur                    |
+| stdout/stderr superflu, mauvais code de sortie/signal ou reçu falsifié                                    | ingestion de reçu                          |
+| démarrage de package avant la preuve d'exécution durable                                                  | première écriture de package               |
+| redémarrage après V durable mais avant le premier J tentant de reprendre le candidat abandonné            | premier travail repris fournisseur/package |
+| reconstruction/installation/incrément/édition ou récupération de journal ambiguë                          | publication d'artefact                     |
 
-Every mutation test asserts that a unique malicious sentinel was never created,
-not merely that postflight later noticed the attack.
+Chaque test de mutation affirme qu'une sentinelle malveillante unique n'a jamais été créée, et non pas simplement que le post-vol a remarqué l'attaque plus tard.
 
 ## 8. Invariants
 
-1. One exact readiness actor `rc_built` context, admitted by
-   `actorId + expectedContextSha256`, supplies the immutable candidate and seal;
-   public input cannot supply either and no actor/registry revision substitutes.
-2. The readiness controller durably accepts `RC_SEAL_INGESTED` before the
-   consumer can load `rc_built`, and accepts the exact
-   observation+verification+byte-snapshot V event only afterward into that same
-   actor.
-3. Snapshot limits, shape, verifier and verified projection are imported only
-   from release-readiness clarification 11; the consumer contains no mirror,
-   alternate parser, copied numeric limit or fallback verifier.
-4. One actor binds one requested run attempt and readiness actor identity.
-5. Every downstream digest names the same single captured artifact buffer.
-6. The closed GitHub protocol uses one exact API origin/version, credential
-   scope, one-page/ETag epoch and one credentialless exact redirect URL.
-7. Attestation/workflow authority passes before ZIP parsing or extraction.
-8. Transport has exactly seven components; payload has six non-self entries;
-   evidence has five authenticated files plus one derived authority.
-9. Clarification-3 `verificationId`, authority self-digest and receipt
-   self-digest remain acyclic.
-10. Capabilities are private, opaque, frozen, identity-based and one-shot.
-11. Host check then payload-token consumption occurs synchronously inside the
-    admission invocation before its first async boundary; `HOST_ADMITTED` only
-    validates/persists the result.
-12. Admission consumption occurs synchronously inside the runtime invocation
-    before its first async boundary or Docker access; `RUNTIME_VERIFIED` only
-    validates/persists the result.
-13. Runtime accepts no raw DTO/path/bytes/port/options/callback/overload/hook.
-14. No exported capability issuer/mint/registrar/brand/registry/test hook exists.
-15. Candidate descriptors remain open and are fully revalidated around Docker.
-16. Only the captured `linux/amd64` manifest digest may execute; no pull/rebuild.
-17. Package reservation occurs only after durable runtime-proof ingestion.
-18. Packaging is package-only and cannot modify tested candidate bytes.
-19. Only listed typed events and guards transition; text and LLMs never decide.
-20. Consumer provider access is read-only; it performs no external mutation.
-21. First cancellation starts exactly one cleanup; exact redelivery is a no-op
-    and a different second cancel has no cleanup or state effect.
-22. Restart follows the exhaustive matrix and never reconstructs ephemeral
-    authority.
-23. Durable V with null J permanently abandons that candidate; neither V nor the
-    accepted-event digest can resume provider, runtime or package work.
-24. Replacement requires the explicit blocked/fresh-candidate/catalog-CAS
-    protocol or a distinct actor/namespace; old V evidence is never rewritten.
-25. Terminal states never start fresh work; exact duplicate observations are
-    no-ops and divergent duplicates reject.
-26. One persisted watcher identity enforces the 45-minute absolute request
-    deadline through retry generations. Per-stage budgets, including both
-    provider invocations, survive retries/restarts without reset or
-    undercharging; ordinary work cannot consume the cleanup reserve.
-27. `cancelled` is impossible after durable V/J until the same readiness actor
-    is durably blocked with V preserved and J null/cleaned; observed publication
-    instead yields `package_validated`.
-28. REST contributes only its documented artifact fields. Signed attempt facts
-    come from `GitHubTransportAttestationV1`; uploader mode/retention/topology
-    come from the candidate's closed workflow policy; the dynamic uploader
-    digest comes only from the validated terminal `ArtifactPublicationJoinV1`;
-    no job ID is inferred.
-29. The snapshot and verified projection are transient private authority only.
-    Durable V retention is exactly observation, verification,
-    `[attestationId, verificationId, snapshotId]` and the complete V-event
-    SHA-256; durable snapshot/projection bytes are forbidden.
-30. The consumer accepts only the parent V2 path/schema, exact ordered thirteen
-    IDs and both exact hashes, and implementation remains blocked until exact
-    clarification-11, producer-revision-11, MV3-revision-26,
-    packaged-tab-revision-11 and CV-accessible-anchor-revision-6 model approvals.
-31. Pre-activation verification consumes the ordered implemented set and emits
-    only consumer-slot evidence. It cannot consume verification receipts, a
-    verified set or activation, perform a provider request, or publish package
-    authority.
-32. No provider read occurs until candidate, audit, gate and controller-global
-    activation agree on fixed-index projections from one complete ordered
-    verified set, all eighteen role-distinct receipts and one final joint
-    activation digest. Review, evidence or verification without activation has
-    no consumer authority.
-33. The signed producer terminal proves every executed project byte came from
-    the candidate commit/tree's recursively read-only execution view with every
-    addressable source ancestor read-only, zero overlays/tracked-path shadows,
-    only the five closed output mounts, empty capability sets and the inherited
-    seccomp/filesystem policy.
-34. The seal, handoff and terminal contain exact prefix-extending ordered
-    command receipts with matching pre/post mount/capability state. Git
-    recapture is defense in depth only; temporary restoration, chmod, link,
-    symlink, rename, remount, namespace escape, implicit output or detached
-    descendant prevents the first provider read.
+1. Un contexte `rc_built` d'acteur de readiness exact, admis par `actorId + expectedContextSha256`, fournit le candidat et le sceau immuables ; l'entrée publique ne peut fournir ni l'un ni l'autre et aucune révision d'acteur/registre ne s'y substitue.
+2. Le contrôleur de readiness accepte durablement `RC_SEAL_INGESTED` avant que le consommateur ne puisse charger `rc_built`, et n'accepte l'événement V observation+vérification+snapshot d'octets exact qu'ensuite dans ce même acteur.
+3. Les limites, la forme, le vérificateur et la projection vérifiée du snapshot sont importés uniquement depuis la clarification 11 de release-readiness ; le consommateur ne contient aucun miroir, parseur alternatif, limite numérique copiée ou vérificateur de repli.
+4. Un acteur lie une tentative de run demandée et une identité d'acteur de readiness.
+5. Chaque digest en aval nomme le même tampon d'artefact capturé unique.
+6. Le protocole GitHub fermé utilise une origine/version d'API exacte, une portée d'identifiants, une époque d'une seule page/ETag et une URL exacte de redirection sans identifiants.
+7. L'autorité d'attestation/workflow est validée avant l'analyse ou l'extraction du ZIP.
+8. Le transport comporte exactement sept composants ; le payload comporte six entrées non auto-référencées ; les preuves comportent cinq fichiers authentifiés plus une autorité dérivée.
+9. Le `verificationId` de la clarification 3, le digest propre de l'autorité et le digest propre du reçu restent acycliques.
+10. Les capabilités sont privées, opaques, gelées, basées sur l'identité et one-shot.
+11. La vérification de l'hôte puis la consommation du token de payload se produisent de façon synchrone à l'intérieur de l'invocation d'admission avant sa première frontière asynchrone ; `HOST_ADMITTED` ne fait que valider/persister le résultat.
+12. La consommation de l'admission se produit de façon synchrone à l'intérieur de l'invocation runtime avant sa première frontière asynchrone ou accès à Docker ; `RUNTIME_VERIFIED` ne fait que valider/persister le résultat.
+13. Le runtime n'accepte aucun DTO/chemin/octets/port/options/callback/surcharge/hook brut.
+14. Aucun émetteur de capabilité/mint/registre/marque/registre/hook de test exporté n'existe.
+15. Les descripteurs du candidat restent ouverts et sont entièrement revalidés autour de Docker.
+16. Seul le digest de manifest `linux/amd64` capturé peut s'exécuter ; aucun pull/rebuild.
+17. La réservation de package n'intervient qu'après l'ingestion durable de la preuve d'exécution.
+18. Le packaging est réservé aux packages et ne peut modifier les octets du candidat testé.
+19. Seuls les événements et gardes typés répertoriés entraînent une transition ; le texte et les LLM ne décident jamais.
+20. L'accès du consommateur au fournisseur est en lecture seule ; il n'effectue aucune mutation externe.
+21. La première annulation démarre exactement un nettoyage ; une réémission identique est un no-op et une seconde annulation différente n'a aucun effet de nettoyage ou d'état.
+22. Le redémarrage suit la matrice exhaustive et ne reconstruit jamais d'autorité éphémère.
+23. Un V durable avec un J null abandonne définitivement ce candidat ; ni V ni le digest d'événement accepté ne peut reprendre le travail fournisseur, runtime ou package.
+24. Le remplacement exige le protocole explicite bloqué/nouveau-candidat/CAS de catalogue ou un acteur/espace de noms distinct ; les anciennes preuves V ne sont jamais réécrites.
+25. Les états terminaux ne démarrent jamais de nouveau travail ; les observations dupliquées exactes sont des no-ops et les doublons divergents sont rejetés.
+26. Une identité de surveillant persistée applique l'échéance absolue de requête de 45 minutes à travers les générations de réessai. Les budgets par étape, y compris les deux invocations de fournisseur, survivent aux réessais/redémarrages sans réinitialisation ni sous-imputation ; le travail ordinaire ne peut consommer la réserve de nettoyage.
+27. `cancelled` est impossible après un V/J durable tant que le même acteur de readiness n'est pas durablement bloqué avec V préservé et J null/nettoyé ; une publication observée produit à la place `package_validated`.
+28. REST ne fournit que ses champs d'artefact documentés. Les faits de tentative signés proviennent de `GitHubTransportAttestationV1` ; le mode d'uploader/rétention/topologie provient de la politique de workflow fermée du candidat ; le digest dynamique de l'uploader provient uniquement de l'`ArtifactPublicationJoinV1` terminale validée ; aucun ID de job n'est déduit.
+29. Le snapshot et la projection vérifiée relèvent de l'autorité privée transitoire uniquement. La rétention durable de V est exactement l'observation, la vérification, `[attestationId, verificationId, snapshotId]` et le SHA-256 de l'événement V complet ; les octets durables de snapshot/projection sont interdits.
+30. Le consommateur n'accepte que le chemin/schéma V2 parent, les treize identifiants ordonnés exacts et les deux hashs exacts, et l'implémentation reste bloquée jusqu'aux approbations de modèle exactes de la clarification 11, de la révision 11 du producteur, de la révision 26 de MV3, de la révision 11 de packaged-tab et de la révision 6 de l'ancre accessible CV.
+31. La vérification de pré-activation consomme l'ensemble implémenté ordonné et n'émet que des preuves de slot consommateur. Elle ne peut consommer de reçus de vérification, d'ensemble vérifié ou d'activation, effectuer de requête auprès d'un fournisseur ou publier une autorité de package.
+32. Aucune lecture auprès du fournisseur n'intervient tant que le candidat, l'audit, la porte et l'activation globale au contrôleur ne s'accordent pas sur des projections à indice fixe depuis un ensemble vérifié ordonné complet, l'ensemble des dix-huit reçus distincts par rôle et un unique digest final d'activation conjointe. Une revue, preuve ou vérification sans activation n'a aucune autorité auprès du consommateur.
+33. Le terminal signé du producteur prouve que chaque octet de projet exécuté provient de la vue d'exécution récursivement en lecture seule du commit/arbre du candidat avec chaque ancêtre source adressable en lecture seule, zéro overlay/masquage de chemin suivi, uniquement les cinq montages de sortie fermés, des ensembles de capabilités vides et la politique seccomp/système de fichiers héritée.
+34. Le sceau, le handoff et le terminal contiennent des reçus ordonnés de commande formant des extensions de préfixe exactes avec des états de montage/capabilité pré/post correspondants. La recapture Git n'est qu'une défense en profondeur ; une restauration temporaire, chmod, lien, lien symbolique, renommage, remontage, évasion de namespace, sortie implicite ou descendant détaché empêche la première lecture auprès du fournisseur.
 
-## 9. Verification and review gate
+## 9. Porte de vérification et de revue
 
-Required future tests:
+Tests futurs requis :
 
-- every allowed/forbidden transition, every restart row and all 34 invariants;
-- real actor-context CAS conflict/idempotence tests using only
-  `actorId + expectedContextSha256`;
-- direct-import contract tests for the parent snapshot keys, Base64 field and
-  reachable aggregate bounds, verifier and projection; source/AST scans must
-  reject every local mirror/redeclaration/fallback;
-- V2-only dependency tests for `scenarios.v2.json`, schema 2, the exact ordered
-  thirteen IDs and both hashes, plus wrong model path/revision/behavior hash,
-  missing/cross-role review/implementation/verification receipt, any of the six
-  model-blob normalization failures, set reorder/projection drift across
-  candidate/audit/gate and reviewed-but-unactivated joint authority;
-- authority-set tests reproduce the reviewed, implemented, evidence and verified
-  JCS preimages, reject every omission/extra/reorder/duplicate/cross-phase field,
-  and prove verification receipts can be issued only from accepted evidence;
-- phase-sandbox tests prove pre-activation verification accepts the implemented
-  set only, rejects a verification receipt/verified set, emits consumer-slot
-  evidence and performs no catalog, actor, provider, endpoint or artifact
-  effect; the production consumer rejects until activation and real
-  provider/runtime proof remains post-activation;
-- producer-source tests mutate every materialization, immutable-source authority,
-  command and pre/post receipt field, tracked source category, unexpected
-  untracked path, cwd, loaded script/config origin and commit/tree join; the
-  consumer rejects the signed terminal before its first GitHub request;
-- hostile producer terminals with writable source/ancestor, backing-path/FD
-  exposure, overlay or tracked-path bind shadow, unknown/late/nonempty output
-  mount, Docker/containerd/buildkit/systemd socket, FUSE/helper broker,
-  sudo/setuid/file-capability gain, `CAP_SYS_ADMIN` or any nonempty capability
-  set, absent `no_new_privs`, widened seccomp, mount topology drift,
-  missing/reordered prefix receipt or unjoined descendant reject before provider
-  access;
-- temporary byte rewrite-and-restore, same-byte rewrite, chmod-and-restore,
-  hard-link, symlink, rename, mount/remount, namespace/chroot escape and an
-  attacker-derived dist sentinel are exercised explicitly. A matching final Git
-  projection cannot authorize any case;
-- transient-lifetime tests proving the private snapshot/projection are cleared
-  after CAS acknowledgement/failure and durable context retains only
-  observation, verification, the three stable IDs and full V-event hash;
-- first cancel, exact duplicate cancel, divergent second cancel and one-shot
-  cleanup invocation/result correlation;
-- initial/work/hard deadline boundaries, watcher generation/attempt
-  correlation, every cumulative child budget, full-allocation restart charge,
-  rollback/stale timeout, retry/restart/CAS non-reset and cleanup-reserve
-  exhaustion;
-- cancellation/deadline before V, after V with J null, across every J phase,
-  cleaned invalidation, publication race and every ambiguous durable residue;
-- every post-V/pre-J crash subwindow plus blocked replacement, same-namespace
-  observed absence and distinct new-actor protocols;
-- pure GitHub envelope, Sigstore, workflow, ZIP, seal, payload, provenance,
-  authority, OCI and receipt guards with all hostile matrix mutations;
-- provider schema tests proving job/run-attempt/direct-mode/requested-retention
-  cannot be sourced from REST; separate persisted-budget tests for redirect and
-  ETag phases; terminal producer-chain/publication-join/action-output mutations;
-  exact signed handoff/policy/fresh-provider/download cross-binding;
-- public export/source scan plus raw/cast/brand/proxy/getter/replay/env/port/hook
-  capability attacks;
-- real production consumer on `linux/x64`, exact OCI build/load/run,
-  descriptor/runtime mutations and package-only validation with zero skips.
+- chaque transition autorisée/interdite, chaque ligne de redémarrage et l'ensemble des 34 invariants ;
+- véritables tests de conflit CAS/idempotence de contexte d'acteur utilisant uniquement `actorId + expectedContextSha256` ;
+- tests de contrat d'import direct pour les clés de snapshot parentes, le champ Base64 et les bornes agrégées atteignables, le vérificateur et la projection ; les analyses de source/AST doivent rejeter chaque miroir/redéclaration/repli local ;
+- tests de dépendance réservés à V2 pour `scenarios.v2.json`, schéma 2, les treize identifiants ordonnés exacts et les deux hashs, plus mauvais chemin/révision/hash de comportement de modèle, reçu de revue/implémentation/vérification manquant ou entrecroisant les rôles, l'un quelconque des six échecs de normalisation de blob de modèle, réordonnancement d'ensemble/dérive de projection entre candidat/audit/porte et autorité conjointe revue mais non activée ;
+- les tests d'ensembles d'autorité reproduisent les préimages JCS revues, implémentées, de preuve et vérifiées, rejettent chaque omission/champ superflu/réordonnancement/doublon/champ entre phases, et prouvent que les reçus de vérification ne peuvent être émis qu'à partir de preuves acceptées ;
+- les tests de sandbox de phase prouvent que la vérification de pré-activation n'accepte que l'ensemble implémenté, rejette un reçu de vérification/ensemble vérifié, émet des preuves de slot consommateur et n'effectue aucun effet de catalogue, d'acteur, de fournisseur, d'endpoint ou d'artefact ; le consommateur de production rejette jusqu'à l'activation et la véritable preuve fournisseur/runtime reste post-activation ;
+- les tests de source de producteur mutent chaque matérialisation, autorité de source immuable, commande et champ de reçu pré/post, catégorie de source suivie, chemin inattendu non suivi, cwd, origine de script/config chargé et ralliement commit/arbre ; le consommateur rejette le terminal signé avant sa première requête GitHub ;
+- les terminaux de producteur hostiles avec source/ancêtre accessible en écriture, exposition de chemin sous-jacent/FD, masquage bind par overlay ou chemin suivi, montage de sortie inconnu/tardif/non vide, socket Docker/containerd/buildkit/systemd, courtier FUSE/aide, gain sudo/setuid/capabilité de fichier, `CAP_SYS_ADMIN` ou tout ensemble de capabilités non vide, `no_new_privs` absent, seccomp élargi, dérive de topologie de montage, reçu de préfixe manquant/réordonné ou descendant non rallié rejettent avant l'accès au fournisseur ;
+- réécriture-et-restauration temporaire d'octets, réécriture à l'octet identique, chmod-et-restauration, lien physique, lien symbolique, renommage, montage/remontage, évasion de namespace/chroot et sentinelle dist dérivée par un attaquant sont exercés explicitement. Une projection Git finale correspondante ne peut autoriser aucun cas ;
+- tests de durée de vie transitoire prouvant que le snapshot/projection privé est effacé après accusé de réception/échec CAS et que le contexte durable ne conserve que l'observation, la vérification, les trois identifiants stables et le hash complet de l'événement V ;
+- première annulation, doublon exact d'annulation, seconde annulation divergente et corrélation d'invocation/résultat de nettoyage one-shot ;
+- frontières d'échéance initiale/de travail/stricte, corrélation de génération/tentative de surveillant, chaque budget cumulé d'enfant, imputation d'allocation complète au redémarrage, rollback/timeout périmé, non-réinitialisation lors de réessai/redémarrage/CAS et épuisement de la réserve de nettoyage ;
+- annulation/échéance avant V, après V avec J null, à travers chaque phase de J, invalidation nettoyée, course critique de publication et chaque résidu durable ambigu ;
+- chaque sous-fenêtre de crash post-V/pré-J plus remplacement bloqué, absence observée dans le même espace de noms et protocoles de nouvel acteur distinct ;
+- gardes pures d'enveloppe GitHub, Sigstore, workflow, ZIP, sceau, payload, provenance, autorité, OCI et reçus avec toutes les mutations de la matrice hostile ;
+- tests de schéma fournisseur prouvant que job/tentative de run/mode direct/rétention demandée ne peuvent provenir de REST ; tests de budget persisté séparés pour les phases de redirection et d'ETag ; mutations terminales de chaîne de producteur/ralliement de publication/sortie d'action ; liaison croisée exacte handoff signé/politique/fournisseur frais/téléchargement ;
+- analyse de source/export public plus attaques de capabilité brute/cast/marque/proxy/getter/rejeu/environnement/port/hook ;
+- véritable consommateur de production sur `linux/x64`, build/load/run OCI exacts, mutations de descripteurs/runtime et validation réservée aux packages sans aucun saut.
 
-Acceptance targets inside the inactive joint phase after all required
-independent reviews; this command list alone is not implementation authority:
+Cibles d'acceptation à l'intérieur de la phase conjointe inactive après l'ensemble des revues indépendantes requises ; cette liste de commandes seule ne constitue pas une autorité d'implémentation :
 
 ```bash
 cd apps/extension
@@ -1713,54 +938,45 @@ cd apps/extension
 ../../node_modules/.bin/prettier --check src/models/sealed-candidate-transport-consumer.model.md
 ```
 
-Structured self-review:
+Auto-revue structurée :
 
-| Check                                                   | Result      |
-| ------------------------------------------------------- | ----------- |
-| explicit inputs, output and non-claims                  | PASS        |
-| authoritative readiness actor and S-before-V order      | PASS        |
-| real actor CAS uses actor ID plus expected context hash | PASS        |
-| direct parent snapshot authority import, no mirror      | PASS        |
-| transient snapshot versus durable three-ID/event hash   | PASS        |
-| exclusive thirteen-entry V2 inventory dependency        | PASS        |
-| staged ordered model sets and atomic joint activation   | PASS        |
-| release 11, producer 11 and consumer 12 slot alignment  | PASS        |
-| exact MV3 26, packaged-tabs 11 and CV 6 hash binding    | PASS        |
-| packaged-tabs 11 approved source commit `ff9164c4`      | PASS        |
-| finite states, typed events and terminal states         | PASS        |
-| nominal transitions with guards/effects                 | PASS        |
-| GitHub/Sigstore/transport/payload/runtime/package chain | PASS        |
-| signed immutable Git-source OS execution protocol       | PASS        |
-| source/output mounts and pre/post capability receipts   | PASS        |
-| common ArtifactPublicationJoinV1 producer/consumer type | PASS        |
-| canonical decimal-string run ID end to end              | PASS        |
-| fatal ambiguity and hostile cases                       | PASS        |
-| retries, cancellation and restart                       | PASS        |
-| cancellation duplicate handling and one-shot cleanup    | PASS        |
-| post-V/J cancellation durable CAS disposition           | PASS        |
-| absolute deadline and non-resetting child budgets       | PASS        |
-| REST fact boundary and closed signed-handoff policy     | PASS        |
-| post-V abandonment and fresh-candidate replacement      | PASS        |
-| invocation-before-async token/admission chronology      | PASS        |
-| exact GitHub origins/credentials/pages/ETag epoch       | PASS        |
-| opaque one-shot capability and forbidden API paths      | PASS        |
-| package chronology and package-only invariant           | PASS        |
-| independent approval of exact pending hash              | **PENDING** |
+| Vérification                                                                     | Résultat    |
+| -------------------------------------------------------------------------------- | ----------- |
+| entrées explicites, sortie et non-revendications                                 | PASS        |
+| acteur de readiness autoritaire et ordre S-avant-V                               | PASS        |
+| le véritable CAS d'acteur utilise l'ID d'acteur plus le hash de contexte attendu | PASS        |
+| import direct de l'autorité de snapshot parent, pas de miroir                    | PASS        |
+| snapshot transitoire contre hash d'événement / 3 ID durable                      | PASS        |
+| dépendance exclusive à l'inventaire V2 à treize entrées                          | PASS        |
+| ensembles de modèles ordonnés étagés et activation conjointe atomique            | PASS        |
+| alignement des slots release 11, producteur 11 et consommateur 12                | PASS        |
+| liaison exacte des hashs MV3 26, packaged-tabs 11 et CV 6                        | PASS        |
+| commit source approuvé `ff9164c4` de packaged-tabs 11                            | PASS        |
+| états finis, événements typés et états terminaux                                 | PASS        |
+| transitions nominales avec gardes/effets                                         | PASS        |
+| chaîne GitHub/Sigstore/transport/payload/runtime/package                         | PASS        |
+| protocole d'exécution de l'OS avec source Git immuable signée                    | PASS        |
+| montages source/sortie et reçus de capabilité pré/post                           | PASS        |
+| type commun ArtifactPublicationJoinV1 producteur/consommateur                    | PASS        |
+| run ID sous forme de chaîne décimale canonique de bout en bout                   | PASS        |
+| ambiguïté fatale et cas hostiles                                                 | PASS        |
+| réessais, annulation et redémarrage                                              | PASS        |
+| gestion des doublons d'annulation et nettoyage one-shot                          | PASS        |
+| disposition CAS durable d'annulation post-V/J                                    | PASS        |
+| échéance absolue et budgets enfants sans réinitialisation                        | PASS        |
+| frontière de faits REST et politique de handoff signé fermée                     | PASS        |
+| abandon post-V et remplacement par candidat frais                                | PASS        |
+| chronologie token/admission d'invocation avant l'asynchrone                      | PASS        |
+| origines/identifiants/pages/époque d'ETag GitHub exacts                          | PASS        |
+| capabilité opaque one-shot et chemins d'API interdits                            | PASS        |
+| chronologie de package et invariant réservé aux packages                         | PASS        |
+| approbation indépendante du hash en attente exact                                | **PENDING** |
 
-Implementation remains forbidden until independent reviewers recompute and
-approve this exact pending hash, release-readiness clarification 11, aligned
-producer revision 11, MV3 harness revision 26, packaged-tab revision 11 and CV
-accessible-anchor revision 6, all
-without a blocking finding. Those reviews permit only the inactive joint
-implementation phase; consumer release work additionally requires distinct
-implementation/verification receipts and the final atomic activation. Current
-release blockers remain:
+L'implémentation reste interdite jusqu'à ce que des réviseurs indépendants recalculent et approuvent ce hash en attente exact, la clarification 11 de release-readiness, la révision 11 alignée du producteur, la révision 26 du harnais MV3, la révision 11 de packaged-tab et la révision 6 de l'ancre accessible CV, le tout sans constat bloquant. Ces revues n'autorisent que la phase inactive d'implémentation conjointe ; le travail de release du consommateur exige en outre des reçus distincts d'implémentation/vérification et l'activation atomique finale. Les points bloquants actuels de la release demeurent :
 
-1. the six exact model hashes are not all independently approved or
-   jointly activated;
-2. no production consumer yet owns the verified-payload private registry;
-3. real Linux/x64 consumer/runtime/package proof has not passed with zero skips;
-4. no green test may substitute for a missing model approval.
+1. les six hashs de modèles exacts ne sont pas tous approuvés indépendamment ou conjointement activés ;
+2. aucun consommateur de production ne possède encore le registre privé de payload vérifié ;
+3. la véritable preuve consommateur/runtime/package sur Linux/x64 n'a pas été validée avec zéro saut ;
+4. aucun test au vert ne peut remplacer une approbation de modèle manquante.
 
-If behavior cannot be represented by this machine, it is not ready to
-implement. If a transition depends on an LLM, the architecture is incorrect.
+Si un comportement ne peut être représenté par cette machine, il n'est pas prêt à être implémenté. Si une transition dépend d'un LLM, l'architecture est incorrecte.

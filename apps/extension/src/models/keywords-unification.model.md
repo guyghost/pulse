@@ -1,45 +1,33 @@
-# Keywords Unification Model
+# Modèle d'unification des mots-clés
 
-Source of truth for the unification of the profile's `stack` (compétences) and
-`searchKeywords` (mots-clés de recherche) into a single `keywords` list. This
-model is the authoritative spec; the implementation in `core/`, `shell/`, `ui/`,
-and tests must conform to it.
+Source de vérité pour l'unification de `stack` (compétences) et `searchKeywords` (mots-clés de recherche) du profil en une seule liste `keywords`. Ce modèle constitue la spécification faisant autorité ; l'implémentation dans `core/`, `shell/`, `ui/` et les tests doit s'y conformer.
 
-## Why
+## Pourquoi
 
-The profile historically exposed two parallel string lists:
+Le profil exposait historiquement deux listes de chaînes en parallèle :
 
-- `stack: string[]` — fed **local scoring** only (`rawStackScore` matches
-  `mission.stack` against `profile.stack`).
-- `searchKeywords: string[]` — fed **connector API queries** only
-  (`buildSearchContext` joins them into the free-text `query`).
+- `stack: string[]` — alimentait uniquement le **scoring local** (`rawStackScore` fait correspondre `mission.stack` avec `profile.stack`).
+- `searchKeywords: string[]` — alimentait uniquement les **requêtes API des connecteurs** (`buildSearchContext` les joint dans la `query` en texte libre).
 
-This split is invisible to a non-technical user, who does not know whether a
-term ("React", "SaaS", "marketplace") should go in "compétences" or
-"mots-clés". The result is either duplicate entry or an empty second field and
-a degraded experience. We collapse both into one list, **`keywords`**, that
-serves both channels. "Il ne restera alors que les mots."
+Cette séparation est invisible pour un utilisateur non technique, qui ignore si un terme ("React", "SaaS", "marketplace") doit aller dans "compétences" ou "mots-clés". Il en résulte soit une saisie en double, soit un second champ vide et une expérience dégradée. Nous fusionnons les deux en une seule liste, **`keywords`**, qui alimente les deux canaux. « Il ne restera alors que les mots. »
 
-## Decision (confirmed by product)
+## Décision (confirmée par le produit)
 
-The unified `keywords` list feeds **both**:
+La liste unifiée `keywords` alimente **les deux** :
 
-1. **Local scoring** — matched against `mission.stack` (tech terms hit; domain
-   terms are scoring-neutral, see Invariants).
-2. **Connector API query** — joined into the free-text `query` sent to every
-   platform connector. `skills: []` stays empty by design (AND-logic on skill
-   arrays over-narrows results; see `search-context.ts` architect note).
+1. **Scoring local** — comparé à `mission.stack` (les termes techniques correspondent ; les termes métier sont neutres pour le scoring, voir Invariants).
+2. **Requête API des connecteurs** — joints dans la `query` en texte libre envoyée à chaque connecteur de plateforme. `skills: []` reste vide par conception (la logique AND sur les tableaux de compétences restreint excessivement les résultats ; voir la note d'architecture dans `search-context.ts`).
 
-This is a **full merge**, not a cosmetic single input over two hidden fields.
+Il s'agit d'une **fusion complète**, et non d'un simple champ de saisie cosmétique masquant deux champs sous-jacents.
 
-## Data shape
+## Structure des données
 
-### `UserProfile` (after)
+### `UserProfile` (après)
 
 ```ts
 export interface UserProfile {
   firstName: string;
-  keywords: string[]; // ← was: stack: string[]
+  keywords: string[]; // ← était : stack: string[]
   tjmMin: number;
   tjmMax: number;
   location: string;
@@ -47,29 +35,27 @@ export interface UserProfile {
   seniority: SeniorityLevel;
   jobTitle: string;
   scoringWeights?: ScoringWeights;
-  // searchKeywords: string[]  ← REMOVED (folded into keywords)
+  // searchKeywords: string[]  ← SUPPRIMÉ (fusionné dans keywords)
 }
 ```
 
-### What is NOT renamed (deliberate)
+### Ce qui n'est PAS renommé (délibéré)
 
-| Symbol                                     | Why it keeps its name                                                                                                                                                                               |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Mission.stack`                            | Parsed from platform HTML; represents the mission's tech stack — a different concept.                                                                                                               |
-| `ScoringWeights.stack`                     | Name of the scoring **dimension** (stack-match), not the profile field.                                                                                                                             |
-| `DEFAULT_SCORING_WEIGHTS.stack`            | Same — dimension weight.                                                                                                                                                                            |
-| `DeterministicBreakdown.stack`             | Score breakdown per dimension.                                                                                                                                                                      |
-| `ConnectedAlertPreferences.requiredStacks` | Cross-app contract: synced to the `apps/dashboard` PostgreSQL `required_stacks` column via `connected-dashboard.ts`. Renaming would break cloud sync. Semantically still "required mission stacks". |
-| `AlertHistoryEntry.requiredStacks`         | Persisted alert history; shares the contract above.                                                                                                                                                 |
-| `SmartAlertCriteria.requiredStacks`        | Same.                                                                                                                                                                                               |
+| Symbole                                    | Pourquoi il conserve son nom                                                                                                                                                                                                                    |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Mission.stack`                            | Parsé depuis le HTML des plateformes ; représente la stack technique de la mission — un concept distinct.                                                                                                                                       |
+| `ScoringWeights.stack`                     | Nom de la **dimension** de scoring (correspondance de stack), et non du champ du profil.                                                                                                                                                        |
+| `DEFAULT_SCORING_WEIGHTS.stack`            | Idem — poids de la dimension.                                                                                                                                                                                                                   |
+| `DeterministicBreakdown.stack`             | Décomposition du score par dimension.                                                                                                                                                                                                           |
+| `ConnectedAlertPreferences.requiredStacks` | Contrat inter-applications : synchronisé avec la colonne PostgreSQL `required_stacks` de `apps/dashboard` via `connected-dashboard.ts`. Le renommer briserait la synchronisation cloud. Sémantiquement toujours « stacks de mission requises ». |
+| `AlertHistoryEntry.requiredStacks`         | Historique des alertes persisté ; partage le contrat ci-dessus.                                                                                                                                                                                 |
+| `SmartAlertCriteria.requiredStacks`        | Idem.                                                                                                                                                                                                                                           |
 
-The scoring dimension `stack` keeps its name because it answers "how much of
-the **mission's** tech stack does the user cover?" — that question is
-unchanged. Only the **profile's** input list is renamed `stack` → `keywords`.
+La dimension de scoring `stack` conserve son nom car elle répond à la question : « quelle part de la stack technique de la **mission** l'utilisateur couvre-t-il ? » — cette question reste inchangée. Seule la liste en entrée du **profil** est renommée `stack` → `keywords`.
 
-## Scoring semantics (unchanged behavior)
+## Sémantique du scoring (comportement inchangé)
 
-`rawStackScore(missionStack, profileKeywords)`:
+`rawStackScore(missionStack, profileKeywords)` :
 
 ```
 denominator = missionStack.length
@@ -77,117 +63,89 @@ numerator   = count of missionStack entries present in profileKeywords (lowercas
 score       = numerator / denominator * 100
 ```
 
-**Invariant (scoring-neutral merge):** the denominator is `missionStack.length`
-and the loop iterates `missionStack`, not `profileKeywords`. Adding domain
-terms ("SaaS", "marketplace") to `profileKeywords` that never appear in any
-mission's `stack` does **not** change the score — they are simply never matched
-in the membership check. Therefore merging `searchKeywords` (domain terms)
-into `keywords` is scoring-neutral for every existing profile.
+**Invariant (fusion neutre pour le scoring) :** le dénominateur est `missionStack.length` et la boucle itère sur `missionStack`, et non sur `profileKeywords`. Ajouter à `profileKeywords` des termes métier ("SaaS", "marketplace") qui n'apparaissent jamais dans le `stack` d'une mission ne modifie **pas** le score — ils ne sont tout simplement jamais validés lors de la vérification d'appartenance. Par conséquent, fusionner `searchKeywords` (termes métier) dans `keywords` est neutre pour le scoring de chaque profil existant.
 
-Edge cases:
+Cas limites :
 
-- `profileKeywords.length === 0` → returns `100` (no constraint; same as today).
-- `missionStack.length === 0` → returns `0` (same as today).
+- `profileKeywords.length === 0` → renvoie `100` (aucune contrainte ; identique à aujourd'hui).
+- `missionStack.length === 0` → renvoie `0` (identique à aujourd'hui).
 
-## Search semantics
+## Sémantique de recherche
 
-`buildSearchContext(profile, lastSync)`:
+`buildSearchContext(profile, lastSync)` :
 
 ```
 query = profile.keywords.map(trim + collapse spaces).filter(nonEmpty).join(' ')
-skills = []   // unchanged: server-side skill filtering stays disabled
+skills = []   // inchangé : le filtrage des compétences côté serveur reste désactivé
 ```
 
-Behavior is identical to today's `searchKeywords`-derived query; the source
-field changes from `searchKeywords` to `keywords`.
+Le comportement est identique à la requête actuelle dérivée de `searchKeywords` ; le champ source passe de `searchKeywords` à `keywords`.
 
-## Profile impact (completion radar)
+## Impact sur le profil (radar de complétion)
 
-The two separate impact items are merged into one:
+Les deux éléments d'impact distincts sont fusionnés en un seul :
 
-| Before                          | Weight | After       | Weight |
-| ------------------------------- | ------ | ----------- | ------ |
-| `stack` ("Stack technique")     | 25     | `keywords`  | 35     |
-| `search-keywords` ("Mots-clés") | 10     | _(removed)_ | —      |
+| Avant                           | Poids | Après        | Poids |
+| ------------------------------- | ----- | ------------ | ----- |
+| `stack` ("Stack technique")     | 25    | `keywords`   | 35    |
+| `search-keywords` ("Mots-clés") | 10    | _(supprimé)_ | —     |
 
-`ProfileImpactFieldId` loses `'search-keywords'`; `'stack'` → `'keywords'`.
-`ProfileImpactInput` follows (`stack` → `keywords`, drop `searchKeywords`).
-Total weight budget stays 100 (25+10 → 35; all other items unchanged).
+`ProfileImpactFieldId` perd `'search-keywords'` ; `'stack'` → `'keywords'`.
+`ProfileImpactInput` suit (`stack` → `keywords`, suppression de `searchKeywords`).
+Le budget total de pondération reste à 100 (25+10 → 35 ; tous les autres éléments restent inchangés).
 
-## State modules
+## Modules d'état
 
-`settings-page.svelte.ts` and `feed-page.svelte.ts` expose a single keyword
-editor surface:
+`settings-page.svelte.ts` et `feed-page.svelte.ts` exposent une surface d'édition de mots-clés unique :
 
-| Before                                                                  | After                                                                               |
+| Avant                                                                   | Après                                                                               |
 | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
 | `profileStack` / `stackInput` / `addStack` / `removeStack` / `setStack` | `profileKeywords` / `keywordInput` / `addKeyword` / `removeKeyword` / `setKeywords` |
-| `searchKeywords` / `keywordInput` / `addKeyword` / `removeKeyword`      | _(removed — folded into above)_                                                     |
+| `searchKeywords` / `keywordInput` / `addKeyword` / `removeKeyword`      | _(supprimé — fusionné ci-dessus)_                                                   |
 
-The two former input buffers collapse into one (`keywordInput`).
+Les deux anciens tampons de saisie fusionnent en un seul (`keywordInput`).
 
 ## UI
 
-- **Onboarding** (`OnboardingWizard.svelte`): the "compétences" step becomes a
-  single "Mots-clés" input. The onboarding still seeds
-  `ConnectedAlertPreferences.requiredStacks` from the profile's keywords
-  (existing wiring; `requiredStacks: keywords`). The field name
-  `requiredStacks` is unchanged (cross-app contract).
-- **Profile** (`ProfileSection.svelte`): the two sections ("Stack technique" +
-  "Mots-clés") become a single "Mots-clés" section.
-- Labels are non-technical: placeholder copy invites both technologies and
-  domains ("React, Node, SaaS, marketplace, fintech…").
+- **Onboarding** (`OnboardingWizard.svelte`) : l'étape « compétences » devient un champ de saisie unique « Mots-clés ». L'onboarding initialise toujours `ConnectedAlertPreferences.requiredStacks` à partir des mots-clés du profil (câblage existant ; `requiredStacks: keywords`). Le nom de champ `requiredStacks` reste inchangé (contrat inter-applications).
+- **Profil** (`ProfileSection.svelte`) : les deux sections (« Stack technique » + « Mots-clés ») deviennent une section unique « Mots-clés ».
+- Les labels sont non techniques : le texte du placeholder invite à la fois les technologies et les domaines ("React, Node, SaaS, marketplace, fintech…").
 
-## Persistence & migration
+## Persistance & migration
 
-Two independent resilience layers (belt + suspenders). Both are required.
+Deux couches de résilience indépendantes (ceinture et bretelles). Les deux sont requises.
 
-### Layer 1 — Read-time schema shim (resilience)
+### Couche 1 — Shim de schéma à la lecture (résilience)
 
-`UserProfileSchema` gains a `z.preprocess` step: when raw data has no
-`keywords` field but has `stack` and/or `searchKeywords`, it merges them into
-`keywords` (dedup, case-insensitive, first-seen casing wins — same rule as
-`appendUniqueNormalized`) before validation. This makes `getProfile()` /
-`parseUserProfile()` tolerate legacy records even if the data migration has
-not run yet (downgrade-reupgrade, skipped migration, synced-from-cloud edge).
+`UserProfileSchema` reçoit une étape `z.preprocess` : lorsque les données brutes n'ont pas de champ `keywords` mais possèdent `stack` et/ou `searchKeywords`, elle les fusionne dans `keywords` (déduplication, insensible à la casse, la casse de la première occurrence prévaut — même règle que `appendUniqueNormalized`) avant la validation. Cela permet à `getProfile()` / `parseUserProfile()` de tolérer les enregistrements existants même si la migration de données n'a pas encore été exécutée (cas d'un downgrade-reupgrade, migration ignorée, ou synchronisation depuis le cloud).
 
-### Layer 2 — Data migration v1 → v2
+### Couche 2 — Migration de données v1 → v2
 
-`APP_DATA_VERSION` bumps `1 → 2`. A new entry in `DATA_MIGRATIONS`
-(`migration-registry.ts`) rewrites the `profile` store record:
+`APP_DATA_VERSION` passe de `1 → 2`. Une nouvelle entrée dans `DATA_MIGRATIONS` (`migration-registry.ts`) réécrit l'enregistrement du store `profile` :
 
-1. Read the single `profile` record (`keyPath: 'id'`, key `'current'`).
-2. If it already has `keywords` → no-op (idempotent).
-3. Else merge `[...(record.stack ?? []), ...(record.searchKeywords ?? [])]`
-   using `appendUniqueNormalized` semantics, set `record.keywords`, delete
-   `record.stack` and `record.searchKeywords`, `put` back.
-4. If no record exists → no-op.
+1. Lire l'enregistrement unique `profile` (`keyPath: 'id'`, clé `'current'`).
+2. S'il possède déjà `keywords` → sans effet (idempotent).
+3. Sinon, fusionner `[...(record.stack ?? []), ...(record.searchKeywords ?? [])]` selon la sémantique de `appendUniqueNormalized`, définir `record.keywords`, supprimer `record.stack` et `record.searchKeywords`, puis réinjecter via `put`.
+4. Si aucun enregistrement n'existe → sans effet.
 
-The migration is pure-data, idempotent, and never delegates decisions to an
-LLM (db-migration.model.md invariant). `DB_VERSION` (structural) is unchanged
-— no store/index is added.
+La migration est purement relative aux données, idempotente, et ne délègue jamais de décisions à un LLM (invariant de `db-migration.model.md`). `DB_VERSION` (structurel) est inchangé — aucun store ni index n'est ajouté.
 
-### Write path
+### Chemin d'écriture
 
-`saveProfile()` writes the new shape (`keywords`, no `stack`/`searchKeywords`).
-`UserProfileSchema.safeParse` in `saveProfile` validates the new shape; the
-preprocess shim is a no-op for already-new records.
+`saveProfile()` écrit la nouvelle structure (`keywords`, sans `stack`/`searchKeywords`).
+`UserProfileSchema.safeParse` dans `saveProfile` valide la nouvelle structure ; le shim de prétraitement est sans effet pour les enregistrements déjà conformes à la nouvelle structure.
 
 ## Invariants
 
-1. **No silent data loss.** A legacy profile (`stack` + `searchKeywords`) is
-   always readable, via the shim (Layer 1) and/or the migration (Layer 2).
-2. **Scoring-neutral merge.** Adding domain keywords never lowers an existing
-   mission's stack-match score (denominator is `missionStack.length`).
-3. **Idempotent migration.** Running v1→v2 twice is a no-op.
-4. **FC&IS.** `keywords` lives on the pure `UserProfile` type; all I/O
-   (migration, save/load) stays in `shell/`. Core never imports shell.
-5. **Cross-app contracts preserved.** `requiredStacks` (alerts) and the
-   dashboard sync are untouched.
-6. **No `any`.** The preprocess shim is typed via `unknown` + narrowing.
+1. **Aucune perte silencieuse de données.** Un profil hérité (`stack` + `searchKeywords`) est toujours lisible, via le shim (Couche 1) et/ou la migration (Couche 2).
+2. **Fusion neutre pour le scoring.** L'ajout de mots-clés de domaine ne diminue jamais le score de correspondance de stack d'une mission existante (le dénominateur est `missionStack.length`).
+3. **Migration idempotente.** Exécuter v1→v2 deux fois est sans effet.
+4. **FC&IS.** `keywords` réside sur le type pur `UserProfile` ; toutes les E/S (migration, sauvegarde/chargement) restent dans `shell/`. Core n'importe jamais shell.
+5. **Contrats inter-applications préservés.** `requiredStacks` (alertes) et la synchronisation avec le dashboard sont inchangés.
+6. **Aucun `any`.** Le shim de prétraitement est typé via `unknown` + rétrécissement de type (`narrowing`).
 
-## Out of scope
+## Hors périmètre
 
-- Renaming `Mission.stack`, `ScoringWeights.stack`, `requiredStacks` (see table).
-- Changing alert filtering semantics (`SmartAlertCriteria` unchanged).
-- Dashboard (`apps/dashboard`) schema changes — none required.
+- Renommer `Mission.stack`, `ScoringWeights.stack`, `requiredStacks` (voir tableau).
+- Modifier la sémantique de filtrage des alertes (`SmartAlertCriteria` inchangé).
+- Modifications de schéma du dashboard (`apps/dashboard`) — aucune n'est requise.
