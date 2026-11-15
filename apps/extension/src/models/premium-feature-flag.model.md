@@ -24,7 +24,7 @@ navigation testable derrière un feature flag. Le kit Gemini Nano sur l'appareil
 est une capacité gratuite et locale dans chaque état du flag. Le Copilot Eve
 distant est une frontière produit distincte : seuls son entitlement serveur et
 son déploiement au build autorisent les jobs distants ; ni `premium_enabled` ni
-`premium_feature_enabled` ne fait autorité pour Eve.
+`premium_feature_enabled` ne font autorité pour Eve.
 
 Ce comportement est une dette de migration. Il ne constitue pas un
 entitlement : le client peut écrire la valeur et aucune autorité de paiement ne
