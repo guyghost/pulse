@@ -1,17 +1,17 @@
-# Feed Filter Bottom Sheet Model
+# Modèle de feuille inférieure des filtres du Feed
 
-Source of truth for the Mission feed filter bottom sheet, informed by Notion's
-mobile filtering and sorting sheets. Existing deterministic feed filtering
-remains authoritative for which missions match. This model owns opening the
-sheet, changing the live filter projection, resetting it, and closing the
-sheet.
+Source de vérité pour la feuille inférieure de filtres du feed de missions,
+inspirée des feuilles mobiles de filtrage et de tri de Notion. Le filtrage
+déterministe existant du feed reste souverain pour déterminer quelles missions
+correspondent. Ce modèle gère l'ouverture de la feuille, la modification de la
+projection de filtres en direct, sa réinitialisation et sa fermeture.
 
-The workflow is synchronous and UI-local. It does not require an XState actor:
-there is no I/O, retry timer, concurrent worker, persistence acknowledgement or
-long-running effect. A pure transition function is the executable projection
-consumed by the Svelte page.
+Le flux est synchrone et local à l'UI. Il ne nécessite pas d'acteur XState : il
+n'y a ni I/O, ni timer de relance, ni worker concurrent, ni acquittement de
+persistance, ni effet de longue durée. Une fonction de transition pure est la
+projection exécutable consommée par la page Svelte.
 
-## State and context
+## État et contexte
 
 ```ts
 interface FeedFilterDraft {
@@ -29,10 +29,11 @@ type FeedFilterSheetState =
   { value: 'closed' } | { value: 'open'; filters: FeedFilterDraft } | { value: 'disposed' };
 ```
 
-The open-state filter snapshot is immutable. Arrays are copied at every model
-boundary so the page state and emitted command never alias one another.
+L'instantané de filtres à l'état ouvert est immuable. Les tableaux sont copiés à
+chaque frontière du modèle afin que l'état de la page et la commande émise ne
+partagent jamais de référence (_alias_).
 
-## Events
+## Événements
 
 ```ts
 type FeedFilterSheetEvent =
@@ -50,143 +51,175 @@ type FeedFilterSheetEvent =
   | { type: 'DISPOSE' };
 ```
 
-## Commands
+## Commandes
 
 ```ts
 type FeedFilterSheetCommand = { type: 'NONE' } | { type: 'SYNC_FILTERS'; filters: FeedFilterDraft };
 ```
 
-Every accepted filter edit emits exactly one `SYNC_FILTERS` command. The page
-consumes it synchronously, so the mission list and live result count change
-while the sheet remains open. Closing never replays or rolls back filters.
+Chaque modification de filtre acceptée émet exactement une commande
+`SYNC_FILTERS`. La page la consomme de manière synchrone, de sorte que la liste
+des missions et le compteur de résultats en direct changent pendant que la
+feuille reste ouverte. La fermeture ne rejoue ni n'annule jamais les filtres.
 
-## Transition table
+## Table de transitions
 
-| From       | Event                                              | Guard                      | To         | Command / effect                                     |
-| ---------- | -------------------------------------------------- | -------------------------- | ---------- | ---------------------------------------------------- |
-| `closed`   | `OPEN(committed)`                                  | filters structurally valid | `open`     | Copy committed filters into the open state.          |
-| `closed`   | edit / reset / dismiss                             | —                          | `closed`   | None.                                                |
-| `open`     | preset / score / TJM / source / remote / seniority | payload is canonical       | `open`     | Normalize, copy and emit `SYNC_FILTERS`.             |
-| `open`     | `TOGGLE_STACK(stack)`                              | trimmed stack is non-empty | `open`     | Add/remove one unique stack; emit `SYNC_FILTERS`.    |
-| `open`     | `RESET_FILTERS`                                    | —                          | `open`     | Empty every sheet-owned filter; emit `SYNC_FILTERS`. |
-| `open`     | `DISMISS(*)`                                       | —                          | `closed`   | Close only; current live filters remain committed.   |
-| any live   | `DISPOSE`                                          | —                          | `disposed` | Drop filter snapshot and accept no later event.      |
-| `disposed` | any                                                | —                          | `disposed` | None.                                                |
+| De         | Événement                                          | Garde                            | Vers       | Commande / effet                                                  |
+| ---------- | -------------------------------------------------- | -------------------------------- | ---------- | ----------------------------------------------------------------- |
+| `closed`   | `OPEN(committed)`                                  | filtres structurellement valides | `open`     | Copie les filtres validés dans l'état ouvert.                     |
+| `closed`   | édition / reset / dismiss                          | —                                | `closed`   | Aucune.                                                           |
+| `open`     | preset / score / TJM / source / remote / seniority | payload canonique                | `open`     | Normalise, copie et émet `SYNC_FILTERS`.                          |
+| `open`     | `TOGGLE_STACK(stack)`                              | stack après trim non vide        | `open`     | Ajoute / retire une stack unique ; émet `SYNC_FILTERS`.           |
+| `open`     | `RESET_FILTERS`                                    | —                                | `open`     | Vide tous les filtres propres à la feuille ; émet `SYNC_FILTERS`. |
+| `open`     | `DISMISS(*)`                                       | —                                | `closed`   | Ferme uniquement ; les filtres en direct restent validés.         |
+| tout actif | `DISPOSE`                                          | —                                | `disposed` | Abandonne l'instantané de filtres et n'accepte plus d'événement.  |
+| `disposed` | tout                                               | —                                | `disposed` | Aucune.                                                           |
 
-Preset normalization is deterministic:
+La normalisation des presets est déterministe :
 
-- selecting the already selected preset clears it;
-- selecting `priority` clears a score bucket so two score authorities do not
-  conflict;
-- selecting `remote-compatible` clears an explicit remote mode;
-- selecting `tjm-negotiation` clears an explicit TJM minimum;
-- selecting an explicit score bucket or remote mode clears the conflicting
-  preset when required;
-- selecting an explicit positive finite TJM minimum clears the conflicting
-  `tjm-negotiation` preset; invalid values are ignored and accepted values are
-  rounded to whole euros;
-- `tjm-negotiation` uses the profile TJM target already owned by the feed;
-- selecting `new` uses the existing stable-new queue projection.
+- sélectionner le preset déjà sélectionné le désactive ;
+- sélectionner `priority` efface un palier de score afin que deux autorités de
+  score n'entrent pas en conflit ;
+- sélectionner `remote-compatible` efface un mode de travail explicite ;
+- sélectionner `tjm-negotiation` efface un minimum de TJM explicite ;
+- sélectionner un palier de score ou un mode de travail explicite efface le
+  preset en conflit lorsque nécessaire ;
+- sélectionner un minimum de TJM explicite positif et fini efface le preset
+  `tjm-negotiation` en conflit ; les valeurs invalides sont ignorées et les
+  valeurs acceptées sont arrondies à l'euro entier ;
+- `tjm-negotiation` utilise la cible TJM du profil déjà détenue par le feed ;
+- sélectionner `new` utilise la projection de file stable existante des
+  nouveautés.
 
-## Presentation projection
+## Projection de présentation
 
-- `closed`: the sheet and scrim do not exist; the filter trigger reports
-  `aria-expanded="false"`.
-- `open`: the trigger reports `aria-expanded="true"`; a modal scrim covers the
-  complete Feed, including the dock, and a structured sheet is anchored to the
-  lower edge. Three quick-filter pills sit above explicit rows for minimum
-  grade and minimum TJM, followed by the connector source section.
-- The sheet uses a white surface, a large rounded top edge and a centered grab
-  handle. It occupies about 70% of the available height, slides vertically from
-  the lower edge and leaves enough space above its top edge for a detached
-  circular close control.
-- The source section shows every connector returned by the build-filtered
-  catalog as a real-logo selector. It also projects deterministic mission counts
-  into a compact coverage list and proportional native progress indicators.
-- Source selection remains canonical and single-valued: `null` means every
-  shipped source is included; selecting one logo dispatches `SET_SOURCE` for
-  that source; selecting the active logo again dispatches `SET_SOURCE(null)`.
-- Connector counts, logo loading and bar widths are presentation signals only.
-  They cannot select a source or dispatch a transition.
-- The detached close control is outside the sheet surface, remains visually
-  associated with the filter trigger, and is the primary way to regain direct
-  control of the dimmed Feed. The scrim is a secondary dismissal target.
-- The dock remains mounted beneath the scrim in both states so its geometry does
-  not jump, but it is not operable while the modal sheet is open.
-- Initial focus moves to the outline-free sheet container. Closing returns
-  focus to the dock trigger when it remains connected.
-- `Escape`, the explicit `Terminer` action, the detached close button, a scrim
-  click and a hidden Feed page dispatch `DISMISS`.
-- Reduced motion sets the scrim and sheet-slide durations to zero without
-  changing state, focus or filter results.
+- `closed` : la feuille et le scrim n'existent pas ; le déclencheur des filtres
+  annonce `aria-expanded="false"`.
+- `open` : le déclencheur annonce `aria-expanded="true"` ; un scrim modal
+  recouvre tout le Feed, dock inclus, et une feuille structurée est ancrée au
+  bord inférieur. Trois pilules de filtre rapide se trouvent au-dessus des
+  lignes explicites de note minimale et de TJM minimum, suivies de la section
+  des sources de connecteurs.
+- La feuille utilise une surface blanche, un grand bord supérieur arrondi et une
+  poignée centrée. Elle occupe environ 70 % de la hauteur disponible, glisse
+  verticalement depuis le bord inférieur et laisse suffisamment d'espace
+  au-dessus de son bord supérieur pour un contrôle circulaire de fermeture
+  détaché.
+- La section des sources affiche chaque connecteur renvoyé par le catalogue
+  filtré au build comme un sélecteur à vrai logo. Elle projette également les
+  compteurs déterministes de missions dans une liste de couverture compacte et
+  des indicateurs de progression natifs proportionnels.
+- La sélection de source reste canonique et à valeur unique : `null` signifie
+  que toutes les sources embarquées sont incluses ; sélectionner un logo émet
+  `SET_SOURCE` pour cette source ; sélectionner à nouveau le logo actif émet
+  `SET_SOURCE(null)`.
+- Les compteurs de connecteurs, le chargement des logos et les largeurs de
+  barres sont uniquement des signaux de présentation. Ils ne peuvent ni
+  sélectionner une source ni déclencher une transition.
+- Le contrôle de fermeture détaché se trouve hors de la surface de la feuille,
+  reste visuellement associé au déclencheur des filtres et constitue le moyen
+  principal de reprendre le contrôle direct du Feed assombri. Le scrim est une
+  cible de fermeture secondaire.
+- Le dock reste monté sous le scrim dans les deux états afin que sa géométrie ne
+  saute pas, mais il n'est pas opérable tant que la feuille modale est ouverte.
+- Le focus initial se déplace vers le conteneur de la feuille sans contour. La
+  fermeture rend le focus au déclencheur du dock lorsqu'il reste connecté.
+- `Escape`, l'action explicite `Terminer`, le bouton de fermeture détaché, un
+  clic sur le scrim et le masquage de la page Feed déclenchent `DISMISS`.
+- Le mouvement réduit met à zéro les durées du scrim et du glissement de la
+  feuille sans changer l'état, le focus ni les résultats des filtres.
 
-## Side effects and ownership
+## Effets de bord et propriété
 
-- Opening and closing perform no I/O and do not alter filters.
-- Accepted edits and reset emit one typed synchronous command. The existing
-  `feed-page.svelte.ts` filter projection owns the resulting mission list.
-- The explicit TJM selector filters missions at or above its selected value.
-  The existing `tjm-negotiation` preset remains available as a distinct quick
-  decision preset and cannot be active at the same time.
-- Source coverage reads the existing deterministic Feed aggregate. A missing
-  count is displayed as zero and does not imply a connector error or disabled
-  state.
-- A failed connector favicon falls back to the connector initials without
-  changing selection or count data.
-- Search is owned by the center dock input. Operational details are owned by
-  the right dock action. Neither is decided by this model.
-- The sheet never starts a scan, changes a connector, persists a view or opens
-  an external URL.
+- L'ouverture et la fermeture n'effectuent aucune I/O et n'altèrent pas les
+  filtres.
+- Les éditions acceptées et la réinitialisation émettent une unique commande
+  synchrone typée. La projection de filtres existante de `feed-page.svelte.ts`
+  détient la liste de missions résultante.
+- Le sélecteur explicite de TJM filtre les missions supérieures ou égales à la
+  valeur choisie. Le preset existant `tjm-negotiation` reste disponible comme
+  preset de décision rapide distinct et ne peut pas être actif en même temps.
+- La couverture des sources lit l'agrégat déterministe existant du Feed. Un
+  compteur manquant est affiché à zéro et n'implique ni une erreur de connecteur
+  ni un état désactivé.
+- Un favicon de connecteur en échec se replie sur les initiales du connecteur
+  sans modifier les données de sélection ni de compteur.
+- La recherche est détenue par la saisie centrale du dock. Les détails
+  opérationnels sont détenus par l'action droite du dock. Aucun des deux n'est
+  décidé par ce modèle.
+- La feuille ne démarre jamais un scan, ne modifie jamais un connecteur, ne
+  persiste jamais une vue et n'ouvre jamais d'URL externe.
 
-## Error, cancellation, retry and permission review
+## Revue d'erreurs, annulation, relance et permissions
 
-- **Invalid/unknown event:** ignored with `NONE`; state remains unchanged.
-- **Invalid stack text:** empty or whitespace-only values are ignored.
-- **Invalid TJM:** non-finite and non-positive values are ignored.
-- **Missing source count:** normalized to zero for presentation.
-- **Logo failure:** shows the deterministic initials fallback; no retry or state
-  transition is performed by the sheet.
-- **Dismissal:** closes the sheet without emitting a duplicate sync. Changes
-  already synced remain visible by design.
-- **Rapid open/close:** `OPEN` while already open is ignored, so a duplicate
-  trigger cannot replace the live snapshot.
-- **Page navigation:** `page-hidden` closes before the Feed becomes inert;
-  returning to Missions starts closed with the latest live filters.
-- **Offline:** local filtering remains available; no network retry exists.
-- **Permissions:** no permission is requested or interpreted.
-- **Retry:** there is no asynchronous operation to retry.
-- **Terminal state:** `disposed` is terminal and contains no snapshot.
+- **Événement invalide / inconnu :** ignoré avec `NONE` ; l'état reste inchangé.
+- **Texte de stack invalide :** les valeurs vides ou composées uniquement
+  d'espaces sont ignorées.
+- **TJM invalide :** les valeurs non finies et non positives sont ignorées.
+- **Compteur de source manquant :** normalisé à zéro pour la présentation.
+- **Échec de logo :** affiche le repli déterministe par initiales ; aucune
+  relance ni transition d'état n'est effectuée par la feuille.
+- **Fermeture :** ferme la feuille sans émettre de synchronisation dupliquée.
+  Les changements déjà synchronisés restent visibles par conception.
+- **Ouverture / fermeture rapide :** `OPEN` alors que déjà ouvert est ignoré,
+  afin qu'un double déclenchement ne puisse pas remplacer l'instantané en
+  direct.
+- **Navigation de page :** `page-hidden` ferme avant que le Feed ne devienne
+  inerte ; revenir sur Missions démarre fermé avec les derniers filtres en
+  direct.
+- **Hors ligne :** le filtrage local reste disponible ; aucune relance réseau
+  n'existe.
+- **Permissions :** aucune permission n'est demandée ni interprétée.
+- **Relance :** il n'y a aucune opération asynchrone à relancer.
+- **État terminal :** `disposed` est terminal et ne contient aucun instantané.
 
-## Forbidden transitions
+## Transitions interdites
 
-- No filter mutation while closed or disposed.
-- No implicit rollback from close, scrim, Escape, navigation or unmount.
-- No unknown preset, source, remote value, seniority or score bucket.
-- No duplicated stack.
-- No animation callback, rendered copy or LLM output chooses a filter state.
+- Aucune mutation de filtre tant que fermé ou détruit (`disposed`).
+- Aucun retour arrière implicite depuis la fermeture, le scrim, Escape, la
+  navigation ou le démontage.
+- Aucun preset, source, valeur de télétravail, séniorité ou palier de score
+  inconnu.
+- Aucune stack dupliquée.
+- Aucun callback d'animation, texte rendu ou sortie LLM ne choisit un état de
+  filtre.
 
 ## Invariants
 
-1. At most one filter bottom sheet is open for a Feed page instance.
-2. Closed and disposed states retain no filter snapshot.
-3. Open arrays never alias committed arrays or emitted command arrays.
-4. Exactly one `SYNC_FILTERS` command is emitted per accepted edit or reset.
-5. Every dismissal path emits `NONE`.
-6. Conflicting preset and explicit-filter authorities are normalized.
-7. The dock remains mounted and visually separated from feed content; the open
-   modal sheet blocks it from interaction.
-8. The model, not component copy, animation timing or an LLM, decides filtering.
-9. Source counts and logo load outcomes never decide source selection.
-10. The source selector exposes only connectors present in the build-filtered
-    catalog.
+1. Au plus une feuille inférieure de filtres est ouverte pour une instance de
+   page Feed.
+2. Les états `closed` et `disposed` ne conservent aucun instantané de filtres.
+3. Les tableaux ouverts ne partagent jamais de référence avec les tableaux
+   validés ni avec les tableaux des commandes émises.
+4. Exactement une commande `SYNC_FILTERS` est émise par édition acceptée ou
+   réinitialisation.
+5. Chaque chemin de fermeture émet `NONE`.
+6. Les autorités conflictuelles de preset et de filtre explicite sont
+   normalisées.
+7. Le dock reste monté et visuellement séparé du contenu du feed ; la feuille
+   modale ouverte l'empêche d'être manipulé.
+8. Le modèle — et non le texte d'un composant, le timing d'animation ou un LLM —
+   décide du filtrage.
+9. Les compteurs de sources et les résultats de chargement des logos ne décident
+   jamais de la sélection de source.
+10. Le sélecteur de sources n'expose que les connecteurs présents dans le
+    catalogue filtré au build.
 
-## Review result
+## Résultat de revue
 
-- [x] Nominal open, live edit, reset and close paths are explicit.
-- [x] Detached close control, Terminer, scrim, Escape, route change and disposal are explicit.
-- [x] Duplicate open, edits while closed and invalid input are covered.
-- [x] Offline, permissions, errors, retry absence and terminal disposal are covered.
-- [x] Conflicting preset and explicit fields cannot create implicit authority.
-- [x] Bottom-sheet motion is reversible, presentation-only and reduced-motion safe.
-- [x] Source selection, deselection, zero-count and logo-fallback behavior are explicit.
-- [x] Every mission change remains owned by deterministic Feed page state.
+- [x] Chemins nominaux d'ouverture, édition en direct, réinitialisation et
+      fermeture explicites.
+- [x] Contrôle de fermeture détaché, Terminer, scrim, Escape, changement de
+      route et destruction explicites.
+- [x] Ouverture dupliquée, éditions pendant la fermeture et entrées invalides
+      couverts.
+- [x] Hors ligne, permissions, erreurs, absence de relance et destruction
+      terminale couverts.
+- [x] Preset et champs explicites en conflit ne peuvent pas créer d'autorité
+      implicite.
+- [x] Mouvement de la feuille inférieure réversible, purement de présentation et
+      sûr pour le mouvement réduit.
+- [x] Comportement de sélection de source, désélection, compteur à zéro et repli
+      de logo explicites.
+- [x] Chaque changement de mission reste détenu par l'état déterministe de la
+      page Feed.

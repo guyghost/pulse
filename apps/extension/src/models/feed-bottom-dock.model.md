@@ -1,142 +1,150 @@
-# Feed Bottom Dock — Presentation Model
+# Dock inférieur du Feed — Modèle de présentation
 
-> Source of truth for the feed's floating bottom dock. This is a synchronous
-> presentation projection over the existing `feed-page` state (same nature as
-> `navigation-motion.model.md`): no XState machine, no new business state — the
-> dock derives everything from already-owned state and owns only its rendering.
+> Source de vérité pour le dock flottant inférieur du feed. Il s'agit d'une
+> projection de présentation synchrone sur l'état `feed-page` existant (même
+> nature que `navigation-motion.model.md`) : aucune machine XState, aucun nouvel
+> état métier — le dock dérive tout d'un état déjà détenu et ne possède que son
+> rendu.
 
-## Scope
+## Périmètre
 
-The feed exposes a **floating dock** anchored above the bottom edge of the
-scrollable mission list. The dock is made of **three separate elements**,
-each autonomous and individually crafted — never a unified bar:
+Le feed expose un **dock flottant** ancré au-dessus du bord inférieur de la
+liste défilante des missions. Le dock est composé de **trois éléments séparés**,
+chacun autonome et travaillé individuellement — jamais d'une barre unifiée :
 
-1. a **search pill** (input, grows with content),
-2. a round **filters button** (opens the filter sheet),
-3. a round **activity button** (« détails opérationnels »).
+1. une **pilule de recherche** (champ de saisie, s'élargit avec le contenu),
+2. un **bouton filtres** rond (ouvre la feuille de filtres),
+3. un **bouton activité** rond (« détails opérationnels »).
 
-The dock stays visible whenever the feed page is the current app page, floats
-**above** the scrolling list (content scrolls underneath), and disappears with
-the page when the feed becomes inactive.
+Le dock reste visible dès que la page feed est la page active de l'application,
+flotte **au-dessus** de la liste défilante (le contenu défile en dessous) et
+disparaît avec la page lorsque le feed devient inactif.
 
-## State and context
+## État et contexte
 
-The dock owns no state. Everything is derived:
+Le dock ne possède aucun état. Tout est dérivé :
 
-| Dock concern       | Owner (existing)                                      |
-| ------------------ | ----------------------------------------------------- |
-| Page visibility    | `app-navigation` — `{#if active}` mount of `FeedPage` |
-| Search query       | `feed-page` state module                              |
-| Filter sheet open  | `feed-filter-sheet.model.md` machine (`filterOpen`)   |
-| Filter active flag | `feed-page` derived state (`filterActive`)            |
-| Focus return       | `feed-filter-sheet.model.md` (Escape → trigger)       |
+| Préoccupation du dock   | Propriétaire (existant)                                 |
+| ----------------------- | ------------------------------------------------------- |
+| Visibilité de page      | `app-navigation` — montage `{#if active}` de `FeedPage` |
+| Requête de recherche    | module d'état `feed-page`                               |
+| Feuille filtres ouverte | machine `feed-filter-sheet.model.md` (`filterOpen`)     |
+| Indicateur filtre actif | état dérivé `feed-page` (`filterActive`)                |
+| Retour du focus         | `feed-filter-sheet.model.md` (Escape → déclencheur)     |
 
-Contract: the dock's buttons may **call** existing actions (toggle sheet,
-focus input) but never define new business transitions. No LLM, no free text,
-no heuristic ever produces a dock state.
+Contrat : les boutons du dock peuvent **appeler** des actions existantes
+(basculer la feuille, focaliser la saisie) mais ne définissent jamais de
+nouvelles transitions métier. Aucun LLM, aucun texte libre, aucune heuristique
+ne produit jamais un état du dock.
 
-## Rendering contract — Liquid Glass, per element
+## Contrat de rendu — Liquid Glass, par élément
 
-Each of the three elements is an independent floating surface. Readability is
-guaranteed over light, dark and saturated content, at rest, on hover and
-while content scrolls underneath.
+Chacun des trois éléments est une surface flottante indépendante. La lisibilité
+est garantie sur un contenu clair, sombre et saturé, au repos, au survol et
+pendant que le contenu défile en dessous.
 
-Per element:
+Par élément :
 
-- **Translucent surfacing layer**: background using the surface-white token at
-  a bounded opacity (45–65%), so underlying content remains perceivable but
-  never competes with foreground text.
-- **Backdrop treatment**: `backdrop-blur` plus `backdrop-saturate` on the same
-  element, dosed so scrolled content blurs into a coherent tint instead of
-  sharp noise (blur ≥ 16 px, saturate ≥ 150%).
-- **Hairline definition**: a 1 px light border (white ≈ 70% opacity) around
-  the full element, keeping each silhouette crisp and preventing visual
-  fusion between neighbouring elements.
-- **Specular top edge**: an inset top highlight (white gradient/line at high
-  opacity) simulating light grazing the top rim of the glass.
-- **Layered elevation**: two stacked shadows — a large diffuse shadow (soft,
-  low opacity, large blur) and a tighter contact shadow (small offset, higher
-  opacity) — so the element visibly lifts off the content.
-- **State harmonization**: hover / active / focus-within adjust opacity and
-  shadow intensity within the same glass language (slightly more opaque, one
-  notch more shadow); focus-within also shows the accessible focus ring.
+- **Couche de surface translucide :** arrière-plan utilisant le token
+  `surface-white` à une opacité bornée (45–65 %), afin que le contenu sous-jacent
+  reste perceptible sans jamais concurrencer le texte au premier plan.
+- **Traitement d'arrière-plan :** `backdrop-blur` plus `backdrop-saturate` sur
+  le même élément, dosés de sorte que le contenu défilant se fonde en une teinte
+  cohérente plutôt qu'en bruit net (flou ≥ 16 px, saturation ≥ 150 %).
+- **Définition par filet fin :** une bordure claire de 1 px (blanc ≈ 70 %
+  d'opacité) tout autour de l'élément, gardant chaque silhouette nette et
+  empêchant la fusion visuelle entre éléments voisins.
+- **Bord supérieur spéculaire :** un reflet supérieur intérieur (dégradé / ligne
+  blanche à forte opacité) simulant la lumière rasant le bord supérieur du verre.
+- **Élévation en couches :** deux ombres empilées — une grande ombre diffuse
+  (douce, faible opacité, grand flou) et une ombre de contact plus serrée (petit
+  décalage, opacité plus élevée) — afin que l'élément se détache visiblement du
+  contenu.
+- **Harmonisation des états :** hover / active / focus-within ajustent
+  l'opacité et l'intensité des ombres dans le même langage vitré (légèrement
+  plus opaque, un cran d'ombre en plus) ; focus-within affiche aussi l'anneau de
+  focus accessible.
 
-The three elements share the same calibration language (same border, shadow
-stack, blur treatment) while remaining visually distinct, separated surfaces —
-a **notion of stacked glass chips**, not one bar.
+Les trois éléments partagent le même langage de calibration (même bordure, pile
+d'ombres, traitement de flou) tout en restant des surfaces visuellement
+distinctes et séparées — une **notion de jetons de verre empilés**, pas une
+barre unique.
 
-## Interaction contract
+## Contrat d'interaction
 
-- Search input: standard text input behaviour, owned by `feed-page` query
-  state; typing never triggers navigation or sheet transitions.
-- Filters button: dispatches the existing `feed-filter-sheet` open event;
-  `aria-expanded` reflects the machine state; `aria-controls="filter-panel"` is
-  preserved; Escape closes the sheet and **returns focus to the filters
-  trigger** (existing behaviour, now guaranteed by contract).
-- Filters button badge: a small active-dot is shown when `filterActive` and
-  the sheet is closed — purely derived.
-- Activity button: opens the existing operational details surface. No new
-  transitions.
+- Saisie de recherche : comportement standard de champ texte, détenu par l'état
+  de requête `feed-page` ; la saisie ne déclenche jamais de navigation ni de
+  transition de feuille.
+- Bouton filtres : envoie l'événement d'ouverture `feed-filter-sheet` existant ;
+  `aria-expanded` reflète l'état de la machine ; `aria-controls="filter-panel"`
+  est conservé ; Escape ferme la feuille et **rend le focus au déclencheur des
+  filtres** (comportement existant, désormais garanti par contrat).
+- Badge du bouton filtres : un petit point actif est affiché lorsque
+  `filterActive` est vrai et que la feuille est fermée — purement dérivé.
+- Bouton activité : ouvre la surface existante de détails opérationnels. Aucune
+  nouvelle transition.
 
-## Z-order and layout
+## Ordre Z et mise en page
 
-- Dock z-order stays **below** the filter sheet overlay (sheet renders above
-  the dock when open).
-- The mission list reserves bottom padding (`pb-28` / `pb-40`) so the last
-  items are never permanently masked by the dock.
-- The dock never overlaps the filter sheet trigger semantics; when the sheet
-  is open the dock remains rendered underneath.
+- L'ordre Z du dock reste **en dessous** de la superposition de la feuille de
+  filtres (la feuille s'affiche au-dessus du dock lorsqu'elle est ouverte).
+- La liste de missions réserve une marge inférieure (`pb-28` / `pb-40`) afin que
+  les derniers éléments ne soient jamais masqués en permanence par le dock.
+- Le dock ne recouvre jamais la sémantique du déclencheur de la feuille de
+  filtres ; lorsque la feuille est ouverte, le dock reste monté en dessous.
 
-## Side effects
+## Effets de bord
 
-- None beyond existing `feed-page`/filter-sheet actions invoked by user
-  interaction. The dock itself performs no I/O, no persistence, no bridge
-  calls.
+- Aucun au-delà des actions `feed-page` / `filter-sheet` existantes invoquées
+  par l'interaction utilisateur. Le dock lui-même n'effectue aucune I/O, aucune
+  persistance, aucun appel bridge.
 
-## Error, permission, retry and cancellation review
+## Revue d'erreurs, permissions, relances et annulation
 
-- **Filter sheet error states**: owned by the filter-sheet model; the dock
-  stays stable and re-focusable.
-- **Empty/long search input**: pure `feed-page` derivation; the pill grows,
-  the two round buttons keep fixed size.
-- **Feed inactive**: the dock unmounts with the page (existing `{#if active}`);
-  no orphan element survives.
-- **Rapid open/close of sheet**: machine-owned; dock only mirrors `aria`
-  state.
-- **Reduced motion**: dock has no entrance/exit animation requirement; only
-  existing page transition rules apply.
+- **États d'erreur de la feuille de filtres :** gérés par le modèle de la
+  feuille de filtres ; le dock reste stable et refocalisable.
+- **Saisie de recherche vide / longue :** dérivation pure de `feed-page` ; la
+  pilule s'agrandit, les deux boutons ronds gardent une taille fixe.
+- **Feed inactif :** le dock se démonte avec la page (existant `{#if active}`) ;
+  aucun élément orphelin ne survit.
+- **Ouverture / fermeture rapide de la feuille :** gérée par la machine ; le dock
+  reflète uniquement l'état `aria`.
+- **Mouvement réduit :** le dock n'a aucune exigence d'animation d'entrée /
+  sortie ; seules les règles de transition de page existantes s'appliquent.
 
-## Forbidden
+## Interdits
 
-- No unified bar merging the three elements.
-- No dock state derived from LLM output or free text.
-- No direct `chrome.*`/IndexedDB access from dock handlers (all through
-  existing state modules / bridge).
-- No masking of list content without padding reservation.
-- No new focus-trap: Escape/focus behaviour stays owned by the filter-sheet
-  model.
+- Aucune barre unifiée fusionnant les trois éléments.
+- Aucun état du dock dérivé d'une sortie LLM ou d'un texte libre.
+- Aucun accès direct à `chrome.*` / IndexedDB depuis les handlers du dock (tout
+  passe par les modules d'état / bridge existants).
+- Aucun masquage du contenu de la liste sans réservation de marge.
+- Aucun nouveau piège de focus : le comportement Escape / focus reste détenu par
+  le modèle de la feuille de filtres.
 
 ## Invariants
 
-1. The dock renders iff the feed page is the current app page.
-2. The dock always consists of exactly three separate, individually bordered
-   and shadowed elements.
-3. Every element keeps its backdrop-filter, hairline border and layered
-   shadows in every state (rest, hover, active, focus-within, scrolling
-   underneath).
-4. Surfacing opacity stays within the bounded range on every element.
-5. Escape with the filter sheet open closes the sheet and restores focus to
-   the filters trigger.
-6. The mission list's effective bottom padding always clears the dock's
-   height.
-7. All dock button states derive exclusively from `feed-page` and
-   filter-sheet state.
+1. Le dock est rendu ssi la page feed est la page courante de l'application.
+2. Le dock se compose toujours exactement de trois éléments séparés,
+   individuellement bordés et ombrés.
+3. Chaque élément conserve son `backdrop-filter`, sa bordure fine et ses ombres
+   en couches dans chaque état (repos, survol, actif, focus-within, défilement
+   en dessous).
+4. L'opacité de surface reste dans la plage bornée sur chaque élément.
+5. Escape avec la feuille de filtres ouverte ferme la feuille et restaure le
+   focus sur le déclencheur des filtres.
+6. La marge inférieure effective de la liste de missions dégage toujours la
+   hauteur du dock.
+7. Tous les états des boutons du dock dérivent exclusivement de l'état de
+   `feed-page` et de la feuille de filtres.
 
-## Review result
+## Résultat de revue
 
-- [x] Nominal, hover, active, focus states covered per element.
-- [x] Visibility vs page-active and vs filter-sheet z-order covered.
-- [x] Escape/focus-return and badge derivation covered.
-- [x] No new business state; all derivations traced to existing owners.
-- [x] Readability over light/dark/saturated content addressed by bounded
-      opacity + blur + saturate contract.
+- [x] États nominal, survol, actif, focus couverts par élément.
+- [x] Visibilité par rapport à la page active et à l'ordre Z de la feuille de
+      filtres couverte.
+- [x] Escape / retour du focus et dérivation du badge couverts.
+- [x] Aucun nouvel état métier ; toutes les dérivations tracées vers les
+      propriétaires existants.
+- [x] Lisibilité sur contenu clair / sombre / saturé traitée par le contrat
+      opacité bornée + flou + saturation.
