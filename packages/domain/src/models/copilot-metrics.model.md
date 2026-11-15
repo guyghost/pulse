@@ -1,96 +1,109 @@
-# Model: Copilot pilot metrics
+# Modèle : métriques du pilote Copilot
 
-## Purpose
+## Objectif
 
-Measure whether the closed Copilot pilot produces useful, reviewable content
-without giving analytics any authority over product state. Metrics observe
-durable transitions already accepted by the Copilot machines. They never
-trigger, retry, approve, reject, bill, refund or delete a job.
+Mesurer si le pilote fermé Copilot produit du contenu utile et révisable sans
+donner à l'analytique aucune autorité sur l'état produit. Les métriques
+observent les transitions durables déjà acceptées par les machines Copilot.
+Elles ne déclenchent, ne relancent, n'approuvent, ne rejettent, ne facturent,
+ne remboursent ni ne suppriment jamais un job.
 
-No telemetry is emitted by the extension. No mission text, profile field,
-evidence, generated result, provider session or free-form error is copied to an
-analytics system. The initial implementation is a private server-side
-projection over operational records that are deleted with their dossier.
+Aucune télémétrie n'est émise par l'extension. Aucun texte de mission, champ de
+profil, preuve, résultat généré, session fournisseur ou message d'erreur libre
+n'est copié vers un système analytique. L'implémentation initiale est une
+projection privée côté serveur sur les enregistrements opérationnels, qui sont
+supprimés avec leur dossier.
 
-## Immutable milestones
+## Jalons immuables
 
-Each job may persist these timestamps once:
+Chaque job peut persister ces horodatages une seule fois :
 
-| Milestone          | Source transition                       | Rule             |
-| ------------------ | --------------------------------------- | ---------------- |
-| `reviewReadyAt`    | validated `JOB_REVIEW_READY` commit     | First value wins |
-| `firstUncertainAt` | first transition to `uncertain`         | First value wins |
-| `terminalAt`       | accepted, rejected, failed or cancelled | First value wins |
+| Jalon              | Transition source                             | Règle                |
+| ------------------ | --------------------------------------------- | -------------------- |
+| `reviewReadyAt`    | commit `JOB_REVIEW_READY` validé              | Première valeur fixe |
+| `firstUncertainAt` | première transition vers `uncertain`          | Première valeur fixe |
+| `terminalAt`       | `accepted`, `rejected`, `failed`, `cancelled` | Première valeur fixe |
 
-Existing authoritative timestamps remain:
+Les horodatages faisant autorité existants demeurent :
 
-- `createdAt`: idempotent admission of a new job;
-- `providerDispatchedAt`: command may have reached Eve;
-- `reviewedAt`: explicit user accept or reject;
-- reservation/refund times: credit ledger entries, not duplicated analytics.
+- `createdAt` : admission idempotente d'un nouveau job ;
+- `providerDispatchedAt` : la commande a potentiellement atteint Eve ;
+- `reviewedAt` : acceptation ou rejet explicite par l'utilisateur ;
+- heures de réservation / remboursement : écritures du registre de crédits, sans
+  analytique dupliquée.
 
-`providerDispatchedAt`, `reviewReadyAt`, `reviewedAt`, `firstUncertainAt` and
-`terminalAt` are stamped by PostgreSQL. Application timestamps only signal that
-the modeled transition occurred; they are never accepted as clock authority.
-This keeps the ordering invariants valid when the Vercel and Supabase clocks
-are skewed. Existing rows are normalized before the constraints are installed.
-`providerDispatchedAt` may still be cleared when the provider adapter proves
-that the attempted command could not have produced any remote effect; that
-clear is business evidence, not a replacement timestamp.
+`providerDispatchedAt`, `reviewReadyAt`, `reviewedAt`, `firstUncertainAt` et
+`terminalAt` sont estampillés par PostgreSQL. Les horodatages applicatifs
+signalent uniquement que la transition modélisée a eu lieu ; ils ne sont jamais
+acceptés comme autorité d'horloge. Cela préserve les invariants d'ordre lorsque
+les horloges Vercel et Supabase dérivent. Les lignes existantes sont normalisées
+avant l'installation des contraintes. `providerDispatchedAt` peut toujours être
+effacé lorsque l'adaptateur fournisseur prouve que la commande tentée n'a pu
+produire aucun effet distant ; cet effacement constitue une preuve métier, pas
+un horodatage de remplacement.
 
-Invariants:
+Invariants :
 
-1. `reviewReadyAt >= providerDispatchedAt` when both are known.
+1. `reviewReadyAt >= providerDispatchedAt` lorsque les deux sont connus.
 2. `reviewedAt >= reviewReadyAt`.
 3. `terminalAt >= createdAt`.
-4. `review`, `accepted` and `rejected` require `reviewReadyAt`.
-5. `accepted`, `rejected`, `failed` and `cancelled` require `terminalAt`.
-6. Idempotent retries never overwrite an existing milestone.
-7. Deleting a dossier deletes its job facts; aggregate history may decrease.
+4. `review`, `accepted` et `rejected` exigent `reviewReadyAt`.
+5. `accepted`, `rejected`, `failed` et `cancelled` exigent `terminalAt`.
+6. Les nouvelles tentatives idempotentes n'écrasent jamais un jalon existant.
+7. La suppression d'un dossier supprime les faits de ses jobs ; l'historique
+   agrégé peut diminuer.
 
-Database functions may stamp a milestone after a modeled transition is
-accepted. A timestamp trigger never decides whether a transition is allowed.
+Les fonctions de base de données peuvent estampiller un jalon après l'acceptation
+d'une transition modélisée. Un déclencheur d'horodatage ne décide jamais si une
+transition est autorisée.
 
-## Private facts
+## Faits privés
 
-The service-role-only projection may contain job and dossier identifiers,
-operation kind, bounded state/failure code, milestones, and net credits derived
-from the existing ledger. It must not expose payloads, consent, evidence,
-results, artifacts, provider handles, continuation tokens or error messages.
+La projection réservée au `service-role` peut contenir les identifiants de job
+et de dossier, le type d'opération, l'état ou code d'échec borné, les jalons et
+les crédits nets dérivés du registre existant. Elle ne doit jamais exposer les
+payloads, le consentement, les preuves, les résultats, les artefacts, les
+handles fournisseur, les jetons de continuation ni les messages d'erreur.
 
-There is no public `/api/copilot/metrics` route. Cross-user aggregation belongs
-to an operator/analytics role and must apply a reviewed minimum cell size before
-export.
+Il n'existe aucune route publique `/api/copilot/metrics`. L'agrégation
+inter-utilisateurs appartient à un rôle opérateur / analytique et doit appliquer
+une taille minimale de cellule vérifiée avant tout export.
 
-## KPI definitions
+## Définitions des KPI
 
-- **Approved-content rate:** dossier has at least one accepted non-analysis job.
-  Cohort windows must state their maturity horizon; lifetime rate is diagnostic
-  only because recent dossiers are right-censored.
-- **Time to first usable draft:** dossier creation to the first explicit user
-  acceptance of a non-analysis result. Publish p50/p90 with approval rate.
-- **Time to review-ready:** dossier creation to first non-analysis
-  `reviewReadyAt`; this is a driver, not a claim that the draft was useful.
-- **Provider latency:** `reviewReadyAt - providerDispatchedAt`.
-- **Error/refund rates:** terminal failures, first uncertainty, reservations and
-  refunds from the authoritative ledger, segmented only by bounded operation
-  kind, failure code and uncertainty phase.
-- **Credit cost per dossier:** net credits reserved minus refunded. This is not
-  monetary provider cost.
+- **Taux de contenu approuvé :** dossier ayant au moins un job hors analyse
+  accepté. Les fenêtres de cohorte doivent indiquer leur horizon de maturité ;
+  le taux sur toute la durée est uniquement diagnostique car les dossiers
+  récents sont censurés à droite.
+- **Temps jusqu'au premier brouillon utilisable :** création du dossier jusqu'à
+  la première acceptation explicite d'un résultat hors analyse par l'utilisateur.
+  Publier p50/p90 avec le taux d'approbation.
+- **Temps jusqu'à prêt pour révision :** création du dossier jusqu'au premier
+  `reviewReadyAt` hors analyse ; c'est un indicateur moteur, pas la preuve que
+  le brouillon était utile.
+- **Latence fournisseur :** `reviewReadyAt - providerDispatchedAt`.
+- **Taux d'erreur / remboursement :** échecs terminaux, première incertitude,
+  réservations et remboursements issus du registre faisant autorité, segmentés
+  uniquement par type d'opération borné, code d'échec et phase d'incertitude.
+- **Coût en crédits par dossier :** crédits nets réservés moins remboursés. Ce
+  n'est pas un coût monétaire fournisseur.
 
-## Explicitly unavailable metrics
+## Métriques explicitement indisponibles
 
-- **Eve monetary cost per dossier:** unavailable until a verified provider
-  billing source exposes a stable record correlated to a provider run. Missing
-  data is reported as `PROVIDER_BILLING_SOURCE_MISSING`, never `0 EUR`.
-- **Premium retention:** unavailable until verified subscription events are
-  stored prospectively in an idempotent append-only private history. The current
-  profile status is not historical evidence. Causal impact additionally needs a
-  reviewed comparison design.
+- **Coût monétaire Eve par dossier :** indisponible tant qu'une source de
+  facturation fournisseur vérifiée n'expose pas un enregistrement stable corrélé
+  à une exécution fournisseur. Les données manquantes sont signalées via
+  `PROVIDER_BILLING_SOURCE_MISSING`, jamais `0 EUR`.
+- **Rétention Premium :** indisponible tant que des événements d'abonnement
+  vérifiés ne sont pas stockés prospectivement dans un historique privé
+  idempotent en ajout seul (_append-only_). Le statut actuel du profil n'est pas
+  une preuve historique. L'impact causal nécessite en outre un plan de
+  comparaison revu.
 
-## Privacy and rollout gate
+## Confidentialité et jalon de déploiement
 
-The public privacy policy currently promises no tracking/analytics. Therefore
-the private projection may be prepared and tested for the internal, default-off
-pilot, but no public behavioral reporting or export is enabled before explicit
-privacy review and policy reconciliation.
+La politique de confidentialité publique promet actuellement l'absence de suivi
+et d'analytique. Par conséquent, la projection privée peut être préparée et
+testée pour le pilote interne désactivé par défaut, mais aucun rapport
+comportemental public ni export n'est activé avant une revue de confidentialité
+explicite et une mise en cohérence de la politique.

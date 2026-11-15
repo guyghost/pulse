@@ -1,64 +1,86 @@
-# Mission Deduplication Model
+# Modèle de déduplication des missions
 
-## Scope
+## Périmètre
 
-This model is the source of truth for mission identity resolution after connector parsing.
-It covers duplicate detection and canonical mission selection for reposted missions, including
-platform proxy cases such as a Cherry Pick mission republished on Free-Work.
+Ce modèle est la source de vérité pour la résolution d'identité des missions
+après le parsing par les connecteurs. Il couvre la détection des doublons et la
+sélection de la mission canonique pour les missions republiées, y compris les
+cas de proxy de plateforme comme une mission Cherry Pick republiée sur
+Free-Work.
 
-## Inputs
+## Entrées
 
-- `Mission[]`: parsed missions from Core connector parsers.
-- `threshold`: minimum confidence required to mark a duplicate, default `0.8`.
-- `source`: trusted platform identity from the connector, not from free text.
+- `Mission[]` : missions parsées par les parsers Core des connecteurs.
+- `threshold` : confiance minimale requise pour marquer un doublon, par défaut
+  `0.8`.
+- `source` : identité de plateforme de confiance issue du connecteur, et non du
+  texte libre.
 
-No LLM output may decide mission identity, duplicate status, or canonical selection.
-Semantic scoring may add review signals only after the mission identity is resolved.
+Aucune sortie LLM ne peut décider de l'identité d'une mission, du statut de
+doublon ou de la sélection canonique. Le scoring sémantique ne peut ajouter des
+signaux de revue qu'après la résolution de l'identité de la mission.
 
-## States
+## États
 
-| State                | Meaning                                                                               | Terminal |
-| -------------------- | ------------------------------------------------------------------------------------- | -------- |
-| `candidate`          | A parsed mission is ready to compare against retained missions.                       | No       |
-| `unique`             | No compatible retained mission reached the duplicate threshold.                       | Yes      |
-| `duplicate`          | A compatible retained mission reached the duplicate threshold.                        | Yes      |
-| `canonical_replaced` | The new duplicate has higher canonical priority or quality than the retained mission. | Yes      |
-| `rejected_candidate` | A retained mission was considered but failed compatibility or confidence checks.      | Yes      |
+| État                 | Signification                                                                               | Terminal |
+| -------------------- | ------------------------------------------------------------------------------------------- | -------- |
+| `candidate`          | Une mission parsée est prête à être comparée aux missions retenues.                         | Non      |
+| `unique`             | Aucune mission retenue compatible n'a atteint le seuil de doublon.                          | Oui      |
+| `duplicate`          | Une mission retenue compatible a atteint le seuil de doublon.                               | Oui      |
+| `canonical_replaced` | Le nouveau doublon possède une priorité canonique ou une qualité supérieure à la retenue.   | Oui      |
+| `rejected_candidate` | Une mission retenue a été évaluée mais a échoué aux contrôles de compatibilité ou de seuil. | Oui      |
 
-## Events And Transitions
+## Événements et transitions
 
-| Event                       | From        | Guard                                                                                                                | To                   | Effect                                                       |
-| --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------ |
-| `same_url`                  | `candidate` | normalized URLs match and both have specific paths                                                                   | `duplicate`          | record relation with confidence `1`                          |
-| `same_structured_signature` | `candidate` | normalized title, client, and stack signature match                                                                  | `duplicate`          | record relation with confidence `1`                          |
-| `proxy_repost_match`        | `candidate` | one client is a known platform proxy, locations are compatible, title overlap is strong, stack overlap is sufficient | `duplicate`          | record relation with reason `same_title_stack_proxy_client`  |
-| `direct_source_preferred`   | `duplicate` | duplicate source priority or quality is higher than retained mission                                                 | `canonical_replaced` | retained mission is replaced by the better canonical mission |
-| `client_conflict`           | `candidate` | real client names disagree and neither is a platform proxy                                                           | `rejected_candidate` | no relation is recorded                                      |
-| `location_conflict`         | `candidate` | specific locations disagree without remote-compatible context                                                        | `rejected_candidate` | no relation is recorded                                      |
-| `below_threshold`           | `candidate` | computed confidence is below threshold                                                                               | `rejected_candidate` | no relation is recorded                                      |
-| `no_candidate`              | `candidate` | no retained mission shares indexed tokens                                                                            | `unique`             | append mission to retained set                               |
+| Événement                   | De          | Garde                                                                                                                            | Vers                 | Effet                                                                 |
+| --------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------- | -------------------- | --------------------------------------------------------------------- |
+| `same_url`                  | `candidate` | les URL normalisées correspondent et ont toutes deux un chemin spécifique                                                        | `duplicate`          | enregistre la relation avec une confiance `1`                         |
+| `same_structured_signature` | `candidate` | les signatures normalisées de titre, client et stack correspondent                                                               | `duplicate`          | enregistre la relation avec une confiance `1`                         |
+| `proxy_repost_match`        | `candidate` | un client est un proxy de plateforme connu, les lieux sont compatibles, le recouvrement de titre est fort et la stack suffisante | `duplicate`          | enregistre la relation avec la raison `same_title_stack_proxy_client` |
+| `direct_source_preferred`   | `duplicate` | la priorité de source ou la qualité du doublon est supérieure à celle de la mission retenue                                      | `canonical_replaced` | la mission retenue est remplacée par la meilleure mission canonique   |
+| `client_conflict`           | `candidate` | les vrais noms de clients divergent et aucun n'est un proxy de plateforme                                                        | `rejected_candidate` | aucune relation n'est enregistrée                                     |
+| `location_conflict`         | `candidate` | les localisations spécifiques divergent sans contexte compatible avec le télétravail                                             | `rejected_candidate` | aucune relation n'est enregistrée                                     |
+| `below_threshold`           | `candidate` | la confiance calculée est inférieure au seuil                                                                                    | `rejected_candidate` | aucune relation n'est enregistrée                                     |
+| `no_candidate`              | `candidate` | aucune mission retenue ne partage de jetons indexés                                                                              | `unique`             | ajoute la mission à l'ensemble retenu                                 |
 
-## Cherry Pick Parsing Invariants
+## Invariants de parsing Cherry Pick
 
-- Cherry Pick `skills` become `Mission.stack` only when each item is a concise skill label.
-- Description paragraphs, semantic explanations, or sentence-like text found in `skills` are discarded.
-- Parser output stays pure: no I/O, no clock access, and no LLM calls.
-- `description` remains the only field for long mission prose after metadata cleanup.
+- Les `skills` Cherry Pick ne deviennent `Mission.stack` que lorsque chaque
+  élément est un libellé de compétence concis.
+- Les paragraphes de description, explications sémantiques ou textes sous forme
+  de phrases trouvés dans `skills` sont écartés.
+- La sortie du parser reste pure : zéro I/O, aucun accès à l'horloge et aucun
+  appel LLM.
+- `description` reste l'unique champ pour le texte long de la mission après
+  nettoyage des métadonnées.
 
-## Deduplication Invariants
+## Invariants de déduplication
 
-- Core deduplication is deterministic and pure.
-- A known platform name in `client` means proxy source, not real end client.
-- Free-Work reposts with client `Cherry Pick` must resolve to the Cherry Pick mission when title and stack signals match.
-- Direct/native sources outrank broad aggregators when duplicate confidence is high enough.
-- Incompatible real clients or incompatible specific locations prevent merging.
-- Duplicate relations always point from retained canonical mission to duplicate mission.
+- La déduplication dans le Core est déterministe et pure.
+- Un nom de plateforme connu dans `client` indique une source proxy, pas le
+  client final réel.
+- Les republications Free-Work avec le client `Cherry Pick` doivent se résoudre
+  vers la mission Cherry Pick lorsque les signaux de titre et de stack
+  correspondent.
+- Les sources directes / natives priment sur les agrégateurs généralistes
+  lorsque la confiance de doublon est suffisamment élevée.
+- Des clients réels incompatibles ou des localisations spécifiques incompatibles
+  empêchent la fusion.
+- Les relations de doublon pointent toujours de la mission canonique retenue
+  vers la mission dupliquée.
 
-## Review Checklist
+## Checklist de revue
 
-- Nominal: exact URLs, exact structured signatures, and proxy reposts merge.
-- Errors: malformed optional fields are tolerated by parser normalization and do not throw.
-- Cancellations/retries: not applicable in Core; Shell scan retry/cancel behavior must not change dedup decisions.
-- Permissions: not applicable in Core; connector permissions only affect whether missions are available as inputs.
-- Terminal states: every candidate ends as `unique`, `duplicate`, `canonical_replaced`, or `rejected_candidate`.
-- Forbidden: state transitions based on LLM text, semantic reason, or free-form prompt output.
+- Nominal : les URL exactes, signatures structurées exactes et republications
+  proxy fusionnent.
+- Erreurs : les champs optionnels malformés sont tolérés par la normalisation du
+  parser et ne lèvent pas d'exception.
+- Annulations / relances : non applicable dans le Core ; le comportement
+  d'annulation / relance du scan dans le Shell ne doit pas modifier les décisions
+  de déduplication.
+- Permissions : non applicable dans le Core ; les permissions des connecteurs
+  affectent uniquement la disponibilité des missions en entrée.
+- États terminaux : chaque candidat se termine en `unique`, `duplicate`,
+  `canonical_replaced` ou `rejected_candidate`.
+- Interdit : transitions d'état fondées sur du texte LLM, une raison sémantique
+  ou une sortie de prompt libre.

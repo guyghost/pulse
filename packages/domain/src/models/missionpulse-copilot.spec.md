@@ -1,89 +1,106 @@
-# Spec: MissionPulse Copilot Premium
+# Spec : MissionPulse Copilot Premium
 
-## Objective
+## Objectif
 
-Build an opt-in Premium copilot for French freelance applications. The first
-vertical slice produces a durable, reviewable application dossier for one
-normalized mission and can prepare a pitch, recruiter message, CV summary or
-TJM negotiation brief.
+Construire un copilote Premium optionnel (_opt-in_) pour les candidatures des
+freelances francophones. La première tranche verticale produit un dossier de
+candidature durable et révisable pour une mission normalisée, et peut préparer
+un pitch, un message recruteur, un résumé de CV ou un brief de négociation TJM.
 
-The free extension remains local-first. Scraping, deterministic scoring and
-Gemini Nano are not replaced. The cloud receives only the fields explicitly
-selected by the user. An LLM may return structured signals or draft content;
-it never grants Premium, consumes credits, approves an artifact or changes an
-application status.
+L'extension gratuite reste _local-first_. Le scraping, le scoring déterministe
+et Gemini Nano ne sont pas remplacés. Le cloud ne reçoit que les champs
+explicitement sélectionnés par l'utilisateur. Un LLM peut renvoyer des signaux
+structurés ou un brouillon de contenu ; il n'octroie jamais Premium, ne consomme
+pas de crédits, n'approuve pas d'artefact et ne modifie pas de statut de
+candidature.
 
-The product plan was approved by the user on 2026-07-21. This document records
-the implementation assumptions that make the approved plan executable:
+Le plan produit a été approuvé par l'utilisateur le 2026-07-21. Ce document
+consigne les hypothèses d'implémentation qui rendent le plan approuvé
+exécutable :
 
-1. The Eve-backed path is disabled by default and is an internal pilot until
-   retention/deletion and authorization controls have been verified.
-2. The initial extension session is linked through a browser auth flow. Its
-   bearer is kept in `chrome.storage.session`, never durable local storage.
-3. The API revalidates the user, Premium entitlement, request ownership and
-   credit balance on every privileged request. A cached extension snapshot is
-   display-only.
-4. Analysis is included in Premium. Each requested draft or TJM brief consumes
-   exactly one credit.
-5. V1 is propose-and-confirm only. It never sends a message, edits a CV,
-   changes a pipeline status or schedules an external action.
-6. Generated artifacts are ordered `draftSegments`; each segment carries one
-   or more typed `sourceRefs`. Experience refs resolve only to explicitly
-   selected evidence. TJM refs resolve only to canonical deterministic local
-   fact IDs. There is no independent free-form draft accepted from a provider.
-7. The server assembles copyable text from validated segments. The provider
-   contract contains no free-form summary; factual claims, gaps, risks,
-   questions, facts, inferences and recommendations remain distinct projections.
-8. Dossier consent is a monotonic cumulative union. A user may explicitly
-   expand it only while the dossier is ready, while every job stores and
-   validates the exact subset selected for that operation. Historical consent
-   never authorizes transmission of a field omitted from the current job.
-   Removing cumulative consent requires confirmed dossier deletion.
-9. The internal pilot admits at most 10 analysis jobs and 20 total jobs per
-   user per UTC day. The admission slot is serialized per user and is consumed
-   only by a newly persisted idempotency key; a canonical retry consumes no
-   additional slot. Exceeding either bound returns `RATE_LIMITED` before any
-   credit or provider effect.
-10. An Eve session is eligible for continuation only after the user accepts
-    its result. Claiming it for the next job atomically makes it ineligible;
-    rejection, invalid output, cancellation or failure retires that context.
+1. Le chemin adossé à Eve est désactivé par défaut et constitue un pilote
+   interne jusqu'à la vérification des contrôles de rétention / suppression et
+   d'autorisation.
+2. La session initiale de l'extension est liée via un flux d'authentification
+   navigateur. Son bearer est conservé dans `chrome.storage.session`, jamais
+   dans le stockage local durable.
+3. L'API revalide l'utilisateur, l'entitlement Premium, la propriété de la
+   requête et le solde de crédits sur chaque requête privilégiée. Un instantané
+   mis en cache dans l'extension sert uniquement à l'affichage.
+4. L'analyse est incluse dans Premium. Chaque brouillon ou brief TJM demandé
+   consomme exactement un crédit.
+5. La V1 fonctionne uniquement en mode proposition et confirmation. Elle n'envoie
+   jamais de message, ne modifie pas de CV, ne change pas de statut pipeline et
+   ne planifie aucune action externe.
+6. Les artefacts générés sont des `draftSegments` ordonnés ; chaque segment
+   porte un ou plusieurs `sourceRefs` typés. Les références d'expérience ne se
+   résolvent que vers des preuves explicitement sélectionnées. Les références
+   TJM ne se résolvent que vers des identifiants canoniques de faits locaux
+   déterministes. Aucun brouillon libre indépendant n'est accepté d'un
+   fournisseur.
+7. Le serveur assemble le texte copiable à partir de segments validés. Le contrat
+   fournisseur ne contient aucun résumé libre ; affirmations factuelles, écarts,
+   risques, questions, faits, inférences et recommandations restent des
+   projections distinctes.
+8. Le consentement du dossier est une union cumulative monotone. L'utilisateur
+   peut l'étendre explicitement uniquement lorsque le dossier est prêt, tandis
+   que chaque job stocke et valide le sous-ensemble exact sélectionné pour cette
+   opération. Le consentement historique n'autorise jamais la transmission d'un
+   champ omis du job courant. Le retrait du consentement cumulatif exige la
+   suppression confirmée du dossier.
+9. Le pilote interne admet au plus 10 jobs d'analyse et 20 jobs au total par
+   utilisateur et par jour UTC. Le créneau d'admission est sérialisé par
+   utilisateur et n'est consommé que par une clé d'idempotence nouvellement
+   persistée ; une nouvelle tentative canonique ne consomme aucun créneau
+   supplémentaire. Le dépassement de l'une ou l'autre borne renvoie
+   `RATE_LIMITED` avant tout effet sur le crédit ou le fournisseur.
+10. Une session Eve n'est éligible à la continuation qu'après acceptation de son
+    résultat par l'utilisateur. Sa réclamation pour le job suivant la rend
+    atomiquement inéligible ; le rejet, une sortie invalide, l'annulation ou
+    l'échec retirent ce contexte.
 
-## Tech Stack
+## Stack technique
 
-- Shared deterministic contracts and XState v5 machines: `@pulse/domain`.
-- Chrome MV3 client: Svelte 5, bridge-only service-worker orchestration.
-- MissionPulse API: SvelteKit on Vercel with Supabase auth/billing.
-- Agent provider: Eve behind a replaceable server-only provider port.
-- Runtime validation: Zod at every extension/API/provider boundary.
+- Contrats déterministes partagés et machines XState v5 : `@pulse/domain`.
+- Client Chrome MV3 : Svelte 5, orchestration service worker via bridge
+  uniquement.
+- API MissionPulse : SvelteKit sur Vercel avec authentification / facturation
+  Supabase.
+- Fournisseur d'agent : Eve derrière un port fournisseur remplaçable réservé au
+  serveur.
+- Validation à l'exécution : Zod à chaque frontière extension / API /
+  fournisseur.
 
-## Commands
+## Commandes
 
-- Shared models: `pnpm --filter @pulse/domain test && pnpm --filter @pulse/domain typecheck`
-- Landing: `pnpm --filter @pulse/landing test && pnpm --filter @pulse/landing typecheck`
-- Extension: `pnpm --filter @pulse/extension test && pnpm --filter @pulse/extension typecheck`
-- Builds: `pnpm --filter @pulse/ui build && pnpm --filter @pulse/landing build && pnpm --filter @pulse/extension build`
-- Formatting: `pnpm exec prettier --check <touched files>`
-- Extension lint: `pnpm --filter @pulse/extension exec eslint <touched extension files>`
+- Modèles partagés : `pnpm --filter @pulse/domain test && pnpm --filter @pulse/domain typecheck`
+- Landing : `pnpm --filter @pulse/landing test && pnpm --filter @pulse/landing typecheck`
+- Extension : `pnpm --filter @pulse/extension test && pnpm --filter @pulse/extension typecheck`
+- Builds : `pnpm --filter @pulse/ui build && pnpm --filter @pulse/landing build && pnpm --filter @pulse/extension build`
+- Formatage : `pnpm exec prettier --check <touched files>`
+- Lint extension : `pnpm --filter @pulse/extension exec eslint <touched extension files>`
 
-## Project Structure
+## Structure du projet
 
-- `packages/domain/src/models/`: authoritative state machines and contracts.
-- `apps/landing/agent/`: Eve agent instructions, explicitly disabled built-in
-  tools and structured output contract.
-- `apps/landing/src/lib/server/copilot/`: auth, entitlement, orchestration,
-  credit idempotency and provider port.
-- `apps/landing/src/routes/api/copilot/`: extension-facing API only.
-- `apps/extension/src/lib/core/copilot/`: pure consent and presentation logic.
-- `apps/extension/src/lib/shell/copilot/`: session-only auth, API transport and
-  durable local projection.
-- `apps/extension/src/lib/shell/messaging/bridge.ts`: the only side-panel/SW
-  boundary.
-- `apps/extension/src/ui/`: review and consent UI; no business transitions.
+- `packages/domain/src/models/` : machines à états et contrats faisant autorité.
+- `apps/landing/agent/` : instructions de l'agent Eve, outils intégrés
+  explicitement désactivés et contrat de sortie structurée.
+- `apps/landing/src/lib/server/copilot/` : authentification, entitlement,
+  orchestration, idempotence de crédit et port fournisseur.
+- `apps/landing/src/routes/api/copilot/` : API exposée à l'extension uniquement.
+- `apps/extension/src/lib/core/copilot/` : logique pure de consentement et de
+  présentation.
+- `apps/extension/src/lib/shell/copilot/` : authentification limitée à la
+  session, transport API et projection locale durable.
+- `apps/extension/src/lib/shell/messaging/bridge.ts` : unique frontière entre
+  side panel et service worker.
+- `apps/extension/src/ui/` : UI de révision et de consentement ; aucune
+  transition métier.
 
-## Code Style
+## Style de code
 
-The model decides; async shells only execute commands and return correlated
-facts:
+Le modèle décide ; les shells asynchrones exécutent uniquement les commandes et
+renvoient les faits corrélés :
 
 ```ts
 const decision = decideCopilotAdmission(snapshot, request);
@@ -93,80 +110,104 @@ const providerResult = await provider.run(decision.providerInput);
 actor.send({ type: 'PROVIDER_COMPLETED', jobId: request.jobId, providerResult });
 ```
 
-No free-form provider text is used as an event name, status or transition.
+Aucun texte libre du fournisseur n'est utilisé comme nom d'événement, statut ou
+transition.
 
-## Testing Strategy
+## Stratégie de test
 
-- Model tests enumerate allowed and forbidden transitions, stale correlation,
-  retry, cancellation, expiry, revocation and terminal states.
-- Pure contract tests reject oversized/untrusted inputs and invented evidence.
-- API tests cover unauthenticated, non-Premium, wrong-owner, insufficient
-  credit, duplicate request, provider failure and exactly-once refund paths.
-- Shell tests cover MV3 restart and session-token loss without granting access.
-- E2E covers consent -> dossier -> draft -> review/copy -> reopen.
-- Synthetic adversarial mission descriptions are treated as data and cannot
-  change instructions or fabricate candidate experience.
+- Les tests de modèles énumèrent les transitions autorisées et interdites, les
+  corrélations périmées, les relances, l'annulation, l'expiration, la révocation
+  et les états terminaux.
+- Les tests de contrats purs rejettent les entrées surdimensionnées / non
+  fiables et les preuves inventées.
+- Les tests d'API couvrent les cas non authentifié, non Premium, mauvais
+  propriétaire, crédit insuffisant, requête dupliquée, échec fournisseur et
+  remboursement exactement une fois.
+- Les tests Shell couvrent le redémarrage MV3 et la perte du jeton de session
+  sans octroyer d'accès.
+- Les tests E2E couvrent consentement -> dossier -> brouillon -> révision / copie
+  -> réouverture.
+- Les descriptions de mission adverses synthétiques sont traitées comme des
+  données et ne peuvent ni modifier les instructions ni fabriquer d'expérience
+  candidat.
 
-## Boundaries
+## Frontières
 
-### Always
+### Toujours
 
-- Validate auth and ownership server-side.
-- Expose no direct `anon` or `authenticated` table privilege for Copilot
-  persistence. Browser/extension clients use only the owner-scoped MissionPulse
-  API; service-role RPCs remain server-only and recheck `userId` correlations.
-- Keep Eve and provider credentials server-only.
-- Persist correlation/idempotency keys before paid provider work.
-- Resume only pre-dispatch durable phases. Once provider dispatch may have
-  happened, missing durable completion becomes `uncertain` and requires
-  operator reconciliation; it is never blindly replayed or refunded.
-- Label every inferred claim and tie experience claims to supplied evidence.
-- Render the exact provenance of each artifact segment from typed source refs.
-- Require an explicit user event to approve/copy or trigger any existing
-  application transition.
+- Valider l'authentification et la propriété côté serveur.
+- N'exposer aucun privilège direct `anon` ou `authenticated` sur les tables de
+  persistance Copilot. Les clients navigateur / extension utilisent uniquement
+  l'API MissionPulse limitée au propriétaire ; les RPC `service-role` restent
+  réservées au serveur et revérifient les corrélations `userId`.
+- Conserver Eve et les identifiants fournisseur côté serveur uniquement.
+- Persister les clés de corrélation / d'idempotence avant tout travail
+  fournisseur payant.
+- Ne reprendre que les phases durables antérieures à l'envoi. Dès qu'un envoi
+  fournisseur a pu avoir lieu, une complétion durable manquante devient
+  `uncertain` et exige une réconciliation opérateur ; elle n'est jamais rejouée
+  ni remboursée à l'aveugle.
+- Étiqueter chaque affirmation inférée et lier les affirmations d'expérience aux
+  preuves fournies.
+- Restituer la provenance exacte de chaque segment d'artefact à partir des
+  références sources typées.
+- Exiger un événement utilisateur explicite pour approuver / copier ou
+  déclencher toute transition de candidature existante.
 
-### Ask first
+### Demander d'abord
 
-- Publicly enabling the pilot.
-- Changing pricing or monthly credit grants.
-- Sending email/messages, writing CVs or adding third-party data sources.
-- Expanding transmitted profile fields or retention.
+- Activer publiquement le pilote.
+- Modifier les tarifs ou les dotations mensuelles de crédits.
+- Envoyer des e-mails / messages, modifier des CV ou ajouter des sources de
+  données tierces.
+- Étendre les champs de profil transmis ou la durée de rétention.
 
-### Never
+### Jamais
 
-- Send cookies, platform sessions, raw HTML or a complete CV to Eve.
-- Let the extension's local Premium state authorize a paid request.
-- Let an LLM consume/refund credits or mutate the application pipeline.
-- Auto-send an application or follow-up.
+- Envoyer de cookies, sessions de plateforme, HTML brut ou CV complet à Eve.
+- Laisser l'état Premium local de l'extension autoriser une requête payante.
+- Laisser un LLM consommer / rembourser des crédits ou muter le pipeline de
+  candidature.
+- Envoyer automatiquement une candidature ou une relance.
 
-## Success Criteria
+## Critères de succès
 
-1. The three authoritative machines compile and their transition suites pass.
-2. An unlinked/free/expired/revoked client fails closed.
-3. A Premium user can consent to fields, create/reopen one dossier per mission,
-   run the included analysis and request one-credit drafts.
-4. Provider output is schema-validated before it reaches review.
-5. A duplicate job request cannot double-charge and a failed paid job refunds
-   no more and no less than once.
-6. Closing/reopening the panel restores the local dossier projection; an MV3
-   worker restart resumes through persisted job/session handles.
-7. The pilot remains disabled unless both the release flag and server
-   configuration are present.
-8. Duplicate recovery settles `reserving` and `refunding` through idempotent
-   ledger RPCs, resumes `queued` only before provider dispatch, and freezes any
-   possibly dispatched provider turn as `uncertain` when Eve cannot look it up.
-9. A user retry after terminal failure creates a fresh job, attempt,
-   idempotency key and billing key after consent is reconfirmed; it never
-   reopens a refunded job.
-10. Approved dossier history is returned completely up to its explicit
-    512-artifact bound; the next artifact request is refused before billing or
-    provider dispatch rather than truncating history.
+1. Les trois machines faisant autorité compilent et leurs suites de transitions
+   passent.
+2. Un client non lié / gratuit / expiré / révoqué échoue de manière fermée
+   (_fail closed_).
+3. Un utilisateur Premium peut consentir aux champs, créer / rouvrir un dossier
+   par mission, lancer l'analyse incluse et demander des brouillons à un crédit.
+4. La sortie du fournisseur est validée par schéma avant d'atteindre la
+   révision.
+5. Une requête de job dupliquée ne peut pas facturer deux fois et un job payant
+   échoué rembourse ni plus ni moins d'une fois.
+6. La fermeture / réouverture du panneau restaure la projection locale du
+   dossier ; un redémarrage du worker MV3 reprend via les handles persistés de
+   job / session.
+7. Le pilote reste désactivé tant que le drapeau de release et la configuration
+   serveur ne sont pas tous deux présents.
+8. La reprise de doublon règle `reserving` et `refunding` via des RPC de
+   registre idempotentes, ne reprend `queued` qu'avant l'envoi fournisseur, et
+   gèle tout tour fournisseur potentiellement envoyé en `uncertain` lorsque Eve
+   ne peut pas le consulter.
+9. Une nouvelle tentative utilisateur après un échec terminal crée un nouveau
+   job, une nouvelle tentative, une nouvelle clé d'idempotence et une nouvelle
+   clé de facturation après reconfirmation du consentement ; elle ne rouvre
+   jamais un job remboursé.
+10. L'historique approuvé du dossier est renvoyé intégralement jusqu'à sa borne
+    explicite de 512 artefacts ; la demande d'artefact suivante est refusée
+    avant facturation ou envoi fournisseur plutôt que de tronquer l'historique.
 
-## Open Production Gates
+## Jalons ouverts pour la production
 
-- Verify and publish Eve session retention/deletion behavior.
-- Complete an authorization/isolation security review with two synthetic users.
-- Reconcile public Premium price copy in a separate change.
-- Define operational budgets for latency and cost before public rollout.
-- Provision and verify the cookieless `copilot.missionpulse.app` API domain on
-  the same Vercel project as the reviewed SvelteKit/Eve sibling topology.
+- Vérifier et publier le comportement de rétention / suppression des sessions
+  Eve.
+- Réaliser une revue de sécurité d'autorisation / isolation avec deux
+  utilisateurs synthétiques.
+- Mettre en cohérence la copy publique du tarif Premium dans un changement
+  séparé.
+- Définir les budgets opérationnels de latence et de coût avant le déploiement
+  public.
+- Provisionner et vérifier le domaine API sans cookie `copilot.missionpulse.app`
+  sur le même projet Vercel que la topologie sœur SvelteKit / Eve revue.

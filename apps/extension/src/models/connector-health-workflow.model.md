@@ -1,38 +1,42 @@
-# Connector Health workflow retirement model
+# Modèle de retrait du workflow Connector Health
 
-Status: **REVISION 7 — REVIEWED FOR RETIREMENT (2026-08-20)**.
+Statut : **RÉVISION 7 — REVUE POUR RETRAIT (2026-08-20)**.
 
-This revision supersedes the active Connector Health workflow protocol. The
-scheduled GitHub Actions workflow and its issue-writing orchestration are
-retired because they repeatedly report infrastructure/tooling failures as
-connector failures and create noisy issues without exercising authenticated
-browser sessions.
+Cette révision remplace le protocole actif du workflow Connector Health. Le
+workflow GitHub Actions planifié et son orchestration de création d'issues sont
+retirés car ils signalent de façon répétée des échecs d'infrastructure / outillage
+comme des échecs de connecteur et créent des issues bruitées sans exercer de
+sessions navigateur authentifiées.
 
-The user-approved retirement request is a deterministic signal. This model,
-not issue text, command output or an LLM, decides the allowed transition.
+La demande de retrait approuvée par l'utilisateur est un signal déterministe.
+Ce modèle — et non le texte d'une issue, la sortie d'une commande ou un LLM —
+décide de la transition autorisée.
 
-## Scope
+## Périmètre
 
-This model owns only the remote automation named **Connector Health**:
+Ce modèle ne régit que l'automatisation distante nommée **Connector Health** :
 
-- `.github/workflows/connector-health.yml`;
-- the connector-failure issue template used by that automation;
-- `apps/extension/scripts/connector-health/` and tests that exercise those
-  workflow-only scripts;
-- documentation that claims the scheduled workflow or automatic issue writer
-  is active.
+- `.github/workflows/connector-health.yml` ;
+- le modèle d'issue d'échec de connecteur utilisé par cette automatisation ;
+- `apps/extension/scripts/connector-health/` et les tests qui exercent ces
+  scripts propres au workflow ;
+- la documentation affirmant que le workflow planifié ou le rédacteur automatique
+  d'issues est actif.
 
-The following behavior is explicitly outside the retirement and must remain:
+Les comportements suivants sont explicitement hors du retrait et doivent être
+conservés :
 
-- pure parser-health classification in
-  `src/lib/core/connectors/parser-health-logic.ts`;
-- scan-time parser-health orchestration and local storage in `src/lib/shell/`;
-- the fixture-only local `health-check` commands and their reporter/runner;
-- parser, connector, scanner and storage tests that protect extension runtime
-  behavior;
-- historical Supabase migrations and schema compatibility.
+- la classification pure de santé des parsers dans
+  `src/lib/core/connectors/parser-health-logic.ts` ;
+- l'orchestration de santé des parsers au moment du scan et le stockage local
+  dans `src/lib/shell/` ;
+- les commandes locales `health-check` basées uniquement sur des fixtures ainsi
+  que leur reporter / runner ;
+- les tests de parser, connecteur, scanner et stockage qui protègent le
+  comportement d'exécution de l'extension ;
+- les migrations Supabase historiques et la compatibilité de schéma.
 
-## States and transitions
+## États et transitions
 
 ```text
 active
@@ -47,72 +51,80 @@ verification_failed
   -> FIX_PREPARED -> verifying
 ```
 
-| State                 | Event                 | Guard                                               | Next                  | Effects                                                   |
-| --------------------- | --------------------- | --------------------------------------------------- | --------------------- | --------------------------------------------------------- |
-| `active`              | `RETIREMENT_REVIEWED` | scope and retained runtime boundaries are explicit  | `retirement_ready`    | record this reviewed model                                |
-| `retirement_ready`    | `RETIRE_IMPLEMENTED`  | only in-scope scheduled/issue automation is removed | `verifying`           | delete workflow automation and remove stale documentation |
-| `verifying`           | `VERIFY_PASSED`       | all invariants and the verification matrix pass     | `retired`             | no further effect                                         |
-| `verifying`           | `VERIFY_FAILED`       | any invariant or required check fails               | `verification_failed` | retain failure evidence; do not claim retirement complete |
-| `verification_failed` | `FIX_PREPARED`        | fix remains inside reviewed scope                   | `verifying`           | rerun the complete verification matrix                    |
+| État                  | Événement             | Garde                                                                     | Suivant               | Effets                                                                   |
+| --------------------- | --------------------- | ------------------------------------------------------------------------- | --------------------- | ------------------------------------------------------------------------ |
+| `active`              | `RETIREMENT_REVIEWED` | le périmètre et les frontières runtime conservées sont explicites         | `retirement_ready`    | enregistre ce modèle revu                                                |
+| `retirement_ready`    | `RETIRE_IMPLEMENTED`  | seule l'automatisation planifiée / d'issues dans le périmètre est retirée | `verifying`           | supprime l'automatisation du workflow et retire la documentation périmée |
+| `verifying`           | `VERIFY_PASSED`       | tous les invariants et la matrice de vérification passent                 | `retired`             | aucun autre effet                                                        |
+| `verifying`           | `VERIFY_FAILED`       | tout invariant ou contrôle requis échoue                                  | `verification_failed` | conserve la preuve d'échec ; ne pas déclarer le retrait terminé          |
+| `verification_failed` | `FIX_PREPARED`        | le correctif reste dans le périmètre revu                                 | `verifying`           | réexécute la matrice complète de vérification                            |
 
-Every absent state/event pair is forbidden. `retired` is the only successful
-terminal. `verification_failed` is non-terminal and cannot be presented as a
-successful retirement.
+Toute paire état / événement absente est interdite. `retired` est le seul état
+terminal réussi. `verification_failed` est non terminal et ne peut pas être
+présenté comme un retrait réussi.
 
-## Effects and invariants
+## Effets et invariants
 
-After `RETIRE_IMPLEMENTED`:
+Après `RETIRE_IMPLEMENTED` :
 
-1. GitHub has no scheduled or manual workflow named Connector Health.
-2. Repository code has no workflow-only actor that can query or create GitHub
-   issues for connector health.
-3. No workflow grants `issues: write` for connector-health automation.
-4. CI and release workflows remain unchanged except for dependency-pin updates
-   separately covered by their own policy models.
-5. Local fixture health checks remain runnable and cannot access live browser
-   sessions, cookies or authenticated connector endpoints.
-6. Runtime parser-health state, events, persistence and notifications remain
-   byte-for-byte unchanged by this retirement.
-7. Historical database migrations are never rewritten or deleted.
-8. Reintroducing remote connector-health automation requires a new model and
-   review; a retry, free-text issue or LLM signal cannot reactivate it.
+1. GitHub n'a aucun workflow planifié ou manuel nommé Connector Health.
+2. Le code du dépôt n'a aucun acteur propre au workflow pouvant interroger ou
+   créer des issues GitHub pour la santé des connecteurs.
+3. Aucun workflow n'accorde `issues: write` pour l'automatisation
+   connector-health.
+4. Les workflows CI et release restent inchangés, à l'exception des mises à jour
+   d'épinglage de dépendances couvertes séparément par leurs propres modèles de
+   politique.
+5. Les vérifications locales de santé sur fixtures restent exécutables et ne
+   peuvent pas accéder aux sessions navigateur réelles, aux cookies ni aux
+   points de terminaison authentifiés des connecteurs.
+6. L'état, les événements, la persistance et les notifications runtime de
+   parser-health restent inchangés octet pour octet par ce retrait.
+7. Les migrations historiques de base de données ne sont jamais réécrites ni
+   supprimées.
+8. Réintroduire une automatisation distante connector-health exige un nouveau
+   modèle et une nouvelle revue ; une relance, une issue en texte libre ou un
+   signal LLM ne peut pas la réactiver.
 
-Cancellation has no special recovery transition: before the removal lands,
-the repository remains `active`; after it lands and verifies, it is `retired`.
-There is no runtime retry or partial issue-write path in `retired` because the
-workflow and token-bearing actor no longer exist.
+L'annulation n'a pas de transition de récupération particulière : avant que la
+suppression soit appliquée, le dépôt reste `active` ; après son application et
+sa vérification, il est `retired`. Il n'existe aucun chemin de relance runtime
+ou d'écriture partielle d'issue dans `retired` car le workflow et l'acteur
+porteur de jeton n'existent plus.
 
-## Review
+## Revue
 
-Review completed against the project checklist:
+Revue effectuée selon la checklist du projet :
 
-- **Nominal:** workflow, issue writer, workflow-only scripts/tests and stale
-  docs are removed; local/runtime health behavior is retained.
-- **Errors:** missing references, broken local checks or any CI failure select
-  `VERIFY_FAILED`, never `retired`.
-- **Cancellation:** an interrupted edit or check cannot produce a successful
-  terminal claim.
-- **Retries:** only `verification_failed -> FIX_PREPARED -> verifying` is
-  allowed; retirement never retries an issue write.
-- **Permissions:** successful retirement removes the connector-health
-  `issues: write` authority and introduces no replacement token path.
-- **Terminal states:** `retired` is the sole successful terminal;
-  `verification_failed` requires correction and full re-verification.
-- **Boundary:** parser-health runtime behavior, fixture health checks and
-  historical database artifacts are explicitly preserved.
+- **Nominal :** le workflow, le rédacteur d'issues, les scripts / tests propres
+  au workflow et la documentation périmée sont retirés ; le comportement de
+  santé local / runtime est conservé.
+- **Erreurs :** références manquantes, vérifications locales cassées ou tout
+  échec CI sélectionnent `VERIFY_FAILED`, jamais `retired`.
+- **Annulation :** une édition ou vérification interrompue ne peut pas produire
+  d'affirmation terminale de succès.
+- **Relances :** seule `verification_failed -> FIX_PREPARED -> verifying` est
+  autorisée ; le retrait ne relance jamais d'écriture d'issue.
+- **Permissions :** un retrait réussi supprime l'autorité `issues: write` de
+  connector-health et n'introduit aucun chemin de jeton de remplacement.
+- **États terminaux :** `retired` est le seul état terminal réussi ;
+  `verification_failed` exige une correction et une revérification complète.
+- **Frontière :** le comportement runtime de parser-health, les vérifications de
+  santé sur fixtures et les artefacts historiques de base de données sont
+  explicitement préservés.
 
-No transition is controlled by free text or an LLM.
+Aucune transition n'est contrôlée par du texte libre ou un LLM.
 
-## Verification matrix
+## Matrice de vérification
 
-Retirement reaches `retired` only when all rows pass:
+Le retrait n'atteint `retired` que lorsque toutes les lignes passent :
 
-| Requirement                   | Required evidence                                                                                                                              |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| Workflow absent               | repository search and workflow inventory contain no `connector-health.yml` or `name: Connector Health`                                         |
-| Issue writer absent           | no remaining workflow/script reference can create connector-health issues and no connector-health workflow permission includes `issues: write` |
-| Workflow-only code absent     | `scripts/connector-health/` and its dedicated unit tests are absent                                                                            |
-| Local fixture checks retained | `pnpm --filter @pulse/extension health-check` succeeds                                                                                         |
-| Runtime health retained       | parser-health core, shell and storage unit tests succeed                                                                                       |
-| CI integrity                  | format, lint, typecheck, unit tests and production build succeed under the pinned toolchains                                                   |
-| Model drift absent            | changed files stay within this scope; runtime parser-health and historical migrations have no diff                                             |
+| Exigence                           | Preuve requise                                                                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Absence du workflow                | la recherche dans le dépôt et l'inventaire des workflows ne contiennent ni `connector-health.yml` ni `name: Connector Health`                    |
+| Absence du rédacteur d'issues      | aucune référence restante de workflow / script ne peut créer d'issues connector-health et aucune permission de workflow n'inclut `issues: write` |
+| Absence du code propre au workflow | `scripts/connector-health/` et ses tests unitaires dédiés sont absents                                                                           |
+| Checks locaux sur fixtures gardés  | `pnpm --filter @pulse/extension health-check` réussit                                                                                            |
+| Santé runtime conservée            | les tests unitaires parser-health du core, du shell et du stockage réussissent                                                                   |
+| Intégrité CI                       | format, lint, typecheck, tests unitaires et build de production réussissent sous les chaînes d'outils épinglées                                  |
+| Absence de dérive de modèle        | les fichiers modifiés restent dans ce périmètre ; parser-health runtime et les migrations historiques n'ont aucun diff                           |

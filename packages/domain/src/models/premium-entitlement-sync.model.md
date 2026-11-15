@@ -1,12 +1,12 @@
-# Premium Entitlement Sync Model
+# Modèle de synchronisation d'entitlement Premium
 
-## Authority
+## Autorité
 
-The server profile is authoritative. The extension stores only a display
-snapshot plus an ephemeral session bearer. Neither `premium_enabled` nor any
-local/dev flag can authorize the Copilot API.
+Le profil serveur fait autorité. L'extension ne stocke qu'un instantané
+d'affichage ainsi qu'un bearer de session éphémère. Ni `premium_enabled` ni aucun
+drapeau local ou de dev ne peut autoriser l'API Copilot.
 
-## States
+## États
 
 ```text
 unlinked -- LINK_REQUESTED --> linking
@@ -26,28 +26,33 @@ active -- LOCAL_EXPIRY_OBSERVED --> expired
 free|active|expired|revoked|error -- UNLINK_REQUESTED --> unlinked
 ```
 
-`LOCAL_EXPIRY_OBSERVED` only removes access early. It cannot create or extend
-access. There is no automatic retry transition; the Shell schedules and emits
-an explicit `SYNC_REQUESTED`.
+`LOCAL_EXPIRY_OBSERVED` ne fait que retirer l'accès de manière anticipée. Il ne
+peut ni créer ni prolonger un accès. Il n'existe aucune transition de relance
+automatique ; le Shell planifie et émet un `SYNC_REQUESTED` explicite.
 
 ## Invariants
 
-1. Only `active` permits remote Copilot admission.
-2. `active` requires a server-issued snapshot with `subject`, `issuedAt` and a
-   future `expiresAt`.
-3. Every response is correlated to the active `requestId`; stale responses are
-   ignored.
-4. Revocation and expiry remove Copilot creation authority but retain a valid
-   bearer for owner-scoped inspect/cancel/review/delete recovery. Only explicit
-   unlink or server session rejection clears identity.
-5. Errors fail closed and never reuse the legacy Premium boolean.
-6. Dev overrides can render synthetic UI but cannot reach a production API.
+1. Seul l'état `active` autorise l'admission vers le Copilot distant.
+2. `active` exige un instantané émis par le serveur contenant `subject`,
+   `issuedAt` et un `expiresAt` dans le futur.
+3. Chaque réponse est corrélée au `requestId` actif ; les réponses périmées sont
+   ignorées.
+4. La révocation et l'expiration retirent l'autorité de création Copilot mais
+   conservent un bearer valide pour la récupération limitée au propriétaire
+   (consultation, annulation, révision, suppression). Seule une dissociation
+   explicite ou un rejet de session par le serveur efface l'identité.
+5. Les erreurs échouent de manière fermée (_fail closed_) et ne réutilisent
+   jamais l'ancien booléen Premium.
+6. Les surcharges de dev peuvent afficher une UI synthétique mais ne peuvent
+   jamais atteindre une API de production.
 
-## Review Coverage
+## Couverture de revue
 
-- Nominal link and refresh.
-- Cancelled popup, denied login and invalid callback.
-- Free, expiry while open, server revocation and malformed response.
-- Offline/error then explicit retry.
-- Old response arriving after unlink or a newer sync.
-- MV3 worker restart with and without `chrome.storage.session` state.
+- Liaison nominale et rafraîchissement.
+- Popup annulée, connexion refusée et callback invalide.
+- Plan gratuit, expiration pendant l'ouverture, révocation serveur et réponse
+  malformée.
+- Hors ligne / erreur puis nouvelle tentative explicite.
+- Ancienne réponse arrivant après une dissociation ou une synchronisation plus
+  récente.
+- Redémarrage du worker MV3 avec et sans état dans `chrome.storage.session`.

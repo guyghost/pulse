@@ -1,111 +1,118 @@
-# Keyboard Shortcuts Help — Interaction and Readability Model
+# Aide des raccourcis clavier — Modèle d'interaction et de lisibilité
 
-This document is the source of truth for the keyboard-shortcuts help panel.
-It models a presentational overlay only: it never registers, changes, or runs a
-keyboard shortcut. The shortcut registry remains the authority for the list.
+Ce document est la source de vérité pour le panneau d'aide des raccourcis
+clavier. Il modélise uniquement une superposition de présentation : il
+n'enregistre, ne modifie ni n'exécute jamais de raccourci clavier. Le registre de
+raccourcis reste l'autorité pour la liste.
 
-Rule: _"Si le comportement ne peut pas être modélisé, il n'est pas prêt à être
-implémenté."_ There is no LLM in this flow.
+Règle : _« Si le comportement ne peut pas être modélisé, il n'est pas prêt à
+être implémenté. »_ Il n'y a aucun LLM dans ce flux.
 
-## Scope
+## Périmètre
 
-The panel is rendered by `KeyboardShortcutsHelp.svelte` and is controlled by
-the `showShortcutsHelp` page state. It presents the currently registered
-shortcuts, grouped by their declared category.
+Le panneau est rendu par `KeyboardShortcutsHelp.svelte` et contrôlé par l'état
+de page `showShortcutsHelp`. Il présente les raccourcis actuellement
+enregistrés, regroupés selon leur catégorie déclarée.
 
-## State machine
+## Machine à états
 
 ```
-States: closed · open
+États : closed · open
 
-                 OPEN (? or first-run toast action)
-  closed ─────────────────────────────────► open
-                                               │
+                 OPEN (? ou action du toast de première utilisation)
+  closed ──────────────────────────────────────────────────────────► open
+                                                                       │
                   CLOSE_BUTTON · CLOSE_BACKDROP · ESCAPE
-  closed ◄────────────────────────────────────┘
+  closed ◄─────────────────────────────────────────────────────────────┘
 ```
 
-| From   | Event                                      | To     | Effect                                                                                |
-| ------ | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------- |
-| closed | `OPEN`                                     | open   | Render the dialog, expose the registry snapshot, and move focus to its close control. |
-| open   | `CLOSE_BUTTON`                             | closed | Set the bound `isOpen` value to `false`.                                              |
-| open   | `CLOSE_BACKDROP` (pointer target is scrim) | closed | Set the bound `isOpen` value to `false`.                                              |
-| open   | `ESCAPE`                                   | closed | Set the bound `isOpen` value to `false`.                                              |
-| open   | Any other key / a pointer inside the panel | open   | No state transition.                                                                  |
+| De     | Événement                                           | Vers   | Effet                                                                                                |
+| ------ | --------------------------------------------------- | ------ | ---------------------------------------------------------------------------------------------------- |
+| closed | `OPEN`                                              | open   | Affiche le dialogue, expose l'instantané du registre et déplace le focus sur le bouton de fermeture. |
+| open   | `CLOSE_BUTTON`                                      | closed | Passe la valeur liée `isOpen` à `false`.                                                             |
+| open   | `CLOSE_BACKDROP` (la cible du pointeur est le fond) | closed | Passe la valeur liée `isOpen` à `false`.                                                             |
+| open   | `ESCAPE`                                            | closed | Passe la valeur liée `isOpen` à `false`.                                                             |
+| open   | Toute autre touche / pointeur dans le panneau       | open   | Aucune transition d'état.                                                                            |
 
-`open` is not terminal: the panel may be opened again after any close. The
-registered shortcuts themselves continue to be owned by
-`shell/utils/keyboard-shortcuts.ts`; rendering the help must not mutate that
-registry.
+`open` n'est pas terminal : le panneau peut être rouvert après toute fermeture.
+Les raccourcis enregistrés eux-mêmes restent détenus par
+`shell/utils/keyboard-shortcuts.ts` ; l'affichage de l'aide ne doit pas muter
+ce registre.
 
-`OPEN` delivery is bound to the feed page's shortcut registration: the global
-`?` listener is installed by the feed page's mount effect, and a `?` keydown
-fired before that registration is dropped — there is no queue or replay.
-`OPEN` is therefore eventually-deliverable, never instantly-deliverable:
-scenarios must wait for the registration to be live (re-pressing `?` until the
-dialog appears) before asserting dialog state.
+La livraison de `OPEN` est liée à l'enregistrement des raccourcis de la page
+feed : l'écouteur global `?` est installé par l'effet de montage de la page
+feed, et une pression sur `?` déclenchée avant cet enregistrement est ignorée —
+il n'y a ni file d'attente ni rejeu. `OPEN` est donc éventuellement livrable
+(_eventually-deliverable_), jamais instantanément livrable : les scénarios
+doivent attendre que l'enregistrement soit actif (en réappuyant sur `?` jusqu'à
+l'apparition du dialogue) avant d'asserter l'état du dialogue.
 
-Synthesized delivery note: the registry identifier of the help shortcut is
-`shift+?` (`SHOW_HELP` declares `shift: true`). A real keyboard sends
-Shift+Slash, so automated scenarios must synthesize `Shift+Slash` — a
-synthetic `?` press without the Shift modifier produces the identifier `?`
-and never matches the registry.
+Note de livraison synthétique : l'identifiant dans le registre du raccourci
+d'aide est `shift+?` (`SHOW_HELP` déclare `shift: true`). Un clavier réel envoie
+`Shift+Slash`, donc les scénarios automatisés doivent synthétiser `Shift+Slash` —
+une pression synthétique `?` sans le modificateur Shift produit l'identifiant
+`?` et ne correspond jamais au registre.
 
-## Readability hierarchy
+## Hiérarchie de lisibilité
 
 ```
-scrim (context only; visually de-emphasised)
-└─ dialog surface (all help content; readable at AA contrast)
-   ├─ header: icon, title, concise purpose, close action
-   ├─ scrollable grouped list
-   │  └─ category label → shortcut description → keyboard keycap
-   └─ footer: typing caveat and acknowledgement action
+scrim (contexte uniquement ; visuellement atténué)
+└─ surface du dialogue (tout le contenu d'aide ; lisible au contraste AA)
+   ├─ en-tête : icône, titre, objectif concis, action de fermeture
+   ├─ liste groupée défilante
+   │  └─ libellé de catégorie → description du raccourci → touche clavier
+   └─ pied de page : note sur la saisie et action d'acquittement
 ```
 
-The scrim and dialog surface are separate layers. The scrim dims the underlying
-feed only. The dialog uses the design-system surface and semantic text tokens,
-so title, section labels, descriptions, keycaps, and footer text never inherit
-the scrim's low contrast.
+Le scrim et la surface du dialogue sont des couches distinctes. Le scrim
+assombrit uniquement le feed sous-jacent. Le dialogue utilise les tokens de
+surface et de texte sémantique du design system, afin que le titre, les libellés
+de section, les descriptions, les touches et le texte de pied de page
+n'héritent jamais du faible contraste du scrim.
 
 ## Invariants
 
-- **I1 — Registry fidelity.** Every displayed item comes from
-  `getRegisteredShortcuts()` and uses `formatShortcut()`. No UI-only shortcut
-  can be invented or executed here.
-- **I2 — Stable grouping.** Categories retain their declared order:
-  Navigation, Actions, Recherche, Filtres, Aide, then Autres/alphabetical.
-- **I3 — One clear reading path.** A category label precedes its rows; each row
-  presents exactly one action description and one right-aligned keycap.
-- **I4 — Contrast boundary.** No help text or control is placed directly on the
-  translucent dark scrim. The dialog surface has an opaque background and a
-  visible boundary/elevation token.
-- **I5 — Closing is predictable.** Close button, acknowledgement button,
-  backdrop click, and `Escape` all produce the same `open → closed` transition.
-- **I6 — Context is preserved.** The feed is not mutated while the panel is
-  open; closing restores the same feed state underneath.
-- **I7 — Keyboard semantics.** The container exposes `role="dialog"`,
-  `aria-modal="true"`, and an accessible title. Its close control has a clear
-  accessible name and receives focus when the dialog opens.
-- **I8 — Bounded scan distance.** The surface uses the available width in a
-  narrow side panel, but is centered and constrained at wide widths so each
-  action remains visually associated with its keycap.
+- **I1 — Fidélité au registre.** Chaque élément affiché provient de
+  `getRegisteredShortcuts()` et utilise `formatShortcut()`. Aucun raccourci
+  uniquement UI ne peut être inventé ou exécuté ici.
+- **I2 — Regroupement stable.** Les catégories conservent leur ordre déclaré :
+  Navigation, Actions, Recherche, Filtres, Aide, puis Autres / alphabétique.
+- **I3 — Chemin de lecture unique et clair.** Un libellé de catégorie précède
+  ses lignes ; chaque ligne présente exactement une description d'action et une
+  touche alignée à droite.
+- **I4 — Frontière de contraste.** Aucun texte d'aide ni contrôle n'est placé
+  directement sur le scrim sombre translucide. La surface du dialogue possède un
+  arrière-plan opaque et un token de bordure / élévation visible.
+- **I5 — Fermeture prévisible.** Bouton de fermeture, bouton d'acquittement,
+  clic sur le fond et `Escape` produisent tous la même transition
+  `open → closed`.
+- **I6 — Contexte préservé.** Le feed n'est pas muté pendant l'ouverture du
+  panneau ; la fermeture restaure exactement le même état du feed en dessous.
+- **I7 — Sémantique clavier.** Le conteneur expose `role="dialog"`,
+  `aria-modal="true"` et un titre accessible. Son contrôle de fermeture possède
+  un nom accessible clair et reçoit le focus à l'ouverture du dialogue.
+- **I8 — Distance de balayage bornée.** La surface utilise la largeur disponible
+  dans un panneau latéral étroit, mais est centrée et contrainte aux grandes
+  largeurs afin que chaque action reste visuellement associée à sa touche.
 
-## Review checklist
+## Checklist de revue
 
-- Nominal: opening through `?` or the first-run toast action shows all registered
-  categories and shortcuts.
-- Error/empty: an empty registry renders an intentionally empty list area;
-  closing still works.
-- Cancellation: clicking inside the panel does not close it; clicking the scrim
-  does.
-- Retry: the panel may be opened immediately after closing without stale rows.
-- Permissions: no Chrome permission, persistence, network call, or AI worker is
-  involved.
-- Terminal state: `closed` unmounts the dialog and leaves the feed untouched.
+- Nominal : l'ouverture via `?` ou l'action du toast de première utilisation
+  affiche toutes les catégories et tous les raccourcis enregistrés.
+- Erreur / vide : un registre vide affiche une zone de liste intentionnellement
+  vide ; la fermeture fonctionne toujours.
+- Annulation : cliquer à l'intérieur du panneau ne le ferme pas ; cliquer sur le
+  scrim le ferme.
+- Relance : le panneau peut être rouvert immédiatement après fermeture sans
+  lignes périmées.
+- Permissions : aucune permission Chrome, persistance, appel réseau ou worker
+  IA n'est impliqué.
+- État terminal : `closed` démonte le dialogue et laisse le feed intact.
 
-## Verification mapping
+## Correspondance de vérification
 
-`tests/unit/ui/KeyboardShortcutsHelp.test.ts` verifies grouping, semantic dialog
-structure, separate scrim/surface layering, and each supported closure path.
-Visual browser inspection verifies the surface remains legible at narrow and
-wide side-panel widths.
+`tests/unit/ui/KeyboardShortcutsHelp.test.ts` vérifie le regroupement, la
+structure sémantique du dialogue, la séparation des couches scrim / surface et
+chaque chemin de fermeture pris en charge. L'inspection visuelle dans le
+navigateur vérifie que la surface reste lisible aux largeurs étroites et larges
+du panneau latéral.

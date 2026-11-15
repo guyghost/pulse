@@ -1,12 +1,13 @@
-# Copilot Dossier Model
+# Modèle de dossier Copilot
 
-## Purpose
+## Objectif
 
-Represent the user-controlled lifecycle of one Premium dossier per mission.
-The dossier stores consent, durable Eve handles, validated analysis and
-explicitly reviewed artifacts. It is not the application pipeline.
+Représenter le cycle de vie contrôlé par l'utilisateur d'un dossier Premium par
+mission. Le dossier stocke le consentement, les handles Eve durables, l'analyse
+validée et les artefacts explicitement révisés. Il ne constitue pas le pipeline
+de candidature.
 
-## States
+## États
 
 ```text
 empty -- CONSENT_STARTED --> consenting
@@ -26,147 +27,181 @@ deleting -- DELETE_FAILED --> deletionFailed
 deletionFailed -- DELETE_RETRIED --> deleting
 ```
 
-Follow-up generation starts from `ready` and may reuse only the Eve session
-whose previous result the user explicitly accepted. The continuation is
-atomically consumed before dispatch. Failure, invalid output or rejection
-retires it; every known handle remains a deletion obligation.
+La génération de suivi démarre depuis `ready` et ne peut réutiliser que la
+session Eve dont l'utilisateur a explicitement accepté le résultat précédent. La
+continuation est consommée atomiquement avant l'envoi. Un échec, une sortie
+invalide ou un rejet la retire ; chaque handle connu demeure une obligation de
+suppression.
 
-Retry after failure is the same explicit `ready -> processing` admission as any
-other generation. It requires fresh consent confirmation and a new job identity;
-the failed job and its settled reservation are never reopened.
+La nouvelle tentative après échec suit la même admission explicite
+`ready -> processing` que toute autre génération. Elle exige une nouvelle
+confirmation de consentement et une nouvelle identité de job ; le job échoué et
+sa réservation réglée ne sont jamais rouverts.
 
-## Consented Data
+## Données consenties
 
-- Mission: title, description, client, stack, location, remote mode, duration,
-  start date and displayed TJM, each individually consented.
-- Profile: job title, seniority, location, keywords/stack, TJM bounds and only
-  explicitly selected experience evidence.
-- Never: cookies, platform sessions, raw HTML, hidden page data or full CV.
+- Mission : titre, description, client, stack, lieu, mode de travail, durée,
+  date de démarrage et TJM affiché, chacun consenti individuellement.
+- Profil : intitulé de poste, séniorité, localisation, mots-clés / stack, bornes
+  TJM et uniquement les preuves d'expérience explicitement sélectionnées.
+- Jamais : cookies, sessions de plateforme, HTML brut, données cachées de page
+  ni CV complet.
 
-## Public read projection
+## Projection de lecture publique
 
-The authenticated owner may read a side-effect-free dossier projection even
-when Premium has expired, access was revoked or the rollout was withdrawn.
-This recovery read never resumes reservation, provider, refund or review work.
-It contains only:
+Le propriétaire authentifié peut lire une projection de dossier sans effet de
+bord même lorsque Premium a expiré, que l'accès a été révoqué ou que le
+déploiement (_rollout_) a été retiré. Cette lecture de récupération ne reprend
+jamais de travail de réservation, fournisseur, remboursement ou révision. Elle
+contient uniquement :
 
-- `missionId` and the bounded dossier state;
-- the cumulative consent identifiers needed to validate approved analysis
-  evidence references;
-- the explicitly approved analysis, if any;
-- explicitly approved artifact drafts and their bounded kind/timestamps;
-- the active job correlation (`jobId`, kind and state), if one exists.
+- `missionId` et l'état borné du dossier ;
+- les identifiants de consentement cumulatifs nécessaires pour valider les
+  références de preuves d'analyse approuvées ;
+- l'analyse explicitement approuvée, le cas échéant ;
+- les brouillons d'artefacts explicitement approuvés et leur type / horodatages
+  bornés ;
+- la corrélation du job actif (`jobId`, type et état), s'il en existe un.
 
-It never contains input payloads, unapproved results, provider/session handles,
-continuation tokens, deletion internals or free-form technical errors. Approved
-content remains visible across later jobs and panel/browser restarts until
-confirmed dossier deletion. The projection is observational and cannot itself
-authorize cancellation, review, deletion or a pipeline transition.
+Elle ne contient jamais de payloads d'entrée, de résultats non approuvés, de
+handles fournisseur / session, de jetons de continuation, de détails internes de
+suppression ni d'erreurs techniques libres. Le contenu approuvé reste visible
+d'un job à l'autre et après un redémarrage du panneau ou du navigateur jusqu'à
+la suppression confirmée du dossier. La projection est purement observationnelle
+et ne peut d'elle-même autoriser une annulation, révision, suppression ou
+transition de pipeline.
 
 ## Invariants
 
-1. No remote job starts before `CONSENT_CONFIRMED`.
-2. Transmitted fields are a subset of both the allowlist and the consent set.
-   Consent may expand only through an explicit event while `ready`; removals
-   require confirmed deletion and a new dossier. Each job persists the exact
-   consent snapshot used to validate its transmitted payload.
-3. An experience claim must reference a supplied evidence identifier; absent
-   evidence is rendered as a gap/question, never invented experience.
-   Every generated artifact is an ordered list of grounded segments. A segment
-   has non-empty typed source refs: `{kind:'experience', id}`,
-   `{kind:'mission-field', id}`, `{kind:'profile-field', id}` or, for TJM only,
-   `{kind:'tjm-fact', id}`. Every ref is bound to an allowlisted, consented
-   source and an exact supporting excerpt. TJM refs are additionally restricted
-   to canonical fact IDs derived from the validated deterministic fact object.
-   Pitch, message and CV-summary artifacts must reference at least one selected
-   experience overall. Providers cannot emit a separate free-form draft;
-   MissionPulse assembles the copyable draft from validated segments only.
-4. Eve handles and results are scoped to one `userId + missionId` dossier.
-   At most one handle is continuation-eligible, and only after acceptance.
-5. Only schema-valid results enter `reviewing`.
-6. Only explicit user events add an approved artifact.
-7. Deletion is forbidden while a job is processing or awaiting review. The job
-   must first settle back to `ready`, so no reservation or provider disposition
-   can be erased by a cascade.
-8. Deletion is terminal only after both MissionPulse records and configured Eve
-   session deletion/retention obligations are confirmed.
-9. Dossier events never directly change `MissionTracking.currentStatus`.
-10. `JOB_FAILED`/free cancellation is projected atomically with the matching
-    job terminal state. The dossier cannot become `ready` before the job is
-    terminal, and a terminal no-credit job cannot leave the dossier stuck in
-    `processing` after a lost response.
-11. Every retained Eve handle has an atomic per-job disposition proof. Its
-    active job is constrained by the same `userId + dossierId`; deletion never
-    infers proof from a handle currently rebound to another job.
-12. Persistence mirrors `activeJob.jobId` on the dossier. Entering
-    `processing` sets it; `reviewing` retains it; only the matching review,
-    refund or no-credit terminal transaction clears it while returning
-    `ready`. All ready/deleting states require it to be null.
-13. Consent expansion validates the cumulative post-union selection, including
-    every collection bound. A rejected expansion leaves both the persisted
-    consent and the modeled context unchanged; concurrent expansions serialize
-    on the dossier row and cannot jointly exceed a bound.
-14. Every Eve session carries a durable deletion disposition:
-    `pending | uncertain | deleted | retention-confirmed`. Deletion first
-    proves that every dispatched job has a known handle, then atomically claims
-    one `pending` obligation as `uncertain` before invoking Eve. A confirmed
-    disposition is never replayed. `uncertain` requires provider lookup or
-    operator reconciliation and is never retried as a blind delete.
-    Recovery may rehydrate a durable `deleting` dossier after process loss and
-    continue only obligations still marked `pending`.
-15. Local deletion commits only after all session dispositions are confirmed.
-    It atomically creates payload-free idempotency receipts for every removed
-    job and deletes exactly one `deleting` dossier. A zero-row delete or any
-    persistence failure after an Eve effect transitions the surviving dossier
-    to `deletionFailed`; the API never reports `deleted` without that commit.
-16. Daily pilot admission is counted in a user/day ledger that does not cascade
-    with dossiers. Deleting a dossier cannot restore quota. Idempotent retries
-    and durable deleted-job receipts are checked before the ledger increments.
-17. Deleted-job receipts contain no dossier payload and expire after 90 days.
-    Expiry is enforced by physical deletion, not only by query filtering: a
-    service-role-only bounded purge runs opportunistically on replay/admission
-    and is drained by an authenticated daily maintenance task. The operational
-    deletion target is within 25 hours after expiry and must be monitored before
-    any public retention guarantee is published.
-18. The owner-only public read projection is side-effect-free and remains
-    available for recovery without active Premium. It includes every approved
-    analysis/artifact, not merely the latest job checkpoint, and exposes no Eve
-    handle or unapproved generated content.
-19. A retryable failure is terminal for its job. A user retry creates a new job
-    with new attempt, idempotency and billing identities, and may consume a new
-    credit. Canonical transport replay of the old job remains idempotent and is
-    never presented as a fresh generation.
-20. Copilot tables and service-role RPCs are not a browser API: `anon` and
-    `authenticated` have no direct table privileges. The owner-only public
-    projection is served exclusively by the MissionPulse API after bearer
-    verification and an explicit `userId + missionId` repository lookup.
-21. A dossier retains at most 512 approved artifacts. Admission rejects a new
-    artifact job before quota, credit or provider effects when that bound is
-    reached; analysis remains available. The machine, database constraint and
-    public projection enforce the same bound, so reopening never truncates
-    previously approved content silently.
+1. Aucun job distant ne démarre avant `CONSENT_CONFIRMED`.
+2. Les champs transmis sont un sous-ensemble à la fois de la liste d'autorisation
+   (_allowlist_) et de l'ensemble consenti. Le consentement ne peut s'étendre
+   que via un événement explicite dans l'état `ready` ; tout retrait exige une
+   suppression confirmée et un nouveau dossier. Chaque job persiste l'instantané
+   exact de consentement utilisé pour valider son payload transmis.
+3. Une affirmation d'expérience doit référencer un identifiant de preuve fourni ;
+   une preuve absente est rendue comme un écart / question, jamais comme une
+   expérience inventée. Chaque artefact généré est une liste ordonnée de
+   segments ancrés. Un segment possède des références sources typées non vides :
+   `{kind:'experience', id}`, `{kind:'mission-field', id}`,
+   `{kind:'profile-field', id}` ou, pour le TJM uniquement,
+   `{kind:'tjm-fact', id}`. Chaque référence est liée à une source autorisée et
+   consentie ainsi qu'à un extrait justificatif exact. Les références TJM sont en
+   outre restreintes aux identifiants canoniques de faits dérivés de l'objet de
+   fait déterministe validé. Les artefacts pitch, message et résumé de CV doivent
+   référencer au moins une expérience sélectionnée au total. Les fournisseurs ne
+   peuvent pas émettre un brouillon libre séparé ; MissionPulse assemble le
+   brouillon copiable uniquement à partir de segments validés.
+4. Les handles et résultats Eve sont limités à un dossier `userId + missionId`.
+   Au plus un handle est éligible à la continuation, et uniquement après
+   acceptation.
+5. Seuls les résultats valides selon le schéma entrent en `reviewing`.
+6. Seuls les événements utilisateur explicites ajoutent un artefact approuvé.
+7. La suppression est interdite pendant qu'un job est en cours de traitement ou
+   en attente de révision. Le job doit d'abord revenir à `ready`, afin qu'aucune
+   réservation ni disposition fournisseur ne puisse être effacée par une cascade.
+8. La suppression n'est terminale qu'après confirmation des obligations de
+   suppression / rétention à la fois des enregistrements MissionPulse et de la
+   session Eve configurée.
+9. Les événements de dossier ne modifient jamais directement
+   `MissionTracking.currentStatus`.
+10. `JOB_FAILED` / l'annulation gratuite est projetée atomiquement avec l'état
+    terminal correspondant du job. Le dossier ne peut pas devenir `ready` avant
+    que le job soit terminal, et un job terminal sans crédit ne peut pas laisser
+    le dossier bloqué en `processing` après une réponse perdue.
+11. Chaque handle Eve conservé possède une preuve atomique de disposition par
+    job. Son job actif est contraint par le même `userId + dossierId` ; la
+    suppression n'infère jamais une preuve à partir d'un handle actuellement
+    réassocié à un autre job.
+12. La persistance reflète `activeJob.jobId` sur le dossier. L'entrée en
+    `processing` le définit ; `reviewing` le conserve ; seule la transaction
+    correspondante de révision, remboursement ou terminal sans crédit l'efface
+    tout en revenant à `ready`. Tous les états `ready` / `deleting` exigent
+    qu'il soit nul.
+13. L'extension du consentement valide la sélection cumulative après union, y
+    compris chaque borne de collection. Une extension rejetée laisse inchangés
+    le consentement persisté et le contexte modélisé ; les extensions
+    concurrentes se sérialisent sur la ligne du dossier et ne peuvent pas
+    dépasser conjointement une borne.
+14. Chaque session Eve porte une disposition durable de suppression :
+    `pending | uncertain | deleted | retention-confirmed`. La suppression prouve
+    d'abord que chaque job envoyé possède un handle connu, puis réclame
+    atomiquement une obligation `pending` comme `uncertain` avant d'invoquer
+    Eve. Une disposition confirmée n'est jamais rejouée. `uncertain` exige une
+    consultation fournisseur ou une réconciliation opérateur et n'est jamais
+    relancée par une suppression à l'aveugle. La reprise peut réhydrater un
+    dossier durable `deleting` après perte de processus et poursuivre uniquement
+    les obligations encore marquées `pending`.
+15. La suppression locale n'est validée qu'après confirmation de toutes les
+    dispositions de session. Elle crée atomiquement des reçus d'idempotence sans
+    payload pour chaque job retiré et supprime exactement un dossier `deleting`.
+    Une suppression de zéro ligne ou tout échec de persistance après un effet
+    Eve fait passer le dossier survivant en `deletionFailed` ; l'API ne signale
+    jamais `deleted` sans cette validation.
+16. L'admission quotidienne au pilote est comptée dans un registre utilisateur /
+    jour qui ne se supprime pas en cascade avec les dossiers. Supprimer un
+    dossier ne peut pas restaurer le quota. Les relances idempotentes et les
+    reçus durables de jobs supprimés sont vérifiés avant l'incrément du
+    registre.
+17. Les reçus de jobs supprimés ne contiennent aucun payload de dossier et
+    expirent après 90 jours. L'expiration est appliquée par suppression
+    physique, pas seulement par filtrage de requête : une purge bornée réservée
+    au `service-role` s'exécute de manière opportuniste au rejeu / admission et
+    est drainée par une tâche quotidienne authentifiée de maintenance. L'objectif
+    opérationnel de suppression est de 25 heures après expiration et doit être
+    surveillé avant toute publication d'une garantie publique de rétention.
+18. La projection de lecture publique réservée au propriétaire est sans effet de
+    bord et reste disponible pour récupération sans Premium actif. Elle inclut
+    chaque analyse / artefact approuvé, pas seulement le dernier point de
+    contrôle de job, et n'expose aucun handle Eve ni contenu généré non
+    approuvé.
+19. Un échec relançable est terminal pour son job. Une nouvelle tentative
+    utilisateur crée un nouveau job avec de nouvelles identités de tentative,
+    d'idempotence et de facturation, et peut consommer un nouveau crédit. Le
+    rejeu de transport canonique de l'ancien job reste idempotent et n'est
+    jamais présenté comme une nouvelle génération.
+20. Les tables Copilot et les RPC `service-role` ne constituent pas une API
+    navigateur : `anon` et `authenticated` n'ont aucun privilège direct sur les
+    tables. La projection publique réservée au propriétaire est servie
+    exclusivement par l'API MissionPulse après vérification du bearer et
+    recherche explicite sur `userId + missionId`.
+21. Un dossier conserve au maximum 512 artefacts approuvés. L'admission rejette
+    un nouveau job d'artefact avant tout effet sur le quota, le crédit ou le
+    fournisseur lorsque cette borne est atteinte ; l'analyse reste disponible.
+    La machine, la contrainte en base de données et la projection publique
+    appliquent la même borne, afin que la réouverture ne tronque jamais
+    silencieusement le contenu précédemment approuvé.
 
-## Review Coverage
+## Couverture de revue
 
-- Consent confirmation/cancellation, monotonic expansion, forbidden removal,
-  and forbidden updates while processing/reviewing.
-- Malicious mission instructions, oversized descriptions and unknown fields.
-- Valid analysis, invalid/fabricated evidence references and provider failure.
-- Artifact segments with missing, mixed, unknown or fabricated source refs.
-- TJM facts, inferred anchor and recommendations rendered as distinct layers.
-- User approve/reject, multiple drafts and reopening after panel/worker restart.
-- Delete failure/retry and user/session isolation.
-- Partial Eve deletion, unknown preflight disposition, confirmed-session retry
-  suppression, local zero-row deletion and durable deleted-job replay denial.
-- Sequential and concurrent consent unions at the maximum collection bounds.
-- Dossier deletion followed by same-day quota and idempotency retries.
-- Retryable failure followed by a fresh consented job; the old refunded billing
-  identity cannot fund the new provider run.
-- Direct anon/authenticated table reads and writes are denied even when a caller
-  guesses a valid dossier or job identifier.
-- Artifact admission at 511/512 retained items and a malformed persisted array
-  above the bound.
-- Receipt expiry followed by physical row deletion through both opportunistic
-  and scheduled maintenance paths.
-- Approved analysis plus multiple approved drafts survive a later job and a
-  side-panel/browser restart through the owner-only dossier projection.
+- Confirmation / annulation du consentement, extension monotone, retrait
+  interdit et mises à jour interdites pendant `processing` / `reviewing`.
+- Instructions de mission malveillantes, descriptions surdimensionnées et champs
+  inconnus.
+- Analyse valide, références de preuves invalides / fabriquées et échec
+  fournisseur.
+- Segments d'artefact avec références sources manquantes, mixtes, inconnues ou
+  fabriquées.
+- Faits TJM, ancre inférée et recommandations rendus en couches distinctes.
+- Approbation / rejet utilisateur, brouillons multiples et réouverture après
+  redémarrage du panneau ou du worker.
+- Échec / relance de suppression et isolation utilisateur / session.
+- Suppression partielle Eve, disposition pré-vérification inconnue, suppression
+  de relance de session confirmée, suppression locale de zéro ligne et refus
+  de rejeu durable d'un job supprimé.
+- Unions de consentement séquentielles et concurrentes aux bornes maximales de
+  collection.
+- Suppression de dossier suivie de relances de quota et d'idempotence le même
+  jour.
+- Échec relançable suivi d'un nouveau job consenti ; l'ancienne identité de
+  facturation remboursée ne peut pas financer la nouvelle exécution fournisseur.
+- Les lectures et écritures directes `anon` / `authenticated` sur les tables
+  sont refusées même lorsqu'un appelant devine un identifiant valide de dossier
+  ou de job.
+- Admission d'artefact à 511/512 éléments conservés et tableau persisté malformé
+  au-dessus de la borne.
+- Expiration de reçu suivie d'une suppression physique des lignes via les chemins
+  opportuniste et planifié de maintenance.
+- L'analyse approuvée ainsi que plusieurs brouillons approuvés survivent à un
+  job ultérieur et à un redémarrage du panneau latéral ou du navigateur via la
+  projection de dossier réservée au propriétaire.
