@@ -20,7 +20,7 @@ const REVIEWED_ACTION_PINS = new Map<string, string>([
   ['actions/checkout', '3d3c42e5aac5ba805825da76410c181273ba90b1'],
   ['actions/setup-node', '949feb2413d6458794dcd2491c4babbbce0c15c1'],
   ['actions/setup-python', '6d4fd22b20465ccc0f7354476588e8df7c9ca0e0'],
-  ['pnpm/action-setup', 'ea17c68df8912ef543352723c149a84f56e3d413'],
+  ['pnpm/action-setup', '73e46992e05b19abd31f2f3c20e0e7370d762115'],
   ['actions/attest', OFFICIAL_ATTEST_SHA],
   ['actions/upload-artifact', OFFICIAL_UPLOAD_SHA],
 ]);
