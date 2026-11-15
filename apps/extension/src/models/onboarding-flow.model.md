@@ -1,26 +1,30 @@
-# Onboarding Flow — State Model
+# Flux d'onboarding — Modèle d'état
 
-> Authoritative prose model for the end-to-end onboarding UI flow. The machine
-> in `onboarding-flow.machine.ts` (+ `.contract.ts`, `.logic.ts`) is the
-> executable form of this document. If the two disagree, **the model is wrong**.
+> Modèle en prose faisant autorité pour le flux UI d'onboarding de bout en bout.
+> La machine dans `onboarding-flow.machine.ts` (+ `.contract.ts`, `.logic.ts`)
+> est la forme exécutable de ce document. Si les deux divergent, **c'est le
+> modèle qui a tort**.
 
-## Purpose
+## Objectif
 
-Take a first-run user from "extension installed" to "first scan running" without
-ever blocking the delivery of first value. The flow collects the minimum
-profile signal needed to score missions, asks for one connected source, and
-launches a scan — even if the user skips every question.
+Amener un utilisateur de première installation de « extension installée » à
+« premier scan en cours » sans jamais bloquer la délivrance de la première
+valeur. Le flux collecte le signal de profil minimal nécessaire pour scorer les
+missions, demande une source connectée et lance un scan — même si l'utilisateur
+passe chaque question.
 
-## Scope
+## Périmètre
 
-- **In scope:** UI phase orchestration (welcome → connect → wizard → notify →
-  persist → scan → done), step validity guards, the `pendingEffect` protocol
-  that the shell consumes to run persist/scan.
-- **Out of scope:** durable source consent + permissions + session detection
-  (owned by `onboarding-source.machine.ts`, reused as-is), credential storage
-  (none — local-first), OTP/compliance (none — cookie-based sessions).
+- **Dans le périmètre :** orchestration des phases UI (welcome → connect →
+  wizard → notify → persist → scan → done), gardes de validité d'étape,
+  protocole `pendingEffect` que le shell consomme pour exécuter la persistance /
+  le scan.
+- **Hors périmètre :** consentement durable aux sources + permissions + détection
+  de session (détenus par `onboarding-source.machine.ts`, réutilisé tel quel),
+  stockage d'identifiants (aucun — _local-first_), OTP / conformité (aucun —
+  sessions par cookies).
 
-## Phases (states)
+## Phases (états)
 
 ```
 welcome ──START──▶ connecting ──NEXT(hasSource)──▶ wizard ──NEXT(lastStep)──▶ notifying
@@ -39,61 +43,65 @@ welcome ──START──▶ connecting ──NEXT(hasSource)──▶ wizard �
                        completed (final)
 ```
 
-`wizard` is a **flat** state: `context.wizardStep ∈ {identity, preferences, skills}`
-is the single source of truth. The top-level **phase is derived from the actor's
-state value** (`phaseFromStateValue`), so context and active state can never
-desync.
+`wizard` est un état **plat** :
+`context.wizardStep ∈ {identity, preferences, skills}` est la source de vérité
+unique. La **phase de haut niveau est dérivée de la valeur d'état de l'acteur**
+(`phaseFromStateValue`), afin que le contexte et l'état actif ne puissent jamais
+se désynchroniser.
 
-## Invariants (binding)
+## Invariants (contraignants)
 
-1. **Never block first value.** A scan always runs. `SKIP` fast-forwards to
-   `scanning` with a partial-default profile; `_FAILED` transitions still
-   advance to the next phase. There is no aborted dead-end and no terminal
-   short of `completed`.
-2. **Idempotent terminal.** `completed` is the sole XState `final` state. No
-   event is admitted after it is reached.
-3. **One primary action per screen.** Each phase has at most one forward (NEXT)
-   and one back (BACK); SKIP is the only escape hatch.
-4. **Guards decide, components don't.** `canAdvanceStep` (pure, in contract) is
-   the sole arbiter of whether NEXT is enabled on a wizard step. The UI never
-   invents a transition.
-5. **Effects are descriptors, not executions.** The machine writes a pure
-   `OnboardingFlowEffect` into `pendingEffect`; the shell reads it, runs the
-   I/O, and reports back via `SCAN_DONE` / `SCAN_FAILED` / `PERSISTED` /
-   `PERSIST_FAILED`. The machine never calls fetch/storage/chrome.*.
-6. **Admitted events only.** Events created by the controller are tagged via a
-   `WeakSet` owned by the **machine module** (not `logic.ts`); the controller
-   calls `admitFlowEvent(event)` before dispatching, and the `admittedEvent`
-   guard reads the same set via the closure passed to
-   `createOnboardingFlowSetup`. Splitting the writer and reader across two
-   modules (two disjoint sets) silently rejects every event — this is a
-   load-bearing invariant: **one set, one module**.
+1. **Ne jamais bloquer la première valeur.** Un scan s'exécute toujours. `SKIP`
+   avance directement vers `scanning` avec un profil par défaut partiel ; les
+   transitions `_FAILED` avancent tout de même vers la phase suivante. Il n'y a
+   aucune impasse avortée et aucun état terminal avant `completed`.
+2. **Terminal idempotent.** `completed` est l'unique état `final` XState. Aucun
+   événement n'est admis après qu'il est atteint.
+3. **Une action principale par écran.** Chaque phase possède au plus une action
+   avant (`NEXT`) et une action arrière (`BACK`) ; `SKIP` est l'unique porte de
+   sortie.
+4. **Les gardes décident, pas les composants.** `canAdvanceStep` (pur, dans le
+   contrat) est l'unique arbitre indiquant si `NEXT` est activé sur une étape du
+   wizard. L'UI n'invente jamais une transition.
+5. **Les effets sont des descripteurs, pas des exécutions.** La machine écrit un
+   `OnboardingFlowEffect` pur dans `pendingEffect` ; le shell le lit, exécute
+   l'I/O et renvoie le résultat via `SCAN_DONE` / `SCAN_FAILED` / `PERSISTED` /
+   `PERSIST_FAILED`. La machine n'appelle jamais `fetch` / `storage` /
+   `chrome.*`.
+6. **Événements admis uniquement.** Les événements créés par le contrôleur sont
+   marqués via un `WeakSet` détenu par le **module de la machine** (pas
+   `logic.ts`) ; le contrôleur appelle `admitFlowEvent(event)` avant d'envoyer,
+   et la garde `admittedEvent` lit le même ensemble via la fermeture passée à
+   `createOnboardingFlowSetup`. Séparer l'écrivain et le lecteur sur deux
+   modules (deux ensembles disjoints) rejette silencieusement chaque événement —
+   c'est un invariant structurel : **un ensemble, un module**.
 
-## Wizard step validity (`canAdvanceStep`)
+## Validité des étapes du wizard (`canAdvanceStep`)
 
-| Step        | Guard                                              |
-| ----------- | -------------------------------------------------- |
-| identity    | `firstName` and `jobTitle` are non-empty (trimmed) |
-| preferences | `tjmMin > 0` and `tjmMax >= tjmMin`                |
-| skills      | at least one keyword                               |
+| Étape       | Garde                                                 |
+| ----------- | ----------------------------------------------------- |
+| identity    | `firstName` et `jobTitle` sont non vides (après trim) |
+| preferences | `tjmMin > 0` et `tjmMax >= tjmMin`                    |
+| skills      | au moins un mot-clé                                   |
 
-## Effect protocol (machine → shell)
+## Protocole d'effets (machine → shell)
 
-| When (transition)      | `pendingEffect` written        | Shell reports back             |
+| Quand (transition)     | `pendingEffect` écrit          | Retour du shell                |
 | ---------------------- | ------------------------------ | ------------------------------ |
 | notifying → persisting | `PERSIST_PROFILE`              | `PERSISTED` / `PERSIST_FAILED` |
 | persisting → scanning  | `START_SCAN`                   | `SCAN_DONE` / `SCAN_FAILED`    |
 | *_SKIP → scanning      | `START_SCAN { partial: true }` | `SCAN_DONE` / `SCAN_FAILED`    |
 
-On `PERSIST_FAILED`, the machine still writes `START_SCAN` and transitions to
-`scanning` (never blocks first value); the typed error is surfaced in
-`context.error` for the UI.
+Sur `PERSIST_FAILED`, la machine écrit tout de même `START_SCAN` et passe à
+`scanning` (ne bloque jamais la première valeur) ; l'erreur typée est remontée
+dans `context.error` pour l'UI.
 
-## Re-entry guard
+## Garde de ré-entrée
 
-`completed` is `final`. The extension gates on `hasCompletedOnboarding`
-(storage flag set by the shell once `completed` is reached), so the flow is
-never re-entered. The controller is created fresh each onboarding run.
+`completed` est `final`. L'extension filtre sur `hasCompletedOnboarding`
+(drapeau de stockage défini par le shell une fois `completed` atteint), donc le
+flux n'est jamais ré-entré. Le contrôleur est recréé à neuf à chaque exécution
+d'onboarding.
 
 ## Progression utilisateur (projection)
 
@@ -124,12 +132,13 @@ Invariants de présentation :
    `Ajouter la compétence`, `Retirer <compétence>` et
    `Activer/Désactiver les notifications`.
 
-## Snapshot (projection)
+## Instantané (projection)
 
-`projectOnboardingFlow(ctx, phase)` exposes a stable `OnboardingFlowSnapshot`:
+`projectOnboardingFlow(ctx, phase)` expose un `OnboardingFlowSnapshot` stable :
 `phase`, `wizardStep`, `profile`, `connectedSources`, `notifyEnabled`,
 `progress {current,total}`, `pendingEffect`, `error`, `terminal`, `canAdvance`.
-The UI consumes only this shape; it never touches context directly.
+L'UI ne consomme que cette forme ; elle ne touche jamais le contexte
+directement.
 
 ## Cycle de vie de l'acteur
 

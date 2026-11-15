@@ -1,140 +1,156 @@
-# Onboarding — Work-Mode & Location Fields Model
+# Onboarding — Modèle des champs Mode de travail & Localisation
 
-Source of truth for the onboarding profile-collection fields that capture
-**where** a freelancer wants to work (location) and **how** (work mode / remote).
-Companion to `profile-state.model.md` (persistence lifecycle) and
-`keywords-unification.model.md` (keyword collection). Proposed change captured
-here pending implementation; the `UserProfile` schema already supports every
-field — this change only fixes what onboarding **collects**.
+Source de vérité pour les champs de collecte du profil lors de l'onboarding qui
+capturent **où** un freelance souhaite travailler (localisation) et **comment**
+(mode de travail / télétravail). Compagnon de `profile-state.model.md` (cycle de
+vie de la persistance) et de `keywords-unification.model.md` (collecte des
+mots-clés). Ce changement est consigné ici en attente d'implémentation ; le
+schéma `UserProfile` prend déjà en charge chaque champ — ce changement corrige
+uniquement ce que l'onboarding **collecte**.
 
-## Problem
+## Problème
 
-`OnboardingWizard.svelte` conflates the two concepts today:
+`OnboardingWizard.svelte` mélange aujourd'hui les deux concepts :
 
-- A single `location` text field with placeholder `ex: Paris ou remote` mixes a
-  place with a work arrangement, so users type either/or and the signal is
-  ambiguous for the location scorer (`core/scoring/location-matching.ts`).
-- `remote` is **hardcoded to `'any'`** in `handleComplete()`. The work-mode
-  preference is never collected at first run, even though `UserProfile.remote`
-  (`RemoteType | 'any'`, where `RemoteType = 'full' | 'hybrid' | 'onsite'`) and
-  the `remote` scoring weight (`DEFAULT_SCORING_WEIGHTS.remote = 15`) exist.
+- Un unique champ texte `location` avec le placeholder `ex: Paris ou remote`
+  mélange un lieu avec un mode d'organisation du travail, si bien que les
+  utilisateurs saisissent l'un ou l'autre et que le signal est ambigu pour le
+  scorer de localisation (`core/scoring/location-matching.ts`).
+- `remote` est **codé en dur à `'any'`** dans `handleComplete()`. La préférence
+  de mode de travail n'est jamais collectée à la première utilisation, bien que
+  `UserProfile.remote` (`RemoteType | 'any'`, où
+  `RemoteType = 'full' | 'hybrid' | 'onsite'`) et le poids de scoring `remote`
+  (`DEFAULT_SCORING_WEIGHTS.remote = 15`) existent.
 
-The profile edit surface (`ProfileSection.svelte`) already exposes two distinct
-fields — a `profileLocation` text input and a `profileRemote` select with
-options `Indifférent / Remote / Hybride / Présentiel`. Onboarding must match
-that separation so first-run data feeds the same scorer with the same shape.
+La surface d'édition du profil (`ProfileSection.svelte`) expose déjà deux champs
+distincts — une saisie texte `profileLocation` et un sélecteur `profileRemote`
+avec les options `Indifférent / Remote / Hybride / Présentiel`. L'onboarding doit
+correspondre à cette séparation afin que les données de première utilisation
+alimentent le même scorer avec la même forme.
 
-## Fields
+## Champs
 
-| Field           | Profile key | Type                  | Onboarding control         | Default | Required |
-| --------------- | ----------- | --------------------- | -------------------------- | ------- | -------- |
-| Localisation    | `location`  | `string`              | Text input (location only) | `''`    | No       |
-| Mode de travail | `remote`    | `RemoteType \| 'any'` | Segmented control (4 opts) | `'any'` | No       |
+| Champ           | Clé profil | Type                  | Contrôle onboarding        | Défaut  | Requis |
+| --------------- | ---------- | --------------------- | -------------------------- | ------- | ------ |
+| Localisation    | `location` | `string`              | Saisie texte (lieu seul)   | `''`    | Non    |
+| Mode de travail | `remote`   | `RemoteType \| 'any'` | Contrôle segmenté (4 opts) | `'any'` | Non    |
 
-Work-mode options (values and labels **identical** to `ProfileSection.remoteOptions`):
+Options de mode de travail (valeurs et libellés **identiques** à
+`ProfileSection.remoteOptions`) :
 
-| value      | label       |
+| valeur     | libellé     |
 | ---------- | ----------- |
 | `'any'`    | Indifférent |
 | `'full'`   | Remote      |
 | `'hybrid'` | Hybride     |
 | `'onsite'` | Présentiel  |
 
-`'any'` is the explicit "no preference" value already used everywhere `remote`
-is optional; it must remain the default so onboarding stays opt-in and the
-existing `withProfileDefaults` fallback is unchanged.
+`'any'` est la valeur explicite « sans préférence » déjà utilisée partout où
+`remote` est optionnel ; elle doit rester la valeur par défaut afin que
+l'onboarding reste opt-in et que le repli `withProfileDefaults` existant reste
+inchangé.
 
-## States (per field, local to the wizard)
+## États (par champ, locaux au wizard)
 
 ```
 location:  untouched ('') ──input──► filled (string) ──clear──► untouched
 remote:    untouched ('any') ──select──► chosen (full|hybrid|onsite) ──select 'any'──► 'any'
 ```
 
-Both fields are always "valid" — there is no error state for them. They are
-optional and never block `canSubmit`.
+Les deux champs sont toujours « valides » — il n'existe aucun état d'erreur pour
+eux. Ils sont optionnels et ne bloquent jamais `canSubmit`.
 
-## Events
+## Événements
 
-| Event                  | Source              | Effect                                                              |
-| ---------------------- | ------------------- | ------------------------------------------------------------------- |
-| `LOCATION_INPUT`       | location text input | `location` state updated                                            |
-| `REMOTE_SELECT(value)` | segmented control   | `remote` state updated to `value`                                   |
-| `SUBMIT`               | "Sauvegarder" btn   | build draft via `normalizeProfileDraft({ …, location, remote, … })` |
+| Événement              | Source              | Effet                                                                          |
+| ---------------------- | ------------------- | ------------------------------------------------------------------------------ |
+| `LOCATION_INPUT`       | saisie localisation | état `location` mis à jour                                                     |
+| `REMOTE_SELECT(value)` | contrôle segmenté   | état `remote` mis à jour à `value`                                             |
+| `SUBMIT`               | bouton Sauvegarder  | construit le brouillon via `normalizeProfileDraft({ …, location, remote, … })` |
 
-On `SUBMIT` the wizard calls `onUpdateProfile(profile)` then `onComplete(profile)`,
-exactly as today — only the `remote` value stops being hardcoded.
+Sur `SUBMIT`, le wizard appelle `onUpdateProfile(profile)` puis
+`onComplete(profile)`, exactement comme aujourd'hui — seule la valeur `remote`
+cesse d'être codée en dur.
 
-## Data flow
+## Flux de données
 
 ```
-OnboardingWizard (local $state: location, remote)
+OnboardingWizard ($state local : location, remote)
    │  SUBMIT
    ▼
 normalizeProfileDraft({ firstName, jobTitle, location, remote, keywords, tjmMin, tjmMax, seniority })
-   │  (pure — already accepts `remote`, defaults to 'any')
+   │  (pur — accepte déjà `remote`, défaut à 'any')
    ▼
 UserProfile  ──onUpdateProfile──►  OnboardingPage.profileDraft  ──PROFILE_UPDATED──► profile store
    │
    └──onComplete──► profile store.SUBMIT_PROFILE ──save()──► IndexedDB
                                                           │
                                                           ▼
-                          scoring: relevance.ts uses location (matchLocation) + remote weight
+                          scoring : relevance.ts utilise location (matchLocation) + poids remote
 ```
 
-No new message types, no bridge change, no schema change. `normalizeProfileDraft`
-and `withProfileDefaults` already handle `remote` and `location`.
+Aucun nouveau type de message, aucune modification du bridge, aucune
+modification de schéma. `normalizeProfileDraft` et `withProfileDefaults` gèrent
+déjà `remote` et `location`.
 
 ## Invariants
 
-1. **Separation.** `location` carries a place only; `remote` carries the work
-   arrangement only. The location placeholder must not suggest "remote" as a
-   location value.
-2. **Vocabulary parity.** Work-mode values/labels in onboarding are byte-for-byte
-   the same set as `ProfileSection.remoteOptions`. The filter bar
-   (`FilterBar.remoteTypes`) uses a different label set (`Full remote / Hybride /
-Sur site`) because it is a mission filter, not a profile preference — that
-   inconsistency is intentional and out of scope here.
-3. **Default safety.** A skipped or untouched work mode resolves to `'any'`;
-   an untouched location resolves to `''`. Both pass through
-   `withProfileDefaults` unchanged.
-4. **No scoring change.** This change adds a collected signal; it does not alter
-   `relevance.ts`, `location-matching.ts`, or `DEFAULT_SCORING_WEIGHTS`.
-5. **canSubmit unchanged.** Submission still requires `firstName`, `jobTitle`,
-   and ≥1 keyword. Work mode and location remain optional.
+1. **Séparation.** `location` ne porte qu'un lieu ; `remote` ne porte que le
+   mode de travail. Le placeholder de localisation ne doit pas suggérer
+   « remote » comme valeur de localisation.
+2. **Parité de vocabulaire.** Les valeurs et libellés du mode de travail dans
+   l'onboarding forment exactement le même ensemble que
+   `ProfileSection.remoteOptions`. La barre de filtres (`FilterBar.remoteTypes`)
+   utilise un jeu de libellés différent (`Full remote / Hybride / Sur site`) car
+   il s'agit d'un filtre de mission, non d'une préférence de profil — cette
+   différence est intentionnelle et hors périmètre ici.
+3. **Sécurité par défaut.** Un mode de travail sauté ou non touché se résout en
+   `'any'` ; une localisation non touchée se résout en `''`. Tous deux passent
+   inchangés dans `withProfileDefaults`.
+4. **Aucun changement de scoring.** Ce changement ajoute un signal collecté ; il
+   ne modifie ni `relevance.ts`, ni `location-matching.ts`, ni
+   `DEFAULT_SCORING_WEIGHTS`.
+5. **`canSubmit` inchangé.** La soumission exige toujours `firstName`,
+   `jobTitle` et ≥ 1 mot-clé. Le mode de travail et la localisation restent
+   optionnels.
 
-## Edge cases & migration
+## Cas limites et migration
 
-- **Existing profiles** stored with `remote: 'any'` (the only value onboarding
-  could ever produce): unchanged. No DB migration, no preprocessor change.
-- **User selects 'Indifférent'**: `remote === 'any'` — identical to today's
-  hardcoded behavior; scoring treats it as "no remote preference."
-- **Location left empty, work mode chosen**: valid; remote weight still applies,
-  location weight contributes 0 for that profile (existing behavior).
-- **Browser autofill / long city names** ("Charenton-le-Pont"): the text input
-  must not truncate; existing input styling already handles this.
-- **Keyboard selection** of the segmented control: each option is a real
-  `<button>` with `aria-pressed`, reachable via Tab, activatable via
-  Space/Enter — keyboard-first is a stated accessibility principle.
+- **Profils existants** stockés avec `remote: 'any'` (la seule valeur que
+  l'onboarding pouvait produire jusqu'ici) : inchangés. Aucune migration DB,
+  aucun changement de préprocesseur.
+- **L'utilisateur sélectionne « Indifférent »** : `remote === 'any'` — identique
+  au comportement codé en dur actuel ; le scoring le traite comme « aucune
+  préférence de télétravail ».
+- **Localisation laissée vide, mode de travail choisi** : valide ; le poids
+  remote s'applique toujours, le poids localisation contribue 0 pour ce profil
+  (comportement existant).
+- **Remplissage automatique navigateur / noms de villes longs**
+  (« Charenton-le-Pont ») : le champ texte ne doit pas tronquer ; le style de
+  saisie existant le gère déjà.
+- **Sélection clavier** du contrôle segmenté : chaque option est un véritable
+  `<button>` avec `aria-pressed`, atteignable via Tab, activable via Espace /
+  Entrée — la navigation clavier d'abord est un principe d'accessibilité affirmé.
 
-## UI mapping
+## Correspondance UI
 
-- **Localisation** field: placeholder changes from `ex: Paris ou remote` to a
-  place-only example (e.g. `Paris, Lyon, Bordeaux…`). Label stays
+- Champ **Localisation** : le placeholder passe de `ex: Paris ou remote` à un
+  exemple de lieu uniquement (p. ex. `Paris, Lyon, Bordeaux…`). Le libellé reste
   `Localisation souhaitée`.
-- **Mode de travail** field: new, placed immediately after Localisation
-  (where → how grouping). Segmented control, 4 options, full-width, default
-  `Indifférent`. Reuses the wizard's existing chip/selected vocabulary and
-  `blueprint-blue` accent so it reads as part of the same surface, not a
-  new component library.
-- Both fields keep the existing onboarding input styling (border, focus ring,
-  radius) — no new design tokens.
+- Champ **Mode de travail** : nouveau, placé immédiatement après Localisation
+  (regroupement où → comment). Contrôle segmenté, 4 options, pleine largeur,
+  défaut `Indifférent`. Réutilise le vocabulaire existant de puces / sélection
+  du wizard et l'accent `blueprint-blue` afin qu'il s'intègre à la même surface,
+  sans nouvelle bibliothèque de composants.
+- Les deux champs conservent le style de saisie d'onboarding existant (bordure,
+  anneau de focus, rayon) — aucun nouveau token de design.
 
-## Out of scope
+## Hors périmètre
 
-- Structured location picker (datalist / geocoding). Location stays free text;
-  `location-matching.ts` already normalizes synonyms and metro areas.
-- Changing `ProfileSection` or `FilterBar` vocabulary.
-- Adding `remote` to the connected alert preferences (alerts are TJM + stack
-  keyed today).
-- Reordering onboarding steps or altering the 5-step tour.
+- Sélecteur de localisation structuré (datalist / géocodage). La localisation
+  reste en texte libre ; `location-matching.ts` normalise déjà les synonymes et
+  aires métropolitaines.
+- Modification du vocabulaire de `ProfileSection` ou `FilterBar`.
+- Ajout de `remote` aux préférences d'alertes connectées (les alertes reposent
+  aujourd'hui sur TJM + stack).
+- Réorganisation des étapes d'onboarding ou modification du tour en 5 étapes.

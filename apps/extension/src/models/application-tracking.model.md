@@ -1,35 +1,21 @@
-# Application Tracking Workflow Model
+# Modèle de workflow de suivi des candidatures
 
-Source of truth for the local application pipeline, truthful persistence,
-revisioned mutations, compare-and-swap Undo, worker-restart reconciliation and
-the disabled connected-dashboard persistence seam.
+Source de vérité pour le pipeline local de candidatures, la persistance fidèle (truthful persistence), les mutations révisées, l'Undo avec compare-and-swap (CAS), la réconciliation lors du redémarrage du worker et le point de coupure (seam) désactivé de persistance vers le dashboard connecté.
 
-The executable statechart is `application-tracking.machine.ts`; strict types and
-pure correlation/settlement validators live in
-`application-tracking.machine.contract.ts`, while typed XState guards/actions
-live in `application-tracking.machine.logic.ts`. These model files emit effect
-commands but perform no I/O. Core owns domain validation and candidate/CAS/digest
-decisions. Shell owns IndexedDB, clocks, UUIDs, runtime messaging, actor
-registration and effect execution.
+Le statechart exécutable est `application-tracking.machine.ts` ; les types stricts et les validateurs purs de corrélation et de règlement (settlement) résident dans `application-tracking.machine.contract.ts`, tandis que les guards et actions XState typés se trouvent dans `application-tracking.machine.logic.ts`. Ces fichiers de modèle émettent des commandes d'effet mais n'effectuent aucun I/O. Le Core possède la validation de domaine et les décisions relatives aux candidats/CAS/digest. Le Shell possède IndexedDB, les horloges, les UUID, la messagerie runtime, l'enregistrement des acteurs et l'exécution des effets.
 
-## Delivery boundary
+## Périmètre de livraison (Delivery boundary)
 
-Two delivery levels must never be conflated:
+Deux niveaux de livraison ne doivent jamais être confondus :
 
-- **Implemented and verified at commit `d32d76b8`: Task 5 / wire v1.** Storage
-  failures are truthful, responses are strict, UI state remains confirmed, and
-  success/Undo is downstream of a persistence acknowledgement.
-- **Reviewed target, not implementation evidence: Task 5b / wire v2.** The
-  envelopes, ledger, per-mission actors, CAS, checkpoints, reconciliation,
-  migration v3 and disabled outbox seam described below remain unimplemented until their RED
-  tests and Shell integration exist.
+- **Implémenté et vérifié au commit `d32d76b8` : Task 5 / wire v1.** Les échecs de stockage sont fidèles (truthful), les réponses sont strictes, l'état de l'UI reste confirmé, et le succès/Undo se situe en aval d'un accusé de réception de persistance.
+- **Cible revue, non preuve d'implémentation : Task 5b / wire v2.** Les enveloppes, le ledger, les acteurs par mission, le CAS, les points de contrôle (checkpoints), la réconciliation, la migration v3 et le seam désactivé d'outbox décrits ci-dessous demeurent non implémentés tant que leurs tests RED et leur intégration Shell n'existent pas.
 
-Creating the machine file makes behavior executable as a model; it does not
-prove that background, storage, bridge, scan or UI consume it.
+Créer le fichier de machine rend le comportement exécutable en tant que modèle ; cela ne prouve pas que le background, le stockage, le bridge, le scan ou l'UI le consomment.
 
-## Domain pipeline
+## Pipeline de domaine
 
-The canonical statuses and transitions come only from `@pulse/domain`:
+Les statuts canoniques et les transitions proviennent uniquement de `@pulse/domain` :
 
 ```ts
 type ApplicationStatus =
@@ -44,7 +30,7 @@ type ApplicationStatus =
   | 'archived';
 ```
 
-| From                   | Allowed targets                               |
+| Depuis                 | Cibles autorisées                             |
 | ---------------------- | --------------------------------------------- |
 | `detected`             | `selected`, `archived`                        |
 | `selected`             | `application_prepared`, `applied`, `archived` |
@@ -56,16 +42,13 @@ type ApplicationStatus =
 | `rejected`             | `archived`                                    |
 | `archived`             | `detected`                                    |
 
-`accepted`, `rejected` and `archived` end follow-up scheduling and force
-`nextActionAt = null` in the same commit. They are settled outcomes but not all
-absorbing states: only the table above permits re-entry.
+`accepted`, `rejected` et `archived` mettent fin à la planification des relances et forcent `nextActionAt = null` dans le même commit. Ce sont des résultats arrêtés (settled outcomes) mais pas tous des états absorbants : seule la table ci-dessus autorise une ré-entrée.
 
-An LLM may generate content or signals. It never chooses a status, mutation ID,
-revision, CAS result or state transition.
+Un LLM peut générer du contenu ou des signaux. Il ne choisit jamais un statut, un ID de mutation, une révision, un résultat CAS ou une transition d'état.
 
-## Task 5 wire v1 — current contract
+## Wire v1 de la Task 5 — contrat actuel
 
-Wire v1 stays exact. Task 5b must not widen its schemas.
+Le wire v1 reste exact. La Task 5b ne doit pas élargir ses schémas.
 
 ```ts
 type ApplicationTrackingIntentV1 = 'load' | 'transition' | 'details' | 'restore';
@@ -90,79 +73,66 @@ interface SerializedApplicationTrackingErrorV1 {
 }
 ```
 
-The only v1 failure response is `TRACKING_FAILED`. The four Task 5b codes
-`STALE_UNDO`, `APPLICATION_BUSY`, `CANCELLED` and `WORKER_RESTARTED` remain
-invalid in v1. A non-null v1 mutation ID is invalid. Code/intent/message/
-recoverable/identity mismatches become a UI-local `PROTOCOL_ERROR`.
+La seule réponse d'échec en v1 est `TRACKING_FAILED`. Les quatre codes de la Task 5b `STALE_UNDO`, `APPLICATION_BUSY`, `CANCELLED` et `WORKER_RESTARTED` restent invalides en v1. Un ID de mutation non nul en v1 est invalide. Les discordances de code/intent/message/recoverable/identité deviennent une erreur locale à l'UI `PROTOCOL_ERROR`.
 
-V1 settlement remains:
+Le règlement (settlement) v1 reste :
 
 ```text
 GET_TRACKINGS
-  success -> TRACKINGS_RESULT(real normalized records, including real [])
+  success -> TRACKINGS_RESULT(vrais enregistrements normalisés, y compris [] réel)
   failure -> TRACKING_FAILED(LOAD_FAILED)
 
 UPDATE_TRACKING / UPDATE_TRACKING_DETAILS
   invalid -> TRACKING_FAILED(INVALID_*)
-  committed -> TRACKING_UPDATED(exact confirmed record)
+  committed -> TRACKING_UPDATED(enregistrement confirmé exact)
   storage failure -> TRACKING_FAILED(PERSIST_FAILED)
 
 RESTORE_TRACKING
   invalid -> TRACKING_FAILED(INVALID_RESTORE)
-  committed -> TRACKING_RESTORED({ missionId, exact record or null })
+  committed -> TRACKING_RESTORED({ missionId, enregistrement exact ou null })
   storage failure -> TRACKING_FAILED(PERSIST_FAILED)
 ```
 
-After the v3 envelope migration, stale v1 contexts are compatibility adapters:
+Après la migration des enveloppes v3, les contextes v1 obsolètes sont des adaptateurs de compatibilité :
 
-- v1 GET projects only active v2 envelopes into `MissionTracking[]`;
-- **every v1 write** (`UPDATE_TRACKING`, `UPDATE_TRACKING_DETAILS` and
-  `RESTORE_TRACKING`) fails closed as v1 `PROTOCOL_ERROR`, because v1 carries
-  neither `dataEpoch` nor a caller mutation token. A pre-reset v1 panel must
-  never be allowed to create revision 1 in a fresh dataset;
-- install/update invalidates and reloads stale extension contexts. Inferring an
-  Undo token from current storage is forbidden.
+- le GET v1 projette uniquement les enveloppes v2 actives en `MissionTracking[]` ;
+- **chaque écriture v1** (`UPDATE_TRACKING`, `UPDATE_TRACKING_DETAILS` et `RESTORE_TRACKING`) échoue de manière étanche (fails closed) en tant que `PROTOCOL_ERROR` v1, car la v1 ne transporte ni `dataEpoch` ni token de mutation émis par l'appelant. Un panneau v1 antérieur à une réinitialisation ne doit jamais pouvoir créer la révision 1 dans un jeu de données réinitialisé ;
+- l'installation/mise à jour invalide et recharge les contextes d'extension obsolètes. Déduire un token d'Undo à partir du stockage actuel est interdit.
 
-## Task 5b identifiers and dataset epoch
+## Identifiants de la Task 5b et epoch du jeu de données
 
 ```ts
-type MutationId = string; // canonical lowercase UUID v4
+type MutationId = string; // UUID v4 canonique en minuscules
 type TrackingDataEpoch = MutationId;
 ```
 
-The exact accepted UUID regex is:
+L'expression régulière exacte acceptée pour l'UUID est :
 
 ```text
 ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
 ```
 
-- Shell injects IDs via `crypto.randomUUID()`; Core and machine never generate
-  them.
-- One explicit intent gets one mutation ID.
-- Retry after a certain failure is a new intent with a new ID.
-- Transport/worker uncertainty keeps the same ID and reconciles; it never
-  replays the mutation.
-- `dataEpoch` identifies the lifetime of the entire local dataset. It is stored
-  in `tracking_meta`, repeated by envelopes/ledger and carried by every
-  v2 mutation, response, reconcile and cancel message.
-- A response or request from an old data epoch is invalid and cannot alter UI or
-  storage. Worker lifetime uses a separate `workerEpoch` UUID.
+- Le Shell injecte les identifiants via `crypto.randomUUID()` ; le Core et la machine ne les génèrent jamais.
+- Une intention explicite reçoit un seul ID de mutation.
+- Une nouvelle tentative après un échec certain constitue une nouvelle intention avec un nouvel ID.
+- L'incertitude de transport ou de worker conserve le même ID et réconcilie ; elle ne rejoue jamais la mutation.
+- `dataEpoch` identifie la durée de vie de l'ensemble du jeu de données local. Elle est stockée dans `tracking_meta`, répétée par les enveloppes et le ledger, et transportée par chaque message v2 de mutation, réponse, réconciliation et annulation.
+- Une réponse ou requête provenant d'une ancienne data epoch est invalide et ne peut modifier ni l'UI ni le stockage. La durée de vie d'un worker utilise un UUID `workerEpoch` distinct.
 
 ```ts
 interface TrackingMetaV1 {
   key: 'tracking_meta';
   schemaVersion: 1;
   dataEpoch: TrackingDataEpoch;
-  collectionRevision: number; // safe integer, starts at 0
+  collectionRevision: number; // entier sûr, commence à 0
 }
 ```
 
-The metadata row is created in the same data-v3 migration transaction as legacy
-envelopes. A fresh post-reset database creates a new epoch before admission.
+La ligne de métadonnées est créée dans la même transaction de migration data-v3 que les enveloppes héritées. Une base de données fraîchement créée après réinitialisation génère une nouvelle epoch avant toute admission.
 
-## Additive wire v2
+## Wire v2 additif
 
-V2 uses distinct discriminants; v1 discriminants and schemas remain unchanged.
+La v2 utilise des discriminants distincts ; les discriminants et schémas v1 restent inchangés.
 
 ```ts
 type PublicTrackingMutationIntentV2 = 'transition' | 'details' | 'restore';
@@ -296,20 +266,11 @@ type TrackingV2Response =
     };
 ```
 
-Schemas are strict and bounded. `GET_TRACKING_ENVELOPES_V2.dataEpoch` is null
-only for the first bootstrap or immediately after a correlated
-`TRACKING_EPOCH_CHANGED_V2`; every continuation/restart sends the epoch returned
-by page one. If a panel presents an old non-null epoch, the worker returns only
-`TRACKING_EPOCH_CHANGED_V2`: no envelope, cursor or old-epoch data. The panel
-accepts it only when `requestId` and `requestedDataEpoch` exactly match its Load,
-discards staging/pending effects, then starts one new request with epoch null and
-cursor null. Every other success/failure must match version, epoch, request ID,
-mutation ID, mission, intent and digest exactly.
+Les schémas sont stricts et bornés. `GET_TRACKING_ENVELOPES_V2.dataEpoch` est null uniquement pour le premier bootstrap ou immédiatement après un `TRACKING_EPOCH_CHANGED_V2` corrélé ; chaque continuation ou redémarrage envoie l'epoch renvoyée par la première page. Si un panneau présente une ancienne epoch non nulle, le worker renvoie uniquement `TRACKING_EPOCH_CHANGED_V2` : aucune enveloppe, aucun curseur ni donnée de l'ancienne epoch. Le panneau ne l'accepte que lorsque `requestId` et `requestedDataEpoch` correspondent exactement à son Load, élimine les effets intermédiaires (staging/pending), puis démarre une nouvelle requête avec epoch null et cursor null. Tout autre succès ou échec doit correspondre exactement en version, epoch, request ID, ID de mutation, mission, intention et digest.
 
-### Normative limits and paginated Load
+### Limites normatives et Load paginé
 
-The same exported Core constants must drive wire schemas, storage validation and
-migration:
+Les mêmes constantes Core exportées doivent régir les schémas wire, la validation de stockage et la migration :
 
 ```ts
 const TRACKING_MISSION_ID_MAX_CHARS = 256;
@@ -329,28 +290,15 @@ const TRACKING_DIAGNOSTIC_WARNING_BYTES = 64 * 1024 * 1024;
 const TRACKING_MIN_QUOTA_HEADROOM_BYTES = 1024 * 1024;
 ```
 
-There is no filtered v2 GET. A complete load includes records and tombstones.
-The cursor is an opaque, worker-validated encoding of `dataEpoch`,
-`snapshotRevision` and the last missionId, and is used with an exclusive key
-range; clients never construct it.
+Il n'y a pas de GET v2 filtré. Un chargement complet inclut les enregistrements et les tombstones. Le curseur est un encodage opaque, validé par le worker, de `dataEpoch`, `snapshotRevision` et du dernier missionId, et s'utilise avec un intervalle de clés exclusif ; les clients ne le construisent jamais.
 
-`tracking_meta.collectionRevision` is incremented in every envelope Tx B. The
-first page fixes `snapshotRevision`; every later page must present it. If the
-meta revision changed, the worker returns `TRACKING_LOAD_RESTART_REQUIRED_V2`
-and the panel discards its staging snapshot and restarts from cursor null. Two
-automatic read restarts are allowed; continued churn surfaces `LOAD_FAILED`.
+`tracking_meta.collectionRevision` est incrémenté lors de chaque Tx B d'enveloppe. La première page fige `snapshotRevision` ; chaque page suivante doit la présenter. Si la révision méta a changé, le worker renvoie `TRACKING_LOAD_RESTART_REQUIRED_V2` et le panneau élimine son instantané en attente (staging snapshot) et redémarre avec cursor null. Deux redémarrages automatiques de lecture sont autorisés ; une instabilité persistante fait remonter `LOAD_FAILED`.
 
-The panel subscribes to broadcasts before page one, stages pages without
-replacing the confirmed collection, and publishes the complete staged map only
-after `complete:true`. A failed/restarted load preserves the prior confirmed
-map. Broadcasts received during pagination are merged by revision into staging
-and confirmed maps. Tombstones mean absence from a page is never interpreted as
-deletion.
+Le panneau s'abonne aux broadcasts avant la page un, met en attente (stage) les pages sans remplacer la collection confirmée, et publie la map complète mise en attente uniquement après `complete:true`. Un chargement échoué ou redémarré préserve la map confirmée antérieure. Les broadcasts reçus durant la pagination sont fusionnés par révision dans les maps de staging et confirmées. Les tombstones signifient que l'absence d'une page n'est jamais interprétée comme une suppression.
 
-### Canonical command digest
+### Digest canonique de commande
 
-Core produces an RFC 8785/JCS UTF-8 representation of one ordered tuple; Shell
-computes lowercase SHA-256 hex once and the machine/storage compare that digest:
+Le Core produit une représentation UTF-8 RFC 8785/JCS d'un tuple ordonné ; le Shell calcule le SHA-256 hexadécimal en minuscules une seule fois et la machine/stockage comparent ce digest :
 
 ```text
 ^[0-9a-f]{64}$
@@ -363,32 +311,25 @@ restore    = [2,dataEpoch,"restore",missionId,expectedRevision,
               expectedMutationId,canonicalPreviousTrackingOrNull]
 ```
 
-All strings are Unicode NFC; `undefined` normalizes to `null`; valid dates use
-UTC `toISOString()`; tracking object keys and nested arrays use the canonical
-wire order. Test vectors must pin Unicode, key order, undefined/null, date
-offsets and restore snapshots. A digest mismatch for an existing mutation ID is
-never recoverable by recomputing the command.
+Toutes les chaînes de caractères sont en Unicode NFC ; `undefined` se normalise en `null` ; les dates valides utilisent `toISOString()` en UTC ; les clés d'objets de suivi et les tableaux imbriqués utilisent l'ordre canonique du wire. Les vecteurs de test doivent figer l'Unicode, l'ordre des clés, undefined/null, les décalages de dates et les instantanés de restauration. Une discordance de digest pour un ID de mutation existant n'est jamais récupérable en recalculant la commande.
 
-The first immutable SHA-256/JCS vectors are:
+Les premiers vecteurs immuables SHA-256/JCS sont :
 
-| Case                                       | Canonical UTF-8 JSON                                                                          | Lowercase SHA-256                                                  |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
-| transition/null                            | `[2,"11111111-1111-4111-8111-111111111111","transition","mission-1","selected",null]`         | `3859a05e023fd89e6eb8c42bf2069c950a45bb5f86f872948491abca2b61912c` |
-| decomposed Unicode input normalized to NFC | `[2,"11111111-1111-4111-8111-111111111111","transition","mission-é","selected","café"]`       | `0d2f3269f4b3d70a1d37d32eafb87c245625c50a39f281d146159604f38c4069` |
-| details `2026-07-15T10:30:00+02:00`        | `[2,"11111111-1111-4111-8111-111111111111","details","mission-1","2026-07-15T08:30:00.000Z"]` | `0ef55b59988a854410a60082ff6d4bcda4e8746165742395f5b3660534e39e17` |
-| details undefined or null                  | `[2,"11111111-1111-4111-8111-111111111111","details","mission-1",null]`                       | `b2d12bf5d004e0fa98a0fb72ebc5b34c23198a26eb150fcdc57273120531484d` |
+| Cas                                         | JSON UTF-8 canonique                                                                          | SHA-256 en minuscules                                              |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------- | ------------------------------------------------------------------ |
+| transition/null                             | `[2,"11111111-1111-4111-8111-111111111111","transition","mission-1","selected",null]`         | `3859a05e023fd89e6eb8c42bf2069c950a45bb5f86f872948491abca2b61912c` |
+| entrée Unicode décomposée normalisée en NFC | `[2,"11111111-1111-4111-8111-111111111111","transition","mission-é","selected","café"]`       | `0d2f3269f4b3d70a1d37d32eafb87c245625c50a39f281d146159604f38c4069` |
+| details `2026-07-15T10:30:00+02:00`         | `[2,"11111111-1111-4111-8111-111111111111","details","mission-1","2026-07-15T08:30:00.000Z"]` | `0ef55b59988a854410a60082ff6d4bcda4e8746165742395f5b3660534e39e17` |
+| details undefined ou null                   | `[2,"11111111-1111-4111-8111-111111111111","details","mission-1",null]`                       | `b2d12bf5d004e0fa98a0fb72ebc5b34c23198a26eb150fcdc57273120531484d` |
 
-A restore fixture with deliberately permuted object keys must hash identically
-to its canonical-key-order fixture; that fixture is generated from the shared
-bounded `MissionTracking` schema rather than maintained as a second hand-written
-serializer.
+Une fixture de restauration avec des clés d'objet délibérément permutées doit avoir un hash identique à sa fixture avec l'ordre de clés canonique ; cette fixture est générée à partir du schéma borné partagé `MissionTracking` plutôt que maintenue comme un second sérialiseur écrit à la main.
 
-## Canonical envelope, tombstone and Undo
+## Enveloppe canonique, tombstone et Undo
 
 ```ts
 interface TrackingRevisionTokenV2 {
   dataEpoch: TrackingDataEpoch;
-  revision: number; // safe integer >= 0; zero means no envelope yet
+  revision: number; // entier sûr >= 0 ; zéro signifie aucune enveloppe pour l'instant
   lastMutationId: MutationId | null;
 }
 
@@ -398,7 +339,7 @@ interface PersistedTrackingEnvelopeV2 {
   missionId: string;
   kind: 'record' | 'tombstone';
   tracking: MissionTracking | null;
-  revision: number; // safe integer >= 1
+  revision: number; // entier sûr >= 1
   lastMutationId: MutationId | null;
   lastMutationIntent: TrackingMutationIntentV2 | null;
   committedAt: number;
@@ -419,43 +360,32 @@ interface TrackingUndoTokenV2 {
 }
 ```
 
-Envelope invariants:
+Invariants des enveloppes :
 
-1. `record` iff tracking is non-null; `tombstone` iff tracking is null.
-2. A non-null tracking repeats mission identity and is fully canonical.
-3. Revision is monotonic per mission across write, tombstone and recreate.
-4. Normal deletion writes a tombstone; it never removes the key.
-5. Legacy migration creates revision 1 with null last mutation/intent/Undo.
-6. `undoBase`, when present, repeats this envelope's revision/mutation exactly.
-7. Only the latest envelope retains an Undo snapshot, bounding storage to one
-   extra tracking snapshot per mission.
-8. A first public transition/details command may materialize `detected` as part
-   of its pure candidate; it still produces one atomic revision and exact Undo.
-9. Revision overflow fails before write.
-10. A newly identified, valid details/restore intent commits one revision even
-    when its candidate tracking is byte-equal to the base. The UI may suppress
-    redundant commands, but storage semantics never depend on that projection.
+1. `record` si et seulement si tracking est non-null ; `tombstone` si et seulement si tracking est null.
+2. Un tracking non-null reprend l'identité de la mission et est entièrement canonique.
+3. La révision est monotone par mission à travers l'écriture, le tombstone et la recréation.
+4. Une suppression normale écrit un tombstone ; elle ne supprime jamais la clé.
+5. La migration héritée crée la révision 1 avec une dernière mutation, une intention et un Undo nuls.
+6. `undoBase`, lorsqu'il est présent, répète exactement la révision et la mutation de cette enveloppe.
+7. Seule l'enveloppe la plus récente conserve un instantané d'Undo, ce qui limite le stockage à un seul instantané de suivi supplémentaire par mission.
+8. Une première commande publique de transition/details peut matérialiser `detected` au sein de son candidat pur ; elle produit toujours une révision atomique et un Undo exact.
+9. Tout dépassement de révision échoue avant l'écriture.
+10. Une intention de details/restore nouvellement identifiée et valide valide une révision même lorsque son tracking candidat est identique en octets à la base. L'UI peut supprimer les commandes redondantes, mais la sémantique de stockage ne dépend jamais de cette projection.
 
-The UI stores confirmed envelopes. Its public active map excludes tombstones;
-its internal envelope map keeps tombstones for revision safety. A loaded
-`undoBase` never creates a toast/Undo spontaneously after panel reload.
+L'UI stocke les enveloppes confirmées. Sa map active publique exclut les tombstones ; sa map interne d'enveloppes conserve les tombstones pour la sécurité des révisions. Un `undoBase` chargé ne crée jamais spontanément de toast/Undo après le rechargement du panneau.
 
-After every completed envelope commit, the worker broadcasts
-`TRACKING_ENVELOPE_BROADCAST_V2`. Every open panel applies it by this exact
-rule:
+Après chaque commit d'enveloppe complété, le worker diffuse `TRACKING_ENVELOPE_BROADCAST_V2`. Chaque panneau ouvert l'applique selon cette règle exacte :
 
-1. different `dataEpoch` -> ignore and require a fresh Load;
-2. no local envelope or greater revision -> apply envelope projection;
-3. equal revision and byte-equivalent canonical envelope -> no-op;
-4. equal revision with different content -> protocol incident and fresh Load;
-5. lower revision -> ignore as stale.
+1. `dataEpoch` différente -> ignorer et exiger un nouveau Load ;
+2. aucune enveloppe locale ou révision plus élevée -> appliquer la projection de l'enveloppe ;
+3. révision égale et enveloppe canonique équivalente en octets -> no-op ;
+4. révision égale avec un contenu différent -> incident de protocole et nouveau Load ;
+5. révision inférieure -> ignorer comme obsolète.
 
-A broadcast updates confirmed state only. It never creates a success toast or
-Undo. The request response or same-ID reconciliation remains the sole source of
-success/Undo for the panel that originated the intent. This keeps other side
-panels current without attributing the mutation to them.
+Un broadcast met à jour l'état confirmé uniquement. Il ne crée jamais de toast de succès ni d'Undo. La réponse à la requête ou la réconciliation avec le même ID reste la seule source de succès/Undo pour le panneau à l'origine de l'intention. Cela maintient les autres panneaux latéraux à jour sans leur attribuer la mutation.
 
-## Durable mutation ledger
+## Ledger durable de mutations
 
 ```ts
 type TrackingMutationPhaseV2 =
@@ -479,109 +409,58 @@ interface PersistedTrackingMutationV2 {
 }
 ```
 
-The keyPath is globally unique `mutationId`. The pure Core canonicalizes the
-bounded command and derives `commandDigest`; the machine only compares the
-provided digest. Same ID + different epoch/mission/digest is `PROTOCOL_ERROR`
-and writes no business record.
+Le keyPath est le `mutationId` globalement unique. Le Core pur canonise la commande bornée et dérive `commandDigest` ; la machine ne fait que comparer le digest fourni. Un même ID avec une epoch/mission/digest différente constitue un `PROTOCOL_ERROR` et n'écrit aucun enregistrement métier.
 
-The ledger is retained until coordinated local reset. This makes old duplicate
-delivery deterministic even after newer writes.
+Le ledger est conservé jusqu'à une réinitialisation locale coordonnée. Cela rend déterministe la remise d'anciens doublons, même après des écritures plus récentes.
 
-Storage diagnostics track envelope, tombstone, ledger and outbox row counts plus
-estimated serialized bytes. The exact soft warning is crossed when either
-estimated tracking bytes reach 64 MiB or `navigator.storage.estimate()` reports
-`usage / quota >= 0.80`. Before Tx A and again before Tx B, Shell rejects a
-write predicted to leave less than 1 MiB headroom. That rejection and every
-`QuotaExceededError` settle as `PERSIST_FAILED`; neither compacts ledgers nor
-tombstones. Unknown quota is not permission to compact: the attempted observed
-transaction remains the truth source. No retention cleanup may make an old
-mutation ID admissible again.
+Les diagnostics de stockage surveillent le nombre de lignes d'enveloppes, de tombstones, de ledger et d'outbox, ainsi qu'une estimation des octets sérialisés. L'avertissement logiciel (soft warning) exact est déclenché dès que l'estimation des octets de suivi atteint 64 Mio ou que `navigator.storage.estimate()` indique `usage / quota >= 0.80`. Avant Tx A et à nouveau avant Tx B, le Shell rejette une écriture dont la marge restante est prévue comme inférieure à 1 Mio. Ce rejet ainsi que chaque `QuotaExceededError` sont réglés comme `PERSIST_FAILED` ; aucun ne compacte les ledgers ni les tombstones. Un quota inconnu ne constitue pas une autorisation de compacter : la transaction observée tentée reste la source de vérité. Aucun nettoyage de rétention ne peut rendre à nouveau admissible un ancien ID de mutation.
 
-Steady-state validation is fail-closed by domain:
+La validation en régime permanent est étanche aux échecs (fail-closed) par domaine :
 
-- an invalid v2 envelope, tracking-meta row or ledger row fences all tracking
-  admission and surfaces `LOAD_FAILED`/`PERSIST_FAILED` plus diagnostics; it is
-  never quarantined, deleted or silently normalized because it may be current
-  idempotency evidence;
-- an invalid disabled-outbox row is isolated in `quarantine` without changing
-  the already committed local envelope/ledger or claiming remote delivery;
-- unrelated invalid mission/profile records keep the existing migration/runtime
-  quarantine policy and cannot authorize tracking repair.
+- une enveloppe v2, une ligne tracking-meta ou une ligne de ledger invalide verrouille (fences) toute admission de suivi et fait remonter `LOAD_FAILED`/`PERSIST_FAILED` avec des diagnostics ; elle n'est jamais mise en quarantaine, supprimée ni silencieusement normalisée, car elle peut constituer une preuve d'idempotence actuelle ;
+- une ligne d'outbox désactivée invalide est isolée dans `quarantine` sans altérer l'enveloppe/ledger local déjà validé ni prétendre à une livraison distante ;
+- les enregistrements invalides sans rapport de mission ou profil conservent la politique existante de quarantaine en migration/runtime et ne peuvent autoriser la réparation du suivi.
 
-The unused `trackStage`/default pipeline path is not part of the live scan
-runtime and must not be turned into a new business mutation. Task 5b removes its
-raw writer or makes the dead stage pure, then adds an architecture test proving
-that no scan path writes tracking. Missing tracking remains logical `detected`
-until an explicit public transition/details command materializes it. A tombstone
-is never reopened by scan discovery.
+Le chemin inutilisé `trackStage`/pipeline par défaut ne fait pas partie du runtime de scan actif et ne doit pas être transformé en une nouvelle mutation métier. La Task 5b retire son writer brut ou rend l'étape morte pure, puis ajoute un test d'architecture prouvant qu'aucun chemin de scan n'écrit de suivi. Un suivi manquant demeure logiquement `detected` jusqu'à ce qu'une commande publique explicite de transition ou details le matérialise. Un tombstone n'est jamais rouvert par la découverte d'un scan.
 
-## Transaction protocol
+## Protocole de transaction
 
-Validation order is mandatory:
+L'ordre de validation est obligatoire :
 
-1. Await the global tracking startup barrier: migration, epoch load and orphan
-   checkpoint recovery.
-2. Validate wire shape and derive the exact command digest without I/O.
-3. Run a pure preflight against the actor's hydrated canonical. An already
-   invalid domain/input/restore intent is rejected without any ledger row.
-4. **Tx A** spans `mission_tracking` + `tracking_mutations`: reread the envelope,
-   verify the actor base token, resolve an existing ledger, then insert
-   `prepared` with the revision/lastMutation actually read. Tx A returns that
-   immutable snapshot.
-5. Core builds the candidate from the Tx A snapshot, outside IndexedDB and with
-   injected time. Candidate construction performs no I/O.
-6. **Tx B** atomically requires the same prepared owner/digest/mission/epoch,
-   requires the envelope to equal the Tx A base token, reruns the pure domain/
-   CAS guard, then writes envelope revision + 1 and ledger `committed`. The
-   Task 5b production capability is disabled, so the outbox store is untouched.
-7. Respond and broadcast only after `tx.oncomplete`.
+1. Attendre la barrière globale de démarrage du suivi : migration, chargement de l'epoch et récupération des points de contrôle (checkpoints) orphelins.
+2. Valider la forme wire et dériver le digest de commande exact sans I/O.
+3. Exécuter un preflight pur contre le canonique hydraté de l'acteur. Une intention de domaine/entrée/restauration déjà invalide est rejetée sans aucune ligne de ledger.
+4. **Tx A** couvre `mission_tracking` + `tracking_mutations` : relire l'enveloppe, vérifier le token de base de l'acteur, résoudre un ledger existant, puis insérer `prepared` avec la révision et le lastMutation effectivement lus. Tx A renvoie cet instantané immuable.
+5. Le Core construit le candidat à partir de l'instantané de Tx A, hors d'IndexedDB et avec le temps injecté. La construction du candidat n'effectue aucun I/O.
+6. **Tx B** exige de manière atomique le même propriétaire/digest/mission/epoch préparés, exige que l'enveloppe soit égale au token de base de Tx A, réexécute le guard pur de domaine/CAS, puis écrit la révision d'enveloppe + 1 et le ledger `committed`. La capacité de production de la Task 5b étant désactivée, le store outbox reste intact.
+7. Répondre et diffuser uniquement après `tx.oncomplete`.
 
-If Tx A sees base drift, it writes one terminal ledger settlement in that same
-transaction and returns the canonical reread:
+Si Tx A constate une dérive de la base, elle écrit un règlement terminal de ledger dans cette même transaction et renvoie la relecture canonique :
 
-- restore settles directly `rejected/STALE_UNDO` with fresh canonical;
-- transition/details settle directly `rejected/APPLICATION_BUSY` with fresh
-  canonical;
-- no command is recomputed or replayed against the new base.
+- restore est directement réglé en `rejected/STALE_UNDO` avec le canonique frais ;
+- transition/details sont directement réglés en `rejected/APPLICATION_BUSY` avec le canonique frais ;
+- aucune commande n'est recalculée ni rejouée contre la nouvelle base.
 
-Tx B repeats the same comparison. A drift between A and B settles the existing
-ledger as rejected in Tx B, writes no envelope and leaves the outbox store
-untouched. If Tx B aborts, envelope/ledger atomicity holds and the outbox store
-is still untouched; a best-effort Tx C moves `prepared` to `failed`. If Tx C
-also fails, cold-start recovery classifies the orphan as `worker_restarted`.
+Tx B répète la même comparaison. Une dérive entre A et B règle le ledger existant comme rejeté dans Tx B, n'écrit aucune enveloppe et laisse le store outbox intact. Si Tx B avorte, l'atomicité enveloppe/ledger est préservée et le store outbox reste toujours intact ; une Tx C au mieux (best-effort) passe `prepared` à `failed`. Si Tx C échoue également, la récupération au démarrage à froid classifie l'orphelin en `worker_restarted`.
 
-Invalid commands never create `prepared`, and base drift never causes implicit
-replay. A candidate is never computed from the stale preflight copy: only the
-snapshot committed by Tx A may feed candidate construction.
+Les commandes invalides ne créent jamais `prepared`, et une dérive de base ne provoque jamais de rejeu implicite. Un candidat n'est jamais calculé à partir de la copie obsolète du preflight : seul l'instantané validé par Tx A peut alimenter la construction du candidat.
 
-### Pre-Tx-A technical failures
+### Échecs techniques avant Tx A
 
-Pure shape/domain rejection is deterministic and creates no ledger. Technical
-failure before Tx A (quota preflight, opener/gate/storage failure) follows a
-different contract:
+Le rejet pur de forme ou de domaine est déterministe et ne crée aucun ledger. Un échec technique avant Tx A (preflight de quota, défaillance d'ouverture/barrière/stockage) suit un contrat différent :
 
-1. A failure may be announced as certain only after
-   `RECORD_TERMINAL_SETTLEMENT` durably records the exact epoch, mission,
-   mutation, intent, digest and failure.
-2. Its result carries the effect `commandId`, current generation and
-   `record_terminal` phase. Only that result can publish `not_committed`.
-3. If the terminal row cannot be observed as committed, Core produces an
-   `uncertain` settlement; the actor and tracking gate remain fenced. The UI may
-   reconcile the same ID or reset, but neither bridge nor actor may replay it.
-4. A later new explicit attempt uses a new mutation ID only after canonical
-   Load/reconciliation. Delivery uncertainty keeps the original ID for control
-   reads only, never for a second UPDATE.
+1. Un échec ne peut être annoncé comme certain qu'après que `RECORD_TERMINAL_SETTLEMENT` a enregistré de manière durable l'epoch exacte, la mission, la mutation, l'intention, le digest et l'échec.
+2. Son résultat transporte le `commandId` de l'effet, la génération courante et la phase `record_terminal`. Seul ce résultat peut publier `not_committed`.
+3. Si la ligne terminale ne peut pas être observée comme validée, le Core produit un règlement `uncertain` ; l'acteur et la barrière de suivi restent verrouillés. L'UI peut réconcilier le même ID ou réinitialiser, mais ni le bridge ni l'acteur ne peuvent le rejouer.
+4. Une tentative explicite ultérieure utilise un nouvel ID de mutation uniquement après un Load ou une réconciliation canonique. L'incertitude de livraison conserve l'ID d'origine pour les lectures de contrôle uniquement, jamais pour un second UPDATE.
 
-Thus a certain `PERSIST_FAILED` cannot be followed by a late commit of the same
-mutation ID. An unrecordable failure never pretends certainty.
+Ainsi, un `PERSIST_FAILED` certain ne peut être suivi d'un commit tardif du même ID de mutation. Un échec non enregistrable ne feint jamais la certitude.
 
-## Per-mission actor and effect ownership
+## Acteur par mission et responsabilité des effets
 
-One XState actor represents one mission. Shell registers it synchronously before
-the first await. Actor registry, dynamic creation, joining active promises and
-stopping actors belong to Shell.
+Un acteur XState représente une mission. Le Shell l'enregistre de manière synchrone avant le premier await. Le registre des acteurs, la création dynamique, la jonction aux promesses actives et l'arrêt des acteurs relèvent du Shell.
 
-Machine states:
+États de la machine :
 
 ```text
 unhydrated -> hydrating -> ready
@@ -590,115 +469,68 @@ preparing -> committing|cancelling|reconciling|settling
 committing -> cancelling|reconciling|settling
 cancelling -> cancelled|reconciling|settling
 recordingTerminal|reconciling -> settling
-settling|cancelled -> ready|failed after a local publication attempt
-any non-final state -> invalidating -> invalidated on RESET
+settling|cancelled -> ready|failed après une tentative de publication locale
+tout état non final -> invalidating -> invalidated lors d'un RESET
 ```
 
-The executable machine defines discriminated SCREAMING_SNAKE_CASE events,
-named pure guards and immutable `assign()` updates. It emits only these effect
-commands for Shell:
+La machine exécutable définit des événements discriminés en `SCREAMING_SNAKE_CASE`, des guards purs nommés et des mises à jour immuables `assign()`. Elle émet uniquement ces commandes d'effet pour le Shell :
 
-- `READ_CANONICAL`;
-- `RECORD_TERMINAL_SETTLEMENT`;
-- `WRITE_PREPARED_CHECKPOINT`;
-- `COMMIT_TRANSACTION`;
-- `READ_SETTLEMENT`;
-- `RECORD_CANCELLATION`;
-- `ABORT_TRANSACTION`;
-- `JOIN_ACTIVE`;
-- `PUBLISH_SETTLEMENT`;
-- `BROADCAST_ENVELOPE`;
+- `READ_CANONICAL` ;
+- `RECORD_TERMINAL_SETTLEMENT` ;
+- `WRITE_PREPARED_CHECKPOINT` ;
+- `COMMIT_TRANSACTION` ;
+- `READ_SETTLEMENT` ;
+- `RECORD_CANCELLATION` ;
+- `ABORT_TRANSACTION` ;
+- `JOIN_ACTIVE` ;
+- `PUBLISH_SETTLEMENT` ;
+- `BROADCAST_ENVELOPE` ;
 - `INVALIDATE_ACTOR`.
 
-No IndexedDB, runtime messaging, clock, UUID, crypto, toast or network call
-lives in the machine.
+Aucun appel à IndexedDB, messagerie runtime, horloge, UUID, crypto, toast ou réseau ne réside dans la machine.
 
-Every effect command carries a monotonically increasing actor-local `commandId`
-and the current operation `generation`. Shell must send `COMMAND_STARTED` before
-I/O. That event atomically removes the command from the pending queue and records
-its exact phase (`hydrate`, `tx_a`, `tx_b`, `record_terminal`, `record_cancel`,
-`abort_tx_b`, `reconcile`, `publish`, `broadcast` or `invalidate`). Every async
-result repeats command ID and generation and is accepted only for that running
-phase. An early result, late result, wrong phase, wrong generation or already
-completed command is ignored and cannot assign canonical state.
+Chaque commande d'effet transporte un `commandId` local à l'acteur strictement croissant et la `generation` de l'opération en cours. Le Shell doit envoyer `COMMAND_STARTED` avant tout I/O. Cet événement retire de manière atomique la commande de la file d'attente pending et consigne sa phase exacte (`hydrate`, `tx_a`, `tx_b`, `record_terminal`, `record_cancel`, `abort_tx_b`, `reconcile`, `publish`, `broadcast` ou `invalidate`). Chaque résultat asynchrone répète le command ID et la génération et n'est accepté que pour cette phase en cours d'exécution. Un résultat prématuré, tardif, de mauvaise phase, de mauvaise génération ou d'une commande déjà terminée est ignoré et ne peut affecter l'état canonique.
 
-Completion atomically removes the running effect before enqueuing its successor:
-Tx-A result -> candidate/Tx B, or terminal settlement; Tx-B result -> terminal
-settlement. A terminal result also removes every pending/running write, abort or
-cancellation command for the operation before publication. Entering
-reconciliation increments generation, clears all obsolete operation commands
-and running effects, then emits the sole `READ_SETTLEMENT` in the new generation.
-Shell rechecks generation immediately before each effect; a removed/old command
-must never execute.
+L'achèvement retire de manière atomique l'effet en cours d'exécution avant d'enfiler son successeur : résultat Tx-A -> candidat/Tx B, ou règlement terminal ; résultat Tx-B -> règlement terminal. Un résultat terminal retire également chaque commande en attente ou en cours d'écriture, d'interruption ou d'annulation pour l'opération avant publication. L'entrée en réconciliation incrémente la génération, efface toutes les commandes d'opération obsolètes et les effets en cours, puis émet l'unique `READ_SETTLEMENT` dans la nouvelle génération. Le Shell revérifie la génération immédiatement avant chaque effet ; une commande retirée ou ancienne ne doit jamais s'exécuter.
 
-Same-mission concurrency:
+Concurrence sur une même mission :
 
-- same active ID + exact epoch/mission/intent/digest/base joins the active
-  promise/effect;
-- same ID with different scope, intent or digest returns `PROTOCOL_ERROR`; it is
-  never downgraded to Busy and never writes;
-- distinct ID while settling/preparing/committing/cancelling receives
-  `APPLICATION_BUSY`, with no hidden queue;
-- separate mission actors progress independently; short IndexedDB store locking
-  is not a global application busy state;
-- a Reconcile for the active exact identity joins; a distinct/unknown valid
-  control identity performs a non-perturbative ledger read and receives exactly
-  one settlement;
-- late events with stale mutation ID, command ID, generation or epoch are
-  ignored.
+- un même ID actif avec epoch/mission/intention/digest/base identiques rejoint la promesse ou l'effet actif ;
+- un même ID avec une portée, une intention ou un digest différent renvoie `PROTOCOL_ERROR` ; il n'est jamais rétrogradé en Busy et n'écrit jamais ;
+- un ID distinct pendant settling/preparing/committing/cancelling reçoit `APPLICATION_BUSY`, sans file d'attente cachée ;
+- les acteurs de missions séparées progressent indépendamment ; le verrouillage court de stores IndexedDB ne constitue pas un état occupé global de l'application ;
+- un Reconcile pour l'identité exacte active se joint ; une identité de contrôle valide distincte/inconnue effectue une lecture non perturbative du ledger et reçoit exactement un règlement ;
+- les événements tardifs portant un ID de mutation, command ID, génération ou epoch obsolète sont ignorés.
 
-### Cancellation winner
+### Résolution en cas d'annulation (Cancellation winner)
 
-Cancel and Reconcile carry and validate dataEpoch + missionId + mutationId +
-intent + command digest and settle through `TRACKING_RECONCILED_V2`; there is no
-optimistic cancel acknowledgement and the worker never invents a missing
-intent/digest.
+Cancel et Reconcile transportent et valident dataEpoch + missionId + mutationId + intent + digest de commande et se règlent via `TRACKING_RECONCILED_V2` ; il n'existe aucun accusé de réception d'annulation optimiste et le worker n'invente jamais une intention ou un digest manquant.
 
-A cancel can win before Tx A only when the worker already owns the matching
-active command context (same epoch, mission, mutation ID, intent and digest).
-An unknown/preemptive cancel has no command to authenticate, creates no ledger
-row and reads using the caller-supplied intent/digest. Absence settles as
-`not_committed/TRANSPORT_ERROR`; it cannot reserve a mutation ID for a future
-command. A different unknown control ID never perturbs the active mutation.
+Une annulation ne peut l'emporter avant Tx A que lorsque le worker possède déjà le contexte de commande active correspondant (mêmes epoch, mission, ID de mutation, intention et digest). Une annulation inconnue ou préventive ne dispose d'aucune commande à authentifier, ne crée aucune ligne de ledger et lit en utilisant l'intention et le digest fournis par l'appelant. L'absence se règle en `not_committed/TRANSPORT_ERROR` ; elle ne peut réserver un ID de mutation pour une commande future. Un ID de contrôle inconnu distinct ne perturbe jamais la mutation active.
 
-1. Before Tx A starts, Cancel wins immediately: no prepared row exists, so a
-   durable `cancelled` ledger row is written and both original and Cancel calls
-   settle `not_committed/CANCELLED` only after that transaction completes.
-2. During Tx A, the actor records `cancelRequested`. When Tx A completes it
-   must not launch candidate construction or Tx B; it moves the prepared row to
-   `cancelled` in an observed transaction.
-3. Between Tx A and Tx B, the same durable cancel settlement applies.
-4. During Tx B, Shell calls `IDBTransaction.abort()` and waits for the terminal
-   transaction event. `onabort` lets Cancel win, after which a separate observed
-   transaction records `cancelled`. `oncomplete` or `InvalidStateError` means
-   commit won and forces reconciliation; Cancel must return
-   `committed_current` or `committed_superseded`.
-5. After commit/ack, Cancel only reconciles the committed result.
-6. A duplicate Cancel joins/reads the same settlement. If persisting
-   `cancelled` fails, the mission remains fenced and reconciles; it never emits
-   a false `CANCELLED`.
+1. Avant le début de Tx A, Cancel l'emporte immédiatement : aucune ligne prepared n'existant, une ligne de ledger durable `cancelled` est écrite et l'appel original ainsi que l'appel Cancel se règlent en `not_committed/CANCELLED` seulement après l'achèvement de cette transaction.
+2. Pendant Tx A, l'acteur consigne `cancelRequested`. Lorsque Tx A se termine, elle ne doit lancer ni la construction du candidat ni Tx B ; elle passe la ligne prepared à `cancelled` dans une transaction observée.
+3. Entre Tx A et Tx B, le même règlement d'annulation durable s'applique.
+4. Pendant Tx B, le Shell appelle `IDBTransaction.abort()` et attend l'événement terminal de transaction. `onabort` laisse Cancel l'emporter, après quoi une transaction observée distincte enregistre `cancelled`. `oncomplete` ou `InvalidStateError` signifie que le commit l'a emporté et force la réconciliation ; Cancel doit renvoyer `committed_current` ou `committed_superseded`.
+5. Après commit/ack, Cancel ne fait que réconcilier le résultat validé.
+6. Un Cancel en double rejoint ou lit le même règlement. Si la persistance de `cancelled` échoue, la mission reste verrouillée et réconcilie ; elle n'émet jamais un faux `CANCELLED`.
 
-The original mutation caller and Cancel caller may receive separate envelopes,
-but both derive from one durable settlement. No code may announce cancellation
-before the ledger phase is committed.
+L'appelant de la mutation d'origine et l'appelant de Cancel peuvent recevoir des enveloppes distinctes, mais toutes deux dérivent d'un unique règlement durable. Aucun code ne peut annoncer une annulation avant que la phase du ledger ne soit validée.
 
-## CAS Undo
+## Undo par CAS
 
-Restore is valid only if all conditions pass in Core and again inside Tx B:
+La restauration n'est valide que si toutes les conditions sont remplies dans le Core et à nouveau au sein de Tx B :
 
-1. snapshot null or complete canonical record for the same mission;
-2. current envelope exists in the same data epoch;
-3. expected revision equals current revision;
-4. expected mutation ID equals current last mutation ID;
-5. requested previous snapshot equals current `undoBase.previousTracking`;
-6. `undoBase` repeats the expected token.
+1. instantané null ou enregistrement canonique complet pour la même mission ;
+2. l'enveloppe actuelle existe dans la même data epoch ;
+3. la révision attendue est égale à la révision actuelle ;
+4. l'ID de mutation attendu est égal au dernier ID de mutation actuel ;
+5. l'instantané précédent demandé est égal à l'actuel `undoBase.previousTracking` ;
+6. `undoBase` répète le token attendu.
 
-Shape failure is `INVALID_RESTORE`. Token/snapshot drift is `STALE_UNDO`, writes
-no envelope, leaves the outbox store untouched, refreshes canonical, removes
-stale Undo and creates no success effect. A successful restore is a new
-mutation/revision and may itself produce a redo token.
+Un défaut de structure est un `INVALID_RESTORE`. Une dérive de token ou d'instantané constitue un `STALE_UNDO`, n'écrit aucune enveloppe, laisse le store outbox intact, rafraîchit le canonique, supprime l'Undo obsolète et ne crée aucun effet de succès. Une restauration réussie constitue une nouvelle mutation/révision et peut elle-même produire un token de redo.
 
-## Reconciliation and restart truth table
+## Table de vérité de la réconciliation et du redémarrage
 
 ```ts
 type TrackingReconciliationOutcomeV2 =
@@ -745,93 +577,61 @@ type TrackingReconciliationV2 =
   CommittedCurrentSettlementV2 | CommittedSupersededSettlementV2 | FailedTrackingSettlementV2;
 ```
 
-Strict coherence is mandatory before Core lets the machine assign a settlement:
+Une cohérence stricte est obligatoire avant que le Core n'autorise la machine à assigner un règlement :
 
-- identity includes exact epoch, mission, mutation, intent and digest;
-- every canonical envelope has the same scope and cannot regress the actor's
-  revision; equal revision requires byte-equivalent canonical content;
-- `committed_current` requires canonical revision/last mutation/intent, Undo and
-  committed revision to agree exactly;
-- `committed_superseded` requires a canonical revision strictly greater than the
-  committed revision and has no Undo/failure/broadcast;
-- `not_committed` has a typed failure and no committed revision/Undo;
-- `inconsistent` has `PROTOCOL_ERROR`, fences the actor and never broadcasts;
-- `uncertain` has `PERSIST_FAILED`, `TRANSPORT_ERROR` or `WORKER_RESTARTED`,
-  fences the actor and never authorizes replay.
+- l'identité inclut l'epoch exacte, la mission, la mutation, l'intention et le digest ;
+- chaque enveloppe canonique a la même portée et ne peut pas régresser la révision de l'acteur ; une révision égale exige un contenu canonique équivalent en octets ;
+- `committed_current` exige que la révision canonique, la dernière mutation, l'intention, l'Undo et la révision validée concordent exactement ;
+- `committed_superseded` exige une révision canonique strictement supérieure à la révision validée et n'a ni Undo, ni échec, ni broadcast ;
+- `not_committed` comporte un échec typé et aucune révision validée ni Undo ;
+- `inconsistent` comporte un `PROTOCOL_ERROR`, verrouille l'acteur et ne diffuse jamais ;
+- `uncertain` comporte un `PERSIST_FAILED`, `TRANSPORT_ERROR` ou `WORKER_RESTARTED`, verrouille l'acteur et n'autorise jamais de rejeu.
 
-| Durable observation                                                            | Outcome                                                                | UI/effect                                                |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------- | -------------------------------------------------------- |
-| ledger committed; canonical same revision and last mutation                    | `committed_current`                                                    | apply canonical; exact Undo; success once                |
-| ledger committed; canonical newer                                              | `committed_superseded`                                                 | apply latest; no old success/Undo                        |
-| old-epoch prepared; no commit                                                  | `not_committed` + `WORKER_RESTARTED`                                   | settle orphan; apply canonical; reject                   |
-| current-worker prepared + registered active actor                              | join                                                                   | join active promise; caller-specific `deduplicated` flag |
-| current-worker prepared without registered actor                               | `inconsistent` + `PROTOCOL_ERROR`                                      | fence mission; no wait/replay                            |
-| ledger failed/rejected/cancelled                                               | `not_committed` + stored failure                                       | apply canonical; reject                                  |
-| no ledger; canonical does not reference ID                                     | `not_committed` + `TRANSPORT_ERROR`                                    | apply canonical; reject; never replay                    |
-| ledger/canonical cannot be read or terminal failure cannot be durably recorded | `uncertain` + typed technical failure                                  | preserve canonical; fence; reconcile/reset; never replay |
-| committed revision lower than canonical                                        | `committed_superseded` only when canonical is valid and strictly newer | latest canonical; no Undo/success                        |
-| committed revision greater than canonical                                      | `inconsistent` + `PROTOCOL_ERROR`                                      | fence mission                                            |
-| equal revision but different lastMutationId                                    | `inconsistent` + `PROTOCOL_ERROR`                                      | fence mission                                            |
-| committed ledger but envelope absent                                           | `inconsistent` + `PROTOCOL_ERROR`                                      | fence mission                                            |
-| envelope references ID but ledger absent, epoch/kind/tracking impossible       | `inconsistent` + `PROTOCOL_ERROR`                                      | fence mission and domain diagnostics                     |
+| Observation durable                                                                  | Résultat                                                                                | UI / effet                                                                           |
+| ------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| ledger committed ; même révision canonique et dernière mutation                      | `committed_current`                                                                     | appliquer le canonique ; Undo exact ; succès une fois                                |
+| ledger committed ; canonique plus récent                                             | `committed_superseded`                                                                  | appliquer le plus récent ; aucun ancien succès/Undo                                  |
+| prepared d'une ancienne epoch ; aucun commit                                         | `not_committed` + `WORKER_RESTARTED`                                                    | régler l'orphelin ; appliquer le canonique ; rejeter                                 |
+| prepared du worker actuel + acteur actif enregistré                                  | join                                                                                    | rejoindre la promesse active ; flag `deduplicated` spécifique à l'appelant           |
+| prepared du worker actuel sans acteur enregistré                                     | `inconsistent` + `PROTOCOL_ERROR`                                                       | verrouiller la mission ; aucune attente/rejeu                                        |
+| ledger failed/rejected/cancelled                                                     | `not_committed` + échec stocké                                                          | appliquer le canonique ; rejeter                                                     |
+| aucun ledger ; le canonique ne référence pas l'ID                                    | `not_committed` + `TRANSPORT_ERROR`                                                     | appliquer le canonique ; rejeter ; ne jamais rejouer                                 |
+| ledger/canonique illisible ou échec terminal non enregistrable de façon durable      | `uncertain` + échec technique typé                                                      | préserver le canonique ; verrouiller ; réconcilier/réinitialiser ; ne jamais rejouer |
+| révision validée inférieure au canonique                                             | `committed_superseded` uniquement si le canonique est valide et strictement plus récent | dernier canonique ; aucun Undo/succès                                                |
+| révision validée supérieure au canonique                                             | `inconsistent` + `PROTOCOL_ERROR`                                                       | verrouiller la mission                                                               |
+| révision égale mais lastMutationId différent                                         | `inconsistent` + `PROTOCOL_ERROR`                                                       | verrouiller la mission                                                               |
+| ledger committed mais enveloppe absente                                              | `inconsistent` + `PROTOCOL_ERROR`                                                       | verrouiller la mission                                                               |
+| l'enveloppe référence l'ID mais le ledger est absent, epoch/kind/tracking impossible | `inconsistent` + `PROTOCOL_ERROR`                                                       | verrouiller la mission et diagnostics de domaine                                     |
 
-`committed_current` additionally requires exact mission, epoch, intent and
-command digest. A current duplicate may receive `TRACKING_COMMITTED_V2` with
-`deduplicated:true`; the admitted first caller receives `false`. Shell wraps
-each joined caller separately instead of sharing one already-labelled response.
-Every superseded or inconsistent duplicate uses `TRACKING_RECONCILED_V2`, never
-an old committed envelope.
+`committed_current` exige en outre la mission, l'epoch, l'intention et le digest de commande exacts. Un doublon actuel peut recevoir `TRACKING_COMMITTED_V2` avec `deduplicated:true` ; le premier appelant admis reçoit `false`. Le Shell enveloppe chaque appelant joint séparément au lieu de partager une réponse déjà étiquetée. Tout doublon remplacé ou incohérent utilise `TRACKING_RECONCILED_V2`, jamais une ancienne enveloppe validée.
 
-Crash proof:
+Preuve de crash :
 
-| Crash point                | Durable state                                       | Deterministic recovery           |
-| -------------------------- | --------------------------------------------------- | -------------------------------- |
-| before Tx A                | no ledger, no commit                                | not observed / not committed     |
-| after Tx A, before Tx B    | prepared only                                       | worker restarted / not committed |
-| during Tx B                | IDB atomic choice                                   | prepared only or complete commit |
-| after Tx B, before ack     | envelope + committed ledger; outbox store untouched | committed current                |
-| ack lost, then newer write | committed ledger + newer canonical                  | committed superseded             |
+| Point de crash                        | État durable                                       | Récupération déterministe             |
+| ------------------------------------- | -------------------------------------------------- | ------------------------------------- |
+| avant Tx A                            | aucun ledger, aucun commit                         | non observé / non validé              |
+| après Tx A, avant Tx B                | prepared uniquement                                | worker restarted / non validé         |
+| pendant Tx B                          | choix atomique IDB                                 | prepared uniquement ou commit complet |
+| après Tx B, avant ack                 | enveloppe + ledger committed ; store outbox intact | committed current                     |
+| ack perdu, puis écriture plus récente | ledger committed + canonique plus récent           | committed superseded                  |
 
-Each worker lifetime has a `workerEpoch`. The startup barrier awaits migrations,
-loads `dataEpoch`, then atomically settles `prepared` ledgers owned by older
-workers before any tracking handler runs. Restart never replays a
-candidate.
+Chaque durée de vie de worker possède un `workerEpoch`. La barrière de démarrage attend les migrations, charge `dataEpoch`, puis règle de manière atomique les ledgers `prepared` détenus par d'anciens workers avant qu'un quelconque gestionnaire de suivi ne s'exécute. Un redémarrage ne rejoue jamais un candidat.
 
-The barrier is observed and retryable, not a cached rejected promise:
+La barrière est observée et renouvelable, et non une promesse rejetée mise en cache :
 
-- callers in one attempt share exactly one migration/recovery promise;
-- `{ok:false}` is failure, never readiness;
-- migration failure rejects current Loads as `LOAD_FAILED` and current mutation
-  intents as their `PERSIST_FAILED`, before admission or ledger creation;
-- failure while recovering ledgers rejects Loads as `LOAD_FAILED` and mutations
-  as `WORKER_RESTARTED`, with the tracking domain still fenced;
-- the next explicit command starts one new serialized attempt; success opens
-  admission, another failure remains fenced;
-- reset preempts/cancels gate retry and owns admission until its journal
-  completes;
-- no actor or tracking storage call can slip between migration success and
-  recovery settlement.
+- les appelants d'une même tentative partagent exactement une promesse de migration/récupération ;
+- `{ok:false}` constitue un échec, jamais un état prêt ;
+- un échec de migration rejette les Loads actuels avec `LOAD_FAILED` et les intentions actuelles de mutation avec leur `PERSIST_FAILED`, avant toute admission ou création de ledger ;
+- un échec lors de la récupération des ledgers rejette les Loads avec `LOAD_FAILED` et les mutations avec `WORKER_RESTARTED`, le domaine de suivi restant verrouillé ;
+- la commande explicite suivante démarre une nouvelle tentative sérialisée ; le succès ouvre l'admission, un nouvel échec maintient le verrouillage ;
+- une réinitialisation préempte/annule les nouvelles tentatives de barrière et détient l'admission jusqu'à ce que son journal soit complété ;
+- aucun appel d'acteur ou de stockage de suivi ne peut s'immiscer entre le succès de migration et le règlement de récupération.
 
-On transport rejection, UI reconciles the same ID once. It never resends UPDATE.
-The panel keeps only origin calls in a pending-effect map, capped at
-`TRACKING_EFFECT_IDS_MAX_ITEMS`. It never evicts a pending ID: while 256 calls
-are unsettled, a 257th is rejected locally before sending. Settlement removes
-the pending entry only after its single caller promise has consumed the local
-success/Undo; any late duplicate has no pending caller and can merge canonical
-state but cannot emit an effect. Reload has no pending IDs and therefore does
-not replay effects from persisted `undoBase`.
+En cas de rejet de transport, l'UI réconcilie le même ID une seule fois. Elle ne renvoie jamais UPDATE. Le panneau conserve uniquement les appels d'origine dans une map d'effets en attente, plafonnée à `TRACKING_EFFECT_IDS_MAX_ITEMS`. Il n'évince jamais un ID en attente : tant que 256 appels ne sont pas réglés, un 257e est rejeté localement avant tout envoi. Le règlement ne retire l'entrée en attente qu'après que son unique promesse appelante a consommé le succès/Undo local ; tout doublon tardif ne dispose d'aucun appelant en attente et peut fusionner l'état canonique sans pouvoir émettre d'effet. Un rechargement ne comporte aucun ID en attente et ne rejoue donc pas les effets à partir d'un `undoBase` persisté.
 
-`PUBLISH_SETTLEMENT` waits only for one local runtime-send attempt, not for a
-receiver acknowledgement. Shell reports `PUBLICATION_ATTEMPTED` with exact
-command/generation/identity and `delivered:true|false`; either value is terminal
-for the actor and releases it to `ready` or `failed`. A closed panel therefore
-cannot block a mission. A worker restart invalidates the old publication
-generation and releases the recovered actor; the original caller observes
-transport loss and reconciles the same ID. Reconciliation read failure itself
-returns an `uncertain` caller settlement and fences the actor instead of leaving
-the promise silent.
+`PUBLISH_SETTLEMENT` n'attend qu'une seule tentative locale d'envoi runtime, et non l'accusé de réception d'un destinataire. Le Shell signale `PUBLICATION_ATTEMPTED` avec la commande, la génération, l'identité exactes et `delivered:true|false` ; l'une ou l'autre valeur est terminale pour l'acteur et le libère vers `ready` ou `failed`. Un panneau fermé ne peut donc pas bloquer une mission. Un redémarrage du worker invalide l'ancienne génération de publication et libère l'acteur récupéré ; l'appelant d'origine constate la perte de transport et réconcilie le même ID. L'échec de lecture lors de la réconciliation renvoie lui-même un règlement appelant `uncertain` et verrouille l'acteur au lieu de laisser la promesse silencieuse.
 
-## Error contract v2
+## Contrat d'erreur v2
 
 ```ts
 type ApplicationTrackingErrorCodeV2 =
@@ -855,44 +655,36 @@ interface SerializedApplicationTrackingErrorV2 {
 }
 ```
 
-Load has the exact `requestId` and null mission/mutation. Its epoch is exact
-when startup reached metadata, and may be null only when migration/metadata
-startup failed before an epoch could be established. Public mutation failures
-have `requestId:null` and carry the exact epoch, mission and mutation identity.
+Load possède le `requestId` exact et des mission/mutation null. Son epoch est exacte lorsque le démarrage a atteint les métadonnées, et ne peut être null que lorsque le démarrage de migration/métadonnées a échoué avant qu'une epoch n'ait pu être établie. Les échecs de mutation publique ont `requestId:null` et transportent l'epoch, la mission et l'identité de mutation exactes.
 
-| Code                 | Allowed intent                             | Recoverable | Stable message                                                                                           |
+| Code                 | Intention autorisée                        | Récupérable | Message stable                                                                                           |
 | -------------------- | ------------------------------------------ | ----------- | -------------------------------------------------------------------------------------------------------- |
-| `LOAD_FAILED`        | load                                       | yes         | `Impossible de charger le suivi des candidatures.`                                                       |
-| `PERSIST_FAILED`     | transition                                 | yes         | `Impossible d’enregistrer le nouveau statut.`                                                            |
-| `PERSIST_FAILED`     | details                                    | yes         | `Impossible d’enregistrer les détails de suivi.`                                                         |
-| `PERSIST_FAILED`     | restore                                    | yes         | `Impossible d’annuler la modification.`                                                                  |
-| `INVALID_TRANSITION` | transition                                 | no          | `Ce changement de statut n’est pas autorisé.`                                                            |
-| `INVALID_DETAILS`    | details                                    | no          | `Les détails de suivi sont invalides.`                                                                   |
-| `INVALID_RESTORE`    | restore                                    | no          | `Cette annulation n’est pas valide.`                                                                     |
-| `TRANSPORT_ERROR`    | `load`, `transition`, `details`, `restore` | yes         | `La confirmation du suivi n’a pas été reçue. Rechargez le suivi avant de réessayer.`                     |
-| `PROTOCOL_ERROR`     | `load`, `transition`, `details`, `restore` | yes         | `La réponse du suivi est invalide. Rechargez le suivi avant de réessayer.`                               |
-| `STALE_UNDO`         | restore                                    | no          | `Cette annulation n’est plus applicable car la candidature a changé.`                                    |
-| `APPLICATION_BUSY`   | `transition`, `details`, `restore`         | yes         | `Une autre modification de cette candidature est en cours. Réessayez après son règlement.`               |
-| `CANCELLED`          | `transition`, `details`, `restore`         | yes         | `La modification a été annulée avant son enregistrement.`                                                |
-| `WORKER_RESTARTED`   | `transition`, `details`, `restore`         | yes         | `Le service de l’extension a redémarré avant de confirmer la modification. L’état local a été rechargé.` |
-| `EPOCH_CHANGED`      | `transition`, `details`, `restore`         | yes         | `Les données locales ont été réinitialisées. Rechargez le suivi avant de continuer.`                     |
+| `LOAD_FAILED`        | load                                       | oui         | `Impossible de charger le suivi des candidatures.`                                                       |
+| `PERSIST_FAILED`     | transition                                 | oui         | `Impossible d’enregistrer le nouveau statut.`                                                            |
+| `PERSIST_FAILED`     | details                                    | oui         | `Impossible d’enregistrer les détails de suivi.`                                                         |
+| `PERSIST_FAILED`     | restore                                    | oui         | `Impossible d’annuler la modification.`                                                                  |
+| `INVALID_TRANSITION` | transition                                 | non         | `Ce changement de statut n’est pas autorisé.`                                                            |
+| `INVALID_DETAILS`    | details                                    | non         | `Les détails de suivi sont invalides.`                                                                   |
+| `INVALID_RESTORE`    | restore                                    | non         | `Cette annulation n’est pas valide.`                                                                     |
+| `TRANSPORT_ERROR`    | `load`, `transition`, `details`, `restore` | oui         | `La confirmation du suivi n’a pas été reçue. Rechargez le suivi avant de réessayer.`                     |
+| `PROTOCOL_ERROR`     | `load`, `transition`, `details`, `restore` | oui         | `La réponse du suivi est invalide. Rechargez le suivi avant de réessayer.`                               |
+| `STALE_UNDO`         | restore                                    | non         | `Cette annulation n’est plus applicable car la candidature a changé.`                                    |
+| `APPLICATION_BUSY`   | `transition`, `details`, `restore`         | oui         | `Une autre modification de cette candidature est en cours. Réessayez après son règlement.`               |
+| `CANCELLED`          | `transition`, `details`, `restore`         | oui         | `La modification a été annulée avant son enregistrement.`                                                |
+| `WORKER_RESTARTED`   | `transition`, `details`, `restore`         | oui         | `Le service de l’extension a redémarré avant de confirmer la modification. L’état local a été rechargé.` |
+| `EPOCH_CHANGED`      | `transition`, `details`, `restore`         | oui         | `Les données locales ont été réinitialisées. Rechargez le suivi avant de continuer.`                     |
 
-Recoverable means only that the listed explicit recovery may succeed. It never
-authorizes automatic replay. `STALE_UNDO` is permanently non-recoverable for
-that token.
+Récupérable signifie uniquement que la récupération explicite listée peut réussir. Cela n'autorise jamais de rejeu automatique. `STALE_UNDO` est définitivement non récupérable pour ce token.
 
-## Connected dashboard seam — disabled in Task 5b
+## Point de coupure du dashboard connecté — désactivé dans la Task 5b
 
-The reviewed production capability for Task 5b is exactly:
+La capacité de production revue pour la Task 5b est exactement :
 
 ```ts
 const PRODUCTION_CONNECTED_DASHBOARD_SYNC_CAPABILITY = { enabled: false } as const;
 ```
 
-Premium state, dev mode and Supabase host permission are not activation proof.
-No production outbox entry, enqueue attempt, sender, scheduler or network call
-is permitted while this capability is false. Task 5b creates only a local
-schema/store seam so the disabled boundary is explicit:
+L'état Premium, le mode dev et la permission d'hôte Supabase ne constituent pas des preuves d'activation. Aucune entrée d'outbox de production, tentative d'enfilage, émetteur, ordonnanceur ou appel réseau n'est autorisé tant que cette capacité est false. La Task 5b crée uniquement un point de coupure (seam) local de schéma/store afin que la frontière désactivée soit explicite :
 
 ```ts
 interface TrackingOutboxEntryV1 {
@@ -906,199 +698,138 @@ interface TrackingOutboxEntryV1 {
 }
 ```
 
-No Task 5b code instantiates this interface: Tx B proves zero outbox writes and
-the extension proves zero dashboard fetches. Authentication, trusted account
-identity, enqueue activation, remote payload, acknowledgements, leases, retry,
-disable/resume and conflict policy belong to a separate future model and RED
-suite. The existence of this store is not dashboard-delivery readiness.
+Aucun code de la Task 5b n'instancie cette interface : Tx B prouve zéro écriture dans l'outbox et l'extension prouve zéro fetch vers le dashboard. L'authentification, l'identité de compte de confiance, l'activation de l'enfilage, le payload distant, les accusés de réception, les baux (leases), le rejeu, la désactivation/reprise et la politique de conflit relèvent d'un futur modèle distinct et d'une suite RED dédiée. L'existence de ce store ne constitue pas un état prêt pour la livraison du dashboard.
 
-## Migration and scan ownership
+## Migration et responsabilité du scan
 
-The DB transition is defined in `db-migration.model.md`:
+La transition de base de données est définie dans `db-migration.model.md` :
 
-- current implementation: DB 5 / data 2;
-- Task 5b target: DB 6 / data 3;
-- v6 adds tracking metadata, mutation ledger, outbox and moves the status index
-  to `tracking.currentStatus`;
-- data v3 wraps valid legacy trackings as revision 1 and quarantines every
-  invalid tracking atomically, independently of the global reject-ratio policy.
+- implémentation actuelle : DB 5 / data 2 ;
+- cible de la Task 5b : DB 6 / data 3 ;
+- la v6 ajoute les métadonnées de suivi, le mutation ledger, l'outbox et déplace l'index de statut vers `tracking.currentStatus` ;
+- data v3 encapsule les suivis hérités valides en tant que révision 1 et met en quarantaine chaque suivi invalide de manière atomique, indépendamment de la politique globale de taux de rejet.
 
-All tracking writers must consume the actor transaction use case. Public raw
-`saveTracking`/`deleteTracking` are removed or made private. The dead
-`trackStage` raw writer is removed/made pure; future dashboard imports and
-test/dev paths may not introduce a parallel writer.
+Tous les rédacteurs de suivi doivent consommer le use case de transaction de l'acteur. Les fonctions publiques brutes `saveTracking`/`deleteTracking` sont supprimées ou rendues privées. Le rédacteur brut mort `trackStage` est supprimé ou rendu pur ; les futurs imports de dashboard et les chemins de test/dev ne doivent pas introduire de rédacteur parallèle.
 
-## Coordinated reset
+## Réinitialisation coordonnée
 
-Reset is the separate critical workflow in `local-data-reset.model.md` and
-`local-data-reset.machine.ts`. Tracking admission closes before quiescence;
-actors receive epoch invalidation and no success is possible until DB deletion,
-selective storage clearing, DB recreation and persistence of a fresh data epoch
-have all completed. Its durable journal is written before destruction and
-removed last. A blocked delete or partial post-delete recovery remains gated
-and retryable; it never reports `reset:true`. Every late old-epoch request,
-response, actor event and broadcast is ignored or rejected.
+La réinitialisation est le workflow critique distinct décrit dans `local-data-reset.model.md` et `local-data-reset.machine.ts`. L'admission de suivi se ferme avant la mise au repos (quiescence) ; les acteurs reçoivent une invalidation d'epoch et aucun succès n'est possible tant que la suppression de la base, le nettoyage sélectif du stockage, la recréation de la base et la persistance d'une nouvelle data epoch ne sont pas tous terminés. Son journal durable est écrit avant la destruction et retiré en dernier. Une suppression bloquée ou une récupération post-suppression partielle reste verrouillée et réessayable ; elle ne signale jamais `reset:true`. Chaque requête, réponse, événement d'acteur et broadcast tardif d'une ancienne epoch est ignoré ou rejeté.
 
-For each unique active, joined, reconciling or publication-pending command
-identity, Core supplies one exact `not_committed/EPOCH_CHANGED` settlement with
-the old command identity. `RESET_INVALIDATED` is accepted only if this list
-covers every unique pending identity exactly once, `resetId` and `nextDataEpoch`
-are canonical lowercase UUID v4 values, and `nextDataEpoch` differs from the
-actor's current epoch. Shell's registry must fan that one identity settlement
-out to every registered caller/promise for the identity and exhaust each caller
-exactly once before reporting invalidation attempted. The actor increments
-generation, removes every command/running effect, enters `invalidating`, and
-emits `INVALIDATE_ACTOR` carrying those settlements plus `resetId` and the new
-epoch. Shell attempts every caller settlement and removes the registry entry;
-`INVALIDATION_ATTEMPTED` then moves the old actor to terminal `invalidated`. It
-can never hydrate against the new dataset. A new-epoch actor is a distinct
-instance.
+Pour chaque identité de commande unique active, jointe, en réconciliation ou en attente de publication, le Core fournit un règlement exact `not_committed/EPOCH_CHANGED` avec l'ancienne identité de commande. `RESET_INVALIDATED` n'est accepté que si cette liste couvre chaque identité en attente unique exactement une fois, que `resetId` et `nextDataEpoch` sont des valeurs UUID v4 canoniques en minuscules, et que `nextDataEpoch` diffère de l'epoch actuelle de l'acteur. Le registre du Shell doit distribuer (fan out) ce règlement d'identité unique à chaque appelant/promesse enregistré pour cette identité et épuiser chaque appelant exactement une fois avant de signaler l'invalidation tentée. L'acteur incrémente la génération, retire chaque commande et effet en cours, entre dans `invalidating`, et émet `INVALIDATE_ACTOR` transportant ces règlements ainsi que `resetId` et la nouvelle epoch. Le Shell tente chaque règlement d'appelant et retire l'entrée du registre ; `INVALIDATION_ATTEMPTED` déplace ensuite l'ancien acteur vers l'état terminal `invalidated`. Il ne peut jamais s'hydrater contre le nouveau jeu de données. Un acteur de la nouvelle epoch est une instance distincte.
 
-## Forbidden transitions
+## Transitions interdites
 
-- Any status edge absent from `APPLICATION_TRANSITIONS`.
-- Candidate/UI success before a completed Tx B or deterministic reconciliation.
-- `prepared` ledger for a command already known invalid.
-- Recompute/replay after base drift, transport uncertainty or worker restart.
-- Same-mission hidden queue for distinct intents.
-- Restore without exact revision/mutation/snapshot CAS.
-- Physical tombstone delete outside coordinated reset.
-- Old duplicate response projecting an older envelope.
-- Scan discovery materializing or reopening tracking without a user command.
-- Outbox enqueue/network while production capability is disabled.
-- Raw tracking writer outside the transaction use case.
-- Result without an exact started command ID/generation/phase.
-- Executable mutation command left pending/running after settlement or entry to
-  reconciliation.
-- Same mutation ID/different digest classified as Busy.
-- Waiting for a panel/receiver acknowledgement to release the actor.
-- Reset success when database deletion is blocked or any late old epoch remains
-  able to mutate state.
+- Tout arc de statut absent de `APPLICATION_TRANSITIONS`.
+- Succès candidat ou UI avant une Tx B terminée ou une réconciliation déterministe.
+- Ledger `prepared` pour une commande déjà reconnue invalide.
+- Recalcul ou rejeu après une dérive de base, une incertitude de transport ou un redémarrage du worker.
+- File d'attente cachée pour la même mission avec des intentions distinctes.
+- Restauration sans CAS exact de révision, mutation et instantané.
+- Suppression physique de tombstone en dehors d'une réinitialisation coordonnée.
+- Ancienne réponse en double projetant une enveloppe plus ancienne.
+- Découverte de scan matérialisant ou rouvrant un suivi sans commande utilisateur.
+- Enfilage outbox ou réseau alors que la capacité de production est désactivée.
+- Rédacteur de suivi brut en dehors du use case transactionnel.
+- Résultat sans command ID, génération et phase de démarrage exacts.
+- Commande de mutation exécutable laissée en attente ou en cours après règlement ou entrée en réconciliation.
+- Même ID de mutation avec un digest différent classifié comme Busy.
+- Attente d'un accusé de réception de panneau ou destinataire pour libérer l'acteur.
+- Succès de réinitialisation lorsque la suppression de la base de données est bloquée ou qu'une ancienne epoch tardive reste capable de modifier l'état.
 
 ## Invariants
 
-1. Domain transitions equal `APPLICATION_TRANSITIONS`.
-2. Every envelope write and committed ledger settlement is atomic; the disabled
-   outbox store remains untouched.
-3. Revision is strictly monotonic across tombstone/recreate.
-4. A mutation ID commits business state at most once for a data epoch.
-5. Same ID + different command/identity/epoch never writes business state.
-6. Invalid command has no prepared checkpoint.
-7. Base drift settles without candidate replay.
-8. Confirmed UI never gets ahead of IndexedDB.
-9. Undo follows exact CAS and is itself a revisioned mutation.
-10. Worker restart reconciles; it never replays.
-11. Superseded settlement never regresses UI or creates stale Undo.
-12. Terminal status and null follow-up commit atomically.
-13. History is non-empty, contiguous, transition-valid, time non-decreasing and
-    ends at current status.
-14. Core is pure; machine only emits effect commands; Shell owns all I/O.
-15. Production dashboard capability false means zero outbox writes/network.
-16. Data epoch invalidates every pre-reset actor/request/response.
-17. Multi-panel broadcast is monotonic projection only; it never emits local
-    success/Undo.
-18. LLM output never decides a transition.
-19. No async result can settle or advance an effect that was not started with
-    the same command ID, generation and phase.
-20. Reconciliation invalidates all obsolete mutation effects before reading
-    durable truth; it cannot run beside a replayable write command.
-21. Every valid Cancel/Reconcile caller supplies intent+digest and receives one
-    join, protocol failure or durable/uncertain read settlement.
-22. Publication completion means one local attempt, never receiver availability.
-23. Reset settles every pending caller and permanently invalidates the old actor
-    before the registry stops it.
+1. Les transitions de domaine sont égales à `APPLICATION_TRANSITIONS`.
+2. Chaque écriture d'enveloppe et règlement de ledger validé est atomique ; le store outbox désactivé reste intact.
+3. La révision est strictement monotone à travers tombstone et recréation.
+4. Un ID de mutation ne valide l'état métier qu'au plus une fois pour une data epoch donnée.
+5. Un même ID avec une commande, identité ou epoch différente n'écrit jamais d'état métier.
+6. Une commande invalide n'a aucun point de contrôle préparé (prepared checkpoint).
+7. La dérive de base se règle sans rejeu de candidat.
+8. L'UI confirmée ne devance jamais IndexedDB.
+9. L'Undo suit un CAS exact et constitue lui-même une mutation versionnée.
+10. Le redémarrage du worker réconcilie ; il ne rejoue jamais.
+11. Un règlement supplanté (superseded) ne fait jamais régresser l'UI ni ne crée d'Undo obsolète.
+12. Le statut terminal et la relance nulle sont validés de façon atomique.
+13. L'historique est non vide, contigu, valide en transition, non décroissant dans le temps et se termine au statut actuel.
+14. Le Core est pur ; la machine n'émet que des commandes d'effet ; le Shell possède tous les I/O.
+15. La capacité de production du dashboard à false signifie zéro écriture outbox et zéro réseau.
+16. La data epoch invalide chaque acteur, requête et réponse antérieurs à la réinitialisation.
+17. La diffusion multi-panneaux n'est qu'une projection monotone ; elle n'émet jamais de succès ni d'Undo local.
+18. La sortie d'un LLM ne décide jamais d'une transition.
+19. Aucun résultat asynchrone ne peut régler ni faire avancer un effet qui n'a pas été démarré avec les mêmes command ID, génération et phase.
+20. La réconciliation invalide tous les effets de mutation obsolètes avant de lire la vérité durable ; elle ne peut s'exécuter aux côtés d'une commande d'écriture rejouable.
+21. Chaque appelant valide de Cancel ou Reconcile fournit intention + digest et reçoit une jonction, un échec de protocole ou un règlement de lecture durable/incertain.
+22. L'achèvement de la publication signifie une tentative locale, jamais la disponibilité du destinataire.
+23. La réinitialisation règle chaque appelant en attente et invalide définitivement l'ancien acteur avant que le registre ne l'arrête.
 
-## Required RED verification before implementation
+## Vérification RED requise avant implémentation
 
-### Machine and Core
+### Machine et Core
 
-- valid plans traverse ready -> preparing -> committing -> ready;
-- invalid preflight publishes its typed failure without any ledger row or
-  `prepared` checkpoint;
-- same active ID joins; distinct same-mission ID is busy; other mission proceeds;
-- same ID/different intent or digest returns Protocol, never Busy;
-- every result before `COMMAND_STARTED`, with wrong command/phase/generation, or
-  after completion is ignored and leaves the pending command/state unchanged;
-- a valid Tx-A/Tx-B result removes its running effect atomically before the next
-  command or settlement appears;
-- after complete operation/publication, a new operation with the same mutation
-  identity cannot authenticate any old command ID;
-- entering reconciliation invalidates queued/running mutation effects before
-  the new-generation read exists;
-- active exact Reconcile joins; distinct/unknown Cancel or Reconcile reads and
-  receives a settlement without perturbing the active mutation;
-- stale async ID/epoch/command/generation event is ignored;
-- cancel before commit aborts; cancel after commit reconciles;
-- delivered and undelivered publication attempts both release the actor; restart
-  during publication does not replay or block;
-- reset attempts `EPOCH_CHANGED` for every caller before terminal invalidation;
-- reset rejects a malformed/uppercase reset ID, malformed/uppercase next epoch,
-  or a next epoch equal to the actor's current epoch;
-- one reset settlement per unique joined identity is fanned out exactly once to
-  every registered Shell caller for that identity;
-- committed-current rejects Undo snapshots different from canonical undoBase in
-  both null-to-record and record-to-null directions;
-- durable pre-Tx-A `PERSIST_FAILED` rejects a substituted `CANCELLED` settlement;
-- every forbidden event/state pair preserves context.
+- les plans valides parcourent ready -> preparing -> committing -> ready ;
+- un preflight invalide publie son échec typé sans aucune ligne de ledger ni point de contrôle `prepared` ;
+- le même ID actif se joint ; un ID distinct sur la même mission est occupé (busy) ; une autre mission se poursuit ;
+- un même ID avec une intention ou un digest différent renvoie Protocol, jamais Busy ;
+- tout résultat antérieur à `COMMAND_STARTED`, avec une commande/phase/génération incorrecte, ou après achèvement est ignoré et laisse la commande ou l'état en attente inchangé ;
+- un résultat valide de Tx-A/Tx-B retire son effet en cours d'exécution de façon atomique avant l'apparition de la commande ou du règlement suivant ;
+- après achèvement complet de l'opération et publication, une nouvelle opération avec la même identité de mutation ne peut authentifier aucun ancien command ID ;
+- l'entrée en réconciliation invalide les effets de mutation en file d'attente ou en cours avant que la lecture de nouvelle génération n'existe ;
+- un Reconcile exact actif se joint ; un Cancel ou Reconcile distinct ou inconnu lit et reçoit un règlement sans perturber la mutation active ;
+- un événement asynchrone portant un ID, une epoch, une commande ou une génération obsolète est ignoré ;
+- une annulation avant commit avorte ; une annulation après commit réconcilie ;
+- les tentatives de publication livrées et non livrées libèrent toutes deux l'acteur ; un redémarrage pendant la publication ne rejoue pas ni ne bloque ;
+- la réinitialisation tente `EPOCH_CHANGED` pour chaque appelant avant l'invalidation terminale ;
+- la réinitialisation rejette un ID de réinitialisation malformé ou en majuscules, une prochaine epoch malformée ou en majuscules, ou une prochaine epoch égale à l'epoch actuelle de l'acteur ;
+- un règlement de réinitialisation par identité jointe unique est distribué exactement une fois à chaque appelant Shell enregistré pour cette identité ;
+- committed-current rejette les instantanés d'Undo différents du undoBase canonique, tant dans le sens null-vers-enregistrement qu'enregistrement-vers-null ;
+- un `PERSIST_FAILED` durable antérieur à Tx A rejette un règlement `CANCELLED` substitué ;
+- chaque paire événement/état interdite préserve le contexte.
 
-### Transaction storage
+### Stockage transactionnel
 
-- revisions 1 -> 2; tombstone -> recreate remains monotonic;
-- duplicate same ID/digest writes history once;
-- old duplicate returns superseded/latest, never old envelope;
-- same ID/different payload is protocol failure;
-- stale Undo after write and after delete/recreate performs zero write;
-- Tx B fault preserves envelope/ledger atomicity and leaves outbox untouched;
-- Tx A and Tx B drift settle without replay;
-- invalid command never leaves prepared;
-- certain pre-Tx-A technical failure has a terminal ledger; unrecordable failure
-  is uncertain/fenced and cannot replay;
+- révisions 1 -> 2 ; tombstone -> la recréation reste monotone ;
+- un doublon avec même ID et digest écrit l'historique une seule fois ;
+- un ancien doublon renvoie superseded/latest, jamais une ancienne enveloppe ;
+- un même ID avec un payload différent constitue un échec de protocole ;
+- un Undo obsolète après écriture et après suppression/recréation n'effectue aucune écriture ;
+- une défaillance de Tx B préserve l'atomicité enveloppe/ledger et laisse l'outbox intacte ;
+- les dérives de Tx A et Tx B se règlent sans rejeu ;
+- une commande invalide ne laisse jamais l'état prepared ;
+- un échec technique certain avant Tx A possède un ledger terminal ; un échec non enregistrable est incertain/verrouillé et ne peut rejouer ;
 
-### Restart and messaging
+### Redémarrage et messagerie
 
-- crashes before Tx A, after Tx A, during Tx B, after Tx B and lost ack match the
-  truth table;
-- startup handlers and scan wait for migration/recovery barrier;
-- v1 remains strict and every v1 write fails closed after migration;
-- v2 schemas enforce UUID, epoch, identity, exact error matrix and sizes;
-- old-epoch Load receives only correlated `TRACKING_EPOCH_CHANGED_V2`, then
-  restarts with null epoch/cursor and no old data;
-- UI transport failure reconciles once and never resends mutation;
-- current, superseded and not-committed settlements project correctly;
-- two panels converge through a higher-revision broadcast while only the
-  originator receives success/Undo; stale/equal-conflicting broadcasts do not
-  regress state;
-- panel reload does not replay persisted success/Undo;
-- settlement guards reject foreign canonical scope, lower revision,
-  equal-revision conflict and incoherent outcome/error/Undo.
+- les crashs avant Tx A, après Tx A, pendant Tx B, après Tx B et un ack perdu correspondent à la table de vérité ;
+- les gestionnaires de démarrage et le scan attendent la barrière de migration/récupération ;
+- la v1 reste stricte et chaque écriture v1 échoue de façon étanche après migration ;
+- les schémas v2 appliquent l'UUID, l'epoch, l'identité, la matrice d'erreurs exacte et les tailles ;
+- un Load d'une ancienne epoch reçoit uniquement `TRACKING_EPOCH_CHANGED_V2` corrélé, puis redémarre avec epoch et curseur nuls et sans anciennes données ;
+- un échec de transport UI réconcilie une fois et ne renvoie jamais la mutation ;
+- les règlements actuels, supplantés et non validés se projettent correctement ;
+- deux panneaux convergent via un broadcast de révision supérieure tandis que seul l'émetteur reçoit succès/Undo ; les broadcasts obsolètes ou conflictuels à révision égale ne font pas régresser l'état ;
+- le rechargement de panneau ne rejoue pas le succès/Undo persisté ;
+- les guards de règlement rejettent une portée canonique étrangère, une révision inférieure, un conflit à révision égale et un résultat/erreur/Undo incohérent.
 
-### Migration, scan, outbox and reset
+### Migration, scan, outbox et réinitialisation
 
-- DB5/data2 legacy -> DB6/data3 envelope migration is idempotent;
-- every invalid legacy tracking is quarantined in the migration transaction,
-  regardless of reject ratio;
-- nested status index, meta, ledger and outbox stores exist;
-- dead `trackStage` no longer performs I/O and a static guard forbids raw
-  tracking writers from every scan path;
-- production disabled capability produces no outbox row or fetch;
-- reset blocked delete preserves its journal and old epoch, reports failure;
-- successful reset orders journal -> admission close -> quiesce -> close -> DB
-  delete -> session clear -> selective local clear -> new DB/epoch -> broadcast
-  -> journal removal;
-- partial post-delete failure never reports success; late old-epoch events are
-  rejected.
+- la migration d'enveloppe DB5/data2 legacy -> DB6/data3 est idempotente ;
+- chaque suivi hérité invalide est mis en quarantaine dans la transaction de migration, quel que soit le taux de rejet ;
+- les stores d'index de statut imbriqué, méta, ledger et outbox existent ;
+- le `trackStage` mort n'effectue plus d'I/O et un guard statique interdit les rédacteurs de suivi bruts depuis tout chemin de scan ;
+- la capacité désactivée de production ne produit aucune ligne d'outbox ni aucun fetch ;
+- une suppression bloquée lors de la réinitialisation préserve son journal et son ancienne epoch, et signale un échec ;
+- une réinitialisation réussie ordonne journal -> fermeture de l'admission -> mise au repos -> fermeture -> suppression DB -> effacement de session -> effacement local sélectif -> nouvelle DB/epoch -> diffusion -> suppression du journal ;
+- un échec partiel post-suppression ne signale jamais un succès ; les événements tardifs d'une ancienne epoch sont rejetés.
 
-## Release evidence gate
+## Critères de preuve de release (Release evidence gate)
 
-Task 5b may be claimed implemented only when:
+La Task 5b ne peut être déclarée implémentée que lorsque :
 
-1. this model and machine receive independent approval;
-2. RED tests fail for the intended missing behavior;
-3. storage, bridge, background, scan and UI consume the machine/effects;
-4. migration and reset safety tests pass;
-5. targeted and full extension suites, typecheck, lint, formatting and build
-   pass;
-6. runtime extension evidence proves lost-ack reconciliation, stale Undo,
-   same-mission concurrency, worker restart and all user-visible tabs.
+1. ce modèle et cette machine reçoivent une approbation indépendante ;
+2. les tests RED échouent pour le comportement manquant prévu ;
+3. le stockage, le bridge, le background, le scan et l'UI consomment la machine et les effets ;
+4. les tests de sécurité de migration et de réinitialisation réussissent ;
+5. les suites de tests ciblées et complètes de l'extension, le typecheck, le lint, le formatage et le build réussissent ;
+6. les preuves de l'extension au runtime démontrent la réconciliation d'ack perdu, l'Undo obsolète, la concurrence sur une même mission, le redémarrage du worker et tous les onglets visibles par l'utilisateur.
 
-Until then, only Task 5 wire-v1 truthfulness is current implementation evidence.
+Jusque-là, seule la fidélité de la Task 5 wire-v1 constitue la preuve d'implémentation actuelle.

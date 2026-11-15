@@ -1,40 +1,25 @@
-# Navigation Motion Model
+# Modèle de mouvement de navigation
 
-Source of truth for the side-panel navigation presentation. The app-shell
-model remains authoritative for bootstrap, route permission and lazy page
-loading; this model owns only the deterministic projection of an accepted
-route into expandable pills and page motion.
+Source de vérité pour la présentation de la navigation du side-panel. Le modèle de l'app-shell reste l'autorité pour le bootstrap, les permissions de routes et le chargement différé (lazy loading) des pages ; ce modèle gère uniquement la projection déterministe d'une route acceptée en pilules extensibles et mouvements de page.
 
-## Scope
+## Périmètre
 
-The navigation keeps the six existing product destinations accessible:
-`Missions`, `Profil`, `CV`, `Suivi`, `TJM` and `Réglages`. `Missions` keeps the
-existing `feed` route identity; visible or accessible copy never changes that
-canonical page value.
+La navigation maintient l'accès aux six destinations produit existantes : `Missions`, `Profil`, `CV`, `Suivi`, `TJM` et `Réglages`. `Missions` conserve l'identité de route `feed` existante ; aucun texte visible ou accessible ne modifie cette valeur de page canonique.
 
-The canonical pill order — also the canonical transition-index order — places
-`Profil` first (leftmost), then `Missions`, `CV`, `Suivi`, `TJM` and
-`Réglages`. The leftmost position is a presentation choice only: it never
-changes the initial route. `Missions` (`feed`) remains the default landing
-page whenever the app-shell route guard accepts it, exactly as before.
+L'ordre canonique des pilules — qui est également l'ordre canonique des index de transition — place `Profil` en premier (le plus à gauche), puis `Missions`, `CV`, `Suivi`, `TJM` et `Réglages`. La position la plus à gauche est uniquement un choix de présentation : elle ne modifie jamais la route initiale. `Missions` (`feed`) reste la page d'atterrissage par défaut dès lors que le garde de route (route guard) de l'app-shell l'accepte, exactement comme auparavant.
 
-The visual contract is inspired by the selected MissionPulse storyboard:
+Le contrat visuel s'inspire du storyboard retenu pour MissionPulse :
 
-- every destination is a separate pill;
-- exactly one pill is expanded and shows its visible label;
-- inactive pills are compact and icon-only;
-- the active pill renders its icon in the **filled** variant while inactive
-  pills render the default stroke variant — the icon variant is a pure
-  function of `currentPage`, never an independent state;
-- the newly selected page enters from the direction of its navigation index;
-- the previously selected page leaves in the opposite direction.
+- chaque destination est une pilule distincte ;
+- exactement une pilule est déployée et affiche son libellé visible ;
+- les pilules inactives sont compactes et n'affichent qu'une icône ;
+- la pilule active affiche son icône dans la variante **pleine** (filled), tandis que les pilules inactives affichent la variante de trait (stroke) par défaut — la variante d'icône est une fonction pure de `currentPage`, jamais un état indépendant ;
+- la page nouvellement sélectionnée entre depuis la direction de son index de navigation ;
+- la page précédemment sélectionnée sort dans la direction opposée.
 
-This is a finite, synchronous presentation projection, not a long-running
-business workflow. It therefore does not require a separate XState actor. The
-existing `createAppNavigation` state module owns the accepted route and exposes
-the projection consumed by the UI.
+Il s'agit d'une projection de présentation synchrone et finie, et non d'un workflow métier de longue durée. Elle ne nécessite donc pas d'acteur XState distinct. Le module d'état existant `createAppNavigation` possède la route acceptée et expose la projection consommée par l'UI.
 
-## State and context
+## État et contexte
 
 ```ts
 type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
@@ -49,8 +34,7 @@ interface NavigationMotionContext {
 }
 ```
 
-`transitionDirection` is `1` when the target page has a greater canonical
-index than the current page and `-1` otherwise. The canonical index order is:
+`transitionDirection` vaut `1` lorsque la page cible a un index canonique supérieur à la page actuelle, et `-1` dans le cas contraire. L'ordre des index canoniques est le suivant :
 
 ```ts
 const PAGE_INDEX = {
@@ -60,135 +44,102 @@ const PAGE_INDEX = {
   applications: 3,
   tjm: 4,
   settings: 5,
-  onboarding: -1, // terminal bootstrap route, never a pill
+  onboarding: -1, // route terminale de bootstrap, jamais une pilule
 };
 ```
 
-`PagePosition` is derived by comparing a rendered page with `currentPage`; it
-is never inferred from copy, icons or DOM order.
+`PagePosition` est dérivé en comparant une page rendue avec `currentPage` ; il n'est jamais déduit du texte, des icônes ou de l'ordre dans le DOM.
 
-## Events
+## Événements
 
 ```ts
 type NavigationMotionEvent = { type: 'NAVIGATE'; page: Page } | { type: 'UNMOUNT' };
 ```
 
-Only an app-shell `NAVIGATE` event that passed the existing `routeAllowed`
-guard reaches this model.
+Seul un événement `NAVIGATE` de l'app-shell ayant franchi avec succès le garde existant `routeAllowed` parvient à ce modèle.
 
-## Transition table
+## Table des transitions
 
-| From                           | Event               | Guard                            | To         | Effects                                                                                            |
-| ------------------------------ | ------------------- | -------------------------------- | ---------- | -------------------------------------------------------------------------------------------------- |
-| `mounted`                      | `NAVIGATE(target)`  | target differs and route allowed | `mounted`  | Compute direction, retain previous page, commit target page; CSS interpolates the new projections. |
-| `mounted` during interpolation | `NAVIGATE(target)`  | target differs and route allowed | `mounted`  | Supersede the prior CSS destination and recompute from the currently committed page.               |
-| any mounted                    | `NAVIGATE(current)` | same page                        | same       | No state or motion change.                                                                         |
-| mounted                        | `UNMOUNT`           | —                                | `disposed` | Stop accepting events; DOM removal cancels any CSS interpolation.                                  |
-| `disposed`                     | any                 | —                                | `disposed` | Ignore.                                                                                            |
+| De                                | Événement           | Garde                               | Vers       | Effets                                                                                                               |
+| --------------------------------- | ------------------- | ----------------------------------- | ---------- | -------------------------------------------------------------------------------------------------------------------- |
+| `mounted`                         | `NAVIGATE(target)`  | cible différente et route autorisée | `mounted`  | Calculer la direction, retenir la page précédente, acter la page cible ; le CSS interpole les nouvelles projections. |
+| `mounted` pendant l'interpolation | `NAVIGATE(target)`  | cible différente et route autorisée | `mounted`  | Remplacer la destination CSS précédente et recalculer à partir de la page actuellement actée.                        |
+| tout état monté                   | `NAVIGATE(current)` | même page                           | identique  | Aucun changement d'état ni de mouvement.                                                                             |
+| `mounted`                         | `UNMOUNT`           | —                                   | `disposed` | Cesser d'accepter des événements ; le démontage du DOM annule toute interpolation CSS.                               |
+| `disposed`                        | tout événement      | —                                   | `disposed` | Ignorer.                                                                                                             |
 
-## Rendering projection
+## Projection de rendu
 
-For each destination pill:
+Pour chaque pilule de destination :
 
-- active iff its page equals `currentPage`;
-- the navigation row consumes exactly 100% of the available inline space;
-- every inactive pill uses the same responsive diameter, clamped between
-  36 px and 40 px;
-- the active pill has no visual maximum width and consumes all space remaining
-  after the five inactive diameters and the five equal gaps are subtracted;
-- outer padding is owned by the shell and is symmetric; the navigation never
-  creates an additional trailing gap;
-- active label has visible width and opacity;
-- the active pill renders its icon in the filled variant; every inactive pill
-  renders the default stroke variant. The variant is recomputed from
-  `currentPage` on every navigation — it is never memorized, animated
-  independently, or driven by anything other than page equality;
-- inactive label has zero visible width and is not exposed twice to assistive
-  technology; the button keeps its full accessible name through `aria-label`;
-- pill interpolation lasts 180 ms with an ease-out curve.
+- active si et seulement si sa page est égale à `currentPage` ;
+- la ligne de navigation occupe exactement 100 % de l'espace inline disponible ;
+- chaque pilule inactive utilise le même diamètre réactif, compris entre 36 px et 40 px ;
+- la pilule active n'a pas de largeur maximale visuelle et consomme tout l'espace restant après soustraction des cinq diamètres inactifs et des cinq espaces (gaps) égaux ;
+- le padding externe appartient au shell et est symétrique ; la navigation ne crée jamais d'espace supplémentaire en fin de ligne ;
+- le libellé actif a une largeur et une opacité visibles ;
+- la pilule active affiche son icône dans la variante pleine (`filled`) ; chaque pilule inactive affiche la variante de trait par défaut (`stroke`). La variante est recalculée à partir de `currentPage` à chaque navigation — elle n'est jamais mémorisée, animée indépendamment, ni pilotée par autre chose que l'égalité de page ;
+- le libellé inactif a une largeur visible nulle et n'est pas exposé deux fois aux technologies d'assistance ; le bouton conserve son nom accessible complet via `aria-label` ;
+- l'interpolation des pilules dure 180 ms avec une courbe ease-out.
 
-For each mounted page:
+Pour chaque page montée :
 
-- `current` projects `translateX(0)` and is interactive;
-- `before` projects to the negative horizontal side and is inert;
-- `after` projects to the positive horizontal side and is inert;
-- page interpolation lasts 220 ms with an ease-out curve;
-- all page wrappers remain mounted so local state and scroll position survive
-  navigation;
-- hidden pages remain `aria-hidden` and `inert` for the entire transition.
+- `current` projette `translateX(0)` et est interactive ;
+- `before` se projette du côté horizontal négatif et est inerte ;
+- `after` se projette du côté horizontal positif et est inerte ;
+- l'interpolation de la page dure 220 ms avec une courbe ease-out ;
+- tous les conteneurs (wrappers) de page restent montés afin que l'état local et la position de défilement (scroll) survivent à la navigation ;
+- les pages masquées restent `aria-hidden` et `inert` pendant toute la durée de la transition.
 
-When the CSS media query reports reduced motion, both durations collapse to
-effectively zero and no intermediate transform is required. This preference is
-a rendering input, not a route transition.
+Lorsque la media query CSS signale la préférence pour des mouvements réduits (`prefers-reduced-motion`), les deux durées s'effondrent à pratiquement zéro et aucune transformation intermédiaire n'est requise. Cette préférence est une entrée de rendu, et non une transition de route.
 
-## Side effects
+## Effets de bord
 
-- The state module changes only ephemeral navigation state.
-- The UI applies CSS width/opacity/transform transitions.
-- Page imports, persistence, telemetry and bridge I/O stay owned by the app
-  shell and are unchanged.
-- Page motion never triggers a scan, a tracking transition or any persistence
-  write.
+- Le module d'état ne modifie qu'un état de navigation éphémère.
+- L'UI applique les transitions CSS de largeur / opacité / transformation.
+- Les imports de page, la persistance, la télémétrie et les E/S du bridge restent sous la responsabilité de l'app-shell et demeurent inchangés.
+- Le mouvement de page ne déclenche jamais de scan, de transition de tracking ou d'écriture de persistance.
 
-## Error, permission, retry and cancellation review
+## Revue des erreurs, permissions, réessais et annulations
 
-- **Bootstrap error:** navigation remains disabled under the app-shell guard;
-  no pill or page motion begins.
-- **Page-load error:** the accepted route remains active and its error surface
-  occupies the current page position; motion does not fabricate success.
-- **Permission denial:** a permitted lock surface moves like any other accepted
-  route; protected code is still gated by the app-shell model.
-- **Retry:** retrying a page chunk does not change the active pill or direction.
-- **Rapid navigation:** a new accepted navigation supersedes the previous CSS
-  destination; there is no completion event capable of mutating route state.
-- **Cancellation:** unmount discards all wrappers with the shell instance, so
-  any in-flight CSS interpolation ends without a route-side callback.
-- **Offline:** local navigation and motion remain available; network status does
-  not choose a route.
-- **Terminal state:** only `disposed` is terminal. `settled` is stable but
-  accepts another explicit `NAVIGATE`.
+- **Erreur de bootstrap :** la navigation reste désactivée sous le garde de l'app-shell ; aucun mouvement de pilule ou de page ne démarre.
+- **Erreur de chargement de page :** la route acceptée reste active et sa surface d'erreur occupe la position de page courante ; le mouvement n'invente pas un succès.
+- **Refus de permission :** une surface de verrouillage autorisée se déplace comme toute autre route acceptée ; le code protégé reste contrôlé par le modèle de l'app-shell.
+- **Réessai (Retry) :** réessayer un chunk de page ne modifie pas la pilule active ni la direction.
+- **Navigation rapide :** une nouvelle navigation acceptée remplace la destination CSS précédente ; il n'y a aucun événement de complétion capable de muter l'état de la route.
+- **Annulation :** le démontage supprime tous les wrappers avec l'instance du shell, de sorte que toute interpolation CSS en cours s'interrompt sans callback côté route.
+- **Hors-ligne :** la navigation locale et le mouvement restent disponibles ; l'état du réseau ne choisit pas de route.
+- **État terminal :** seul `disposed` est terminal. `settled` est stable mais accepte un autre `NAVIGATE` explicite.
 
-## Forbidden transitions
+## Transitions interdites
 
-- No navigation during app-shell `bootstrapping` or `error`.
-- No transition to an unknown page.
-- No state change when the active pill is selected again.
-- No page direction derived from text labels, icons, LLM output or animation
-  completion order.
-- No hidden page may receive pointer, keyboard or accessibility focus.
+- Aucune navigation pendant les états `bootstrapping` ou `error` de l'app-shell.
+- Aucune transition vers une page inconnue.
+- Aucun changement d'état lorsque la pilule active est de nouveau sélectionnée.
+- Aucune direction de page dérivée de libellés textuels, d'icônes, de sorties de LLM ou de l'ordre d'achèvement des animations.
+- Aucune page masquée ne peut recevoir le focus du pointeur, du clavier ou de l'accessibilité.
 
 ## Invariants
 
-1. Exactly one product destination is active when the shell is ready.
-2. Exactly one destination pill is expanded.
-3. The active basis, five inactive diameters and five gaps sum to the complete
-   navigation content width at every supported panel width.
-4. Every existing destination remains reachable and keeps its accessible name.
-5. `PagePosition(page, currentPage)` is deterministic for every known page.
-6. Motion changes presentation only; route and business state remain owned by
-   the existing deterministic app-navigation model.
-7. Reduced-motion users receive the same final state without meaningful
-   animation.
-8. An LLM never chooses a page, direction, duration or completion transition.
-9. The leftmost pill (`Profil`) is a position choice only: the default landing
-   page remains `feed` (`Missions`) whenever the route guard accepts it, and
-   `PAGE_INDEX` never influences route selection — only direction.
-10. Exactly the active pill renders the filled icon variant; every inactive
-    pill renders the stroke variant. No pill owns an independent icon-variant
-    state.
+1. Exactement une destination produit est active lorsque le shell est prêt.
+2. Exactement une pilule de destination est déployée.
+3. La base active, les cinq diamètres inactifs et les cinq espacements totalisent la largeur complète du contenu de navigation, à chaque largeur de panneau supportée.
+4. Chaque destination existante reste accessible et conserve son nom accessible.
+5. `PagePosition(page, currentPage)` est déterministe pour chaque page connue.
+6. Le mouvement ne modifie que la présentation ; la route et l'état métier restent la propriété du modèle d'app-navigation déterministe existant.
+7. Les utilisateurs avec mouvements réduits obtiennent le même état final sans animation perceptible.
+8. Un LLM ne choisit jamais une page, une direction, une durée ou une transition de complétion.
+9. La pilule la plus à gauche (`Profil`) est un choix de position uniquement : la page d'atterrissage par défaut reste `feed` (`Missions`) dès lors que le garde de route l'accepte, et `PAGE_INDEX` n'influence jamais la sélection de route — uniquement la direction.
+10. Seule la pilule active affiche la variante d'icône pleine (`filled`) ; chaque pilule inactive affiche la variante de trait (`stroke`). Aucune pilule ne possède d'état indépendant pour sa variante d'icône.
 
-## Review result
+## Résultat de la revue
 
-- [x] Nominal forward and backward navigation are explicit.
-- [x] Re-selection and rapid navigation supersession are explicit.
-- [x] Bootstrap/page-load errors and retries keep deterministic ownership.
-- [x] Permission, offline and reduced-motion behavior are covered.
-- [x] Unmount cancellation and the terminal state are covered.
-- [x] No existing destination is removed or hidden behind implicit copy.
-- [x] Narrow and wide side-panel widths cannot leave unused navigation space or
-      clip an inactive destination.
-- [x] Canonical order (`profile` leftmost) is a presentation choice that never
-      changes the `feed` initial route; the direction table derives from
-      `PAGE_INDEX` only.
-- [x] The filled/stroke icon variant is a deterministic projection of
-      `currentPage` and introduces no new state or transition.
+- [x] La navigation nominale vers l'avant et vers l'arrière est explicite.
+- [x] La re-sélection et le remplacement en cas de navigation rapide sont explicites.
+- [x] Les erreurs de bootstrap/chargement de page et les réessais conservent une responsabilité déterministe.
+- [x] Les comportements relatifs aux permissions, au mode hors-ligne et aux mouvements réduits sont couverts.
+- [x] L'annulation au démontage et l'état terminal sont couverts.
+- [x] Aucune destination existante n'est supprimée ou masquée derrière un texte implicite.
+- [x] Les largeurs étroites ou larges du side-panel ne peuvent pas laisser d'espace de navigation inutilisé ni tronquer une destination inactive.
+- [x] L'ordre canonique (`profile` le plus à gauche) est un choix de présentation qui ne modifie jamais la route initiale `feed` ; la table de direction dérive uniquement de `PAGE_INDEX`.
+- [x] La variante d'icône pleine / trait est une projection déterministe de `currentPage` et n'introduit aucun nouvel état ni transition.

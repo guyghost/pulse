@@ -1,202 +1,199 @@
-# Packaged tab scenarios model
+# Modèle de scénarios d'onglets packagés
 
-Status: **MODEL REVISION 11 — PENDING INDEPENDENT REVIEW; IMPLEMENTATION FORBIDDEN**.
+Statut : **RÉVISION 11 DU MODÈLE — EN ATTENTE DE REVUE INDÉPENDANTE ; IMPLÉMENTATION INTERDITE**.
 
 Pending behavior SHA-256: `30b628046132da3222a7affb19044ed92d46ea71bf31192509f10a98e400ddb9`.
 
-The normalized pending behavior hash is SHA-256 of the complete raw UTF-8/LF
-bytes of this file after replacing only the value between backticks on the
-`Pending behavior SHA-256` line with the literal
-`__PENDING_BEHAVIOR_SHA256__`. The surrounding backticks, period and every
-other byte remain unchanged. The input must already be UTF-8 without BOM and
-use LF line endings; there is no additional whitespace, Unicode, Markdown or
-JSON normalization.
+Le hachage normalisé du comportement en attente est le SHA-256 de l'intégralité des
+octets bruts UTF-8/LF de ce fichier après remplacement exclusif de la valeur entre
+accents graves sur la ligne `Pending behavior SHA-256` par le littéral
+`__PENDING_BEHAVIOR_SHA256__`. Les accents graves environnants, le point et tout
+autre octet demeurent inchangés. L'entrée doit déjà être en UTF-8 sans BOM et
+utiliser des fins de ligne LF ; il n'y a aucune normalisation supplémentaire d'espaces,
+Unicode, Markdown ou JSON.
 
-Revision 1 was independently rejected at exact raw UTF-8/LF SHA-256
+La révision 1 a été rejetée de manière indépendante au SHA-256 UTF-8/LF brut exact
 `92d62124130a2dc41a39288903cd2b8663f0daea958f8f2297dab10c4c1a05ed`.
-Revision 2 was independently rejected at normalized UTF-8/LF behavior hash
-`f01ad85c80e22e412080598c7bab66f97c3439e2f255994dc11b784bf137c541`:
-its MV3 parent dependency still named the obsolete revision-19/20 lineage, and
-its generic live-state failure rows also matched `failed_cleaning`, permitting
-a cleanup failure, cancellation or timeout to allocate another cleanup effect.
+La révision 2 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
+`f01ad85c80e22e412080598c7bab66f97c3439e2f255994dc11b784bf137c541` :
+sa dépendance parente MV3 désignait toujours le lignage obsolète des révisions 19/20, et
+ses lignes d'échec d'état actif génériques correspondaient également à `failed_cleaning`,
+autorisant un échec de nettoyage, une annulation ou un timeout à allouer un autre effet de nettoyage.
 
-Revision 3 preserved all five revision-1 corrections from revision 2: explicit
-checkpoint capture/reassertion events and correlations; an explicit offline
-child machine; the distinct immutable V2 inventory-blob and scenario-matrix
-authorities; a fail-closed
-MV3 parent dependency; and a closed CV expansion action behind a separately
-reviewed accessible-anchor contract. It now binds that parent dependency only
-to pending MV3 harness revision 26 and its normalized behavior hash
+La révision 3 a conservé l'ensemble des cinq corrections de la révision 1 issues de la révision 2 : les
+événements explicites de capture/réaffirmation de points de contrôle (checkpoints) et leurs corrélations ; une machine
+enfant hors-ligne explicite ; les autorités distinctes et immuables du blob d'inventaire V2 et de la matrice
+de scénarios ; une dépendance parente MV3 avec bascule en échec hermétique (fail-closed) ; et une action d'expansion
+de CV fermée protégée par un contrat d'ancrage accessible revu séparément. Elle lie désormais cette dépendance parente
+uniquement à la révision 26 du harnais MV3 en attente et à son hachage de comportement normalisé
 `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`,
-without treating that candidate hash as approval, implementation or
-verification. It also removes `failed_cleaning` from every generic transition
-and gives that state exactly two terminal exits. No approval transfers from
-revision 1, revision 2 or any MV3 harness revision.
+sans traiter ce hachage candidat comme une approbation, une implémentation ou
+une vérification. Elle supprime également `failed_cleaning` de chaque transition générique
+et attribue à cet état exactement deux sorties terminales. Aucune approbation n'est transférée depuis
+la révision 1, la révision 2 ou une quelconque révision du harnais MV3.
 
-Revision 3 was independently rejected at normalized UTF-8/LF behavior hash
+La révision 3 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
 `e378d64435e7a3e255d6b8a744a43d1988b8b36da22ca190ccc44b4fc7dc097f`.
-It still depended on rejected release-readiness clarification 5, represented
-release approval and implementation through one ambiguous digest, and created
-an implementation cycle: this child forbade RED tests until the parent was
-verified while the parent required all four child scenarios to execute before
-its own verification could finish. Revision 4 replaces that cycle with one
-closed joint implementation phase followed by one atomic authority activation.
-It consumes distinct review, implementation and verification receipts for
-release-readiness clarification 7, MV3 harness revision 26 and this revision 4;
-none of those receipt digests is edited into this source file. No approval
-transfers from revision 3.
+Elle dépendait toujours de la clarification 5 de préparation à la release qui avait été rejetée, représentait
+l'approbation de release et l'implémentation via un condensat (digest) ambigu unique, et créait
+un cycle d'implémentation : cet enfant interdisait les tests RED jusqu'à ce que le parent soit
+vérifié, alors que le parent exigeait l'exécution des quatre scénarios enfants avant que
+sa propre vérification ne puisse se terminer. La révision 4 remplace ce cycle par une
+phase conjointe fermée d'implémentation suivie d'une activation atomique de l'autorité.
+Elle consomme des reçus distincts de revue, d'implémentation et de vérification pour
+la clarification 7 de préparation à la release, la révision 26 du harnais MV3 et cette révision 4 ;
+aucun de ces condensats de reçu n'est édité dans ce fichier source. Aucune approbation ne se
+transfère depuis la révision 3.
 
-Revision 4 was independently rejected at normalized UTF-8/LF behavior hash
+La révision 4 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
 `24dd339609de659497eb6e958319fe244149184137360c2dc9ca464d049486b0`.
-Its pre-activation sandbox consumed one already
-`ReviewedImplementedVerifiedModelAuthorityV1` tuple even though that sandbox
-was supposed to produce the evidence from which verification receipts were
-issued. It also named no typed ordered review, implementation and verification
-sets or their exact JCS digest preimages, and the shared Git/activation contract
-proved only two model blobs rather than the six-model authority set. Revision 5
-consumes review-only authority for implementation, review-plus-implementation
-authority for verification, and the complete verified authority only after
-evidence has been accepted and receipts have been issued. No approval transfers
-from revision 4.
+Son bac à sable (sandbox) de pré-activation consommait un uplet déjà
+`ReviewedImplementedVerifiedModelAuthorityV1`, alors même que ce bac à sable
+était censé produire les preuves à partir desquelles les reçus de vérification étaient
+émis. Il ne nommait pas non plus d'ensembles ordonnés et typés de revue, d'implémentation et de vérification
+ni leurs préimages exactes de condensat JCS, et le contrat partagé Git/activation
+ne prouvait que deux blobs de modèle au lieu de l'ensemble d'autorité à six modèles. La révision 5
+consomme une autorité de revue seule pour l'implémentation, une autorité de revue plus implémentation
+pour la vérification, et l'autorité vérifiée complète uniquement après acceptation des
+preuves et émission des reçus. Aucune approbation ne se transfère
+depuis la révision 4.
 
-Revision 5 was independently rejected at normalized UTF-8/LF behavior hash
+La révision 5 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
 `2e8e56fd119d8fccf08f1463cc12aca7dd9ff21af3d18118212ccbad6d911cc5`.
-It verified tracked bytes only before and after commands, so a child could
-temporarily mutate or shadow a source/test/config/module byte, build `dist`, and
-restore the original tree before recapture. Revision 6 requires every packaged
-scenario command and descendant to execute with the complete Git source mount
-and its parents OS-read-only, no mount capability, and writes limited to closed
-separate output mounts that cannot shadow tracked authority. No approval
-transfers from revision 5.
+Elle ne vérifiait les octets suivis qu'avant et après les commandes, si bien qu'un enfant pouvait
+temporairement muter ou masquer un octet source/test/configuration/module, builder `dist`, et
+restaurer l'arbre d'origine avant la recapture. La révision 6 exige que chaque commande
+de scénario packagé et ses descendants s'exécutent avec le point de montage source Git complet
+et ses parents en lecture seule au niveau de l'OS (OS-read-only), sans capacité de montage (mount capability), et avec des écritures
+limitées à des points de montage de sortie distincts et fermés qui ne peuvent pas masquer l'autorité suivie. Aucune approbation
+ne se transfère depuis la révision 5.
 
-Revision 6 was withdrawn at normalized UTF-8/LF behavior hash
+La révision 6 a été retirée au hachage de comportement normalisé UTF-8/LF
 `9b73affd0e6096ec8b2b60a1e5cffaa93633c0a5fea4cbf4d2ba91ae2c56b044`.
-Its six-slot authority still pinned the CV accessible-anchor model at obsolete
-revision 1 while the reviewed behavior had advanced to revision 3, so the joint
-activation could not prove the exact CV semantics exercised by checkpoint A3.
-Revision 7 preserves the immutable-source boundary and requires CV revision 3
-at its exact frozen behavior hash. It also closes the non-candidate `test:mv3`
-diagnostic-upload projection so workflow inspection cannot confuse diagnostic
-evidence with candidate transport. No approval transfers from revision 6.
+Son autorité à six emplacements épinglait toujours le modèle d'ancrage accessible du CV à
+la révision 1 obsolète alors que le comportement revu avait progressé jusqu'à la révision 3, de sorte que l'activation
+conjointe ne pouvait pas prouver la sémantique exacte du CV exercée par le checkpoint A3.
+La révision 7 préserve la frontière de source immuable et exige la révision 3 du CV
+à son hachage de comportement figé exact. Elle ferme également la projection d'upload
+de diagnostic `test:mv3` non-candidate afin que l'inspection des flux de travail (workflows) ne puisse pas confondre
+les preuves de diagnostic avec le transport de candidats. Aucune approbation ne se transfère depuis la révision 6.
 
-Revision 7 was withdrawn at normalized UTF-8/LF behavior hash
+La révision 7 a été retirée au hachage de comportement normalisé UTF-8/LF
 `f5fc3235a2c73988f1bfcdb11247cba1deae7a33fc5d8e64e3440cff19930962`.
-Its CV dependency pinned revision 3, which was rejected because callback
-availability was absent from the decoder and save had neither a validated
-payload nor an immutable form-to-draft merge rule. It also left the packaged
-MissionCard, TJM-results and theme-control anchors as implementation-time
-choices even though positional fallback is forbidden. Revision 8 binds the
-corrected CV revision 4 at its exact frozen behavior hash and closes the three
-packaged UI contracts: a non-interactive named mission article with an explicit
-controlled disclosure; a named TJM region/list/item hierarchy; and a named
-three-button theme group whose pressed state follows only confirmed settings.
-It preserves revision 7's immutable-source and separately projected diagnostic
-upload boundaries. No approval transfers from revision 7.
+Sa dépendance de CV épinglait la révision 3, qui a été rejetée car la disponibilité
+du callback était absente du décodeur et la sauvegarde n'avait ni payload validé
+ni règle de fusion immuable de formulaire vers brouillon. Elle laissait également les ancres
+packagées de MissionCard, des résultats TJM et du contrôle de thème sous forme de choix
+d'implémentation alors que le repli positionnel est interdit. La révision 8 lie la
+révision 4 corrigée du CV à son hachage de comportement figé exact et ferme les trois
+contrats d'UI packagés : un article de mission nommé non interactif avec une divulgation
+contrôlée explicite ; une hiérarchie nommée région/liste/élément pour le TJM ; et un groupe
+de thèmes nommé à trois boutons dont l'état pressé suit uniquement les réglages confirmés.
+Elle préserve la source immuable de la révision 7 et les frontières d'upload de diagnostic
+projetées séparément. Aucune approbation ne se transfère depuis la révision 7.
 
-Revision 8 was withdrawn at normalized UTF-8/LF behavior hash
+La révision 8 a été retirée au hachage de comportement normalisé UTF-8/LF
 `4933b559dc9fca2977d7f3d7371eed69a4f72ca8f687979cb1ebee8716693155`.
-Its CV dependency pinned revision 4, whose live machine had no transition rows
-for stale, unknown or mismatched callback settlements: the only wildcard rows
-were restricted to UI intents. A late or divergent callback result could
-therefore remain outside the closed transition table. No approval transfers
-from revision 8.
+Sa dépendance de CV épinglait la révision 4, dont la machine active n'avait aucune ligne de transition
+pour les règlements de callbacks périmés, inconnus ou discordants : les seules lignes génériques
+étaient restreintes aux intentions d'UI. Un résultat de callback tardif ou divergent pouvait
+donc rester en dehors de la table de transition fermée. Aucune approbation ne se transfère
+depuis la révision 8.
 
-The first revision-9 candidate was withdrawn before independent review at
-normalized UTF-8/LF behavior hash
+Le premier candidat de la révision 9 a été retiré avant la revue indépendante au
+hachage de comportement normalisé UTF-8/LF
 `eaa67f36ff21210e7b4a0910d0556d5643bf0fd969091bf8a3191f88a7647c1e`.
-It bound CV revision 5, whose provisional approval was revoked after the model's
-focus-exit audit exposed a phantom `FOCUS_EXIT_REQUESTED` output with no explicit
-Svelte callback port or unconditional terminal cleanup. That package candidate
-therefore could not prove checkpoint A3 even though it had closed the
-MissionCard, TJM and appearance anchors.
+Il liait la révision 5 du CV, dont l'approbation provisoire avait été révoquée après que l'audit
+de sortie de focus du modèle a exposé une sortie fantôme `FOCUS_EXIT_REQUESTED` sans port de
+callback Svelte explicite ni nettoyage terminal inconditionnel. Ce candidat de package
+ne pouvait donc pas prouver le checkpoint A3 même s'il avait fermé les ancres
+de MissionCard, du TJM et de l'apparence.
 
-Revision 9 was independently rejected at normalized UTF-8/LF behavior hash
+La révision 9 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
 `9b910299cf2d77d277503610f4996a3465eb9a21d35a9d3cce296472f907238a`.
-Its `dependency_admitting` state allocated `ADMIT_REQUIRED_AUTHORITIES` but had
-no correlated transition for the closed `EFFECT_FAILED`, `TIMEOUT` or
-`CANCELLED` transport events. An admission transport failure could therefore
-leave a live state without a terminal path. Revision 10 adds exact current
-admission-failure transitions directly to `failed`, before any browser exists
-and without allocating cleanup. No approval transfers from revision 9.
+Son état `dependency_admitting` allouait `ADMIT_REQUIRED_AUTHORITIES` mais ne comportait
+aucune transition corrélée pour les événements de transport fermés `EFFECT_FAILED`, `TIMEOUT` ou
+`CANCELLED`. Un échec de transport lors de l'admission pouvait donc laisser un état actif sans chemin
+terminal. La révision 10 ajoute des transitions exactes d'échec d'admission courante directement vers `failed`,
+avant qu'aucun navigateur n'existe et sans allouer de nettoyage. Aucune approbation ne se transfère depuis la révision 9.
 
-This revision-10 candidate binds the independently approved CV
-accessible-anchor revision 6 at normalized behavior hash
+Ce candidat de révision 10 lie la révision 6 d'ancrage accessible du CV
+approuvée de manière indépendante au hachage de comportement normalisé
 `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`.
-Revision 6 preserves the exact packaged A3 article/toggle/region contract,
-consumes every live callback settlement, exposes one decoded synchronous
-`onFocusExitRequest` port and guarantees focus confinement, details-ID lease
-release and terminal removal through nested `finally` effects. This revision
-also retains revision 8's closed MissionCard, TJM-region and appearance-group
-anchors, RED/proof obligations, immutable-source execution boundary and the
-exact separately projected `diagnostic_only` MV3 uploader. The joint parent is
-the forthcoming release-readiness clarification 11, which must freeze this
-exact candidate hash before its own review. No approval transfers from revision
-8, either revision-9 candidate or any CV predecessor.
+La révision 6 préserve le contrat exact d'article/bascule/région packagé A3,
+consomme chaque règlement de callback actif, expose un port synchrone décodé
+`onFocusExitRequest` et garantit le confinement du focus, la libération du bail
+d'identifiant de détails et la suppression terminale via des effets `finally` imbriqués. Cette révision
+retient également les ancres fermées de la révision 8 pour MissionCard, la région TJM et le groupe
+d'apparence, les obligations RED/preuves, la frontière d'exécution à source immuable et le
+téléverseur MV3 `diagnostic_only` exactement projeté séparément. Le parent conjoint est
+la clarification 11 de préparation à la release à venir, qui doit figer ce
+hachage candidat exact avant sa propre revue. Aucune approbation ne se transfère depuis la révision
+8, aucun des deux candidats de révision 9 ou un quelconque prédécesseur du CV.
 
-Revision 10 was independently rejected at normalized UTF-8/LF behavior hash
+La révision 10 a été rejetée de manière indépendante au hachage de comportement normalisé UTF-8/LF
 `2c18f03f8ff287ae65c6142552af0b60d7707dae994bb337719553c1f12d0cc8`.
-Although its dependency-admission transport paths were closed, the normative
-required-identity tuple still required packaged-tabs `modelRevision = 9`, so
-neither the revision-10 tuple nor the obsolete revision-9 tuple could satisfy
-the authority decoder. Revision 11 preserves the revision-10 admission fix and
-updates every current packaged-tabs identity, invariant, plan and activation
-reference to revision 11. No approval transfers from revision 10; these exact
-revision-11 bytes still require independent review.
+Bien que ses chemins de transport d'admission des dépendances aient été fermés, l'uplet d'identité
+normatif requis exigeait toujours `modelRevision = 9` pour les onglets packagés, de sorte que
+ni l'uplet de révision 10 ni l'uplet obsolète de révision 9 ne pouvaient satisfaire
+le décodeur d'autorité. La révision 11 préserve le correctif d'admission de la révision 10 et
+met à jour chaque identité, invariant, plan et référence d'activation actuelle des onglets packagés
+vers la révision 11. Aucune approbation ne se transfère depuis la révision 10 ; ces octets exacts
+de révision 11 nécessitent toujours une revue indépendante.
 
-No test, harness, UI, service-worker, storage, inventory or release-gate
-implementation is authorized from this document until an independent reviewer
-approves its exact bytes.
+Aucune implémentation de test, harnais, UI, service worker, stockage, inventaire ou porte de release
+(release gate) n'est autorisée à partir de ce document jusqu'à ce qu'un réviseur indépendant
+approuve ses octets exacts.
 
-The only lawful lifecycle is
-`Model -> Review -> Implement -> Verify -> Joint activation`. Review may admit
-the bounded RED-first implementation phase; it cannot skip implementation
-receipts, verification evidence, distinct verification receipts or the final
-atomic activation. A prompt, green exit code, worktree diff or LLM statement is
-not a lifecycle transition.
+Le seul cycle de vie légal est
+`Model -> Review -> Implement -> Verify -> Joint activation`. La revue peut admettre
+la phase d'implémentation délimitée orientée RED d'abord ; elle ne peut pas ignorer les reçus
+d'implémentation, les preuves de vérification, les reçus de vérification distincts ou l'activation
+atomique finale. Une invite (prompt), un code de sortie vert, un diff de copie de travail (worktree) ou une déclaration de LLM
+ne constitue pas une transition de cycle de vie.
 
-The author records the computed lowercase 64-hex candidate digest only on the
-`Pending behavior SHA-256` line. The reviewer independently reproduces it
-outside this file. Normalization restores the literal placeholder before
-hashing, so that this one digest substitution does not change the reviewed
-behavior bytes. Any other byte change invalidates approval and returns the
-model to pending review. Model receipt digests are runtime activation authority,
-not source placeholders; recording or replacing one inside this file is
-forbidden and would require a new revision and review.
+L'auteur consigne le condensat candidat calculé en 64 caractères hexadécimaux minuscules uniquement sur la ligne
+`Pending behavior SHA-256`. Le réviseur le reproduit de façon indépendante
+en dehors de ce fichier. La normalisation rétablit le texte de remplacement (placeholder) littéral avant
+le hachage, de sorte que cette unique substitution de condensat ne modifie pas les octets du
+comportement revu. Toute autre modification d'octet invalide l'approbation et renvoie le
+modèle à l'état de revue en attente. Les condensats de reçus de modèles constituent l'autorité d'activation
+à l'exécution, et non des espaces réservés de source ; consigner ou remplacer l'un d'eux à l'intérieur
+de ce fichier est interdit et nécessiterait une nouvelle révision et une nouvelle revue.
 
-## Decision and objective
+## Décision et objectif
 
-The production claim owned by this model is deliberately narrow:
+La revendication de production détenue par ce modèle est délibérément étroite :
 
-> In a real Chromium/Chrome Manifest V3 process loading the exact sealed
-> `apps/extension/dist` package, every one of the six navigation tabs can perform
-> its representative user workflow, confirmed local state survives a warm page
-> reload, onboarding completion survives a reload, and cached local workflows
-> remain truthful through offline and recovery transitions.
+> Dans un véritable processus Chromium/Chrome Manifest V3 chargeant le package scellé exact
+> `apps/extension/dist`, chacun des six onglets de navigation peut exécuter
+> son flux de travail utilisateur représentatif, l'état local confirmé survit à un rechargement
+> de page à chaud (warm reload), l'achèvement de l'onboarding survit à un rechargement,
+> et les flux de travail locaux mis en cache restent conformes à la réalité à travers les transitions hors-ligne et de récupération.
 
-The six tabs are `Missions` (the feed page), `Profil`, `CV`, `Suivi` (the Candidatures page), `TJM`
-and `Réglages`. Onboarding is a separate initial-route workflow, not a seventh
-tab.
+Les six onglets sont `Missions` (la page de feed), `Profil`, `CV`, `Suivi` (la page Candidatures), `TJM`
+et `Réglages`. L'onboarding est un flux de travail d'itinéraire initial séparé, et non un septième
+onglet.
 
-This model adds persistence and workflow proof to the existing render-only
-coverage in `tests/e2e-extension/navigation.test.ts`. It does not claim that:
+Ce modèle ajoute la persistance et la preuve de flux de travail à la couverture existante
+portant uniquement sur le rendu dans `tests/e2e-extension/navigation.test.ts`. Il ne prétend pas que :
 
-- a connector can log in to, scrape or mutate an external platform;
-- an external application is submitted;
-- CV sync, generated assets, Gemini Nano or notifications work;
-- the dormant application-tracking wire v2 or Settings V2 cutover is live;
-- selecting an onboarding source is currently durable;
-- the service worker survives a process restart in these new scenarios. That
-  separate claim remains owned by `runtime.service-worker-reload` and the MV3
-  harness model.
+- un connecteur peut se connecter à, scraper ou muter une plateforme externe ;
+- une candidature externe est soumise ;
+- la synchronisation de CV, les assets générés, Gemini Nano ou les notifications fonctionnent ;
+- le wire v2 dormant de suivi des candidatures ou la bascule vers Réglages V2 est actif ;
+- la sélection d'une source d'onboarding est actuellement durable ;
+- le service worker survit à un redémarrage de processus dans ces nouveaux scénarios. Cette
+  revendication distincte reste détenue par `runtime.service-worker-reload` et le modèle
+  du harnais MV3.
 
-The canonical command remains:
+La commande canonique demeure :
 
 ```text
 pnpm --filter @pulse/extension test:mv3
 ```
 
-The CI step may be followed by exactly one separately projected diagnostic
-upload. Its closed contract is byte-for-byte:
+L'étape de CI peut être suivie d'exactement un téléversement de diagnostic projeté séparément. Son contrat fermé est, octet par octet :
 
 ```text
 schema             = missionpulse.mv3-diagnostic-artifact-policy
@@ -216,84 +213,47 @@ retention-days      = 14
 candidateAuthority  = false
 ```
 
-`jobProjectionSha256` is recomputed from the complete exact committed
-`test-mv3` job projection above; it is never caller-supplied. The step is that
-job's sole evidence publication and no other non-privileged job may upload an
-artifact. `output/playwright/` contains bounded raw Playwright/runtime
-diagnostics only. Neither its pathname, upload result nor receipt may enter the
-thirteen-scenario verdict, the seven-component sealed candidate, privileged
-command plan, candidate inventory, seal, attestation subject, transport digest,
-catalog activation or any release transition preimage. It is never named
-`missionpulse-sealed-candidate`, never carries `dist`, source, model, seal,
-handoff or executable-controller bytes, and never sets `archive:false`.
+`jobProjectionSha256` est recalculé à partir de la projection de job `test-mv3` validée exacte et complète ci-dessus ; il n'est jamais fourni par l'appelant. L'étape constitue l'unique publication de preuve de ce job et aucun autre job non privilégié ne peut téléverser d'artefact. `output/playwright/` contient uniquement des diagnostics bruts Playwright/runtime délimités. Ni son chemin d'accès, ni son résultat de téléversement, ni son reçu ne peuvent entrer dans le verdict des treize scénarios, le candidat scellé à sept composants, le plan de commandes privilégiées, l'inventaire des candidats, le sceau, le sujet d'attestation, le condensat de transport, l'activation du catalogue ou toute préimage de transition de release. Il n'est jamais nommé `missionpulse-sealed-candidate`, ne transporte jamais d'octets de `dist`, de source, de modèle, de sceau, de transfert (handoff) ou de contrôleur exécutable, et ne définit jamais `archive:false`.
 
-The workflow policy decoder and inspector accept exactly that one SHA-pinned
-projection and reject a missing/second uploader, another job permission, a
-mutable/shortened pin, changed condition/name/path/error/overwrite/retention
-input, an extra input, a candidate-shaped artifact, or any diagnostic receipt
-presented as release authority. Missing diagnostic files fail the `test-mv3` CI
-job because `if-no-files-found=error`; upload success or failure never changes a
-candidate state. The current inspector's blanket rejection of this otherwise
-exact uploader is an implementation blocker, not evidence that the diagnostic
-step should be deleted, widened or relabeled.
+Le décodeur et l'inspecteur de politique de workflow acceptent exactement cette projection unique épinglée par SHA et rejettent un téléverseur manquant ou secondaire, une autre permission de job, une épingle mutable ou raccourcie, une entrée modifiée pour condition/nom/chemin/erreur/écrasement/rétention, une entrée supplémentaire, un artefact de forme candidate ou tout reçu de diagnostic présenté comme autorité de release. Les fichiers de diagnostic manquants font échouer le job de CI `test-mv3` car `if-no-files-found=error` ; le succès ou l'échec du téléversement ne modifie jamais l'état d'un candidat. Le rejet général actuel par l'inspecteur de ce téléverseur par ailleurs exact constitue un bloqueur d'implémentation, et non une preuve que l'étape de diagnostic devrait être supprimée, élargie ou réétiquetée.
 
-## Authority and current release boundary
+## Autorité et frontière actuelle de release
 
-The implementation must follow the current runtime, not a reviewed future
-target. The following sources are normative for this proof:
+L'implémentation doit suivre le runtime actuel, et non une cible future revue. Les sources suivantes font autorité normative pour cette preuve :
 
-| Concern                                                           | Current authority used by these scenarios                                                                                                                                                                         |
-| ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Packaged process, sealed artifact, diagnostics and warm ownership | `src/models/mv3-packaged-harness.model.md`, `tests/e2e-extension/fixtures.ts`, `tests/mv3/harness/mv3-harness-controller.ts`                                                                                      |
-| Six routes, labels and boot behavior                              | `src/models/app-shell.model.md`, `src/lib/state/app-navigation.svelte.ts`, `tests/e2e-extension/navigation.test.ts`                                                                                               |
-| Feed favorite and tracking UI                                     | `src/ui/pages/FeedPage.svelte`, `src/ui/molecules/MissionCard.svelte`, `src/lib/state/feed-page.svelte.ts`, `src/lib/state/tracking.svelte.ts`                                                                    |
-| Profile lifecycle                                                 | `src/models/profile-state.model.md`, `src/ui/pages/ProfilePage.svelte`, `src/ui/organisms/ProfileSection.svelte`                                                                                                  |
-| CV experience lifecycle                                           | `src/models/cv-experience-sync.model.md`, `src/ui/pages/CvPage.svelte`, `src/ui/organisms/ExperienceFeed.svelte`, `src/ui/molecules/ExperienceEditForm.svelte`                                                    |
-| Candidature transition and details                                | Current Task 5 / wire v1 boundary in `src/models/application-tracking.model.md`, current bridge handlers in `src/background/index.ts`, `src/ui/pages/ApplicationsPage.svelte`                                     |
-| TJM local analysis                                                | `src/lib/core/tjm-history/`, `src/lib/shell/storage/tjm-history.ts`, `src/ui/pages/TJMPage.svelte`, `src/ui/organisms/TJMDashboard.svelte`                                                                        |
-| Settings mutation                                                 | Current release envelope in `src/lib/shell/settings-release/settings-release.contract.ts` and coordinator; `src/ui/pages/SettingsPage.svelte`                                                                     |
-| Onboarding completion                                             | Current `src/ui/pages/OnboardingPage.svelte`, `src/ui/organisms/OnboardingFlow.svelte`, `src/lib/state/app-navigation.svelte.ts`; the unconnected target is documented in `src/models/onboarding-source.model.md` |
-| Offline projection                                                | `src/models/app-shell.model.md`, `src/lib/state/connection.svelte.ts`, `src/lib/shell/utils/connection-monitor.ts`, `src/sidepanel/App.svelte`                                                                    |
-| Persisted schemas                                                 | `src/lib/shell/storage/db.ts`, `src/lib/shell/storage/migration-registry.ts`, `src/lib/shell/storage/favorites.ts`, `src/lib/shell/storage/tracking.ts`                                                           |
-| Existing committed scenarios                                      | `tests/mv3/scenarios.v1.json`                                                                                                                                                                                     |
+| Domaine / Préoccupation                                              | Autorité actuelle utilisée par ces scénarios                                                                                                                                                                         |
+| -------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Processus packagé, artefact scellé, diagnostics et propriété à chaud | `src/models/mv3-packaged-harness.model.md`, `tests/e2e-extension/fixtures.ts`, `tests/mv3/harness/mv3-harness-controller.ts`                                                                                         |
+| Six routes, libellés et comportement d'amorçage                      | `src/models/app-shell.model.md`, `src/lib/state/app-navigation.svelte.ts`, `tests/e2e-extension/navigation.test.ts`                                                                                                  |
+| UI de favori et de suivi du feed                                     | `src/ui/pages/FeedPage.svelte`, `src/ui/molecules/MissionCard.svelte`, `src/lib/state/feed-page.svelte.ts`, `src/lib/state/tracking.svelte.ts`                                                                       |
+| Cycle de vie du profil                                               | `src/models/profile-state.model.md`, `src/ui/pages/ProfilePage.svelte`, `src/ui/organisms/ProfileSection.svelte`                                                                                                     |
+| Cycle de vie des expériences de CV                                   | `src/models/cv-experience-sync.model.md`, `src/ui/pages/CvPage.svelte`, `src/ui/organisms/ExperienceFeed.svelte`, `src/ui/molecules/ExperienceEditForm.svelte`                                                       |
+| Transition et détails de candidature                                 | Frontière actuelle Task 5 / wire v1 dans `src/models/application-tracking.model.md`, gestionnaires de pont actuels dans `src/background/index.ts`, `src/ui/pages/ApplicationsPage.svelte`                            |
+| Analyse locale du TJM                                                | `src/lib/core/tjm-history/`, `src/lib/shell/storage/tjm-history.ts`, `src/ui/pages/TJMPage.svelte`, `src/ui/organisms/TJMDashboard.svelte`                                                                           |
+| Mutation des réglages                                                | Enveloppe de release actuelle dans `src/lib/shell/settings-release/settings-release.contract.ts` et coordinateur ; `src/ui/pages/SettingsPage.svelte`                                                                |
+| Achèvement de l'onboarding                                           | `src/ui/pages/OnboardingPage.svelte` actuel, `src/ui/organisms/OnboardingFlow.svelte`, `src/lib/state/app-navigation.svelte.ts` ; la cible non connectée est documentée dans `src/models/onboarding-source.model.md` |
+| Projection hors-ligne                                                | `src/models/app-shell.model.md`, `src/lib/state/connection.svelte.ts`, `src/lib/shell/utils/connection-monitor.ts`, `src/sidepanel/App.svelte`                                                                       |
+| Schémas persistés                                                    | `src/lib/shell/storage/db.ts`, `src/lib/shell/storage/migration-registry.ts`, `src/lib/shell/storage/favorites.ts`, `src/lib/shell/storage/tracking.ts`                                                              |
+| Scénarios validés existants                                          | `tests/mv3/scenarios.v1.json`                                                                                                                                                                                        |
 
-The following distinctions are mandatory:
+Les distinctions suivantes sont obligatoires :
 
-1. Application tracking uses the implemented wire v1. The proposed wire v2
-   envelope, ledger, CAS, mutation revision and restart reconciliation are not
-   required or asserted by these scenarios.
-2. Settings proof uses the implemented
-   `missionpulse_settings_release_v1` envelope and the public
-   `GET_SETTINGS_RELEASE` / `MUTATE_SETTINGS_RELEASE` protocol. It does not claim
-   the larger Settings V2 writer-fence cutover is complete.
-3. TJM history is actually stored at `chrome.storage.local['tjm_history']` even
-   though the storage module's introductory comment says IndexedDB. Tests follow
-   runtime behavior, not that stale comment.
-4. The production premium feature flag is dormant and the six tabs are
-   unlocked. A `premium_enabled` seed is not authority and is not used.
-5. `OnboardingWizard` currently advances after a source choice without
-   persisting that source. The onboarding scenario proves profile, alert and
-   completion persistence only. It must not manufacture a source-persistence
-   claim.
+1. Le suivi des candidatures utilise le wire v1 implémenté. L'enveloppe, le registre (ledger), le CAS, la révision de mutation et la réconciliation au redémarrage proposés pour le wire v2 ne sont ni requis ni affirmés par ces scénarios.
+2. La preuve des réglages utilise l'enveloppe `missionpulse_settings_release_v1` implémentée et le protocole public `GET_SETTINGS_RELEASE` / `MUTATE_SETTINGS_RELEASE`. Elle ne prétend pas que la bascule plus vaste de cloisonnement des écritures (writer-fence) de Réglages V2 est terminée.
+3. L'historique du TJM est en réalité stocké dans `chrome.storage.local['tjm_history']`, bien que le commentaire d'introduction du module de stockage mentionne IndexedDB. Les tests suivent le comportement à l'exécution, et non ce commentaire obsolète.
+4. L'indicateur de fonctionnalité (feature flag) de production premium est dormant et les six onglets sont déverrouillés. Un amorçage (seed) de `premium_enabled` ne fait pas autorité et n'est pas utilisé.
+5. `OnboardingWizard` avance actuellement après un choix de source sans persister cette source. Le scénario d'onboarding prouve uniquement la persistance du profil, de l'alerte et de l'achèvement. Il ne doit pas fabriquer une prétention de persistance de source.
 
-## Blocking parent and UI authorities
+## Autorités parentes et d'UI bloquantes
 
-Revision 11 is not standalone implementation, verification or release
-authority. It consumes the clarification-11 parent-owned staged authority
-contracts:
+La révision 11 ne constitue pas une autorité autonome d'implémentation, de vérification ou de release. Elle consomme les contrats d'autorité échelonnée détenus par le parent de clarification 11 :
 
-- `ReviewedModelAuthorityV1` carries only the exact model identity and review
-  receipt digest;
-- `ReviewedImplementedModelAuthorityV1` extends that exact value with one
-  implementation receipt digest;
-- `ReviewedImplementedVerifiedModelAuthorityV1` extends that exact value only
-  after a verification receipt has been issued from accepted evidence; and
-- the corresponding `OrderedReviewedModelAuthoritySetV1`,
-  `OrderedReviewedImplementedModelAuthoritySetV1` and
-  `OrderedReviewedImplementedVerifiedModelAuthoritySetV1` contain exactly six
-  entries in the parent-defined order.
+- `ReviewedModelAuthorityV1` transporte uniquement l'identité exacte du modèle et le condensat du reçu de revue ;
+- `ReviewedImplementedModelAuthorityV1` étend cette valeur exacte avec un condensat de reçu d'implémentation ;
+- `ReviewedImplementedVerifiedModelAuthorityV1` n'étend cette valeur exacte qu'après l'émission d'un reçu de vérification à partir de preuves acceptées ; et
+- les ensembles correspondants `OrderedReviewedModelAuthoritySetV1`, `OrderedReviewedImplementedModelAuthoritySetV1` et `OrderedReviewedImplementedVerifiedModelAuthoritySetV1` contiennent exactement six entrées dans l'ordre défini par le parent.
 
-The complete verified tuple has exactly these fields:
+L'uplet vérifié complet comporte exactement ces champs :
 
 ```text
 modelPath
@@ -304,16 +264,9 @@ implementationReceiptSha256
 verificationReceiptSha256
 ```
 
-The three receipt bytes are independently loaded from the immutable review,
-implementation and verification receipt stores. Their strict decoders require
-the same path, revision and behavior hash; the implementation receipt also
-binds one clean implementation commit/tree and implementation digest, and the
-verification receipt binds that implementation receipt digest, one closed test
-matrix digest and a passing result. A receipt digest is never a behavior digest,
-one receipt cannot satisfy another role, and no tuple field may be inferred from
-text, a test exit code, an environment variable or a model filename.
+Les trois octets de reçus sont chargés de façon indépendante depuis les magasins de reçus immuables de revue, d'implémentation et de vérification. Leurs décodeurs stricts exigent le même chemin, la même révision et le même hachage de comportement ; le reçu d'implémentation lie également un commit/arbre d'implémentation propre et un condensat d'implémentation, et le reçu de vérification lie ce condensat de reçu d'implémentation, un condensat de matrice de test fermée et un résultat passant. Un condensat de reçu n'est jamais un condensat de comportement, un reçu ne peut pas satisfaire un autre rôle, et aucun champ d'uplet ne peut être déduit d'un texte, d'un code de sortie de test, d'une variable d'environnement ou d'un nom de fichier de modèle.
 
-The exact required identities are:
+Les identités exactes requises sont :
 
 ```text
 MV3 harness:
@@ -339,22 +292,9 @@ CV accessible anchor:
   behaviorSha256 = d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98
 ```
 
-MV3 revision 26's known behavior digest identifies only the pending candidate;
-it is not an approval, implementation or verification receipt. The release and
-packaged-tab behavior values are likewise recomputed from the exact committed
-model blobs rather than copied from a worktree or supplied by a caller. The
-release dependency is admitted only when clarification 11 has independently
-approved exact bytes and its exact implementation and verification receipts
-prove the joint V2 implementation described below. The parent derives both the
-inventory-blob and scenario-array digests from the committed Git blob. A child
-model, worktree, environment variable or runtime report cannot mint or override
-either value.
+Le condensat de comportement connu de la révision 26 de MV3 identifie uniquement le candidat en attente ; il ne constitue pas un reçu d'approbation, d'implémentation ou de vérification. Les valeurs de comportement de la release et des onglets packagés sont de même recalculées à partir des blobs de modèles validés exacts plutôt que copiées depuis une copie de travail ou fournies par un appelant. La dépendance de release n'est admise que lorsque la clarification 11 a approuvé de façon indépendante les octets exacts et que ses reçus exacts d'implémentation et de vérification prouvent l'implémentation conjointe V2 décrite ci-dessous. Le parent dérive à la fois les condensats du blob d'inventaire et du tableau de scénarios à partir du blob Git validé. Un modèle enfant, une copie de travail, une variable d'environnement ou un rapport d'exécution ne peut fabriquer ou écraser aucune de ces deux valeurs.
 
-The CV dependency is admitted only after the exact model path, revision and
-behavior hash named above independently authorize the accessible
-experience-card anchor and expansion control, and matching implementation and
-verification receipts prove that contract on the joint clean tree. The minimum
-contract required by this scenario is:
+La dépendance de CV n'est admise qu'après que le chemin de modèle, la révision et le hachage de comportement exacts nommés ci-dessus ont autorisé de façon indépendante l'ancre accessible de carte d'expérience et le contrôle d'expansion, et que des reçus d'implémentation et de vérification correspondants prouvent ce contrat sur l'arbre propre conjoint. Le contrat minimal requis par ce scénario est :
 
 ```text
 role=article, accessible name="Expérience Lead Packaged UI chez MissionPulse QA"
@@ -364,151 +304,70 @@ toggle aria-controls=<stable bounded details id>
 controlled role=region, accessible name="Détails de l’expérience Lead Packaged UI"
 ```
 
-The separate UI model may strengthen those semantics but may not replace them
-with card index, DOM ancestry, CSS class, pixel position or visible-text
-guessing. A worktree component or focused unit pass without the matching
-implementation/verification receipts is not authority, so checkpoint A3
-remains blocked until joint admission.
+Le modèle d'UI distinct peut renforcer ces sémantiques mais ne peut pas les remplacer par l'index de carte, l'ascendance DOM, la classe CSS, la position en pixels ou une estimation du texte visible. Un composant dans la copie de travail ou un succès de test unitaire ciblé sans les reçus d'implémentation/vérification correspondants ne fait pas autorité, si bien que le checkpoint A3 reste bloqué jusqu'à l'admission conjointe.
 
-`DEPENDENCIES_ADMITTED` is a typed event, not a configuration boolean. Its
-strict payload contains one `JointReleaseModelActivationV1` whose
-`verifiedModelAuthoritySet` is the complete parent-owned ordered six-entry
-verified set. The packaged scenario machine accepts it only when every receipt
-independently validates, the set digest and every ordered projection validate,
-every tuple matches the exact identity above, and the activation atomically
-binds that same set to one source commit/tree, V2 inventory blob/array pair and
-activated catalog revision. Missing, pending, stale, differently hashed,
-cross-role or unverified authority produces `DEPENDENCY_ADMISSION_FAILED` and
-no scenario effect.
+`DEPENDENCIES_ADMITTED` est un événement typé, et non un booléen de configuration. Son payload strict contient un `JointReleaseModelActivationV1` dont le `verifiedModelAuthoritySet` est l'ensemble complet vérifié à six entrées ordonnées détenu par le parent. La machine de scénarios packagés ne l'accepte que lorsque chaque reçu est validé de manière indépendante, que le condensat de l'ensemble et chaque projection ordonnée sont validés, que chaque uplet correspond à l'identité exacte ci-dessus, et que l'activation lie de manière atomique ce même ensemble à un commit/arbre source, à une paire blob/tableau d'inventaire V2 et à une révision de catalogue activée. Une autorité manquante, en attente, obsolète, hachée différemment, de rôle croisé ou non vérifiée produit `DEPENDENCY_ADMISSION_FAILED` et aucun effet de scénario.
 
-Pre-activation joint verification uses a separate private
-`VERIFICATION_DEPENDENCIES_ADMITTED` event carrying the parent-owned
-`JointImplementationVerificationSandboxV1` capability **and** the exact
-`OrderedReviewedImplementedModelAuthoritySetV1`. That set contains review and
-implementation receipt digests only; a verification receipt digest in this
-event is schema-invalid. The sandbox repeats its set digest, phase ID, frozen
-commit/tree and inventory digests, but has `authorityMode:'verification_only'`,
-no activation digest and no catalog write capability. Only the joint
-verification facade can emit it. It permits the exact same scenario effects and
-assertions so the reviewed implementation can be verified without circular
-authority. Its successful terminal is `verified_only` and emits bounded
-`JointModelVerificationEvidenceV1` for the packaged-tab slot. The parent
-evidence-set builder validates that evidence before the independent verifier
-issues a `ModelVerificationReceiptV1`; only then can the complete verified set
-be constructed. Verification-only evidence can never satisfy a release
-`PackagedMv3GateReceiptV1`, candidate, audit, seal or production
-`DEPENDENCIES_ADMITTED` guard. After activation, release scenarios run again
-under `authorityMode:'activated_release'`; verification-only evidence is not
-promoted or re-labeled.
+La vérification conjointe de pré-activation utilise un événement privé distinct `VERIFICATION_DEPENDENCIES_ADMITTED` transportant la capacité `JointImplementationVerificationSandboxV1` détenue par le parent **et** l'exact `OrderedReviewedImplementedModelAuthoritySetV1`. Cet ensemble contient uniquement des condensats de reçus de revue et d'implémentation ; un condensat de reçu de vérification dans cet événement est invalide sur le plan du schéma. Le bac à sable répète son condensat d'ensemble, son identifiant de phase, ses condensats de commit/arbre figé et d'inventaire, mais possède `authorityMode:'verification_only'`, aucun condensat d'activation et aucune capacité d'écriture dans le catalogue. Seule la façade de vérification conjointe peut l'émettre. Elle autorise exactement les mêmes effets de scénario et assertions afin que l'implémentation revue puisse être vérifiée sans autorité circulaire. Son état terminal réussi est `verified_only` et émet un `JointModelVerificationEvidenceV1` délimité pour l'emplacement des onglets packagés. Le constructeur d'ensemble de preuves parent valide ces preuves avant que le vérificateur indépendant n'émette un `ModelVerificationReceiptV1` ; c'est seulement alors que l'ensemble vérifié complet peut être construit. Les preuves de vérification seule ne peuvent jamais satisfaire un `PackagedMv3GateReceiptV1` de release, un candidat, un audit, un sceau ou une garde `DEPENDENCIES_ADMITTED` de production. Après l'activation, les scénarios de release s'exécutent à nouveau sous `authorityMode:'activated_release'` ; les preuves de vérification seule ne sont pas promues ou réétiquetées.
 
-Both modes also require the parent-owned
-`ImmutableGitSourceExecutionAuthorityV1`. Before any scenario child is spawned,
-its Linux mount/capability receipt must prove:
+Les deux modes exigent également l'`ImmutableGitSourceExecutionAuthorityV1` détenu par le parent. Avant qu'un enfant de scénario ne soit engendré, son reçu de montage/capacité Linux doit prouver :
 
-- the complete committed Git tree is the backing source and the execution view
-  is a recursive bind mount with `ro,nodev,nosuid,noexec`;
-- the execution root, source mount and every source ancestor are read-only for
-  the child and every descendant for their complete lifetime;
-- the source view is not overlayfs and contains no bind/overlay mount on a
-  tracked path or beneath any tracked source, model, module, test, fixture,
-  harness, Playwright configuration, script, manifest, lock or config path;
-- writable dependencies, caches, `dist`, browser profiles and reports are
-  separate allowlisted mount roots. A mount inside the execution view is legal
-  only at a fixed path proven absent from the Git tree, created empty by the
-  controller, and still empty immediately before the separate output mount is
-  attached;
-- `CAP_SYS_ADMIN` and the complete capability bounding set are absent,
-  `no_new_privs` is set, mount/remount/pivot/chroot namespace escape syscalls are
-  denied and those restrictions are inherited by the complete process tree;
-- Docker/containerd/buildkit/systemd sockets, FUSE, sudo/setuid/file-capability
-  gain and every helper-mediated mutation broker are absent from scenario
-  children;
-- source-targeted write, chmod, link, symlink, rename, mount or remount attempts
-  fail at the OS boundary before a byte changes; and
-- every command has `cwd` in the read-only source view, names its writable
-  outputs explicitly, and produces matching pre-exec/post-exit mount,
-  capability, descriptor and process-tree receipts.
+- l'arbre Git validé complet constitue la source sous-jacente et la vue d'exécution est un montage lié (bind mount) récursif avec `ro,nodev,nosuid,noexec` ;
+- la racine d'exécution, le montage source et chaque ancêtre source sont en lecture seule pour l'enfant et chaque descendant pendant toute leur durée de vie ;
+- la vue source n'est pas un overlayfs et ne contient aucun montage lié/overlay sur un chemin suivi ou sous un quelconque chemin suivi de source, modèle, module, test, fixture, harnais, configuration Playwright, script, manifeste, verrou ou configuration ;
+- les dépendances, caches, `dist`, profils de navigateur et rapports accessibles en écriture sont des racines de montage distinctes sur liste blanche. Un montage à l'intérieur de la vue d'exécution n'est légal qu'à un chemin fixe prouvé absent de l'arbre Git, créé vide par le contrôleur, et toujours vide immédiatement avant que le montage de sortie distinct ne soit attaché ;
+- `CAP_SYS_ADMIN` et l'ensemble de limitation de capacités complet sont absents, `no_new_privs` est positionné, les appels système d'échappement d'espace de noms (namespace) par mount/remount/pivot/chroot sont refusés et ces restrictions sont héritées par l'arbre de processus complet ;
+- les sockets Docker/containerd/buildkit/systemd, FUSE, les gains par sudo/setuid/capacités de fichier et tout intermédiaire de mutation assisté sont absents des enfants de scénario ;
+- les tentatives d'écriture, chmod, link, symlink, renommage, montage ou remontage ciblant la source échouent à la frontière de l'OS avant qu'un octet ne change ; et
+- chaque commande a son `cwd` dans la vue source en lecture seule, nomme ses sorties accessibles en écriture de façon explicite, et produit des reçus concordants de montage, capacités, descripteurs et arbre de processus pré-exécution et post-sortie.
 
-These are prevention guards, not before/after drift heuristics. Restoring bytes
-after a transient mutation cannot satisfy them because the command never
-receives a write or mount capability over source. `dist` evidence is invalid
-unless its producing build receipt binds the same immutable-source authority and
-closed output mount. Any overlay, tracked-path shadow, writable source ancestor,
-unexpected mount, changed mount ID/flags, new namespace, escaping symlink or
-receipt gap produces `DEPENDENCY_ADMISSION_FAILED` before browser launch.
+Ce sont des gardes de prévention, et non des heuristiques de dérive avant/après. Restaurer des octets après une mutation transitoire ne peut pas les satisfaire, car la commande ne reçoit jamais de capacité d'écriture ou de montage sur la source. Les preuves de `dist` sont invalides à moins que le reçu de build qui les produit ne lie la même autorité de source immuable et le même montage de sortie fermé. Tout overlay, masquage de chemin suivi, ancêtre source accessible en écriture, montage inattendu, changement d'identifiant/drapeaux de montage, nouvel espace de noms, lien symbolique d'échappement ou rupture de reçu produit `DEPENDENCY_ADMISSION_FAILED` avant le lancement du navigateur.
 
-## Packaged-only admission
+## Admission en mode packagé uniquement
 
-Every scenario is admitted only after the exact independently approved,
-implemented and verified MV3 harness revision 26/hash tuple named above has
-proved all of the following:
+Chaque scénario n'est admis qu'après que l'uplet exact révision 26/hachage du harnais MV3 approuvé, implémenté et vérifié de manière indépendante nommé ci-dessus a prouvé tout ce qui suit :
 
-1. the exact `dist` tree was sealed before browser launch;
-2. `manifest.json` is MV3 and its packaged permission contract is valid;
-3. a fresh temporary Chromium user-data directory and the packaged extension
-   are running in one real persistent browser context;
-4. the service worker identity belongs to the packaged extension;
-5. page and worker diagnostics were installed before scenario effects;
-6. no `src/dev`, Chrome stub, DevPanel, bridge logger, DEV global or DEV storage
-   artifact is present;
-7. no Vite server, application backend, mock server or external platform is
-   started.
+1. l'arbre `dist` exact a été scellé avant le lancement du navigateur ;
+2. `manifest.json` est en MV3 et son contrat de permissions packagées est valide ;
+3. un répertoire de données utilisateur Chromium temporaire et vierge et l'extension packagée s'exécutent dans un contexte de navigateur persistant réel unique ;
+4. l'identité du service worker appartient à l'extension packagée ;
+5. les diagnostics de page et de worker ont été installés avant les effets de scénario ;
+6. aucun artefact de `src/dev`, stub Chrome, DevPanel, enregistreur de pont (bridge logger), globale DEV ou stockage DEV n'est présent ;
+7. aucun serveur Vite, backend applicatif, serveur mock ou plateforme externe n'est démarré.
 
-All scenario data is local. Tests never click an external mission URL. A
-permission prompt, login wall, external page, backend request used as a fixture,
-or DEV fallback is a terminal failure rather than a reason to weaken an
-assertion.
+Toutes les données de scénario sont locales. Les tests ne cliquent jamais sur une URL de mission externe. Une invite de permission, un mur d'authentification, une page externe, une requête backend utilisée comme fixture ou un repli DEV constitue un échec terminal plutôt qu'une raison d'affaiblir une assertion.
 
-## Proposed scenario inventory v2
+## Inventaire proposé des scénarios v2
 
-A later jointly authorized parent/child implementation phase creates
-`tests/mv3/scenarios.v2.json` and atomically switches every inventory consumer
-from v1 to v2. The old v1 file must not remain the release authority after that
-cutover.
+Une phase d'implémentation conjointe autorisée ultérieurement entre parent et enfant crée `tests/mv3/scenarios.v2.json` et bascule de manière atomique chaque consommateur d'inventaire de la v1 vers la v2. L'ancien fichier v1 ne doit pas rester l'autorité de release après cette bascule.
 
-The exact JCS/UTF-8 bytes of the proposed v2 inventory, with no BOM or trailing
-LF, are:
+Les octets JCS/UTF-8 exacts de l'inventaire v2 proposé, sans BOM ni LF final, sont :
 
 ```text
 {"scenarioIds":["harness.bootstrap-diagnostics","harness.late-diagnostic","harness.page-console","harness.page-error","harness.worker-rejection","navigation.all-tabs","navigation.cold-onboarding","navigation.shortcuts-focus","packaged-tabs.applications-tjm-settings-persistence","packaged-tabs.feed-profile-cv-persistence","packaged-tabs.offline-recovery","packaged-tabs.onboarding-completion","runtime.service-worker-reload"],"schema":"missionpulse.packaged-mv3-scenario-inventory","version":2}
 ```
 
-Two hashes bind different byte authorities and must never be conflated:
+Deux hachages lient différentes autorités d'octets et ne doivent jamais être confondus :
 
 ```text
 inventoryBlobSha256 = b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef
 scenarioMatrixSha256 = 2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a
 ```
 
-`inventoryBlobSha256` is SHA-256 of the complete one-line JCS inventory object
-above, including `schema`, `version` and `scenarioIds`.
-`scenarioMatrixSha256` is SHA-256 of JCS of only the exact ordered
-`scenarioIds` array, again with no BOM or trailing LF:
+`inventoryBlobSha256` est le SHA-256 de l'objet d'inventaire JCS complet sur une seule ligne ci-dessus, y compris `schema`, `version` et `scenarioIds`.
+`scenarioMatrixSha256` est le SHA-256 du JCS du tableau `scenarioIds` ordonné exact uniquement, là encore sans BOM ni LF final :
 
 ```text
 ["harness.bootstrap-diagnostics","harness.late-diagnostic","harness.page-console","harness.page-error","harness.worker-rejection","navigation.all-tabs","navigation.cold-onboarding","navigation.shortcuts-focus","packaged-tabs.applications-tjm-settings-persistence","packaged-tabs.feed-profile-cv-persistence","packaged-tabs.offline-recovery","packaged-tabs.onboarding-completion","runtime.service-worker-reload"]
 ```
 
-The first digest proves the exact committed blob. The second proves the exact
-scenario matrix expected and executed by the packaged gate. Equality between
-the two is neither expected nor permitted as a shortcut.
+Le premier condensat prouve le blob validé exact. Le second prouve la matrice exacte de scénarios attendue et exécutée par la porte packagée. L'égalité entre les deux n'est ni attendue ni autorisée en tant que raccourci.
 
-In clarification 11, parent field `PACKAGED_MV3_SCENARIO_INVENTORY_V2.blobSha256`
-and candidate `mv3ScenarioInventoryBlobSha256` map only to
-`inventoryBlobSha256`. Parent `scenarioIdsSha256` and candidate
-`expectedMv3ScenarioInventorySha256` map only to `scenarioMatrixSha256`. Those
-aliases do not change the byte domain and cannot be cross-assigned.
+Dans la clarification 11, le champ parent `PACKAGED_MV3_SCENARIO_INVENTORY_V2.blobSha256` et le candidat `mv3ScenarioInventoryBlobSha256` correspondent uniquement à `inventoryBlobSha256`. Le champ parent `scenarioIdsSha256` et le candidat `expectedMv3ScenarioInventorySha256` correspondent uniquement à `scenarioMatrixSha256`. Ces alias ne modifient pas le domaine d'octets et ne peuvent pas être intervertis.
 
-`scenarioIds` is strictly increasing by ASCII byte order, contains no duplicate
-and preserves every v1 scenario. Release validation must prove an exact
-one-to-one mapping between this list and Playwright `scenario-id` annotations.
-An absent, extra, duplicated, skipped or retried-under-another-ID scenario is a
-release failure.
+`scenarioIds` est strictement croissant selon l'ordre des octets ASCII, ne contient aucun doublon et préserve chaque scénario v1. La validation de release doit prouver une correspondance exacte biunivoque entre cette liste et les annotations `scenario-id` de Playwright. Un scénario absent, supplémentaire, dupliqué, ignoré ou retenté sous un autre identifiant constitue un échec de release.
 
-The inventory cutover is jointly owned with release-readiness clarification 11.
-Neither model may require the other's completed implementation as a
-precondition for beginning implementation. Instead, clarification 11 owns one
-closed `JointReleaseModelImplementationV1` phase with these states and events:
+La bascule de l'inventaire est détenue conjointement avec la clarification 11 de préparation à la release. Aucun des deux modèles ne peut exiger l'implémentation achevée de l'autre comme condition préalable pour commencer l'implémentation. À la place, la clarification 11 détient une phase fermée `JointReleaseModelImplementationV1` comportant ces états et événements :
 
 ```text
 states:
@@ -525,77 +384,39 @@ events:
   JOINT_PHASE_FAILED
 ```
 
-`JOINT_IMPLEMENTATION_STARTED` requires one valid
-`OrderedReviewedModelAuthoritySetV1` containing approved review receipts for
-exact release-readiness clarification 11, this packaged-tab revision 11, MV3 harness
-revision 26, the CV accessible-anchor model and the aligned producer/consumer
-satellite models. It allocates one phase ID and bounded implementation plan.
-During `implementing` and `verification_pending`, the V2
-inventory, scenario tests, harness, producer and release consumers may be
-implemented and tested together, but they are candidate bytes only: no release
-actor may consume them, the operative catalog remains on its pre-activation
-authority, and no partial V2 consumer is authoritative.
+`JOINT_IMPLEMENTATION_STARTED` exige un `OrderedReviewedModelAuthoritySetV1` valide contenant des reçus de revue approuvés pour la clarification 11 exacte de préparation à la release, cette révision 11 d'onglets packagés, la révision 26 du harnais MV3, le modèle d'ancrage accessible du CV et les modèles satellites producteurs/consommateurs alignés. Il alloue un identifiant de phase et un plan d'implémentation délimité. Pendant `implementing` et `verification_pending`, l'inventaire V2, les tests de scénarios, le harnais, le producteur et les consommateurs de release peuvent être implémentés et testés ensemble, mais ce ne sont que des octets candidats : aucun acteur de release ne peut les consommer, le catalogue opérationnel reste sur son autorité d'avant l'activation, et aucun consommateur V2 partiel ne fait autorité.
 
-`JOINT_IMPLEMENTATION_COMPLETED` freezes one clean commit/tree and one valid
-`OrderedReviewedImplementedModelAuthoritySetV1` that is the exact ordered
-extension of the review set. The private verification sandbox consumes that
-implemented set and emits one ordered six-entry
-`JointModelVerificationEvidenceSetV1`; it does not consume or manufacture a
-verified set. The verifier validates each closed matrix against the same tree,
-then issues six distinct verification receipts. `JOINT_VERIFICATION_PASSED`
-accepts only the resulting
-`OrderedReviewedImplementedVerifiedModelAuthoritySetV1` whose review and
-implementation projection is byte-identical to the implemented set. Only
-`JOINT_AUTHORITY_ACTIVATED` may then perform one
-durable catalog CAS that records `JointReleaseModelActivationV1` and atomically
-switches every inventory consumer from V1 to V2. A conflict, missing tuple,
-partial cutover or any failure enters `blocked`; it publishes no activation and
-cannot be repaired by editing receipt fields or reusing the phase ID.
+`JOINT_IMPLEMENTATION_COMPLETED` fige un commit/arbre propre et un `OrderedReviewedImplementedModelAuthoritySetV1` valide qui constitue l'extension ordonnée exacte de l'ensemble de revue. Le bac à sable de vérification privé consomme cet ensemble implémenté et émet un `JointModelVerificationEvidenceSetV1` ordonné à six entrées ; il ne consomme ni ne fabrique d'ensemble vérifié. Le vérificateur valide chaque matrice fermée par rapport au même arbre, puis émet six reçus de vérification distincts. `JOINT_VERIFICATION_PASSED` accepte uniquement le `OrderedReviewedImplementedVerifiedModelAuthoritySetV1` résultant dont la projection de revue et d'implémentation est identique au niveau des octets à l'ensemble implémenté. Seul `JOINT_AUTHORITY_ACTIVATED` peut alors effectuer un CAS durable de catalogue qui enregistre `JointReleaseModelActivationV1` et bascule de manière atomique chaque consommateur d'inventaire de la V1 vers la V2. Un conflit, un uplet manquant, une bascule partielle ou tout échec entre dans `blocked` ; cela ne publie aucune activation et ne peut être réparé en éditant les champs de reçus ou en réutilisant l'identifiant de phase.
 
-The joint implementation and its atomic activation must ensure that actor
-construction and sealing:
+L'implémentation conjointe et son activation atomique doivent garantir que la construction de l'acteur et le scellement :
 
-1. read only `apps/extension/tests/mv3/scenarios.v2.json` from the exact clean
-   committed Git tree;
-2. require the exact V2 schema and the raw blob digest
-   `inventoryBlobSha256` above;
-3. derive the ordered array from those bytes and require its JCS digest to equal
-   `scenarioMatrixSha256` above;
-4. copy that array byte-for-byte into candidate, raw-report and packaged-gate
-   authority;
-5. reject the V1 path, dual authority, worktree override, digest swap, missing
-   annotation, reorder, duplicate, skip, retry or diagnostic;
-6. bind the exact clarification-11 ordered six-entry verified authority set,
-   including revision 11 and revision 26, plus the joint activation receipt into
-   candidate, audit and gate
-   authority.
+1. lisent uniquement `apps/extension/tests/mv3/scenarios.v2.json` depuis l'arbre Git validé propre et exact ;
+2. exigent le schéma V2 exact et le condensat brut de blob `inventoryBlobSha256` ci-dessus ;
+3. dérivent le tableau ordonné à partir de ces octets et exigent que son condensat JCS soit égal à `scenarioMatrixSha256` ci-dessus ;
+4. copient ce tableau octet par octet dans l'autorité du candidat, du rapport brut et de la porte packagée ;
+5. rejettent le chemin V1, la double autorité, l'écrasement par copie de travail, l'interversion de condensat, l'annotation manquante, le réordonnancement, le doublon, l'omission, la relance ou le diagnostic ;
+6. lient l'ensemble d'autorité vérifié exact à six entrées ordonnées de la clarification 11, y compris la révision 11 et la révision 26, plus le reçu d'activation conjointe, dans l'autorité du candidat, de l'audit et de la porte.
 
-Approval of either model alone does not authorize a cutover. Reviews authorize
-only entry into the closed joint implementation phase; verified implementation
-authorizes only the atomic activation attempt; only a committed activation
-receipt admits a release candidate.
+L'approbation de l'un ou l'autre modèle seul n'autorise pas une bascule. Les revues n'autorisent que l'entrée dans la phase fermée d'implémentation conjointe ; l'implémentation vérifiée n'autorise que la tentative d'activation atomique ; seul un reçu d'activation validé admet un candidat de release.
 
-## Exact UI surfaces
+## Surfaces d'UI exactes
 
-The route proof reuses the current accessible surfaces instead of CSS position
-or icon order:
+La preuve des routes réutilise les surfaces accessibles actuelles au lieu de la position CSS ou de l'ordre des icônes :
 
-| Tab          | Navigation button accessible name | Required page surface                      | Required heading                             |
-| ------------ | --------------------------------- | ------------------------------------------ | -------------------------------------------- |
-| Missions     | `Missions`                        | `feed-scroll-container` and `mission-feed` | `Feed de missions` (sr-only h1)              |
-| Profil       | `Profil`                          | `page-profile`                             | `Votre profil MissionPulse` or `Bonjour ...` |
-| CV           | `CV`                              | `page-cv`                                  | `CV & expériences`                           |
-| Candidatures | `Suivi`                           | `page-applications`                        | `Candidatures`                               |
-| TJM          | `TJM`                             | `page-tjm`                                 | `Analyse TJM`                                |
-| Réglages     | `Réglages`                        | `page-settings`                            | `Réglages`                                   |
+| Onglet       | Nom accessible du bouton de navigation | Surface de page requise                   | En-tête requis                               |
+| ------------ | -------------------------------------- | ----------------------------------------- | -------------------------------------------- |
+| Missions     | `Missions`                             | `feed-scroll-container` et `mission-feed` | `Feed de missions` (h1 en sr-only)           |
+| Profil       | `Profil`                               | `page-profile`                            | `Votre profil MissionPulse` ou `Bonjour ...` |
+| CV           | `CV`                                   | `page-cv`                                 | `CV & expériences`                           |
+| Candidatures | `Suivi`                                | `page-applications`                       | `Candidatures`                               |
+| TJM          | `TJM`                                  | `page-tjm`                                | `Analyse TJM`                                |
+| Réglages     | `Réglages`                             | `page-settings`                           | `Réglages`                                   |
 
-At every route checkpoint, `.panel-shell` must have non-zero width and height,
-non-empty rendered text, no `bootstrap-error` and no
-`[data-testid^='page-load-error-']`.
+À chaque checkpoint de route, `.panel-shell` doit avoir une largeur et une hauteur non nulles, un texte rendu non vide, pas de `bootstrap-error` et pas de `[data-testid^='page-load-error-']`.
 
-## Fixed bounds
+## Limites fixes
 
-The proof is bounded independently of Playwright defaults:
+La preuve est délimitée indépendamment des valeurs par défaut de Playwright :
 
 ```text
 scenario count                         = 13 total, 4 new
@@ -621,16 +442,13 @@ network recovery timeout               = 10 s
 service-worker restarts in new tests   = 0
 ```
 
-The first overflow or timeout produces one typed failure event. There is no
-unbounded polling, recursive retry, sleep-based success, hidden queue or
-best-effort continuation.
+Le premier dépassement ou timeout produit un événement d'échec typé. Il n'y a pas d'attente active (polling) non bornée, de relance récursive, de succès basé sur du sommeil (sleep), de file d'attente cachée ou de continuation au mieux (best-effort).
 
-## Canonical local fixture data
+## Données de fixture locales canoniques
 
-### Shared non-authoritative UI flags
+### Indicateurs d'UI partagés ne faisant pas autorité
 
-For scenarios that bypass onboarding, the test-only seed adapter may write only
-these exact non-release keys before opening the proof page:
+Pour les scénarios qui contournent l'onboarding, l'adaptateur d'amorçage réservé aux tests ne peut écrire que ces clés exactes ne relevant pas de la release avant d'ouvrir la page de preuve :
 
 ```text
 feed_tour_seen              = true
@@ -640,14 +458,11 @@ profile_banner_dismissed    = true
 favoriteMissions            = {}
 ```
 
-It must not seed `settings`, `onboarding_completed`,
-`missionpulse_settings_release_v1`, `premium_enabled` or
-`premium_feature_enabled`. Consent is established through the real settings
-release message protocol after the page opens.
+Il ne doit pas amorcer `settings`, `onboarding_completed`, `missionpulse_settings_release_v1`, `premium_enabled` ou `premium_feature_enabled`. Le consentement est établi via le véritable protocole de messages de release des réglages après l'ouverture de la page.
 
-### Base profile
+### Profil de base
 
-The exact precondition profile is stored under IndexedDB key `current`:
+Le profil exact de précondition est stocké sous la clé IndexedDB `current` :
 
 ```json
 {
@@ -664,13 +479,11 @@ The exact precondition profile is stored under IndexedDB key `current`:
 }
 ```
 
-The physical IndexedDB record adds only `id: 'current'`. Public profile reads
-must not expose that persistence key.
+L'enregistrement IndexedDB physique ajoute uniquement `id: 'current'`. Les lectures publiques de profil ne doivent pas exposer cette clé de persistance.
 
-### Mission fixture
+### Fixture de mission
 
-The service-worker seed adapter constructs `scrapedAt` as a real `Date` from
-`2026-07-17T08:05:00.000Z`; all other fields are these exact values:
+L'adaptateur d'amorçage du service worker construit `scrapedAt` sous la forme d'une véritable `Date` à partir de `2026-07-17T08:05:00.000Z` ; tous les autres champs correspondent à ces valeurs exactes :
 
 ```json
 {
@@ -695,13 +508,11 @@ The service-worker seed adapter constructs `scrapedAt` as a real `Date` from
 }
 ```
 
-The applications scenario uses the same valid mission shape with ID
-`mv3-application-proof-001` and title `Lead Svelte Candidature`.
+Le scénario des candidatures utilise la même forme de mission valide avec l'identifiant `mv3-application-proof-001` et le titre `Lead Svelte Candidature`.
 
-### Tracking fixtures
+### Fixtures de suivi
 
-The Feed scenario starts with this canonical detected record, where
-`T0 = 1735689600000`:
+Le scénario Feed commence par cet enregistrement canonique détecté, où `T0 = 1735689600000` :
 
 ```json
 {
@@ -715,39 +526,28 @@ The Feed scenario starts with this canonical detected record, where
 }
 ```
 
-The applications scenario starts at `selected` with two contiguous history
-entries: the record above for `mv3-application-proof-001`, followed by
-`{from:'detected', to:'selected', timestamp:T0+1000, note:null}`.
+Le scénario des candidatures commence à `selected` avec deux entrées d'historique contiguës : l'enregistrement ci-dessus pour `mv3-application-proof-001`, suivi de `{from:'detected', to:'selected', timestamp:T0+1000, note:null}`.
 
-### TJM history fixture
+### Fixture d'historique TJM
 
-`chrome.storage.local['tjm_history']` contains exactly four `svelte` records:
+`chrome.storage.local['tjm_history']` contient exactement quatre enregistrements `svelte` :
 
-| Date         | Region          | Seniority   | Min | Max | Average | Sample count |
-| ------------ | --------------- | ----------- | --: | --: | ------: | -----------: |
-| `2026-06-01` | `ile-de-france` | `senior`    | 650 | 750 |     700 |            4 |
-| `2026-07-01` | `ile-de-france` | `senior`    | 700 | 800 |     750 |            4 |
-| `2026-06-01` | `lyon`          | `confirmed` | 550 | 650 |     600 |            3 |
-| `2026-07-01` | `lyon`          | `confirmed` | 580 | 680 |     630 |            3 |
+| Date         | Région          | Séniorité   | Min | Max | Moyenne | Nombre d'échantillons |
+| ------------ | --------------- | ----------- | --: | --: | ------: | --------------------: |
+| `2026-06-01` | `ile-de-france` | `senior`    | 650 | 750 |     700 |                     4 |
+| `2026-07-01` | `ile-de-france` | `senior`    | 700 | 800 |     750 |                     4 |
+| `2026-06-01` | `lyon`          | `confirmed` | 550 | 650 |     600 |                     3 |
+| `2026-07-01` | `lyon`          | `confirmed` | 580 | 680 |     630 |                     3 |
 
-Unfiltered analysis must expose four data points and both `Île-de-France` and
-`Lyon`. Filtering `ile-de-france` must expose two data points, exactly one
-region insight and the `Île-de-France` label.
+L'analyse non filtrée doit exposer quatre points de données ainsi qu'`Île-de-France` et `Lyon`. Le filtrage sur `ile-de-france` doit exposer deux points de données, exactement un aperçu (insight) de région et le libellé `Île-de-France`.
 
-## Test-only service-worker data seam
+## Point de raccordement de données du service worker réservé aux tests
 
-The current harness can seed `chrome.storage.local` but has no typed IndexedDB
-fixture port. Implementation therefore requires a test-only
-`PackagedScenarioDataAdapterV1` under `tests/`; it is never imported by
-`src/`, never bundled into `dist`, and never exposed to application code.
+Le harnais actuel peut amorcer `chrome.storage.local` mais ne dispose d'aucun port typé de fixtures IndexedDB. L'implémentation requiert donc un `PackagedScenarioDataAdapterV1` réservé aux tests sous `tests/` ; il n'est jamais importé par `src/`, jamais intégré dans le bundle `dist`, et jamais exposé au code applicatif.
 
-The adapter is serialized as one immutable source string, hashed at test build
-time and executed only through the current instrumented service-worker
-evaluation capability. Its result is admitted only after a strict decoder
-checks `schemaVersion`, `scenarioId`, `operationId`, counts and digest. Arbitrary
-evaluation text, returned prose or exception text never selects a transition.
+L'adaptateur est sérialisé sous la forme d'une chaîne source immuable unique, hachée au moment du build de test et exécutée uniquement via la capacité actuelle d'évaluation du service worker instrumenté. Son résultat n'est admis qu'après qu'un décodeur strict a vérifié `schemaVersion`, `scenarioId`, `operationId`, les décomptes et le condensat. Un texte d'évaluation arbitraire, de la prose renvoyée ou un texte d'exception ne sélectionne jamais une transition.
 
-The adapter has exactly three operations:
+L'adaptateur comporte exactement trois opérations :
 
 ```text
 WAIT_READY
@@ -755,63 +555,41 @@ SEED_EXACT_SCENARIO
 CAPTURE_EXACT_SCENARIO
 ```
 
-`WAIT_READY` proves all of the following before seeding:
+`WAIT_READY` prouve l'ensemble des points suivants avant l'amorçage :
 
-- `missionpulse.appDataVersion === 2`;
-- IndexedDB database name is `missionpulse` and version is `5`;
-- stores `missions`, `profile`, `connector_status`, `generated_assets`,
-  `mission_tracking` and `quarantine` exist;
-- the fresh profile contains no mission, profile or tracking row;
-- no downgrade, migration error or quarantine fact is present.
+- `missionpulse.appDataVersion === 2` ;
+- le nom de base de données IndexedDB est `missionpulse` et la version est `5` ;
+- les magasins `missions`, `profile`, `connector_status`, `generated_assets`, `mission_tracking` et `quarantine` existent ;
+- le profil vierge ne contient aucune ligne de mission, de profil ou de suivi ;
+- aucun fait de rétrogradation (downgrade), d'erreur de migration ou de mise en quarantaine n'est présent.
 
-`SEED_EXACT_SCENARIO` accepts only a closed discriminated fixture from this
-model. It checks that the target stores are still empty, writes the exact
-mission/profile/tracking rows in one bounded IndexedDB transaction, writes only
-the allowlisted scenario storage keys, closes its database handle, reads every
-written value back and returns a `ScenarioSeedReceiptV1`. It never clears or
-resets production data, never opens a different database version and never
-touches the settings release envelope.
+`SEED_EXACT_SCENARIO` n'accepte qu'une fixture fermée discriminée provenant de ce modèle. Il vérifie que les magasins cibles sont toujours vides, écrit les lignes exactes de mission/profil/suivi en une seule transaction IndexedDB délimitée, écrit uniquement les clés de stockage de scénario sur liste blanche, ferme son descripteur de base de données, relit chaque valeur écrite et renvoie un `ScenarioSeedReceiptV1`. Il n'efface ni ne réinitialise jamais les données de production, n'ouvre jamais une version de base de données différente et ne touche jamais à l'enveloppe de release des réglages.
 
-`CAPTURE_EXACT_SCENARIO` is read-only. It closes its database handle before
-returning a normalized snapshot. Dates become ISO strings; object keys and
-primary-key result arrays are sorted before JCS hashing. It captures only:
+`CAPTURE_EXACT_SCENARIO` est en lecture seule. Il ferme son descripteur de base de données avant de renvoyer un instantané (snapshot) normalisé. Les dates deviennent des chaînes ISO ; les clés d'objets et les tableaux de résultats de clés primaires sont triés avant le hachage JCS. Il capture uniquement :
 
-- the allowlisted storage keys relevant to the current scenario;
-- the current settings release public snapshot and raw V1 envelope projection;
-- at most 16 rows from each of `missions`, `profile` and `mission_tracking`;
-- database name, database version and store names.
+- les clés de stockage sur liste blanche pertinentes pour le scénario courant ;
+- l'instantané public actuel de release des réglages et la projection brute de l'enveloppe V1 ;
+- au plus 16 lignes de chacun des magasins `missions`, `profile` et `mission_tracking` ;
+- le nom de la base de données, la version de la base de données et les noms des magasins.
 
-The adapter source SHA-256, fixture JCS SHA-256, operation ID and result JCS
-SHA-256 are included in every receipt. A source hash mismatch, malformed value,
-unexpected row, extra seed key, read-back mismatch, blocked open, version drift
-or transaction abort fails closed.
+Le SHA-256 de la source de l'adaptateur, le SHA-256 JCS de la fixture, l'identifiant d'opération et le SHA-256 JCS du résultat sont inclus dans chaque reçu. Une non-concordance de hachage source, une valeur malformée, une ligne inattendue, une clé d'amorçage supplémentaire, une non-concordance à la relecture, une ouverture bloquée, une dérive de version ou un abandon de transaction échoue de façon hermétique (fail-closed).
 
-When the machine consumes the exact correlated `PRECONDITIONS_PROVED` event,
-`SEED_EXACT_SCENARIO` is permanently disabled. Only read-only captures remain
-available. Every business mutation after that explicit transition comes from a
-visible UI action.
+Lorsque la machine consomme l'événement corrélé exact `PRECONDITIONS_PROVED`, `SEED_EXACT_SCENARIO` est désactivé de manière permanente. Seules les captures en lecture seule restent disponibles. Toute mutation métier après cette transition explicite provient d'une action d'UI visible.
 
-## Consent setup for non-onboarding scenarios
+## Configuration du consentement pour les scénarios sans onboarding
 
-After local seeding and first panel open, but before the first business
-checkpoint, the page uses the real bridge protocol:
+Après l'amorçage local et la première ouverture du panneau, mais avant le premier checkpoint métier, la page utilise le véritable protocole de pont :
 
-1. send `GET_SETTINGS_RELEASE` and require a confirmed snapshot with
-   `onboardingCompleted:false`;
-2. send one `MUTATE_SETTINGS_RELEASE` intent with `kind:'set_consent'`, a fresh
-   UUID request ID, the exact returned `baseRevision` and
-   `targetConsent:true`;
-3. require a `settled` / `committed` `set_consent` outcome whose snapshot has
-   `onboardingCompleted:true`;
-4. perform a setup reload and require the same confirmed consent from a new app
-   bootstrap.
+1. envoyer `GET_SETTINGS_RELEASE` et exiger un instantané confirmé avec `onboardingCompleted:false` ;
+2. envoyer une intention `MUTATE_SETTINGS_RELEASE` avec `kind:'set_consent'`, un identifiant de requête UUID vierge, la `baseRevision` exacte renvoyée et `targetConsent:true` ;
+3. exiger une issue `set_consent` `settled` / `committed` dont l'instantané comporte `onboardingCompleted:true` ;
+4. effectuer un rechargement de configuration (setup reload) et exiger le même consentement confirmé depuis un nouvel amorçage de l'application.
 
-An already-true consent in a fresh scenario is fixture contamination and fails.
-The setup mutation is not counted as one of the six tab mutations.
+Un consentement déjà vrai dans un scénario vierge constitue une contamination de fixture et échoue. La mutation de configuration n'est pas comptabilisée comme l'une des six mutations d'onglets.
 
-## Persistence snapshot and warm reload
+## Instantané de persistance et rechargement à chaud
 
-Every business checkpoint produces a `PersistenceCheckpointV1`:
+Chaque checkpoint métier produit un `PersistenceCheckpointV1` :
 
 ```text
 {
@@ -826,33 +604,26 @@ Every business checkpoint produces a `PersistenceCheckpointV1`:
 }
 ```
 
-The projection contains only the fields named by that checkpoint. It is
-captured after durable acknowledgement, then again after reload. Exact JCS
-equality is required except for fields explicitly described as relational time
-bounds. No field may be silently dropped to make equality pass.
+La projection contient uniquement les champs nommés par ce checkpoint. Elle est capturée après accusé de réception durable, puis à nouveau après rechargement. Une égalité JCS exacte est exigée sauf pour les champs décrits explicitement comme des bornes temporelles relationnelles. Aucun champ ne peut être silencieusement omis pour faire réussir l'égalité.
 
-A **warm proof reload** is exactly:
+Un **rechargement de preuve à chaud** (warm proof reload) correspond exactement à :
 
 ```text
-same Page + same BrowserContext + same Chromium PID + same user-data directory
+même Page + même BrowserContext + même PID Chromium + même répertoire de données utilisateur
 -> page.reload({ waitUntil: 'domcontentloaded' })
--> app bootstrap ready
--> no seed, no reset and no service-worker restart
--> navigate back to the checkpoint tab
--> UI assertion + read-only persistence capture
+-> amorçage de l'application prêt
+-> aucun amorçage (seed), aucune réinitialisation et aucun redémarrage du service worker
+-> revenir à l'onglet du checkpoint
+-> assertion d'UI + capture de persistance en lecture seule
 ```
 
-Current navigation is ephemeral, so a reload may legitimately return to Feed.
-The test must navigate back to the target tab rather than claiming the selected
-tab itself is persisted.
+La navigation actuelle étant éphémère, un rechargement peut légitimement revenir à Feed. Le test doit revenir à l'onglet cible au lieu de prétendre que l'onglet sélectionné lui-même est persisté.
 
-## Packaged scenario machine
+## Machine de scénario packagé
 
-Each new Playwright scenario invokes one private XState v5
-`packagedTabScenarioMachine`. The model owns decisions; the shell owns browser,
-page, storage, clock, UUID, hashing and assertion I/O.
+Chaque nouveau scénario Playwright invoque une `packagedTabScenarioMachine` XState v5 privée. Le modèle détient les décisions ; le shell détient les I/O de navigateur, page, stockage, horloge, UUID, hachage et assertions.
 
-### Context
+### Contexte
 
 ```text
 scenarioId
@@ -877,8 +648,7 @@ pageIdentity | null
 failure | null
 ```
 
-`dependencyAuthority` is the following closed discriminated union; no common
-shape may erase the phase boundary:
+`dependencyAuthority` est l'union discriminée fermée suivante ; aucune forme commune ne peut effacer la frontière de phase :
 
 ```ts
 type PackagedScenarioDependencyAuthorityV6 =
@@ -900,18 +670,9 @@ type PackagedScenarioDependencyAuthorityV6 =
     };
 ```
 
-The verification variant is accepted only with the complete private event
-payload containing the implemented set and sandbox. The activated variant is
-accepted only with the complete production event payload containing the joint
-activation and its verified set. In both variants,
-`commandReceiptSetSha256` is the digest of the complete nonempty ordered
-parent-owned `ImmutableGitSourceCommandReceiptV1` array. Every receipt binds the
-same `immutableSourceExecutionAuthoritySha256` and exact scenario command plan;
-the event carries the receipts through its sandbox or activation rather than a
-consumer-supplied digest-only substitute. Unknown or extra authority fields
-reject.
+La variante de vérification est acceptée uniquement avec le payload complet de l'événement privé contenant l'ensemble implémenté et le bac à sable. La variante activée est acceptée uniquement avec le payload complet de l'événement de production contenant l'activation conjointe et son ensemble vérifié. Dans les deux variantes, `commandReceiptSetSha256` est le condensat du tableau complet non vide ordonné `ImmutableGitSourceCommandReceiptV1` détenu par le parent. Chaque reçu lie la même `immutableSourceExecutionAuthoritySha256` et le plan de commandes de scénario exact ; l'événement achemine les reçus via son bac à sable ou son activation plutôt qu'un substitut de condensat seul fourni par le consommateur. Tout champ d'autorité inconnu ou supplémentaire provoque le rejet.
 
-`pendingEffect` is exactly:
+`pendingEffect` est exactement :
 
 ```text
 {
@@ -923,39 +684,15 @@ reject.
 }
 ```
 
-`scenarioAttempt` can only be `1`. The Playwright runner may rerun a failed test
-for diagnostics outside a release command, but a release proof with retries
-greater than zero is ineligible.
+`scenarioAttempt` ne peut être que `1`. L'exécuteur Playwright peut relancer un test ayant échoué à des fins de diagnostic en dehors d'une commande de release, mais une preuve de release avec des tentatives supérieures à zéro est inéligible.
 
-Each bounded `checkpointPlan` entry contains closed `mutationActions[]` and
-`postReloadActions[]` discriminated unions. The current non-empty post-reload
-plans are exactly A2 `OPEN_PROFILE_EDITOR_AFTER_RELOAD`, A3
-`EXPAND_SAVED_EXPERIENCE_DETAILS` and B2
-`REAPPLY_TJM_REGION_FILTER_AFTER_RELOAD`; every other current checkpoint has an
-empty post-reload action list.
+Chaque entrée délimitée de `checkpointPlan` contient les unions discriminées fermées `mutationActions[]` et `postReloadActions[]`. Les plans post-rechargement non vides actuels sont exactement A2 `OPEN_PROFILE_EDITOR_AFTER_RELOAD`, A3 `EXPAND_SAVED_EXPERIENCE_DETAILS` et B2 `REAPPLY_TJM_REGION_FILTER_AFTER_RELOAD` ; tous les autres checkpoints actuels ont une liste d'actions post-rechargement vide.
 
-The machine has at most one `pendingEffect`. Before emitting a Shell command, a
-named `allocateEffect` action increments `operationGeneration` exactly once,
-retains the complete pending tuple and places that same tuple in the command.
-Every effect result repeats all five fields plus a strict receipt SHA-256. The
-named `isCurrentEffectResult` guard requires exact equality with the retained
-tuple and the current scenario/checkpoint/action. A current result atomically
-clears the pending tuple before any successor is allocated. An early, stale,
-wrong-kind, wrong-checkpoint, wrong-action, duplicate or post-cancellation
-result cannot assign context or advance state.
+La machine a au plus un `pendingEffect`. Avant d'émettre une commande Shell, une action nommée `allocateEffect` incrémente `operationGeneration` exactement une fois, conserve l'uplet en attente complet et place ce même uplet dans la commande. Chaque résultat d'effet répète l'ensemble des cinq champs plus un SHA-256 de reçu strict. La garde nommée `isCurrentEffectResult` exige une égalité exacte avec l'uplet conservé et les scénario/checkpoint/action actuels. Un résultat courant efface de manière atomique l'uplet en attente avant que tout successeur ne soit alloué. Un résultat précoce, périmé, de mauvais type, de mauvais checkpoint, de mauvaise action, dupliqué ou postérieur à une annulation ne peut pas affecter le contexte ni faire avancer l'état.
 
-Control events carry `scenarioId`, a unique bounded `eventId` and the exact
-current `operationGeneration`. Effect-result events additionally carry the
-complete pending-effect tuple and `receiptSha256`. `CHECKPOINT_STARTED` is the
-only internal control event: the private machine raises it synchronously through
-the named pure `raiseCheckpointStarted` action with exact checkpoint index, ID,
-scenario-plan digest, current generation, `causeEffectId` and
-`causeReceiptSha256` copied from the just-consumed `PRECONDITIONS_PROVED` or
-`CHECKPOINT_PROVED`. The `isCurrentCheckpointStart` guard matches every one of
-those fields against retained context. It is not exposed by the public facade,
-cannot be supplied by the test shell and cannot arise from state entry alone.
+Les événements de contrôle transportent `scenarioId`, un `eventId` délimité unique et l'exact `operationGeneration` actuel. Les événements de résultat d'effet transportent en outre l'uplet complet d'effet en attente et `receiptSha256`. `CHECKPOINT_STARTED` est l'unique événement de contrôle interne : la machine privée le lève de manière synchrone via l'action pure nommée `raiseCheckpointStarted` avec l'index de checkpoint exact, l'identifiant, le condensat du plan de scénario, la génération actuelle, `causeEffectId` et `causeReceiptSha256` copiés depuis le `PRECONDITIONS_PROVED` ou `CHECKPOINT_PROVED` tout juste consommé. La garde `isCurrentCheckpointStart` fait correspondre chacun de ces champs par rapport au contexte conservé. Il n'est pas exposé par la façade publique, ne peut être fourni par le shell de test et ne peut découler de la seule entrée dans l'état.
 
-### Closed events
+### Événements fermés
 
 ```text
 START
@@ -988,106 +725,64 @@ CLEANUP_PROVED
 CLEANUP_FAILED
 ```
 
-`PRE_MUTATION_CAPTURED` is an effect result for the pending
-`CAPTURE_PERSISTENCE/captureKind:'before'` command. It repeats that command's
-exact effect ID, operation generation, effect kind, checkpoint ID, null action
-ID and receipt SHA-256, plus the exact checkpoint index and before-projection
-SHA-256. `UI_REASSERTED` is an effect result for the pending
-`REASSERT_CHECKPOINT_UI` command. It repeats that command's exact effect ID,
-operation generation, effect kind, checkpoint ID, null action ID and receipt
-SHA-256, plus the exact checkpoint index, post-reload UI assertion-set SHA-256
-and page identity. Neither may be inferred from entry into a state, a locator
-resolution, visible prose or a later capture. Unknown or malformed events are
-rejected at the schema boundary; schema-valid but stale or mismatched events are
-retained as diagnostics and ignored.
+`PRE_MUTATION_CAPTURED` est un résultat d'effet pour la commande en attente `CAPTURE_PERSISTENCE/captureKind:'before'`. Il répète l'identifiant d'effet exact de cette commande, la génération d'opération, le type d'effet, l'identifiant de checkpoint, l'identifiant d'action null et le SHA-256 du reçu, ainsi que l'index de checkpoint exact et le SHA-256 de la projection avant. `UI_REASSERTED` est un résultat d'effet pour la commande en attente `REASSERT_CHECKPOINT_UI`. Il répète l'identifiant d'effet exact de cette commande, la génération d'opération, le type d'effet, l'identifiant de checkpoint, l'identifiant d'action null et le SHA-256 du reçu, ainsi que l'index de checkpoint exact, le SHA-256 de l'ensemble d'assertions d'UI post-rechargement et l'identité de page. Aucun des deux ne peut être déduit de l'entrée dans un état, de la résolution d'un sélecteur (locator), d'une prose visible ou d'une capture ultérieure. Les événements inconnus ou malformés sont rejetés à la frontière du schéma ; les événements valides selon le schéma mais périmés ou discordants sont conservés comme diagnostics et ignorés.
 
-`POST_RELOAD_ACTION_READY` is an effect result for the pending
-`PREPARE_POST_RELOAD_UI_ACTION` command. It repeats the complete effect tuple,
-post-reload action ID/index, exact accessible-anchor contract ID/hash,
-`controlledTargetId:string|null` and precondition assertion-set SHA-256. The
-closed action decoder requires a non-null `controlledTargetId` only for A3 and
-requires it to equal the toggle's `aria-controls`; A2 and B2 require null. A
-post-reload `UI_ACTION_PROVED` additionally carries
-`actionPhase:'post_reload'` and must match that retained preparation proof. The
-mutation-phase variant carries `actionPhase:'mutation'`. The two variants cannot
-satisfy one another's guard.
+`POST_RELOAD_ACTION_READY` est un résultat d'effet pour la commande en attente `PREPARE_POST_RELOAD_UI_ACTION`. Il répète l'uplet d'effet complet, l'identifiant/index d'action post-rechargement, l'identifiant/hachage exact du contrat d'ancre accessible, `controlledTargetId:string|null` et le SHA-256 de l'ensemble d'assertions de précondition. Le décodeur d'action fermé n'exige un `controlledTargetId` non nul que pour A3 et exige qu'il soit égal à l'`aria-controls` de la bascule ; A2 et B2 exigent null. Un `UI_ACTION_PROVED` post-rechargement transporte en outre `actionPhase:'post_reload'` et doit correspondre à cette preuve de préparation conservée. La variante de phase de mutation transporte `actionPhase:'mutation'`. Les deux variantes ne peuvent pas satisfaire la garde de l'autre.
 
-### States and transitions
+### États et transitions
 
-| State                                                                               | Event / named guard                                                                                                         | Next                               | Effect / named action                                                                                    |
-| ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| `idle`                                                                              | `START`, exact scenario ID, generation `0`                                                                                  | `dependency_admitting`             | allocate and invoke `ADMIT_REQUIRED_AUTHORITIES`                                                         |
-| `dependency_admitting`                                                              | current `DEPENDENCIES_ADMITTED`, exact activation, ordered verified set and immutable-source authority                      | `waiting_ready`                    | consume; set `authorityMode:'activated_release'`; allocate `WAIT_FOR_STORAGE_READY`                      |
-| `dependency_admitting`                                                              | current private `VERIFICATION_DEPENDENCIES_ADMITTED`, exact sandbox, ordered implemented set and immutable-source authority | `waiting_ready`                    | consume; set `authorityMode:'verification_only'`; allocate `WAIT_FOR_STORAGE_READY`                      |
-| `dependency_admitting`                                                              | current `DEPENDENCY_ADMISSION_FAILED`                                                                                       | `failed`                           | consume result; freeze blocker; emit no scenario effect                                                  |
-| `dependency_admitting`                                                              | current `EFFECT_FAILED` for the exact pending `ADMIT_REQUIRED_AUTHORITIES` tuple                                            | `failed`                           | consume and fence admission effect; freeze transport blocker; allocate no browser cleanup                |
-| `dependency_admitting`                                                              | current `TIMEOUT` or `CANCELLED` for the exact pending `ADMIT_REQUIRED_AUTHORITIES` tuple                                   | `failed`                           | consume and fence admission effect; freeze original cause; allocate no browser cleanup                   |
-| `waiting_ready`                                                                     | current `READY_PROVED`                                                                                                      | `seeding`                          | consume; allocate exact scenario seed or fresh-state assertion                                           |
-| `seeding`                                                                           | current `SEED_PROVED`                                                                                                       | `opening_panel`                    | consume; allocate `OPEN_SIDE_PANEL`                                                                      |
-| `opening_panel`                                                                     | current `PANEL_OPENED` and `requiresConsent`                                                                                | `consenting`                       | consume; allocate `SET_ONBOARDING_CONSENT`                                                               |
-| `opening_panel`                                                                     | current `PANEL_OPENED` and `isOnboardingScenario`                                                                           | `preconditions`                    | consume; allocate `ASSERT_PAGE_SURFACE`                                                                  |
-| `consenting`                                                                        | current committed `CONSENT_PROVED`                                                                                          | `setup_reloading`                  | consume; allocate setup `WARM_RELOAD`                                                                    |
-| `setup_reloading`                                                                   | current `WARM_RELOAD_PROVED` with `reloadKind:'setup'`                                                                      | `preconditions`                    | consume; allocate `ASSERT_PAGE_SURFACE`                                                                  |
-| `preconditions`                                                                     | current `PRECONDITIONS_PROVED` and non-offline plan                                                                         | `checkpoint_selecting`             | consume; named pure `raiseCheckpointStarted`                                                             |
-| `preconditions`                                                                     | current `PRECONDITIONS_PROVED` and offline plan                                                                             | `offline_running`                  | consume; invoke private offline child with exact plan digest                                             |
-| `checkpoint_selecting`                                                              | exact internal `CHECKPOINT_STARTED`                                                                                         | `checkpoint_navigating`            | allocate `NAVIGATE_TO_TAB` for exact checkpoint                                                          |
-| `checkpoint_navigating`                                                             | current `CHECKPOINT_ROUTE_PROVED`                                                                                           | `checkpoint_capturing_before`      | consume; allocate `CAPTURE_PERSISTENCE` with `captureKind:'before'`                                      |
-| `checkpoint_capturing_before`                                                       | current `PRE_MUTATION_CAPTURED`                                                                                             | `checkpoint_mutating`              | consume; retain before snapshot; allocate first indexed UI action                                        |
-| `checkpoint_mutating`                                                               | current `UI_ACTION_PROVED` with `actionPhase:'mutation'` and `hasMoreActions`                                               | `checkpoint_mutating`              | consume; increment action index; allocate next exact UI action                                           |
-| `checkpoint_mutating`                                                               | current `UI_ACTION_PROVED` with `actionPhase:'mutation'` and `isFinalAction`                                                | `checkpoint_capturing_after`       | consume; allocate polling `CAPTURE_PERSISTENCE` with `captureKind:'after'`                               |
-| `checkpoint_capturing_after`                                                        | current `POST_MUTATION_CAPTURED` and `mutationInvariantsHold`                                                               | `checkpoint_reloading`             | consume; retain after snapshot; allocate proof `WARM_RELOAD`                                             |
-| `checkpoint_reloading`                                                              | current `WARM_RELOAD_PROVED` with exact checkpoint ID and `hasNoPostReloadActions`                                          | `checkpoint_reasserting`           | consume; allocate `REASSERT_CHECKPOINT_UI`                                                               |
-| `checkpoint_reloading`                                                              | current `WARM_RELOAD_PROVED` with exact checkpoint ID and `hasPostReloadActions`                                            | `checkpoint_post_reload_preparing` | consume; reset post-reload action index; allocate `PREPARE_POST_RELOAD_UI_ACTION`                        |
-| `checkpoint_post_reload_preparing`                                                  | current `POST_RELOAD_ACTION_READY` for exact indexed action                                                                 | `checkpoint_post_reload_acting`    | consume; retain accessible precondition proof; allocate exact closed UI action                           |
-| `checkpoint_post_reload_acting`                                                     | current `UI_ACTION_PROVED` with `actionPhase:'post_reload'` and `hasMorePostReloadActions`                                  | `checkpoint_post_reload_preparing` | consume; increment post-reload action index; allocate next preparation                                   |
-| `checkpoint_post_reload_acting`                                                     | current `UI_ACTION_PROVED` with `actionPhase:'post_reload'` and `isFinalPostReloadAction`                                   | `checkpoint_reasserting`           | consume; allocate `REASSERT_CHECKPOINT_UI`                                                               |
-| `checkpoint_reasserting`                                                            | current `UI_REASSERTED`                                                                                                     | `checkpoint_recapturing`           | consume; retain UI proof; allocate `CAPTURE_PERSISTENCE` with `captureKind:'after_reload'`               |
-| `checkpoint_recapturing`                                                            | current `POST_RELOAD_CAPTURED` and exact projection equality                                                                | `checkpoint_freezing`              | consume; retain reload snapshot; allocate `FREEZE_CHECKPOINT_EVIDENCE`                                   |
-| `checkpoint_freezing`                                                               | current `CHECKPOINT_PROVED` and `hasMoreCheckpoints`                                                                        | `checkpoint_selecting`             | consume; increment checkpoint index; reset action index; named pure `raiseCheckpointStarted`             |
-| `checkpoint_freezing`                                                               | current `CHECKPOINT_PROVED` and `isFinalCheckpoint`                                                                         | `diagnostics_checking`             | consume; allocate `ASSERT_RUNTIME_DIAGNOSTICS`                                                           |
-| `offline_running`                                                                   | exact current parent `CANCELLED`                                                                                            | `offline_running`                  | forward correlated `OFFLINE_CANCELLED`; child fences its effect and owns cleanup                         |
-| `offline_running`                                                                   | exact current parent `TIMEOUT` for the child deadline                                                                       | `offline_running`                  | forward correlated `OFFLINE_TIMEOUT`; child fences its effect and owns cleanup                           |
-| `offline_running`                                                                   | current child `OFFLINE_FLOW_PROVED` with online terminal proof                                                              | `diagnostics_checking`             | retain child receipt; allocate `ASSERT_RUNTIME_DIAGNOSTICS`                                              |
-| `offline_running`                                                                   | current child `OFFLINE_FLOW_FAILED`                                                                                         | `failed_cleaning`                  | retain child failure/cleanup receipt; allocate idempotent online cleanup                                 |
-| `diagnostics_checking`                                                              | current `DIAGNOSTICS_PROVED`                                                                                                | `finishing`                        | consume; allocate `FREEZE_SCENARIO_EVIDENCE`                                                             |
-| `finishing`                                                                         | current `SCENARIO_FINISHED` and `authorityMode === 'activated_release'`                                                     | `passed`                           | consume; freeze final release proof                                                                      |
-| `finishing`                                                                         | current `SCENARIO_FINISHED` and `authorityMode === 'verification_only'`                                                     | `verified_only`                    | consume; freeze non-release model-verification evidence                                                  |
-| any live state except dependency admission, `offline_running` and `failed_cleaning` | current `EFFECT_FAILED`                                                                                                     | `failed_cleaning`                  | consume/fence current effect; retain failure; allocate online cleanup exactly once                       |
-| any live state except dependency admission, `offline_running` and `failed_cleaning` | current `TIMEOUT` or `CANCELLED`                                                                                            | `failed_cleaning`                  | retain event; fence the old effect with the sole new generation allocated to online cleanup exactly once |
-| `failed_cleaning`                                                                   | current `CLEANUP_PROVED`                                                                                                    | `failed`                           | consume; freeze original failure plus cleanup proof                                                      |
-| `failed_cleaning`                                                                   | current `CLEANUP_FAILED`                                                                                                    | `failed`                           | consume; freeze aggregate failure; never pass                                                            |
+| État                                                                                   | Événement / garde nommée                                                                                                         | Suivant                            | Effet / action nommée                                                                                                                 |
+| -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `idle`                                                                                 | `START`, identifiant de scénario exact, génération `0`                                                                           | `dependency_admitting`             | allouer et invoquer `ADMIT_REQUIRED_AUTHORITIES`                                                                                      |
+| `dependency_admitting`                                                                 | `DEPENDENCIES_ADMITTED` actuel, activation exacte, ensemble vérifié ordonné et autorité de source immuable                       | `waiting_ready`                    | consommer ; définir `authorityMode:'activated_release'` ; allouer `WAIT_FOR_STORAGE_READY`                                            |
+| `dependency_admitting`                                                                 | `VERIFICATION_DEPENDENCIES_ADMITTED` privé actuel, bac à sable exact, ensemble implémenté ordonné et autorité de source immuable | `waiting_ready`                    | consommer ; définir `authorityMode:'verification_only'` ; allouer `WAIT_FOR_STORAGE_READY`                                            |
+| `dependency_admitting`                                                                 | `DEPENDENCY_ADMISSION_FAILED` actuel                                                                                             | `failed`                           | consommer le résultat ; figer le bloqueur ; n'émettre aucun effet de scénario                                                         |
+| `dependency_admitting`                                                                 | `EFFECT_FAILED` actuel pour l'uplet exact en attente `ADMIT_REQUIRED_AUTHORITIES`                                                | `failed`                           | consommer et cloisonner l'effet d'admission ; figer le bloqueur de transport ; n'allouer aucun nettoyage de navigateur                |
+| `dependency_admitting`                                                                 | `TIMEOUT` ou `CANCELLED` actuel pour l'uplet exact en attente `ADMIT_REQUIRED_AUTHORITIES`                                       | `failed`                           | consommer et cloisonner l'effet d'admission ; figer la cause d'origine ; n'allouer aucun nettoyage de navigateur                      |
+| `waiting_ready`                                                                        | `READY_PROVED` actuel                                                                                                            | `seeding`                          | consommer ; allouer l'amorçage de scénario exact ou l'assertion d'état vierge                                                         |
+| `seeding`                                                                              | `SEED_PROVED` actuel                                                                                                             | `opening_panel`                    | consommer ; allouer `OPEN_SIDE_PANEL`                                                                                                 |
+| `opening_panel`                                                                        | `PANEL_OPENED` actuel et `requiresConsent`                                                                                       | `consenting`                       | consommer ; allouer `SET_ONBOARDING_CONSENT`                                                                                          |
+| `opening_panel`                                                                        | `PANEL_OPENED` actuel et `isOnboardingScenario`                                                                                  | `preconditions`                    | consommer ; allouer `ASSERT_PAGE_SURFACE`                                                                                             |
+| `consenting`                                                                           | `CONSENT_PROVED` validé actuel                                                                                                   | `setup_reloading`                  | consommer ; allouer le `WARM_RELOAD` de configuration                                                                                 |
+| `setup_reloading`                                                                      | `WARM_RELOAD_PROVED` actuel avec `reloadKind:'setup'`                                                                            | `preconditions`                    | consommer ; allouer `ASSERT_PAGE_SURFACE`                                                                                             |
+| `preconditions`                                                                        | `PRECONDITIONS_PROVED` actuel et plan non hors-ligne                                                                             | `checkpoint_selecting`             | consommer ; action pure nommée `raiseCheckpointStarted`                                                                               |
+| `preconditions`                                                                        | `PRECONDITIONS_PROVED` actuel et plan hors-ligne                                                                                 | `offline_running`                  | consommer ; invoquer l'enfant privé hors-ligne avec le condensat de plan exact                                                        |
+| `checkpoint_selecting`                                                                 | `CHECKPOINT_STARTED` interne exact                                                                                               | `checkpoint_navigating`            | allouer `NAVIGATE_TO_TAB` pour le checkpoint exact                                                                                    |
+| `checkpoint_navigating`                                                                | `CHECKPOINT_ROUTE_PROVED` actuel                                                                                                 | `checkpoint_capturing_before`      | consommer ; allouer `CAPTURE_PERSISTENCE` avec `captureKind:'before'`                                                                 |
+| `checkpoint_capturing_before`                                                          | `PRE_MUTATION_CAPTURED` actuel                                                                                                   | `checkpoint_mutating`              | consommer ; conserver l'instantané avant ; allouer la première action d'UI indexée                                                    |
+| `checkpoint_mutating`                                                                  | `UI_ACTION_PROVED` actuel avec `actionPhase:'mutation'` et `hasMoreActions`                                                      | `checkpoint_mutating`              | consommer ; incrémenter l'index d'action ; allouer l'action d'UI exacte suivante                                                      |
+| `checkpoint_mutating`                                                                  | `UI_ACTION_PROVED` actuel avec `actionPhase:'mutation'` et `isFinalAction`                                                       | `checkpoint_capturing_after`       | consommer ; allouer le polling de `CAPTURE_PERSISTENCE` avec `captureKind:'after'`                                                    |
+| `checkpoint_capturing_after`                                                           | `POST_MUTATION_CAPTURED` actuel et `mutationInvariantsHold`                                                                      | `checkpoint_reloading`             | consommer ; conserver l'instantané après ; allouer le `WARM_RELOAD` de preuve                                                         |
+| `checkpoint_reloading`                                                                 | `WARM_RELOAD_PROVED` actuel avec l'identifiant exact de checkpoint et `hasNoPostReloadActions`                                   | `checkpoint_reasserting`           | consommer ; allouer `REASSERT_CHECKPOINT_UI`                                                                                          |
+| `checkpoint_reloading`                                                                 | `WARM_RELOAD_PROVED` actuel avec l'identifiant exact de checkpoint et `hasPostReloadActions`                                     | `checkpoint_post_reload_preparing` | consommer ; réinitialiser l'index d'action post-rechargement ; allouer `PREPARE_POST_RELOAD_UI_ACTION`                                |
+| `checkpoint_post_reload_preparing`                                                     | `POST_RELOAD_ACTION_READY` actuel pour l'action indexée exacte                                                                   | `checkpoint_post_reload_acting`    | consommer ; conserver la preuve de précondition accessible ; allouer l'action d'UI fermée exacte                                      |
+| `checkpoint_post_reload_acting`                                                        | `UI_ACTION_PROVED` actuel avec `actionPhase:'post_reload'` et `hasMorePostReloadActions`                                         | `checkpoint_post_reload_preparing` | consommer ; incrémenter l'index d'action post-rechargement ; allouer la préparation suivante                                          |
+| `checkpoint_post_reload_acting`                                                        | `UI_ACTION_PROVED` actuel avec `actionPhase:'post_reload'` et `isFinalPostReloadAction`                                          | `checkpoint_reasserting`           | consommer ; allouer `REASSERT_CHECKPOINT_UI`                                                                                          |
+| `checkpoint_reasserting`                                                               | `UI_REASSERTED` actuel                                                                                                           | `checkpoint_recapturing`           | consommer ; conserver la preuve d'UI ; allouer `CAPTURE_PERSISTENCE` avec `captureKind:'after_reload'`                                |
+| `checkpoint_recapturing`                                                               | `POST_RELOAD_CAPTURED` actuel et égalité exacte de projection                                                                    | `checkpoint_freezing`              | consommer ; conserver l'instantané de rechargement ; allouer `FREEZE_CHECKPOINT_EVIDENCE`                                             |
+| `checkpoint_freezing`                                                                  | `CHECKPOINT_PROVED` actuel et `hasMoreCheckpoints`                                                                               | `checkpoint_selecting`             | consommer ; incrémenter l'index de checkpoint ; réinitialiser l'index d'action ; action pure nommée `raiseCheckpointStarted`          |
+| `checkpoint_freezing`                                                                  | `CHECKPOINT_PROVED` actuel et `isFinalCheckpoint`                                                                                | `diagnostics_checking`             | consommer ; allouer `ASSERT_RUNTIME_DIAGNOSTICS`                                                                                      |
+| `offline_running`                                                                      | `CANCELLED` parent actuel exact                                                                                                  | `offline_running`                  | transmettre le `OFFLINE_CANCELLED` corrélé ; l'enfant cloisonne son effet et gère son nettoyage                                       |
+| `offline_running`                                                                      | `TIMEOUT` parent actuel exact pour l'échéance de l'enfant                                                                        | `offline_running`                  | transmettre le `OFFLINE_TIMEOUT` corrélé ; l'enfant cloisonne son effet et gère son nettoyage                                         |
+| `offline_running`                                                                      | `OFFLINE_FLOW_PROVED` enfant actuel avec preuve terminale en ligne                                                               | `diagnostics_checking`             | conserver le reçu enfant ; allouer `ASSERT_RUNTIME_DIAGNOSTICS`                                                                       |
+| `offline_running`                                                                      | `OFFLINE_FLOW_FAILED` enfant actuel                                                                                              | `failed_cleaning`                  | conserver le reçu d'échec/nettoyage enfant ; allouer un nettoyage idempotent en ligne                                                 |
+| `diagnostics_checking`                                                                 | `DIAGNOSTICS_PROVED` actuel                                                                                                      | `finishing`                        | consommer ; allouer `FREEZE_SCENARIO_EVIDENCE`                                                                                        |
+| `finishing`                                                                            | `SCENARIO_FINISHED` actuel et `authorityMode === 'activated_release'`                                                            | `passed`                           | consommer ; figer la preuve finale de release                                                                                         |
+| `finishing`                                                                            | `SCENARIO_FINISHED` actuel et `authorityMode === 'verification_only'`                                                            | `verified_only`                    | consommer ; figer les preuves de vérification de modèle hors-release                                                                  |
+| tout état actif sauf admission des dépendances, `offline_running` et `failed_cleaning` | `EFFECT_FAILED` actuel                                                                                                           | `failed_cleaning`                  | consommer/cloisonner l'effet actuel ; conserver l'échec ; allouer un nettoyage en ligne exactement une fois                           |
+| tout état actif sauf admission des dépendances, `offline_running` et `failed_cleaning` | `TIMEOUT` ou `CANCELLED` actuel                                                                                                  | `failed_cleaning`                  | conserver l'événement ; cloisonner l'ancien effet avec l'unique nouvelle génération allouée au nettoyage en ligne exactement une fois |
+| `failed_cleaning`                                                                      | `CLEANUP_PROVED` actuel                                                                                                          | `failed`                           | consommer ; figer l'échec d'origine plus la preuve de nettoyage                                                                       |
+| `failed_cleaning`                                                                      | `CLEANUP_FAILED` actuel                                                                                                          | `failed`                           | consommer ; figer l'échec agrégé ; ne jamais passer en succès                                                                         |
 
-`passed`, `verified_only` and `failed` are final. `verified_only` has no release
-authority and cannot transition to `passed`. A failed scenario cannot be healed by a later
-capture, reload, retry or cleanup success. Every table row names the sole event
-that can advance it; state entry, Promise completion, locator text and effect
-arrival order have no transition authority.
+`passed`, `verified_only` et `failed` sont finals. `verified_only` ne détient aucune autorité de release et ne peut pas transiter vers `passed`. Un scénario en échec ne peut pas être guéri par une capture ultérieure, un rechargement, une relance ou un succès de nettoyage. Chaque ligne de table nomme le seul événement qui peut la faire avancer ; l'entrée dans l'état, l'achèvement d'une Promise, le texte d'un locator et l'ordre d'arrivée des effets n'ont aucune autorité de transition.
 
-The three admission transport rows are closed and exhaustive. Their guard
-requires the exact retained scenario ID, effect ID, operation generation,
-effect kind `ADMIT_REQUIRED_AUTHORITIES`, null checkpoint/action IDs and the
-current admission deadline where applicable. Early, stale, duplicate,
-wrong-kind or wrong-generation `EFFECT_FAILED`, `TIMEOUT` or `CANCELLED` is a
-diagnostic exact no-op. A current admission failure clears/fences the retained
-tuple, freezes the typed cause and enters final `failed`; because no browser or
-scenario adapter has been allocated, it never allocates `ONLINE_CLEANUP`.
+Les trois lignes de transport d'admission sont fermées et exhaustives. Leur garde exige l'identifiant de scénario conservé exact, l'identifiant d'effet, la génération d'opération, le type d'effet `ADMIT_REQUIRED_AUTHORITIES`, des identifiants de checkpoint/action nuls et l'échéance d'admission actuelle le cas échéant. Un `EFFECT_FAILED`, `TIMEOUT` ou `CANCELLED` précoce, périmé, dupliqué, de mauvais type ou de mauvaise génération est une absence d'opération (no-op) exacte de diagnostic. Un échec d'admission courant efface/cloisonne l'uplet conservé, fige la cause typée et entre dans `failed` final ; comme aucun navigateur ni adaptateur de scénario n'a été alloué, il n'alloue jamais `ONLINE_CLEANUP`.
 
-`failed_cleaning` is explicitly outside every generic or `any live state`
-transition. Its predecessor allocates one cleanup effect and one cleanup
-generation before entry; the state itself never allocates, retries or replaces
-that effect. Its only outgoing transitions are the two rows above:
-`CLEANUP_PROVED -> failed` and `CLEANUP_FAILED -> failed`. A cleanup transport
-rejection, cleanup deadline expiry or cleanup assertion failure is decoded
-directly as the one correlated `CLEANUP_FAILED`; it is never re-emitted as
-`EFFECT_FAILED` or a second `TIMEOUT`. `TIMEOUT`, `CANCELLED`, `EFFECT_FAILED`,
-duplicate/stale cleanup results and every other event have no transition in
-`failed_cleaning`, allocate no generation or effect and cannot extend the
-cleanup deadline. Thus cleanup has no retry, reallocation, recursive cleanup or
-second timeout path.
+`failed_cleaning` est explicitement en dehors de toute transition générique ou `tout état actif`. Son prédécesseur alloue un effet de nettoyage et une génération de nettoyage avant l'entrée ; l'état lui-même n'alloue, ne relance ni ne remplace jamais cet effet. Ses seules transitions sortantes sont les deux lignes ci-dessus : `CLEANUP_PROVED -> failed` et `CLEANUP_FAILED -> failed`. Un rejet de transport de nettoyage, l'expiration de l'échéance de nettoyage ou un échec d'assertion de nettoyage est décodé directement comme l'unique `CLEANUP_FAILED` corrélé ; il n'est jamais réémis sous forme de `EFFECT_FAILED` ou de second `TIMEOUT`. `TIMEOUT`, `CANCELLED`, `EFFECT_FAILED`, les résultats de nettoyage dupliqués/périmés et tout autre événement n'ont aucune transition dans `failed_cleaning`, n'allouent aucune génération ni aucun effet et ne peuvent pas prolonger l'échéance de nettoyage. Ainsi, le nettoyage ne comporte aucune relance, aucune réallocation, aucun nettoyage récursif ni aucun chemin de second timeout.
 
-### Effect allowlist
+### Liste blanche des effets
 
-The machine may emit only these commands:
+La machine ne peut émettre que ces commandes :
 
 ```text
 ADMIT_REQUIRED_AUTHORITIES
@@ -1113,26 +808,15 @@ ASSERT_RUNTIME_DIAGNOSTICS
 RESTORE_NETWORK_FOR_CLEANUP
 ```
 
-No command accepts a free-form JavaScript expression, selector or expected
-status. Scenario plans are closed discriminated unions compiled from this
-document. An LLM may not generate a selector, fixture, expected value, event or
-transition at runtime.
+Aucune commande n'accepte d'expression JavaScript libre, de sélecteur ou de statut attendu. Les plans de scénario sont des unions discriminées fermées compilées à partir de ce document. Un LLM ne peut pas générer de sélecteur, de fixture, de valeur attendue, d'événement ou de transition à l'exécution.
 
-## Offline proof child machine
+## Machine enfant de preuve hors-ligne
 
-`packaged-tabs.offline-recovery` does not reuse the generic checkpoint loop for
-network authority. `offline_running` invokes one private
-`packagedOfflineProofMachine` whose state is the sole authority for network
-mode, reload order, navigation and recovery.
+`packaged-tabs.offline-recovery` ne réutilise pas la boucle de checkpoint générique pour l'autorité réseau. `offline_running` invoque une `packagedOfflineProofMachine` privée dont l'état constitue la seule autorité pour le mode réseau, l'ordre de rechargement, la navigation et la récupération.
 
-Its context retains `scenarioId`, `scenarioPlanSha256`, `childGeneration`,
-`pendingOfflineEffect`, page identity, pre-offline persistence digest, offline
-favorite digest, offline TJM digest, post-reload digest, recovery digest,
-`networkMode` and the first failure/cancellation. The child uses the same
-single-pending-effect rule: each result repeats exact child generation, effect
-ID, kind, page identity, scenario ID and receipt SHA-256.
+Son contexte conserve `scenarioId`, `scenarioPlanSha256`, `childGeneration`, `pendingOfflineEffect`, l'identité de la page, le condensat de persistance pré-hors-ligne, le condensat de favori hors-ligne, le condensat TJM hors-ligne, le condensat post-rechargement, le condensat de récupération, `networkMode` et le premier échec/annulation. L'enfant applique la même règle d'effet en attente unique : chaque résultat répète la génération enfant exacte, l'identifiant d'effet, le type, l'identité de page, l'identifiant de scénario et le SHA-256 du reçu.
 
-The closed child events are:
+Les événements fermés de l'enfant sont :
 
 ```text
 OFFLINE_REQUESTED
@@ -1154,796 +838,340 @@ ONLINE_CLEANUP_PROVED
 ONLINE_CLEANUP_FAILED
 ```
 
-`OFFLINE_REQUESTED` and `OFFLINE_CANCELLED` are correlated control events with
-exact event ID and current child generation. Every `*_PROVED`,
-`OFFLINE_EFFECT_FAILED` and cleanup result is a current effect-result event with
-the complete pending-offline-effect tuple. `OFFLINE_TIMEOUT` carries the exact
-current deadline ID and generation. No free-form network text or
-`navigator.onLine` value alone is an event.
+`OFFLINE_REQUESTED` et `OFFLINE_CANCELLED` sont des événements de contrôle corrélés comportant l'identifiant d'événement exact et la génération enfant actuelle. Chaque `*_PROVED`, `OFFLINE_EFFECT_FAILED` et résultat de nettoyage est un événement de résultat d'effet courant avec l'uplet complet d'effet hors-ligne en attente. `OFFLINE_TIMEOUT` transporte l'identifiant d'échéance exact et la génération actuels. Aucun texte réseau libre ou valeur de `navigator.onLine` seule ne constitue un événement.
 
-On invocation, the parent passes the already proved online Feed surface, page
-identity and pre-offline persistence digest. The named pure
-`raiseOfflineRequested` action synchronously raises the sole internal
-`OFFLINE_REQUESTED` event with those retained hashes. Merely entering
-`online_baseline` cannot advance the child. A child-owned shell effect failure
-is decoded directly as `OFFLINE_EFFECT_FAILED`; it is never surfaced as a
-generic parent `EFFECT_FAILED`.
+Lors de l'invocation, le parent transmet la surface de Feed en ligne déjà prouvée, l'identité de la page et le condensat de persistance pré-hors-ligne. L'action pure nommée `raiseOfflineRequested` lève de manière synchrone le seul événement interne `OFFLINE_REQUESTED` avec ces hachages conservés. Le simple fait d'entrer dans `online_baseline` ne peut pas faire avancer l'enfant. Un échec d'effet de shell détenu par l'enfant est décodé directement sous la forme de `OFFLINE_EFFECT_FAILED` ; il n'est jamais remonté sous la forme d'un `EFFECT_FAILED` parent générique.
 
-| Child state                                                    | Event / named guard                                                                  | Next                       | Effect                                                                                                                            |
-| -------------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
-| `online_baseline`                                              | exact internal `OFFLINE_REQUESTED` and baseline UI/storage proof retained            | `entering_offline`         | allocate `SET_BROWSER_CONTEXT_OFFLINE`                                                                                            |
-| `entering_offline`                                             | current `OFFLINE_PROVED`, browser offline and exact Feed UI offline                  | `offline_feed`             | consume; set `networkMode:'offline'`; allocate closed cached-Feed assertions                                                      |
-| `offline_feed`                                                 | current `OFFLINE_FEED_PROVED`                                                        | `offline_favoriting`       | consume; allocate exact favorite UI action and durable polling                                                                    |
-| `offline_favoriting`                                           | current `OFFLINE_FAVORITE_PROVED`                                                    | `offline_tjm_navigating`   | consume; allocate exact `TJM` navigation                                                                                          |
-| `offline_tjm_navigating`                                       | current `OFFLINE_TJM_NAVIGATION_PROVED`                                              | `offline_tjm`              | consume; allocate offline TJM cache/filter/capture assertions                                                                     |
-| `offline_tjm`                                                  | current `OFFLINE_TJM_PROVED`                                                         | `offline_reloading`        | consume; retain TJM digest; allocate warm reload while offline                                                                    |
-| `offline_reloading`                                            | current `OFFLINE_RELOAD_PROVED`, same process/context/page and browser still offline | `offline_feed_reasserting` | consume; allocate packaged shell, six-tab, Feed cache and favorite reassertion                                                    |
-| `offline_feed_reasserting`                                     | current `OFFLINE_FEED_REASSERTED`                                                    | `offline_tjm_renavigating` | consume; allocate exact `TJM` navigation after reload                                                                             |
-| `offline_tjm_renavigating`                                     | current `OFFLINE_TJM_RENAVIGATION_PROVED`                                            | `offline_tjm_reasserting`  | consume; allocate TJM cache/history/filter reassertion                                                                            |
-| `offline_tjm_reasserting`                                      | current `OFFLINE_TJM_REASSERTED` and pre/post reload data equality                   | `restoring`                | consume; set `networkMode:'restoring'`; allocate `SET_BROWSER_CONTEXT_ONLINE`                                                     |
-| `restoring`                                                    | current `ONLINE_PROVED`, browser online and offline listeners settled                | `online_reasserting`       | consume; set `networkMode:'online'`; allocate recovery UI and no-data-loss capture                                                |
-| `online_reasserting`                                           | current `ONLINE_RECOVERY_PROVED`                                                     | `passed`                   | consume; freeze online recovery receipt and return `OFFLINE_FLOW_PROVED`                                                          |
-| any state from `entering_offline` through `online_reasserting` | current `OFFLINE_EFFECT_FAILED` or `OFFLINE_TIMEOUT`                                 | `failed_restoring`         | consume/fence current effect; retain first failure; allocate `RESTORE_NETWORK_FOR_CLEANUP` as the sole child-generation increment |
-| any state from `entering_offline` through `online_reasserting` | exact `OFFLINE_CANCELLED`                                                            | `cancelled_restoring`      | fence pending effect; retain cancellation; allocate `RESTORE_NETWORK_FOR_CLEANUP` as the sole child-generation increment          |
-| `failed_restoring`                                             | current `ONLINE_CLEANUP_PROVED`                                                      | `failed`                   | freeze original failure plus correlated online proof                                                                              |
-| `failed_restoring`                                             | current `ONLINE_CLEANUP_FAILED`                                                      | `failed`                   | freeze aggregate failure and cleanup failure                                                                                      |
-| `cancelled_restoring`                                          | current `ONLINE_CLEANUP_PROVED`                                                      | `cancelled`                | freeze cancellation plus correlated online proof                                                                                  |
-| `cancelled_restoring`                                          | current `ONLINE_CLEANUP_FAILED`                                                      | `cancelled`                | freeze cancellation plus cleanup failure                                                                                          |
+| État enfant                                            | Événement / garde nommée                                                                       | Suivant                    | Effet                                                                                                                                                |
+| ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `online_baseline`                                      | `OFFLINE_REQUESTED` interne exact et preuve d'UI/stockage de référence conservée               | `entering_offline`         | allouer `SET_BROWSER_CONTEXT_OFFLINE`                                                                                                                |
+| `entering_offline`                                     | `OFFLINE_PROVED` actuel, navigateur hors-ligne et UI exacte de Feed hors-ligne                 | `offline_feed`             | consommer ; définir `networkMode:'offline'` ; allouer les assertions de Feed en cache fermées                                                        |
+| `offline_feed`                                         | `OFFLINE_FEED_PROVED` actuel                                                                   | `offline_favoriting`       | consommer ; allouer l'action d'UI de favori exacte et le polling durable                                                                             |
+| `offline_favoriting`                                   | `OFFLINE_FAVORITE_PROVED` actuel                                                               | `offline_tjm_navigating`   | consommer ; allouer la navigation `TJM` exacte                                                                                                       |
+| `offline_tjm_navigating`                               | `OFFLINE_TJM_NAVIGATION_PROVED` actuel                                                         | `offline_tjm`              | consommer ; allouer les assertions de cache/filtre/capture du TJM hors-ligne                                                                         |
+| `offline_tjm`                                          | `OFFLINE_TJM_PROVED` actuel                                                                    | `offline_reloading`        | consommer ; conserver le condensat du TJM ; allouer le rechargement à chaud en étant hors-ligne                                                      |
+| `offline_reloading`                                    | `OFFLINE_RELOAD_PROVED` actuel, même processus/contexte/page et navigateur toujours hors-ligne | `offline_feed_reasserting` | consommer ; allouer la réaffirmation du shell packagé, des six onglets, du cache de Feed et du favori                                                |
+| `offline_feed_reasserting`                             | `OFFLINE_FEED_REASSERTED` actuel                                                               | `offline_tjm_renavigating` | consommer ; allouer la navigation `TJM` exacte après rechargement                                                                                    |
+| `offline_tjm_renavigating`                             | `OFFLINE_TJM_RENAVIGATION_PROVED` actuel                                                       | `offline_tjm_reasserting`  | consommer ; allouer la réaffirmation du cache/historique/filtre du TJM                                                                               |
+| `offline_tjm_reasserting`                              | `OFFLINE_TJM_REASSERTED` actuel et égalité des données pré/post rechargement                   | `restoring`                | consommer ; définir `networkMode:'restoring'` ; allouer `SET_BROWSER_CONTEXT_ONLINE`                                                                 |
+| `restoring`                                            | `ONLINE_PROVED` actuel, navigateur en ligne et écouteurs hors-ligne stabilisés                 | `online_reasserting`       | consommer ; définir `networkMode:'online'` ; allouer l'UI de récupération et la capture d'absence de perte de données                                |
+| `online_reasserting`                                   | `ONLINE_RECOVERY_PROVED` actuel                                                                | `passed`                   | consommer ; figer le reçu de récupération en ligne et renvoyer `OFFLINE_FLOW_PROVED`                                                                 |
+| tout état de `entering_offline` à `online_reasserting` | `OFFLINE_EFFECT_FAILED` ou `OFFLINE_TIMEOUT` actuel                                            | `failed_restoring`         | consommer/cloisonner l'effet actuel ; conserver le premier échec ; allouer `RESTORE_NETWORK_FOR_CLEANUP` comme unique incrément de génération enfant |
+| tout état de `entering_offline` à `online_reasserting` | `OFFLINE_CANCELLED` exact                                                                      | `cancelled_restoring`      | cloisonner l'effet en attente ; conserver l'annulation ; allouer `RESTORE_NETWORK_FOR_CLEANUP` comme unique incrément de génération enfant           |
+| `failed_restoring`                                     | `ONLINE_CLEANUP_PROVED` actuel                                                                 | `failed`                   | figer l'échec d'origine plus la preuve en ligne corrélée                                                                                             |
+| `failed_restoring`                                     | `ONLINE_CLEANUP_FAILED` actuel                                                                 | `failed`                   | figer l'échec agrégé et l'échec de nettoyage                                                                                                         |
+| `cancelled_restoring`                                  | `ONLINE_CLEANUP_PROVED` actuel                                                                 | `cancelled`                | figer l'annulation plus la preuve en ligne corrélée                                                                                                  |
+| `cancelled_restoring`                                  | `ONLINE_CLEANUP_FAILED` actuel                                                                 | `cancelled`                | figer l'annulation plus l'échec de nettoyage                                                                                                         |
 
-The child final states are `passed`, `failed` and `cancelled`. `failed` and
-`cancelled` both return `OFFLINE_FLOW_FAILED` to the parent with the exact child
-terminal receipt and whether correlated online cleanup succeeded. Cleanup calls
-`setOffline(false)` idempotently even if failure occurred after the browser had
-already returned online. A cleanup timeout, stale cleanup result or page loss is
-decoded as the correlated `ONLINE_CLEANUP_FAILED` result, retained and can never
-produce `OFFLINE_FLOW_PROVED`. The parent applies the same rule to its final
-idempotent cleanup: its bounded cleanup deadline emits `CLEANUP_FAILED`, never a
-second `TIMEOUT` transition or an unbounded wait.
+Les états finaux de l'enfant sont `passed`, `failed` et `cancelled`. `failed` et `cancelled` renvoient tous deux `OFFLINE_FLOW_FAILED` au parent avec le reçu terminal exact de l'enfant et l'indication si le nettoyage en ligne corrélé a réussi. Le nettoyage appelle `setOffline(false)` de manière idempotente même si l'échec est survenu après que le navigateur était déjà revenu en ligne. Un timeout de nettoyage, un résultat de nettoyage périmé ou une perte de page est décodé comme le résultat corrélé `ONLINE_CLEANUP_FAILED`, conservé et ne peut jamais produire `OFFLINE_FLOW_PROVED`. Le parent applique la même règle à son nettoyage idempotent final : son échéance de nettoyage délimitée émet `CLEANUP_FAILED`, jamais une transition de second `TIMEOUT` ni une attente non bornée.
 
-## Scenario A — Feed, Profil and CV persistence
+## Scénario A — Persistance Feed, Profil et CV
 
-Scenario ID:
+Identifiant de scénario :
 `packaged-tabs.feed-profile-cv-persistence`.
 
-Setup writes the shared flags, base profile, mission
-`mv3-tab-proof-001`, empty favorites and its detected tracking record. It then
-establishes consent through the current release protocol.
+La configuration écrit les drapeaux partagés, le profil de base, la mission `mv3-tab-proof-001`, des favoris vides et son enregistrement de suivi détecté. Elle établit ensuite le consentement via le protocole de release actuel.
 
-### Checkpoint A1 — Feed favorite and tracking
+### Checkpoint A1 — Favori et suivi du Feed
 
-1. Navigate through the exact `Missions` button and resolve exactly one
-   `role=article` whose accessible name is
-   `Mission Architecte TypeScript Packaged chez Client Preuve` inside
-   `mission-feed`. The article root is non-interactive: it has no click or
-   keyboard transition, no `tabindex`, and never impersonates a button.
-2. Scope every following control to that article. Resolve exactly one favorite
-   button named `Ajouter la mission aux favoris` with `aria-pressed=false`.
-   Resolve exactly one `role=group` named
-   `Statut de la mission Architecte TypeScript Packaged`; inside that group,
-   resolve exactly one `role=status` named `Statut actuel : Détectée` and one
-   allowed transition button named `Passer le statut à Sélectionnée`. Resolve
-   exactly one disclosure button named
-   `Afficher les détails de la mission Architecte TypeScript Packaged`. The
-   disclosure owns `aria-expanded=false` and
-   `aria-controls=<stable bounded mission details id>` before its first click.
-   That ID is unique in the document, remains byte-identical for the mounted
-   article, matches `^mission-details-[A-Za-z][A-Za-z0-9-]{0,63}$` and is
-   17..80 ASCII code units inclusive. Nested interactive content inside an
-   interactive card root, a page-global match, card index, `nth`, CSS class,
-   pixel position or bare title-text match is a terminal anchor failure.
-3. Click the scoped disclosure exactly once. Require that same button to expose
-   the new accessible name
-   `Masquer les détails de la mission Architecte TypeScript Packaged`,
-   `aria-expanded=true` and its controlled visible `role=region`, with the
-   exact retained ID, to be named
-   `Détails de la mission Architecte TypeScript Packaged`. This inline
-   disclosure transition is distinct from `onInvestigate`/drawer navigation;
-   neither transition may be inferred from clicking the article surface.
-4. Record `actionStartedAt` from the test shell.
-5. Click `Ajouter la mission aux favoris`. The accessible name and pressed
-   state remain `Ajouter la mission aux favoris` / `false` until the correlated
-   favorite persistence acknowledgement is consumed; only then do they become
-   `Retirer la mission des favoris` / `true`.
-6. Click the allowed status target `Passer le statut à Sélectionnée` from the
-   seeded `Détectée` tracking state. From effect allocation until its correlated
-   tracking acknowledgement or failure, the named status group exposes
-   `aria-busy=true`, the current status remains
-   `Statut actuel : Détectée` and every transition control in the group is
-   disabled. A committed acknowledgement changes the unique status projection
-   to `Statut actuel : Sélectionnée`, clears busy and projects the next allowed
-   transition set. A failure clears busy, preserves `Détectée`, re-enables only
-   the still-allowed controls and emits `EFFECT_FAILED`; optimistic text cannot
-   normalize that path into success.
-7. Record `actionSettledAt` only after both public bridge reads and the raw
-   persistence capture agree.
+1. Naviguer via le bouton exact `Missions` et résoudre exactement un `role=article` dont le nom accessible est `Mission Architecte TypeScript Packaged chez Client Preuve` à l'intérieur de `mission-feed`. La racine de l'article est non interactive : elle n'a aucune transition au clic ou au clavier, aucun `tabindex`, et ne se fait jamais passer pour un bouton.
+2. Délimiter chaque contrôle suivant à cet article. Résoudre exactement un bouton de favori nommé `Ajouter la mission aux favoris` avec `aria-pressed=false`. Résoudre exactement un `role=group` nommé `Statut de la mission Architecte TypeScript Packaged` ; à l'intérieur de ce groupe, résoudre exactement un `role=status` nommé `Statut actuel : Détectée` et un bouton de transition autorisée nommé `Passer le statut à Sélectionnée`. Résoudre exactement un bouton de divulgation nommé `Afficher les détails de la mission Architecte TypeScript Packaged`. La divulgation détient `aria-expanded=false` et `aria-controls=<stable bounded mission details id>` avant son premier clic. Cet identifiant est unique dans le document, demeure identique en octets pour l'article monté, correspond à `^mission-details-[A-Za-z][A-Za-z0-9-]{0,63}$` et compte entre 17 et 80 unités de code ASCII inclusivement. Un contenu interactif imbriqué dans une racine de carte interactive, une correspondance globale à la page, un index de carte, `nth`, une classe CSS, une position en pixels ou une simple correspondance sur le titre textuel brut constitue un échec terminal d'ancre.
+3. Cliquer sur la divulgation délimitée exactement une fois. Exiger que ce même bouton expose le nouveau nom accessible `Masquer les détails de la mission Architecte TypeScript Packaged`, `aria-expanded=true` et que son `role=region` visible contrôlé, avec l'identifiant conservé exact, soit nommé `Détails de la mission Architecte TypeScript Packaged`. Cette transition de divulgation en ligne est distincte de `onInvestigate`/navigation par tiroir ; aucune des deux transitions ne peut être déduite d'un clic sur la surface de l'article.
+4. Enregistrer `actionStartedAt` depuis le shell de test.
+5. Cliquer sur `Ajouter la mission aux favoris`. Le nom accessible et l'état pressé demeurent `Ajouter la mission aux favoris` / `false` jusqu'à ce que l'accusé de réception corrélé de persistance du favori soit consommé ; c'est seulement alors qu'ils deviennent `Retirer la mission des favoris` / `true`.
+6. Cliquer sur la cible de statut autorisée `Passer le statut à Sélectionnée` depuis l'état de suivi amorcé `Détectée`. De l'allocation de l'effet jusqu'à son accusé de réception de suivi corrélé ou son échec, le groupe de statuts nommé expose `aria-busy=true`, le statut actuel demeure `Statut actuel : Détectée` et chaque contrôle de transition du groupe est désactivé. Un accusé de réception validé modifie la projection unique de statut en `Statut actuel : Sélectionnée`, efface busy et projette l'ensemble des transitions autorisées suivantes. Un échec efface busy, préserve `Détectée`, réactive uniquement les contrôles toujours autorisés et émet `EFFECT_FAILED` ; un texte optimiste ne peut pas normaliser ce chemin en succès.
+7. N'enregistrer `actionSettledAt` qu'après que les lectures publiques du pont et la capture de persistance brute concordent.
 
-The durable projection must prove:
+La projection durable doit prouver :
 
-- `favoriteMissions` has exactly one own key,
-  `mv3-tab-proof-001`;
-- its value is a safe integer in the inclusive
-  `[actionStartedAt, actionSettledAt]` interval;
-- the raw `mission_tracking` row and `GET_TRACKINGS` projection are equal;
-- `currentStatus === 'selected'`;
-- history has exactly two contiguous entries and ends with
-  `detected -> selected`;
-- the new transition timestamp is in the same action interval and is not less
-  than the seeded timestamp;
-- the mission row is still present and valid.
+- `favoriteMissions` a exactement une clé propre, `mv3-tab-proof-001` ;
+- sa valeur est un entier sûr dans l'intervalle inclusif `[actionStartedAt, actionSettledAt]` ;
+- la ligne brute de `mission_tracking` et la projection `GET_TRACKINGS` sont égales ;
+- `currentStatus === 'selected'` ;
+- l'historique a exactement deux entrées contiguës et se termine par `detected -> selected` ;
+- l'horodatage de la nouvelle transition se situe dans le même intervalle d'action et n'est pas inférieur à l'horodatage amorcé ;
+- la ligne de mission est toujours présente et valide.
 
-After warm proof reload, the same uniquely named article must still expose the
-same named status group, no busy state, the unique
-`role=status[name="Statut actuel : Sélectionnée"]`, and its scoped favorite
-control named `Retirer la mission des favoris` with `aria-pressed=true`. The
-durable projection, including both stored timestamps, is byte-equivalent to its
-post-mutation projection.
+Après rechargement de preuve à chaud, le même article nommé de manière unique doit toujours exposer le même groupe de statuts nommé, aucun état occupé (busy), l'unique `role=status[name="Statut actuel : Sélectionnée"]`, et son contrôle de favori délimité nommé `Retirer la mission des favoris` avec `aria-pressed=true`. La projection durable, y compris les deux horodatages stockés, est équivalente en octets à sa projection post-mutation.
 
-### Checkpoint A2 — Profil edit, save and reload
+### Checkpoint A2 — Édition, sauvegarde et rechargement du profil
 
-1. Navigate to `Profil` and click `Modifier mes critères`.
-2. Replace the fields selected by their real placeholders:
-   - `Prénom` -> `Camille Packaged`;
-   - `Poste (ex: Développeur React Senior)` -> `Architecte Svelte`;
-   - `Localisation` -> `Lyon`;
-   - `TJM min` -> `720`;
+1. Naviguer vers `Profil` et cliquer sur `Modifier mes critères`.
+2. Remplacer les champs sélectionnés par leurs véritables textes indicatifs (placeholders) :
+   - `Prénom` -> `Camille Packaged` ;
+   - `Poste (ex: Développeur React Senior)` -> `Architecte Svelte` ;
+   - `Localisation` -> `Lyon` ;
+   - `TJM min` -> `720` ;
    - `TJM max` -> `980`.
-3. Fill `Mots-clés` with `MV3-Proof`, click `Ajouter le mot-clé`, and require
-   the new chip before saving.
-4. Click `Enregistrer le profil`; wait for the Profile actor to leave `saving`
-   and for `GET_PROFILE` plus the raw `profile/current` row to agree.
+3. Remplir `Mots-clés` avec `MV3-Proof`, cliquer sur `Ajouter le mot-clé`, et exiger la nouvelle pastille (chip) avant d'enregistrer.
+4. Cliquer sur `Enregistrer le profil` ; attendre que l'acteur Profile quitte `saving` et que `GET_PROFILE` ainsi que la ligne brute `profile/current` concordent.
 
-The saved profile must preserve `remote:'hybrid'`, `seniority:'senior'`, the
-empty experience list and `availability:null`; it must preserve the two seeded
-keywords and append `MV3-Proof` exactly once. No stale `stack` or
-`searchKeywords` field may appear.
+Le profil enregistré doit préserver `remote:'hybrid'`, `seniority:'senior'`, la liste d'expériences vide et `availability:null` ; il doit préserver les deux mots-clés amorcés et ajouter `MV3-Proof` exactement une fois. Aucun champ périmé `stack` ou `searchKeywords` ne doit apparaître.
 
-After warm proof reload and a return to Profil, the
-`OPEN_PROFILE_EDITOR_AFTER_RELOAD` plan first emits
-`POST_RELOAD_ACTION_READY` only after the rendered summary and unique
-`Modifier mes critères` button prove the changed identity. Its correlated
-post-reload `UI_ACTION_PROVED` opens the editor exactly once. Only then may
-`UI_REASSERTED` prove every changed form value. The physical `id:'current'`
-record and the public profile projection must otherwise match their post-save
-values.
+Après rechargement de preuve à chaud et retour à Profil, le plan `OPEN_PROFILE_EDITOR_AFTER_RELOAD` n'émet d'abord `POST_RELOAD_ACTION_READY` qu'après que le récapitulatif rendu et l'unique bouton `Modifier mes critères` ont prouvé l'identité modifiée. Son `UI_ACTION_PROVED` post-rechargement corrélé ouvre l'éditeur exactement une fois. C'est seulement alors que `UI_REASSERTED` peut prouver chaque valeur de formulaire modifiée. L'enregistrement physique `id:'current'` et la projection publique du profil doivent par ailleurs correspondre à leurs valeurs post-sauvegarde.
 
-### Checkpoint A3 — CV add, save and reload
+### Checkpoint A3 — Ajout, sauvegarde et rechargement de CV
 
-1. Navigate to `CV` and click `Ajouter une expérience` from the empty state.
-2. Fill the labeled fields exactly:
-   - Titre du poste: `Lead Packaged UI`;
-   - Entreprise: `MissionPulse QA`;
-   - Type de contrat: `Freelance`;
-   - Début: `2025-01`;
-   - Poste actuel: checked;
-   - Localisation: `Lyon`;
-   - Description: `Preuve CV locale dans Chrome MV3.`;
-   - Compétences: `Svelte, TypeScript, Playwright`.
-3. Click the form's `Enregistrer` button and wait for the CV edit actor to leave
-   `saving` and for the profile bridge/raw record to agree.
+1. Naviguer vers `CV` et cliquer sur `Ajouter une expérience` depuis l'état vide.
+2. Remplir exactement les champs étiquetés :
+   - Titre du poste : `Lead Packaged UI` ;
+   - Entreprise : `MissionPulse QA` ;
+   - Type de contrat : `Freelance` ;
+   - Début : `2025-01` ;
+   - Poste actuel : coché ;
+   - Localisation : `Lyon` ;
+   - Description : `Preuve CV locale dans Chrome MV3.` ;
+   - Compétences : `Svelte, TypeScript, Playwright`.
+3. Cliquer sur le bouton `Enregistrer` du formulaire et attendre que l'acteur d'édition du CV quitte `saving` et que le pont de profil et l'enregistrement brut concordent.
 
-The new experience must have a non-empty generated ID different from `blank`,
-`source:'manual'`, `sourceExternalId:null`, `positionIndex:0`,
-`isCurrent:true`, `endDate:null`, and an `updatedAt` safe integer inside the
-save interval. Every Profile checkpoint value must remain unchanged.
+La nouvelle expérience doit avoir un identifiant généré non vide différent de `blank`, `source:'manual'`, `sourceExternalId:null`, `positionIndex:0`, `isCurrent:true`, `endDate:null`, et un entier sûr `updatedAt` situé dans l'intervalle de sauvegarde. Chaque valeur de checkpoint du Profil doit rester inchangée.
 
-After warm proof reload and a return to CV, checkpoint A3 performs the closed
-action `EXPAND_SAVED_EXPERIENCE_DETAILS`; it does not infer an open card from
-skill text. The action is legal only after the separately modeled CV accessible
-anchor dependency has been admitted. It must:
+Après rechargement de preuve à chaud et retour à CV, le checkpoint A3 exécute l'action fermée `EXPAND_SAVED_EXPERIENCE_DETAILS` ; il ne déduit pas une carte ouverte à partir du texte de compétences. L'action n'est légale qu'après que la dépendance d'ancrage accessible du CV modélisée séparément a été admise. Elle doit :
 
-1. resolve exactly one `article` named
-   `Expérience Lead Packaged UI chez MissionPulse QA` and require that article
-   to show `Lead Packaged UI`, `MissionPulse QA` and `Freelance`;
-2. within that article, resolve exactly one button named
-   `Afficher les détails de l’expérience Lead Packaged UI` with
-   `aria-expanded=false` and an `aria-controls` value equal to the stable,
-   unique, bounded details-region ID retained by
-   `POST_RELOAD_ACTION_READY`;
-3. click the button exactly once and consume only its correlated
-   `UI_ACTION_PROVED` event;
-4. require the same button to expose `aria-expanded=true` and the controlled
-   visible `region` with that exact retained ID to be named
-   `Détails de l’expérience Lead Packaged UI`;
-5. assert `Svelte`, `TypeScript` and `Playwright` as skill badges scoped inside
-   that controlled region before emitting `UI_REASSERTED`.
+1. résoudre exactement un `article` nommé `Expérience Lead Packaged UI chez MissionPulse QA` et exiger que cet article affiche `Lead Packaged UI`, `MissionPulse QA` et `Freelance` ;
+2. au sein de cet article, résoudre exactement un bouton nommé `Afficher les détails de l’expérience Lead Packaged UI` avec `aria-expanded=false` et une valeur d'`aria-controls` égale à l'identifiant stable, unique et borné de région de détails conservé par `POST_RELOAD_ACTION_READY` ;
+3. cliquer sur le bouton exactement une fois et consommer uniquement son événement `UI_ACTION_PROVED` corrélé ;
+4. exiger que le même bouton expose `aria-expanded=true` et que la `region` visible contrôlée portant cet identifiant conservé exact soit nommée `Détails de l’expérience Lead Packaged UI` ;
+5. affirmer `Svelte`, `TypeScript` et `Playwright` en tant que badges de compétences délimités à l'intérieur de cette région contrôlée avant d'émettre `UI_REASSERTED`.
 
-A missing, duplicated or differently named article, toggle, controlled region
-or skill is terminal failure. Card index, `nth`, DOM ancestry outside the
-article, CSS class, pixel position and visible-text guessing are forbidden. The
-generated ID and `updatedAt` must be identical to the post-save capture; reload
-must not recreate the experience.
+Un article, une bascule, une région contrôlée ou une compétence manquant, dupliqué ou nommé différemment constitue un échec terminal. L'index de carte, `nth`, l'ascendance DOM en dehors de l'article, la classe CSS, la position en pixels et la devinette sur le texte visible sont interdits. L'identifiant généré et `updatedAt` doivent être identiques à la capture post-sauvegarde ; le rechargement ne doit pas recréer l'expérience.
 
-## Scenario B — Candidatures, TJM and Réglages persistence
+## Scénario B — Persistance Candidatures, TJM et Réglages
 
-Scenario ID:
+Identifiant de scénario :
 `packaged-tabs.applications-tjm-settings-persistence`.
 
-Setup writes the shared flags, base profile, applications mission, selected
-tracking record and exact four-record TJM history. It establishes consent
-through the current release protocol. It does not seed a Settings envelope or
-theme value.
+La configuration écrit les drapeaux partagés, le profil de base, la mission de candidatures, l'enregistrement de suivi sélectionné et l'historique TJM exact à quatre enregistrements. Elle établit le consentement via le protocole de release actuel. Elle n'amorce pas d'enveloppe de Réglages ni de valeur de thème.
 
-### Checkpoint B1 — Candidature transition, details and reload
+### Checkpoint B1 — Transition, détails et rechargement de candidature
 
-1. Navigate through `Suivi` to the `Candidatures` page.
-2. Select `Lead Svelte Candidature` from the missions list and require its
-   current `Sélectionnée` status.
-3. Record the action time bounds and click the allowed target `Préparée`.
-4. Fill `Prochaine action` with local datetime `2035-01-15T09:30`.
-5. In the page context, compute the expected ISO using the same browser
-   timezone rule, `new Date(localValue).toISOString()`, then click the adjacent
-   `Enregistrer`.
-6. Wait until `GET_TRACKINGS` and the raw row agree.
+1. Naviguer via `Suivi` vers la page `Candidatures`.
+2. Sélectionner `Lead Svelte Candidature` dans la liste des missions et exiger son statut actuel `Sélectionnée`.
+3. Consigner les bornes temporelles d'action et cliquer sur la cible autorisée `Préparée`.
+4. Remplir `Prochaine action` avec la date/heure locale `2035-01-15T09:30`.
+5. Dans le contexte de la page, calculer l'ISO attendu en utilisant la même règle de fuseau horaire de navigateur, `new Date(localValue).toISOString()`, puis cliquer sur le bouton adjacent `Enregistrer`.
+6. Attendre que `GET_TRACKINGS` et la ligne brute concordent.
 
-The row must have `currentStatus:'application_prepared'`, a third contiguous
-history entry `selected -> application_prepared`, a transition timestamp
-inside the action interval and `nextActionAt` exactly equal to the captured ISO.
-Generated asset IDs, rating and notes remain unchanged.
+La ligne doit avoir `currentStatus:'application_prepared'`, une troisième entrée d'historique contiguë `selected -> application_prepared`, un horodatage de transition à l'intérieur de l'intervalle d'action et `nextActionAt` exactement égal à l'ISO capturé. Les identifiants d'assets générés, l'évaluation et les notes demeurent inchangés.
 
-After warm proof reload and a return to Suivi, the selected mission must show
-`Préparée`, the local datetime input must round-trip to
-`2035-01-15T09:30`, and `Historique des décisions` must contain the prepared
-transition. The persistence projection is unchanged.
+Après rechargement de preuve à chaud et retour à Suivi, la mission sélectionnée doit afficher `Préparée`, le champ de saisie de date/heure local doit restituer fidèlement `2035-01-15T09:30`, et `Historique des décisions` doit contenir la transition préparée. La projection de persistance est inchangée.
 
-### Checkpoint B2 — TJM seed, filter and reload
+### Checkpoint B2 — Amorçage, filtrage et rechargement du TJM
 
-1. Navigate to `TJM` and require unfiltered analysis with four data points and
-   one `role=region` named `TJM par région`. That region contains exactly one
-   native `h3` named `TJM par région` and one semantic `ul` named
-   `Régions analysées`; each region result is exactly one direct `li` whose
-   unique native `h4` is its accessible identity. The unfiltered list therefore
-   has exactly two list items headed `Île-de-France` and `Lyon`. A generic
-   `div`, visual label, progress bar, filter option or page-global text match
-   cannot satisfy the region, list, list-item or heading anchor.
-2. Select `ile-de-france` through the control labeled
-   `Filtrer les tendances TJM par région`.
-3. Require the filtered analysis to expose two data points, exactly one region
-   insight and exactly one direct `li` with one `h4` headed
-   `Île-de-France` in the `Régions analysées` list; no `li` headed `Lyon` may
-   remain inside
-   `role=region[name="TJM par région"]`. The persistent region filter is
-   intentionally outside that assertion: `Lyon` may and must remain available
-   in its `<option>` catalogue, so a page-wide absence assertion is forbidden.
-4. Capture `tjm_history` and require exact equality with the seeded four records.
+1. Naviguer vers `TJM` et exiger une analyse non filtrée avec quatre points de données et un `role=region` nommé `TJM par région`. Cette région contient exactement un `h3` natif nommé `TJM par région` et une `ul` sémantique nommée `Régions analysées` ; chaque résultat de région est exactement un `li` direct dont le `h4` natif unique constitue l'identité accessible. La liste non filtrée comporte donc exactement deux éléments de liste intitulés `Île-de-France` et `Lyon`. Un `div` générique, une étiquette visuelle, une barre de progression, une option de filtrage ou une correspondance textuelle globale à la page ne peut pas satisfaire l'ancre de région, de liste, d'élément de liste ou d'en-tête.
+2. Sélectionner `ile-de-france` via le contrôle étiqueté `Filtrer les tendances TJM par région`.
+3. Exiger que l'analyse filtrée expose deux points de données, exactement un aperçu de région et exactement un `li` direct avec un `h4` intitulé `Île-de-France` dans la liste `Régions analysées` ; aucun `li` intitulé `Lyon` ne doit subsister à l'intérieur de `role=region[name="TJM par région"]`. Le filtre de région persistant est intentionnellement en dehors de cette assertion : `Lyon` peut et doit rester disponible dans son catalogue d'`<option>`, si bien qu'une assertion d'absence sur l'ensemble de la page est interdite.
+4. Capturer `tjm_history` et exiger une égalité exacte avec les quatre enregistrements amorcés.
 
-The selected region is deliberately ephemeral UI state. After warm proof
-reload, `REAPPLY_TJM_REGION_FILTER_AFTER_RELOAD` may emit
-`POST_RELOAD_ACTION_READY` only after `Toutes les régions` is selected, the raw
-history is unchanged, the unfiltered four-point analysis has returned and the
-unique control labeled `Filtrer les tendances TJM par région` is ready. Its
-correlated post-reload `UI_ACTION_PROVED` selects `ile-de-france`; only the
-following `UI_REASSERTED` may prove the same two-point result. Persisting the
-dropdown selection would violate, not satisfy, this checkpoint.
+La région sélectionnée constitue délibérément un état d'UI éphémère. Après rechargement de preuve à chaud, `REAPPLY_TJM_REGION_FILTER_AFTER_RELOAD` ne peut émettre `POST_RELOAD_ACTION_READY` qu'après que `Toutes les régions` est sélectionné, que l'historique brut est inchangé, que l'analyse non filtrée à quatre points est revenue et que le contrôle unique étiqueté `Filtrer les tendances TJM par région` est prêt. Son `UI_ACTION_PROVED` post-rechargement corrélé sélectionne `ile-de-france` ; seul le `UI_REASSERTED` suivant peut prouver le même résultat à deux points. Persister la sélection du menu déroulant violerait ce checkpoint au lieu de le satisfaire.
 
-### Checkpoint B3 — Réglages mutation and reload
+### Checkpoint B3 — Mutation des réglages et rechargement
 
-1. Navigate to `Réglages` and read the current confirmed Settings
-   release snapshot. Resolve exactly one `role=group` named `Apparence`, with
-   exactly the three native buttons `Clair`, `Sombre` and `Système`, no fourth
-   interactive descendant and `aria-busy=false`. Every button exposes an
-   explicit boolean `aria-pressed`; exactly one is `true`, and it corresponds
-   to the confirmed snapshot theme.
-2. Click `Sombre` inside that group. From mutation allocation until the
-   correlated confirmed snapshot or failure is consumed, the group exposes
-   `aria-busy=true` and all three controls are natively disabled.
-   `aria-pressed` continues to
-   represent the last confirmed theme; it must not move optimistically on the
-   physical click.
-3. Wait for the UI settings actor to settle, then require a confirmed release
-   snapshot with `settings.theme === 'dark'`, a strictly greater revision and
-   generation, no pending transaction, and a raw V1 envelope whose confirmed
-   theme is also `dark`. Only after that confirmation may `Sombre` expose
-   `aria-pressed=true`; `Clair` and `Système` expose `aria-pressed=false`, the
-   group exposes `aria-busy=false`, and all three controls are enabled.
-4. Require `document.documentElement.classList` to contain `dark`.
+1. Naviguer vers `Réglages` et lire l'instantané de release des réglages confirmé actuel. Résoudre exactement un `role=group` nommé `Apparence`, comportant exactement les trois boutons natifs `Clair`, `Sombre` et `Système`, aucun quatrième descendant interactif et `aria-busy=false`. Chaque bouton expose un booléen explicite `aria-pressed` ; exactement un est `true`, et il correspond au thème de l'instantané confirmé.
+2. Cliquer sur `Sombre` au sein de ce groupe. De l'allocation de mutation jusqu'à la consommation de l'instantané confirmé corrélé ou de l'échec, le groupe expose `aria-busy=true` et les trois contrôles sont nativement désactivés. `aria-pressed` continue de représenter le dernier thème confirmé ; il ne doit pas se déplacer de manière optimiste lors du clic physique.
+3. Attendre que l'acteur des réglages d'UI se stabilise, puis exiger un instantané de release confirmé avec `settings.theme === 'dark'`, une révision et une génération strictement supérieures, aucune transaction en attente, et une enveloppe V1 brute dont le thème confirmé est également `dark`. Ce n'est qu'après cette confirmation que `Sombre` peut exposer `aria-pressed=true` ; `Clair` et `Système` exposent `aria-pressed=false`, le groupe expose `aria-busy=false`, et les trois contrôles sont activés.
+4. Exiger que `document.documentElement.classList` contienne `dark`.
 
-If the settings mutation fails, its correlated failure restores
-`aria-busy=false` and re-enables the three controls, but the previously
-confirmed button remains
-the sole `aria-pressed=true` control, the confirmed release snapshot and raw V1
-envelope remain unchanged, and no unconfirmed theme class is retained. That
-path emits `EFFECT_FAILED` for checkpoint B3 and can never be normalized into
-success by a toast, optimistic DOM state or later uncorrelated snapshot.
+Si la mutation des réglages échoue, son échec corrélé rétablit `aria-busy=false` et réactive les trois contrôles, mais le bouton précédemment confirmé demeure l'unique contrôle avec `aria-pressed=true`, l'instantané de release confirmé et l'enveloppe V1 brute restent inchangés, et aucune classe de thème non confirmée n'est conservée. Ce chemin émet `EFFECT_FAILED` pour le checkpoint B3 et ne peut jamais être normalisé en succès par un toast, un état DOM optimiste ou un instantané ultérieur non corrélé.
 
-After warm proof reload and a return to Réglages, the same uniquely named group
-must expose exactly the same three controls, only `Sombre` pressed, none busy or
-disabled. The public snapshot, raw confirmed theme, revision and generation
-must equal the post-mutation capture, and the document must still use the
-`dark` class. This is proof of the current release envelope only; it does not
-emit a Settings V2 writer-fence claim.
+Après rechargement de preuve à chaud et retour à Réglages, le même groupe nommé de manière unique doit exposer exactement les trois mêmes contrôles, seul `Sombre` étant pressé, aucun n'étant occupé ou désactivé. L'instantané public, le thème confirmé brut, la révision et la génération doivent être égaux à la capture post-mutation, et le document doit toujours utiliser la classe `dark`. Ceci constitue la preuve de l'enveloppe de release actuelle uniquement ; cela n'émet aucune revendication de cloisonnement d'écrivain (writer-fence) de Réglages V2.
 
-## Scenario C — Onboarding completion and reload
+## Scénario C — Achèvement de l'onboarding et rechargement
 
-Scenario ID: `packaged-tabs.onboarding-completion`.
+Identifiant de scénario : `packaged-tabs.onboarding-completion`.
 
-The fixture is fresh. It contains no profile, mission, tracking, first-scan flag,
-legacy onboarding key or confirmed consent. No seed operation writes business
-data.
+La fixture est vierge. Elle ne contient aucun profil, mission, suivi, drapeau de premier scan, clé d'onboarding legacy ou consentement confirmé. Aucune opération d'amorçage n'écrit de données métier.
 
-1. Open the packaged panel and require `page-onboarding`, the welcome hero
-   heading `Toutes vos missions freelance, centralisées et scorées.` and no
-   navigation bar. The hero is rendered only by `OnboardingWelcome` once the
-   lazily-imported `OnboardingPage` chunk resolves; the pre-hydration skeleton
-   renders a different placeholder (`Configurez votre premier scan`), so the
-   hero assertion also proves the real onboarding mounted (not the skeleton).
-2. Click `Configurer le radar`.
-3. Select the first visible connector from the build-filtered catalogue and
-   click `Continuer avec <name>`. The selected connector ID/name are captured as
-   ephemeral UI evidence only.
-4. Click `Créer une première alerte`.
-5. On the alert step, fill:
-   - Prénom: `Nora Packaged`;
-   - Poste recherché: `Consultante Svelte`;
-   - Mots-clés: `Svelte` and add it;
-   - Localisation souhaitée: `Paris`;
-   - Mode de travail: `Hybride`;
-   - TJM cible: `750`.
-6. Set the alert range to `85` and click `Voir le premier insight`. Require the
-   real `SAVE_CONNECTED_ALERT_PREFERENCES` acknowledgement before advancing;
-   because the profile draft was filled first, this acknowledgement must bind
-   daily rate `750` and required stack `Svelte`.
-7. On the insight step, click `Sauvegarder mon profil`, never `Passer et voir le feed` or
-   `Passer l’onboarding`.
-8. Wait for profile persistence, then the real consent mutation, then the Feed
-   route.
+1. Ouvrir le panneau packagé et exiger `page-onboarding`, l'en-tête de bienvenue (hero) `Toutes vos missions freelance, centralisées et scorées.` et aucune barre de navigation. L'en-tête hero n'est rendu que par `OnboardingWelcome` une fois que le chunk `OnboardingPage` importé tardivement est résolu ; le squelette de pré-hydratation rend un placeholder différent (`Configurez votre premier scan`), si bien que l'assertion de l'en-tête hero prouve également que le véritable onboarding est monté (et non le squelette).
+2. Cliquer sur `Configurer le radar`.
+3. Sélectionner le premier connecteur visible depuis le catalogue filtré au build et cliquer sur `Continuer avec <name>`. L'identifiant/nom du connecteur sélectionné est capturé comme preuve d'UI éphémère uniquement.
+4. Cliquer sur `Créer une première alerte`.
+5. À l'étape d'alerte, remplir :
+   - Prénom : `Nora Packaged` ;
+   - Poste recherché : `Consultante Svelte` ;
+   - Mots-clés : `Svelte` et l'ajouter ;
+   - Localisation souhaitée : `Paris` ;
+   - Mode de travail : `Hybride` ;
+   - TJM cible : `750`.
+6. Régler la plage d'alerte à `85` et cliquer sur `Voir le premier insight`. Exiger le véritable accusé de réception `SAVE_CONNECTED_ALERT_PREFERENCES` avant d'avancer ; comme le brouillon de profil a été rempli en premier, cet accusé de réception doit lier le tarif journalier `750` et la stack requise `Svelte`.
+7. À l'étape d'insight, cliquer sur `Sauvegarder mon profil`, jamais sur `Passer et voir le feed` ou `Passer l’onboarding`.
+8. Attendre la persistance du profil, puis la véritable mutation de consentement, puis la route Feed.
 
-The post-completion projection must prove:
+La projection post-achèvement doit prouver :
 
-- `profile/current` equals the normalized profile: `tjmMin:750`,
-  `tjmMax:900`, `seniority:'senior'`, `experiences:[]`, `availability:null`;
-- public `GET_PROFILE` agrees with the raw record;
-- `missionpulse.connectedAlertPreferences` is enabled with threshold `85`,
-  minimum daily rate `750`, required stacks `['Svelte']`, maximum results `5`,
-  null mute and a valid positive revision/timestamp;
-- the Settings release snapshot is confirmed with
-  `onboardingCompleted:true`;
-- there is no legacy `onboarding_completed` key after release migration;
-- no source-persistence assertion is emitted.
+- `profile/current` est égal au profil normalisé : `tjmMin:750`, `tjmMax:900`, `seniority:'senior'`, `experiences:[]`, `availability:null` ;
+- le `GET_PROFILE` public concorde avec l'enregistrement brut ;
+- `missionpulse.connectedAlertPreferences` est activé avec le seuil `85`, le tarif journalier minimal `750`, les stacks requises `['Svelte']`, le nombre maximal de résultats `5`, mute null et une révision/horodatage positif valide ;
+- l'instantané de release des Réglages est confirmé avec `onboardingCompleted:true` ;
+- il n'y a aucune clé legacy `onboarding_completed` après la migration de release ;
+- aucune assertion de persistance de source n'est émise.
 
-After warm proof reload, initial routing must go directly to Feed,
-`page-onboarding` must be absent, and the profile, alert preferences and release
-snapshot must equal their post-completion projections. The captured source
-choice remains explicitly non-durable until `onboarding-source.model.md` is
-connected to runtime.
+Après rechargement de preuve à chaud, le routage initial doit aller directement vers Feed, `page-onboarding` doit être absent, et le profil, les préférences d'alerte et l'instantané de release doivent être égaux à leurs projections post-achèvement. Le choix de source capturé demeure explicitement non durable jusqu'à ce que `onboarding-source.model.md` soit connecté au runtime.
 
-## Scenario D — Offline and recovery
+## Scénario D — Hors-ligne et récupération
 
-Scenario ID: `packaged-tabs.offline-recovery`.
+Identifiant de scénario : `packaged-tabs.offline-recovery`.
 
-Setup uses the shared flags, base profile, mission, empty favorites and the
-four-record TJM history, then establishes real consent.
+La configuration utilise les drapeaux partagés, le profil de base, la mission, les favoris vides et l'historique TJM à quatre enregistrements, puis établit le véritable consentement.
 
-The numbered product proof below is an exact projection of the offline child
-machine, not a second orchestration authority:
+La preuve produit numérotée ci-dessous est une projection exacte de la machine enfant hors-ligne, et non une seconde autorité d'orchestration :
 
-1. In `online_baseline`, open Feed online and retain the cached mission, normal
-   scan control, page identity and pre-offline persistence digest. The internal
-   correlated `OFFLINE_REQUESTED` event alone may allocate the offline command.
-2. In `entering_offline`, invoke Playwright
-   `BrowserContext.setOffline(true)` on the real current context. Dispatching
-   synthetic `online`/`offline` DOM events is forbidden. Only correlated
-   `OFFLINE_PROVED` may set `networkMode:'offline'` after it proves
-   `navigator.onLine === false`, the accessible `Hors ligne` indicator, banner
-   `Mode hors ligne — Données en cache uniquement`, cached mission visibility
-   and disabled scan control labeled `Scan indisponible hors ligne`.
-3. In `offline_feed` then `offline_favoriting`, prove the cached Feed and
-   favorite the mission through its visible control. Only correlated
-   `OFFLINE_FAVORITE_PROVED` after durable acknowledgement may advance.
-4. In `offline_tjm_navigating` then `offline_tjm`, navigate through the exact
-   `TJM` button and require `Mode hors ligne`, `Cache local`, the unchanged
-   four-record history and working `ile-de-france` local filter. Retain the
-   correlated `OFFLINE_TJM_PROVED` projection digest.
-5. In `offline_reloading`, perform exactly one warm proof reload while the
-   context remains offline. `OFFLINE_RELOAD_PROVED` must bind the unchanged
-   process, context and page identity and prove the browser is still offline.
-6. In `offline_feed_reasserting`, require offline bootstrap, all six navigation
-   buttons, cached mission and durable favorite on Feed. Then
-   `offline_tjm_renavigating` must navigate through the exact `TJM` button after
-   reload, and `offline_tjm_reasserting` must re-prove the unchanged history,
-   local filter result and pre/post reload data equality. The prior TJM page
-   being visible before reload cannot substitute for these two correlated
-   post-reload events.
-7. Only from `restoring` may the child invoke
-   `BrowserContext.setOffline(false)`. Correlated `ONLINE_PROVED` must establish
-   `navigator.onLine === true` and settled connection listeners before the
-   child enters `online_reasserting`. Correlated `ONLINE_RECOVERY_PROVED` must
-   then prove the recovery toast `Connexion restaurée`, removal of the
-   offline-only scan label and no loss of profile, mission, favorite or TJM data
-   before the child can pass.
+1. Dans `online_baseline`, ouvrir Feed en ligne et conserver la mission en cache, le contrôle de scan normal, l'identité de page et le condensat de persistance pré-hors-ligne. Seul l'événement interne corrélé `OFFLINE_REQUESTED` peut allouer la commande hors-ligne.
+2. Dans `entering_offline`, invoquer `BrowserContext.setOffline(true)` de Playwright sur le véritable contexte actuel. L'émission d'événements DOM `online`/`offline` synthétiques est interdite. Seul le `OFFLINE_PROVED` corrélé peut définir `networkMode:'offline'` après avoir prouvé `navigator.onLine === false`, l'indicateur accessible `Hors ligne`, la bannière `Mode hors ligne — Données en cache uniquement`, la visibilité de la mission en cache et le contrôle de scan désactivé étiqueté `Scan indisponible hors ligne`.
+3. Dans `offline_feed` puis `offline_favoriting`, prouver le Feed en cache et mettre la mission en favori via son contrôle visible. Seul le `OFFLINE_FAVORITE_PROVED` corrélé après accusé de réception durable peut faire avancer.
+4. Dans `offline_tjm_navigating` puis `offline_tjm`, naviguer via le bouton `TJM` exact et exiger `Mode hors ligne`, `Cache local`, l'historique inchangé à quatre enregistrements et le filtre local `ile-de-france` fonctionnel. Conserver le condensat de projection corrélé `OFFLINE_TJM_PROVED`.
+5. Dans `offline_reloading`, effectuer exactement un rechargement de preuve à chaud pendant que le contexte reste hors-ligne. `OFFLINE_RELOAD_PROVED` doit lier l'identité de processus, de contexte et de page inchangée et prouver que le navigateur est toujours hors-ligne.
+6. Dans `offline_feed_reasserting`, exiger l'amorçage hors-ligne, l'ensemble des six boutons de navigation, la mission en cache et le favori durable sur Feed. Ensuite, `offline_tjm_renavigating` doit naviguer via le bouton `TJM` exact après rechargement, et `offline_tjm_reasserting` doit reprouver l'historique inchangé, le résultat du filtre local et l'égalité des données pré/post rechargement. Le fait que la page TJM antérieure ait été visible avant le rechargement ne peut pas se substituer à ces deux événements corrélés post-rechargement.
+7. Ce n'est que depuis `restoring` que l'enfant peut invoquer `BrowserContext.setOffline(false)`. Le `ONLINE_PROVED` corrélé doit établir `navigator.onLine === true` et la stabilisation des écouteurs de connexion avant que l'enfant n'entre dans `online_reasserting`. Le `ONLINE_RECOVERY_PROVED` corrélé doit ensuite prouver le toast de récupération `Connexion restaurée`, la suppression du libellé de scan réservé au mode hors-ligne et l'absence de perte de données de profil, de mission, de favori ou de TJM avant que l'enfant ne puisse réussir (pass).
 
-Every offline command and result carries the child effect ID, generation,
-effect kind, page identity and receipt digest defined above. A failure or
-timeout in any live offline state enters `failed_restoring`; cancellation enters
-`cancelled_restoring`. Both retain the first cause and require a separately
-correlated, idempotent online-cleanup result. No stale success, UI text, cleanup
-success or outer-machine inference can turn either path into a pass.
+Chaque commande et résultat hors-ligne transporte l'identifiant d'effet enfant, la génération, le type d'effet, l'identité de page et le condensat de reçu définis ci-dessus. Un échec ou un timeout dans tout état hors-ligne actif entre dans `failed_restoring` ; une annulation entre dans `cancelled_restoring`. Les deux conservent la cause initiale et exigent un résultat de nettoyage en ligne idempotent et corrélé séparément. Aucun succès périmé, texte d'UI, succès de nettoyage ou déduction de la machine externe ne peut transformer l'un de ces chemins en succès.
 
-No network response is needed for success. Recovery proves local truth and UI
-reenablement, not connector reachability.
+Aucune réponse réseau n'est nécessaire au succès. La récupération prouve la conformité locale et la réactivation de l'UI, et non la joignabilité des connecteurs.
 
-## Cross-scenario invariants
+## Invariants inter-scénarios
 
-1. The sealed `dist` tree hash before launch equals the hash after all effects.
-2. `allDependenciesExact` is false unless the admitted phase value binds this
-   revision 11, approved/implemented/verified MV3 harness revision 26 at behavior hash
-   `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`,
-   release-readiness clarification 11 and CV accessible-anchor revision 6 at
-   behavior hash
-   `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`
-   to their exact behavior plus distinct review, implementation and
-   verification receipt hashes, all bound by one committed joint activation
-   receipt.
-3. `inventoryBlobSha256` proves the complete committed V2 object while
-   `scenarioMatrixSha256` proves only its ordered scenario array. Parent and
-   child authority require both exact values and never swap, alias or derive one
-   from the other.
-4. Every non-offline checkpoint advances through the exact closed sequence
-   `CHECKPOINT_STARTED` -> `CHECKPOINT_ROUTE_PROVED` ->
-   `PRE_MUTATION_CAPTURED` -> indexed `UI_ACTION_PROVED` events ->
-   `POST_MUTATION_CAPTURED` -> `WARM_RELOAD_PROVED` -> the checkpoint's bounded
-   zero-or-more `POST_RELOAD_ACTION_READY` / post-reload `UI_ACTION_PROVED`
-   pairs -> `UI_REASSERTED` -> `POST_RELOAD_CAPTURED` ->
-   `CHECKPOINT_PROVED`. No state entry or later proof implies an omitted event.
-5. The machine and offline child each retain at most one pending effect. Exact
-   effect ID, generation, kind, scenario, checkpoint/action where applicable and
-   receipt correlation is required before any result can mutate context.
-6. Every business mutation after preconditions originates from an exact visible
-   UI control; the test adapter never writes expected postconditions.
-7. Side-panel code never reads IndexedDB directly. Test-only IndexedDB setup and
-   capture run in the instrumented service-worker context.
-8. A UI toast, CSS class, rendered label or optimistic local state is never
-   sufficient persistence proof; the public bridge and raw persistence must
-   agree.
-9. A raw persistence row without the matching UI projection is also failure.
-10. Every allowed tracking edge comes from `APPLICATION_TRANSITIONS`; no test
-    patches status directly after setup.
-11. Profile save preserves unrelated fields. CV save preserves all profile
-    fields. Reload never creates a second experience or tracking transition.
-12. After the CV reload, skills may be asserted only after the exact accessible
-    article/toggle/controlled-region contract and closed expansion action pass.
-    CSS position or already-visible skill text has no authority.
-13. Favorites use their stored first-favorited timestamp; reload cannot replace
-    it with a new timestamp.
-14. TJM filter selection is ephemeral, while `tjm_history` is durable.
-15. Theme proof uses the current release V1 snapshot/envelope and never claims
-    Settings V2 global writer fencing.
-16. Onboarding completion requires the full save path. Skip is not equivalent
-    proof.
-17. Offline state comes from real browser network emulation, not DEV stubs or
-    synthetic DOM events.
-18. The offline child solely owns offline entry, offline Feed mutation, TJM
-    navigation, offline reload, post-reload Feed/TJM reassertion, restoration
-    and recovery. Failure and cancellation always retain their cause and end in
-    correlated online cleanup or an explicit cleanup failure.
-19. Warm reload keeps process, profile, context and Playwright epoch fixed. A
-    service-worker restart invalidates this proof path and belongs to its
-    existing scenario.
-20. Zero page errors, worker exceptions, error console entries, failure-class
-    warnings, unhandled rejections and late blocking diagnostics are required.
-21. No optional host permission, external credential, backend or LLM output
-    decides a transition.
-22. The first failed invariant blocks the verdict. Later cleanup cannot turn it
-    green.
-23. `failed_cleaning` is excluded from all generic transitions. Its already
-    allocated cleanup effect terminates only through one current
-    `CLEANUP_PROVED` or `CLEANUP_FAILED`; no retry, reallocation, recursive
-    cleanup, generic failure event or second timeout exists.
-24. Model review authorizes only the closed joint implementation phase. No V2
-    release authority exists before one atomic `JOINT_AUTHORITY_ACTIVATED` CAS;
-    partial producer, consumer, harness, scenario or inventory activation is
-    forbidden.
-25. `verification_only` and `activated_release` are disjoint authority modes.
-    Sandbox success terminates at `verified_only`, is never a packaged release
-    gate, and cannot be promoted; the post-activation release suite runs again
-    from a fresh scenario attempt under activated authority.
-26. Every scenario process and descendant inherits one immutable-source mount
-    authority. Source and its ancestors are recursively read-only throughout
-    execution; only closed output mounts are writable, and none may shadow a
-    tracked or authority-bearing path. Pre/post equality without this OS
-    prevention is insufficient.
-27. A mission-card root is a uniquely named non-interactive article. Only its
-    explicit scoped disclosure control can expand inline details; favorite,
-    status, disclosure and investigation controls remain independent actions.
-    An interactive card root containing nested controls is invalid even if a
-    browser happens to expose usable descendants.
-28. TJM region assertions resolve the uniquely named results region and its
-    named semantic list. Filtering may remove a region result item but never
-    removes the same region from the filter-option catalogue; the two scopes
-    cannot satisfy or invalidate one another.
-29. Theme selection is a confirmed-state projection. Exactly one control is
-    pressed at rest; while a mutation is pending, all three controls are
-    disabled, the group is busy and the prior confirmed control stays pressed.
-    Success moves the pressed state only with the correlated confirmation;
-    failure deterministically restores the same prior confirmed projection.
-30. The sole `test-mv3` diagnostic uploader matches the complete exact
-    `diagnostic_only` contract in this file. It has read-only job permission and
-    zero candidate/activation authority; changing it, adding another uploader
-    or presenting any diagnostic receipt as candidate evidence blocks before
-    release actor construction.
+1. Le hachage de l'arbre `dist` scellé avant le lancement est égal au hachage après tous les effets.
+2. `allDependenciesExact` est faux à moins que la valeur de phase admise ne lie cette révision 11, la révision 26 approuvée/implémentée/vérifiée du harnais MV3 au hachage de comportement `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`, la clarification 11 de préparation à la release et la révision 6 d'ancrage accessible du CV au hachage de comportement `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98` à leurs hachages de comportement exacts plus leurs hachages de reçus distincts de revue, d'implémentation et de vérification, le tout lié par un reçu d'activation conjointe validé.
+3. `inventoryBlobSha256` prouve l'objet V2 complet validé tandis que `scenarioMatrixSha256` prouve uniquement son tableau de scénarios ordonné. L'autorité parente et enfant exigent toutes deux ces valeurs exactes et ne permutent, n'aliasent ni ne dérivent jamais l'une de l'autre.
+4. Chaque checkpoint non hors-ligne avance via la séquence fermée exacte `CHECKPOINT_STARTED` -> `CHECKPOINT_ROUTE_PROVED` -> `PRE_MUTATION_CAPTURED` -> événements `UI_ACTION_PROVED` indexés -> `POST_MUTATION_CAPTURED` -> `WARM_RELOAD_PROVED` -> les paires délimitées de zéro ou plusieurs `POST_RELOAD_ACTION_READY` / `UI_ACTION_PROVED` post-rechargement du checkpoint -> `UI_REASSERTED` -> `POST_RELOAD_CAPTURED` -> `CHECKPOINT_PROVED`. Aucune entrée dans un état ou preuve ultérieure n'implique un événement omis.
+5. La machine et l'enfant hors-ligne conservent chacun au plus un effet en attente. Une corrélation exacte de l'identifiant d'effet, de la génération, du type, du scénario, du checkpoint/action le cas échéant et du reçu est requise avant que tout résultat ne puisse muter le contexte.
+6. Toute mutation métier après les préconditions trouve son origine dans un contrôle d'UI visible exact ; l'adaptateur de test n'écrit jamais les postconditions attendues.
+7. Le code du panneau latéral (sidepanel) ne lit jamais directement IndexedDB. La configuration et la capture IndexedDB réservées aux tests s'exécutent dans le contexte du service worker instrumenté.
+8. Un toast d'UI, une classe CSS, un libellé rendu ou un état local optimiste ne constitue jamais une preuve de persistance suffisante ; le pont public et la persistance brute doivent concorder.
+9. Une ligne de persistance brute sans la projection d'UI correspondante constitue également un échec.
+10. Chaque arête de suivi autorisée provient de `APPLICATION_TRANSITIONS` ; aucun test ne patche le statut directement après la configuration.
+11. La sauvegarde de profil préserve les champs sans rapport. La sauvegarde de CV préserve tous les champs du profil. Le rechargement ne crée jamais de seconde expérience ou transition de suivi.
+12. Après le rechargement du CV, les compétences ne peuvent être affirmées qu'après que le contrat exact d'article/bascule/région contrôlée accessible et l'action d'expansion fermée ont réussi. La position CSS ou le texte de compétences déjà visible ne fait pas autorité.
+13. Les favoris utilisent leur horodatage de premier ajout en favori stocké ; le rechargement ne peut pas le remplacer par un nouvel horodatage.
+14. La sélection du filtre TJM est éphémère, tandis que `tjm_history` est durable.
+15. La preuve de thème utilise l'instantané/enveloppe V1 de release actuel et ne revendique jamais le cloisonnement d'écrivain global de Réglages V2.
+16. L'achèvement de l'onboarding nécessite le parcours complet de sauvegarde. L'omission (skip) ne constitue pas une preuve équivalente.
+17. L'état hors-ligne provient de la véritable émulation réseau du navigateur, et non de stubs DEV ou d'événements DOM synthétiques.
+18. L'enfant hors-ligne détient exclusivement l'entrée hors-ligne, la mutation du Feed hors-ligne, la navigation TJM, le rechargement hors-ligne, la réaffirmation post-rechargement de Feed/TJM, la restauration et la récupération. L'échec et l'annulation conservent toujours leur cause et se terminent par un nettoyage en ligne corrélé ou un échec de nettoyage explicite.
+19. Le rechargement à chaud conserve fixes le processus, le profil, le contexte et l'époque Playwright. Un redémarrage du service worker invalide ce chemin de preuve et appartient à son scénario existant.
+20. Zéro erreur de page, exception de worker, entrée de console d'erreur, avertissement de classe échec, rejet non géré et diagnostic bloquant tardif sont exigés.
+21. Aucune permission d'hôte optionnelle, identifiant externe, backend ou sortie de LLM ne décide d'une transition.
+22. Le premier invariant en échec bloque le verdict. Un nettoyage ultérieur ne peut pas le rendre vert.
+23. `failed_cleaning` est exclu de toutes les transitions génériques. Son effet de nettoyage déjà alloué ne se termine que par un `CLEANUP_PROVED` ou `CLEANUP_FAILED` actuel ; aucune relance, réallocation, nettoyage récursif, événement d'échec générique ou second timeout n'existe.
+24. La revue du modèle n'autorise que la phase fermée d'implémentation conjointe. Aucune autorité de release V2 n'existe avant un CAS atomique `JOINT_AUTHORITY_ACTIVATED` ; toute activation partielle de producteur, consommateur, harnais, scénario ou inventaire est interdite.
+25. `verification_only` et `activated_release` sont des modes d'autorité disjoints. Le succès en bac à sable se termine à `verified_only`, ne constitue jamais une porte de release packagée, et ne peut être promu ; la suite de release post-activation s'exécute à nouveau à partir d'une nouvelle tentative de scénario sous l'autorité activée.
+26. Chaque processus de scénario et descendant hérite d'une autorité de montage de source immuable. La source et ses ancêtres sont récursivement en lecture seule pendant toute l'exécution ; seuls les montages de sortie fermés sont accessibles en écriture, et aucun ne peut masquer un chemin suivi ou porteur d'autorité. L'égalité avant/après sans cette prévention au niveau de l'OS est insuffisante.
+27. Une racine de carte de mission est un article non interactif nommé de manière unique. Seul son contrôle de divulgation délimité explicite peut développer les détails en ligne ; les contrôles de favori, de statut, de divulgation et d'investigation demeurent des actions indépendantes. Une racine de carte interactive contenant des contrôles imbriqués est invalide même si un navigateur se trouve exposer des descendants utilisables.
+28. Les assertions de région TJM résolvent la région de résultats nommée de manière unique et sa liste sémantique nommée. Le filtrage peut supprimer un élément de résultat de région mais ne supprime jamais cette même région du catalogue d'options de filtrage ; les deux portées ne peuvent ni se satisfaire ni s'invalider mutuellement.
+29. La sélection de thème est une projection d'état confirmé. Exactement un contrôle est pressé au repos ; pendant qu'une mutation est en attente, les trois contrôles sont désactivés, le groupe est occupé et le contrôle confirmé précédent reste pressé. Le succès ne déplace l'état pressé qu'avec la confirmation corrélée ; l'échec rétablit de façon déterministe la même projection confirmée antérieure.
+30. L'unique téléverseur de diagnostics `test-mv3` correspond au contrat complet et exact `diagnostic_only` de ce fichier. Il dispose d'une permission de job en lecture seule et d'aucune autorité candidate/d'activation ; le modifier, ajouter un autre téléverseur ou présenter un quelconque reçu de diagnostic comme preuve candidate bloque avant la construction des acteurs de release.
 
-## Review obligations before implementation
+## Obligations de revue avant implémentation
 
-An independent reviewer must verify the exact raw file hash and answer every
-item below with evidence:
+Un réviseur indépendant doit vérifier le hachage brut exact du fichier et répondre à chaque point ci-dessous avec des preuves :
 
-### Authority and explicit transition closure
+### Autorité et fermeture explicite des transitions
 
-- reproduce the raw UTF-8/LF pending behavior hash using only the specified
-  placeholder substitution and bind the review receipt to those exact bytes;
-- confirm that dependency receipt hashes are not edited into this model and
-  that runtime authority requires three distinct immutable receipts per model;
-- confirm that no release-authorizing verdict can be issued while the
-  exact harness revision-26 hash
-  `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`
-  lacks any matching approval, implementation or verification receipt, or
-  while the release-readiness clarification-11, revision-11, joint-activation or
-  CV anchor authority is missing;
-- confirm the CV anchor tuple is exactly revision 6 at behavior hash
-  `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`
-  and that no withdrawn revision-5 receipt, worktree implementation or focused
-  component pass can satisfy its distinct implementation/verification slots;
-- confirm parent clarification 11 and this child jointly require the distinct
-  blob digest `b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef`
-  and scenario-matrix digest
-  `2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a`;
-- trace `review_waiting -> implementing -> verification_pending ->
-evidence_frozen -> verified -> activated`, prove implementation can proceed
-  jointly without authority, and
-  prove only one catalog CAS can activate all V2 consumers together;
-- prove the private verification sandbox can reach only `verified_only`, cannot
-  emit a release gate, and that activated release proof reruns the scenarios
-  rather than promoting sandbox evidence;
-- prove each command and descendant enters with the same read-only source mount,
-  empty capability bounding set, `no_new_privs` and closed writable output mount
-  set; hostile write/chmod/link/symlink/mount/remount/namespace attempts fail
-  during execution rather than being detected only after restoration;
-- prove no privileged service socket, FUSE device, sudo/setuid/file-capability
-  gain or helper broker lets a child ask another process to mutate source;
-- prove workflow inspection accepts exactly the pinned `test:mv3`
-  `diagnostic_only` uploader and rejects candidate bytes, `dist`, unbounded
-  paths, a mutable action, a second uploader or any diagnostic receipt used as
-  release authority;
-- prove every writable mount target was absent from the Git tree, empty before
-  attachment, is outside authority-bearing paths, and cannot overlay or shadow a
-  source, module, test, fixture, harness, Playwright config, script, lock or
-  config byte;
-- trace every machine row from one typed event to one named guard/action and
-  verify `CHECKPOINT_STARTED`, `PRE_MUTATION_CAPTURED` and `UI_REASSERTED` have
-  exact effect/generation/checkpoint correlation rather than implicit entry or
-  Promise authority;
-- verify mutation and post-reload `UI_ACTION_PROVED` variants are phase-typed
-  and cannot satisfy one another's guards;
-- trace the complete online -> offline Feed -> offline TJM -> offline reload ->
-  Feed reassertion -> TJM re-navigation/reassertion -> restoring -> online
-  recovery path, plus failure, timeout and cancellation cleanup;
-- verify checkpoint A3 performs its closed post-reload expansion action through
-  the separately reviewed accessible article/toggle/region contract before any
-  skill assertion, with no CSS or positional fallback.
-- verify checkpoint A1 resolves exactly one article named
-  `Mission Architecte TypeScript Packaged chez Client Preuve`, that its root is
-  non-interactive, and that its favorite pressed state, named status group,
-  unique `role=status`, busy/disabled settlement projection and stable bounded
-  controlled-details disclosure are independently scoped; reject
-  nested-button pseudo-cards, article-surface clicks, optimistic status/favorite
-  success and drawer/disclosure transition conflation;
-- verify checkpoint B2 resolves only `role=region[name="TJM par région"]` and
-  the unique `h3`, `list[name="Régions analysées"]`, direct `li` items and their
-  unique `h4` headings; prove the Lyon absence check cannot inspect or be
-  satisfied by the filter options;
-- verify checkpoint B3 resolves only `role=group[name="Apparence"]`, proves the
-  exact `Clair`/`Sombre`/`Système` set, exactly one confirmed pressed control,
-  and deterministic pending, success and failure projections with no optimistic
-  theme class or pressed state;
+- reproduire le hachage de comportement en attente UTF-8/LF brut en utilisant uniquement la substitution d'espace réservé spécifiée et lier le reçu de revue à ces octets exacts ;
+- confirmer que les hachages de reçus de dépendance ne sont pas édités dans ce modèle et que l'autorité à l'exécution exige trois reçus immuables distincts par modèle ;
+- confirmer qu'aucun verdict autorisant la release ne peut être émis tant que le hachage exact de la révision 26 du harnais `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b` manque d'un reçu d'approbation, d'implémentation ou de vérification correspondant, ou tant que la clarification 11 de préparation à la release, la révision 11, l'activation conjointe ou l'autorité d'ancrage du CV font défaut ;
+- confirmer que l'uplet d'ancrage du CV correspond exactement à la révision 6 au hachage de comportement `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98` et qu'aucun reçu retiré de révision 5, implémentation de copie de travail ou succès de composant ciblé ne peut satisfaire ses emplacements distincts d'implémentation/vérification ;
+- confirmer que la clarification parente 11 et cet enfant exigent conjointement le condensat de blob distinct `b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef` et le condensat de matrice de scénarios `2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a` ;
+- retracer `review_waiting -> implementing -> verification_pending -> evidence_frozen -> verified -> activated`, prouver que l'implémentation peut se dérouler conjointement sans autorité, et prouver qu'un seul CAS de catalogue peut activer tous les consommateurs V2 ensemble ;
+- prouver que le bac à sable de vérification privé ne peut atteindre que `verified_only`, ne peut pas émettre de porte de release, et que la preuve de release activée réexécute les scénarios plutôt que de promouvoir les preuves du bac à sable ;
+- prouver que chaque commande et descendant entre avec le même montage source en lecture seule, un ensemble de limitation de capacités vide, `no_new_privs` et un ensemble fermé de montages de sortie accessibles en écriture ; les tentatives hostiles d'écriture/chmod/link/symlink/mount/remount/namespace échouent pendant l'exécution plutôt que d'être détectées seulement après restauration ;
+- prouver qu'aucun socket de service privilégié, périphérique FUSE, gain de privilège sudo/setuid/capacité de fichier ou courtier intermédiaire ne permet à un enfant de demander à un autre processus de muter la source ;
+- prouver que l'inspection des flux de travail accepte exactement le téléverseur épinglé `diagnostic_only` de `test:mv3` et rejette les octets candidats, `dist`, les chemins non bornés, une action mutable, un second téléverseur ou tout reçu de diagnostic utilisé comme autorité de release ;
+- prouver que chaque cible de montage accessible en écriture était absente de l'arbre Git, vide avant d'être attachée, se situe en dehors des chemins porteurs d'autorité, et ne peut pas superposer ou masquer un octet de source, module, test, fixture, harnais, configuration Playwright, script, verrou ou configuration ;
+- retracer chaque ligne de la machine depuis un événement typé vers une garde/action nommée et vérifier que `CHECKPOINT_STARTED`, `PRE_MUTATION_CAPTURED` et `UI_REASSERTED` ont une corrélation exacte d'effet/génération/checkpoint plutôt qu'une autorité implicite d'entrée ou de Promise ;
+- vérifier que les variantes de `UI_ACTION_PROVED` de mutation et post-rechargement sont typées par phase et ne peuvent pas satisfaire les gardes de l'autre ;
+- retracer le chemin complet en ligne -> Feed hors-ligne -> TJM hors-ligne -> rechargement hors-ligne -> réaffirmation du Feed -> re-navigation/réaffirmation du TJM -> restauration -> récupération en ligne, ainsi que le nettoyage en cas d'échec, de timeout et d'annulation ;
+- vérifier que le checkpoint A3 effectue son action d'expansion fermée post-rechargement via le contrat accessible d'article/bascule/région revu séparément avant toute assertion de compétences, sans repli CSS ou positionnel.
+- vérifier que le checkpoint A1 résout exactement un article nommé `Mission Architecte TypeScript Packaged chez Client Preuve`, que sa racine est non interactive, et que son état pressé de favori, son groupe de statuts nommé, son `role=status` unique, sa projection de règlement occupé/désactivé et sa divulgation stable et bornée de détails contrôlés sont délimités de manière indépendante ; rejeter les pseudo-cartes à boutons imbriqués, les clics sur la surface de l'article, le succès optimiste de statut/favori et la confusion entre transitions de tiroir et de divulgation ;
+- vérifier que le checkpoint B2 résout uniquement `role=region[name="TJM par région"]` et le `h3` unique, `list[name="Régions analysées"]`, les éléments `li` directs et leurs en-têtes `h4` uniques ; prouver que la vérification d'absence de Lyon ne peut pas inspecter ni être satisfaite par les options de filtrage ;
+- vérifier que le checkpoint B3 résout uniquement `role=group[name="Apparence"]`, prouve l'ensemble exact `Clair`/`Sombre`/`Système`, exactement un contrôle pressé confirmé, et des projections déterministes d'attente, de succès et d'échec sans classe de thème optimiste ni état pressé optimiste ;
 
-### Nominal and persistence
+### Nominal et persistance
 
-- each of six tabs has at least one real user action and one UI assertion;
-- Feed, Profil, CV, Candidatures and Réglages each have a durable mutation,
-  read-back and warm reload assertion;
-- TJM correctly distinguishes durable history from ephemeral filtering;
-- onboarding uses save, alert acknowledgement and consent, not skip;
-- offline reload and online recovery preserve local data.
+- chacun des six onglets comporte au moins une action utilisateur réelle et une assertion d'UI ;
+- Feed, Profil, CV, Candidatures et Réglages ont chacun une assertion de mutation durable, de relecture et de rechargement à chaud ;
+- le TJM distingue correctement l'historique durable du filtrage éphémère ;
+- l'onboarding utilise la sauvegarde, l'accusé de réception d'alerte et le consentement, et non l'omission (skip) ;
+- le rechargement hors-ligne et la récupération en ligne préservent les données locales.
 
-### Errors, cancellation and retry
+### Erreurs, annulation et relance
 
-- every adapter, bridge, storage, UI, reload and network-mode failure has a
-  typed terminal path;
-- verify `failed_cleaning` is excluded from every wildcard/generic row, accepts
-  only current `CLEANUP_PROVED` or `CLEANUP_FAILED` as outgoing transitions and
-  cannot retry, reallocate, recurse or consume a second `TIMEOUT`;
-- offline timeout and failure enter `failed_restoring`; cancellation enters
-  `cancelled_restoring`; each cleanup result repeats the exact pending effect
-  tuple and preserves the original cause;
-- release proofs forbid Playwright retries;
-- optimistic favorite state cannot pass before storage acknowledgement;
-- profile/CV/tracking save failures cannot be mistaken for success;
-- no hidden reseed, clear, reset or retry occurs after preconditions.
+- chaque défaillance d'adaptateur, de pont, de stockage, d'UI, de rechargement et de mode réseau dispose d'un chemin terminal typé ;
+- vérifier que `failed_cleaning` est exclu de chaque ligne générique/wildcard, n'accepte que `CLEANUP_PROVED` ou `CLEANUP_FAILED` actuel comme transitions sortantes et ne peut pas relancer, réallouer, récurser ou consommer un second `TIMEOUT` ;
+- le timeout et l'échec hors-ligne entrent dans `failed_restoring` ; l'annulation entre dans `cancelled_restoring` ; chaque résultat de nettoyage répète l'uplet d'effet en attente exact et préserve la cause d'origine ;
+- les preuves de release interdisent les relances Playwright ;
+- l'état de favori optimiste ne peut pas réussir avant l'accusé de réception du stockage ;
+- les échecs de sauvegarde de profil/CV/suivi ne peuvent pas être pris pour des succès ;
+- aucun réamorçage, effacement, réinitialisation ou relance caché ne se produit après les préconditions.
 
-### Permissions and boundaries
+### Permissions et frontières
 
-- scenarios request no optional host permission and open no external URL;
-- the adapter is test-only and excluded from `dist` by an artifact test;
-- the current tracking wire v1 and Settings release V1 boundaries are explicit;
-- onboarding source non-persistence is not concealed;
-- premium dormant behavior is not faked with a storage override.
+- les scénarios ne demandent aucune permission d'hôte optionnelle et n'ouvrent aucune URL externe ;
+- l'adaptateur est réservé aux tests et exclu de `dist` par un test d'artefact ;
+- les frontières actuelles du wire v1 de suivi et de la release V1 des réglages sont explicites ;
+- la non-persistance de la source d'onboarding n'est pas dissimulée ;
+- le comportement dormant premium n'est pas simulé par une surcharge de stockage.
 
-### Determinism and capacity
+### Déterminisme et capacité
 
-- inventory byte order, both non-interchangeable digests and annotation parity
-  are exact in child and parent authority;
-- fixture schemas and dates are valid under current runtime decoders;
-- capture normalization is canonical and bounded;
-- time-dependent values use recorded intervals or browser-derived ISO, never
-  wall-clock string snapshots;
-- stale/duplicate/wrong-generation events cannot advance the machine;
-- all loops, buffers, rows, actions, checkpoints and deadlines are bounded.
+- l'ordre des octets de l'inventaire, les deux condensats non interchangeables et la parité des annotations sont exacts dans l'autorité enfant et parente ;
+- les schémas et dates des fixtures sont valides sous les décodeurs d'exécution actuels ;
+- la normalisation de la capture est canonique et bornée ;
+- les valeurs dépendantes du temps utilisent des intervalles enregistrés ou l'ISO dérivé du navigateur, jamais des instantanés de chaînes de temps réel (wall-clock) ;
+- les événements périmés/dupliqués/de mauvaise génération ne peuvent pas faire avancer la machine ;
+- l'ensemble des boucles, tampons, lignes, actions, checkpoints et échéances sont bornés.
 
-## Joint implementation and activation order after approval
+## Ordre d'implémentation conjointe et d'activation après approbation
 
-The current revision permits review only. Its independent approval, together
-with approvals of clarification 11, MV3 revision 26, the CV anchor and aligned
-satellite models, permits entry into the non-authoritative joint implementation
-phase. The required order is:
+La révision actuelle n'autorise que la revue. Son approbation indépendante, conjointement avec les approbations de la clarification 11, de la révision 26 de MV3, de l'ancre du CV et des modèles satellites alignés, permet l'entrée dans la phase d'implémentation conjointe non souveraine. L'ordre requis est :
 
-1. independently review these exact revision-11 bytes and every exact companion
-   model; no review receipt alone is release authority;
-2. dispatch one correlated `JOINT_IMPLEMENTATION_STARTED` event and freeze its
-   phase ID, reviewed model tuples and bounded plan;
-3. add RED unit/component/Playwright contract tests for inventory v2 parsing,
-   strict ASCII order, duplicate/missing annotation rejection, adapter decoders,
-   snapshot canonicalization, bounds, machine forbidden transitions, the
-   non-interactive named MissionCard article, pressed favorite, named
-   status/busy projection and controlled disclosure, the TJM named
-   region/list/direct-item/heading scope, and the appearance group's
-   confirmed/pending/failure semantics. The RED receipts must prove the current
-   implementation fails for the intended contract reason before UI production
-   code changes;
-4. implement those three packaged UI-anchor contracts, then add the private
-   XState scenario machine, offline child and pure closed
-   scenario plans;
-5. add the test-only service-worker data adapter and prove it is absent from
-   `dist`;
-6. implement the four Playwright scenarios with exact annotations and zero
-   retries;
-7. implement every parent, producer and consumer V2 reader behind the inactive
-   joint phase; no consumer is independently authoritative;
-8. freeze one clean implementation commit/tree and emit the ordered
-   review-plus-implementation authority set;
-9. materialize that commit/tree, install the immutable-source mount/capability
-   boundary and closed output mounts, and reject until its pre-exec authority
-   receipt passes;
-10. construct the phase sandbox from that implemented set and run focused
-    unit/contract tests, including forbidden transitions, stale results,
-    `failed_cleaning` rejection of generic failure/cancel/timeout events, offline
-    failure/cancel cleanup and CV anchor ambiguity;
-11. in the same sandbox, run the canonical packaged MV3 command against a
-    freshly built sealed artifact; require all scenarios to terminate
-    `verified_only`, emit no release gate, and require every command receipt to
-    retain the exact immutable-source and output-mount authority;
-12. freeze the ordered evidence set, issue distinct verification receipts for
-    every model, and construct the exact ordered verified set;
-13. perform one `JOINT_AUTHORITY_ACTIVATED` catalog CAS that atomically switches
-    every consumer to V2 and retains pre/post artifact digests, both inventory
-    authority digests, all model receipts, checkpoint receipt hashes and
-    zero-diagnostic evidence;
-14. for an actual candidate, rerun the complete packaged suite from fresh
-    attempts under `activated_release`; only those receipts may enter the release
-    gate.
+1. réviser de manière indépendante ces octets exacts de la révision 11 et chaque modèle compagnon exact ; aucun reçu de revue seul ne constitue une autorité de release ;
+2. distribuer un événement corrélé `JOINT_IMPLEMENTATION_STARTED` et figer son identifiant de phase, les uplets de modèles revus et le plan délimité ;
+3. ajouter des tests de contrat unitaires/de composant/Playwright RED pour l'analyse de l'inventaire v2, l'ordre ASCII strict, le rejet d'annotations dupliquées/manquantes, les décodeurs d'adaptateur, la canonisation des instantanés, les limites, les transitions interdites de la machine, l'article nommé non interactif de MissionCard, le favori pressé, la projection de statut nommé/occupé et la divulgation contrôlée, la portée nommée région/liste/élément direct/en-tête du TJM, et la sémantique confirmée/en attente/échec du groupe d'apparence. Les reçus RED doivent prouver que l'implémentation actuelle échoue pour la raison de contrat visée avant que le code de production de l'UI ne change ;
+4. implémenter ces trois contrats d'ancrage d'UI packagés, puis ajouter la machine de scénarios XState privée, l'enfant hors-ligne et les plans de scénarios purs fermés ;
+5. ajouter l'adaptateur de données de service worker réservé aux tests et prouver son absence de `dist` ;
+6. implémenter les quatre scénarios Playwright avec des annotations exactes et zéro relance ;
+7. implémenter chaque lecteur V2 parent, producteur et consommateur derrière la phase conjointe inactive ; aucun consommateur ne fait autorité de manière indépendante ;
+8. figer un commit/arbre d'implémentation propre et émettre l'ensemble ordonné d'autorité revue plus implémentation ;
+9. matérialiser ce commit/arbre, installer la frontière de montage/capacités de source immuable et les montages de sortie fermés, et rejeter jusqu'à ce que son reçu d'autorité pré-exécution réussisse ;
+10. construire le bac à sable de phase à partir de cet ensemble implémenté et exécuter des tests unitaires/de contrat ciblés, y compris les transitions interdites, les résultats périmés, le rejet par `failed_cleaning` des événements d'échec/annulation/timeout génériques, le nettoyage en cas d'échec/annulation hors-ligne et l'ambiguïté de l'ancre de CV ;
+11. dans le même bac à sable, exécuter la commande packagée MV3 canonique sur un artefact scellé fraîchement compilé ; exiger que tous les scénarios se terminent par `verified_only`, n'émettent aucune porte de release, et exiger que chaque reçu de commande conserve l'autorité exacte de source immuable et de montage de sortie ;
+12. figer l'ensemble de preuves ordonné, émettre des reçus de vérification distincts pour chaque modèle, et construire l'ensemble vérifié ordonné exact ;
+13. effectuer un CAS de catalogue `JOINT_AUTHORITY_ACTIVATED` qui bascule de manière atomique chaque consommateur vers la V2 et conserve les condensats d'artefacts avant/après, les deux condensats d'autorité d'inventaire, tous les reçus de modèles, les hachages de reçus de checkpoint et zéro preuve de diagnostic ;
+14. pour un candidat réel, réexécuter la suite packagée complète à partir de tentatives vierges sous `activated_release` ; seuls ces reçus peuvent entrer dans la porte de release.
 
-## Release gate
+## Porte de release
 
-The extension can claim this packaged tab proof only when:
+L'extension ne peut prétendre à cette preuve d'onglets packagés que lorsque :
 
-- the admitted authority tuple names this exact independently approved child
-  behavior hash and exact approved/implemented/verified dependency receipts for
-  MV3 harness revision 26 at behavior hash
-  `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`,
-  release-readiness clarification 11, this revision 11 and the CV
-  accessible-anchor revision 6 at behavior hash
-  `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`;
-- one committed joint activation receipt proves clarification 11, revision 11,
-  the aligned producer/consumer refinements and MV3 revision 26 were implemented
-  and verified against the same clean committed V2 blob;
-- the committed inventory object hashes exactly to
-  `inventoryBlobSha256=b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef`
-  and its derived ordered array hashes exactly to
-  `scenarioMatrixSha256=2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a`;
-- all four new scenario IDs execute exactly once and pass together with every
-  preserved V1 scenario and exact annotation parity under
-  `authorityMode:'activated_release'`; no `verified_only` receipt is present;
-- every non-offline checkpoint retains correlated before, post-mutation,
-  post-reload UI and post-reload persistence receipts with equal durable
-  projections;
-- the offline child completes its full reload/re-navigation/recovery path and
-  ends online; every failed or cancelled run also has truthful correlated
-  online cleanup evidence;
-- CV post-reload skills are proved only inside the controlled expanded region;
-- diagnostics are empty and the post-test artifact digest equals the pre-launch
-  digest;
-- every build/scenario command receipt binds the same immutable-source authority,
-  source mount/ancestors stayed OS-read-only for the entire child process tree,
-  and only the closed dependency/cache/dist/profile/report mounts were writable.
+- l'uplet d'autorité admis nomme ce hachage de comportement enfant exact approuvé de manière indépendante et des reçus de dépendance approuvés/implémentés/vérifiés exacts pour la révision 26 du harnais MV3 au hachage de comportement `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`, la clarification 11 de préparation à la release, cette révision 11 et la révision 6 d'ancrage accessible du CV au hachage de comportement `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98` ;
+- un reçu d'activation conjointe validé prouve que la clarification 11, la révision 11, les raffinements producteurs/consommateurs alignés et la révision 26 de MV3 ont été implémentés et vérifiés par rapport au même blob V2 validé propre ;
+- l'objet d'inventaire validé a pour hachage exact `inventoryBlobSha256=b386a936abad72ccd4fe2b0dd5cdf2390a6762e3d2ce3e0b0e07635f16f6a1ef` et son tableau ordonné dérivé a pour hachage exact `scenarioMatrixSha256=2a9c9f67e0c19a0dae126f7db15c25a0c1411b0753e63ecad6eaa0824720f79a` ;
+- l'ensemble des quatre nouveaux identifiants de scénario s'exécutent exactement une fois et réussissent conjointement avec chaque scénario V1 préservé et une parité exacte des annotations sous `authorityMode:'activated_release'` ; aucun reçu `verified_only` n'est présent ;
+- chaque checkpoint non hors-ligne conserve des reçus corrélés d'avant, post-mutation, d'UI post-rechargement et de persistance post-rechargement avec des projections durables égales ;
+- l'enfant hors-ligne termine son parcours complet de rechargement/re-navigation/récupération et se termine en ligne ; chaque exécution en échec ou annulée dispose également de preuves corrélées fidèles de nettoyage en ligne ;
+- les compétences post-rechargement du CV sont prouvées uniquement à l'intérieur de la région développée contrôlée ;
+- les diagnostics sont vides et le condensat d'artefact post-test est égal au condensat d'avant lancement ;
+- chaque reçu de commande de build/scénario lie la même autorité de source immuable, le montage source et ses ancêtres sont restés en lecture seule au niveau de l'OS pour l'ensemble de l'arbre de processus enfant, et seuls les montages fermés de dépendances/cache/dist/profil/rapport étaient accessibles en écriture.
 
-Any skipped scenario, test retry, stale inventory consumer, adapter leakage into
-`dist`, promoted/re-labeled verification-only evidence,
-missing/stale/mismatched/cross-role receipt, absent or partial joint
-activation, digest substitution, source-hash mismatch, missing/changed mount or
-capability receipt, writable source/ancestor, tracked-path shadow, overlay,
-chmod/remount/symlink escape, omitted typed
-checkpoint event, implicit offline transition, ambiguous CV anchor,
-optimistic-only success, raw/UI divergence, diagnostic, cleanup failure or
-artifact drift blocks production readiness.
+Tout scénario ignoré, relance de test, consommateur d'inventaire obsolète, fuite d'adaptateur dans `dist`, preuve de vérification seule promue/réétiquetée, reçu manquant/périmé/discordant/de rôle croisé, activation conjointe absente ou partielle, substitution de condensat, discordance de hachage source, reçu de montage ou de capacité manquant/modifié, source/ancêtre accessible en écriture, masquage de chemin suivi, overlay, échappement par chmod/remount/symlink, événement de checkpoint typé omis, transition hors-ligne implicite, ancre de CV ambiguë, succès optimiste seul, divergence brut/UI, diagnostic, échec de nettoyage ou dérive d'artefact bloque la préparation à la production.
 
-## Known risks exposed by this model
+## Risques connus exposés par ce modèle
 
-1. **Harness seam gap.** The public fixture has no typed IndexedDB seed/capture
-   method today. The test-only, hash-bound service-worker adapter is required
-   before these scenarios can be implemented without DEV stubs.
-2. **Harness revision-26 blocker.** Revision 26 at normalized behavior hash
-   `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`
-   is only a pending candidate. Its distinct approval, implementation and
-   verification receipts are required; no earlier revision or differently
-   hashed implementation can substitute.
-3. **Joint activation blocker.** Release-readiness clarification 11 and this
-   revision 11 have no committed `JointReleaseModelActivationV1`. Approved models
-   may enter only the non-authoritative joint implementation phase; no V2
-   release candidate is admitted until the atomic activation CAS succeeds.
-4. **CV accessible-anchor implementation blocker.** CV model revision 6 at
-   behavior hash
-   `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`
-   has independent model approval and defines the required stable article,
-   controlled expansion, callback-settlement, synchronous focus-exit port and
-   nested terminal cleanup semantics. Matching implementation and verification
-   receipts on the joint clean tree are still required before checkpoint A3 can
-   assert post-reload skills.
-5. **Diagnostic inspector blocker.** The current release-workflow inspector
-   rejects the exact `test:mv3` diagnostic `upload-artifact` step. It must learn
-   the closed non-candidate projection above while retaining fail-closed
-   rejection of every candidate-shaped or unmodeled upload.
-6. **Settings authority gap.** The broad Settings V2 model reports an incomplete
-   global writer cutover. This test exercises the shipped V1 release envelope;
-   it must not be cited as closure of that separate blocker.
-7. **Tracking authority gap.** Packaged runtime remains on wire v1. These tests
-   do not prove wire v2 ledger, CAS, restart reconciliation or data epoch rules.
-8. **Onboarding source gap.** Source choice is currently ephemeral and the
-   onboarding source model is not connected. If product acceptance expects the
-   chosen connector to survive reload, production readiness remains blocked
-   outside this scenario scope.
-9. **Onboarding skip mismatch.** Current skip completion does not prove the
-   target model's transactional `autoScan:false` rule. The success scenario
-   avoids skip, but the mismatch remains separate debt.
-10. **TJM storage documentation drift.** The storage module claims IndexedDB in
-    its header while runtime uses `chrome.storage.local`. A future migration must
-    update this model and fixtures atomically.
-11. **Schema/version drift.** The adapter is pinned to DB5/data2 and current
-    store key paths. A structural or data migration requires a new reviewed
-    model revision before tests are updated.
-12. **Packaged UI-anchor implementation blocker.** Current MissionCard has an
-    interactive `role=button` root containing nested buttons and no closed
-    named status settlement group; current TJM insights are generic `div`
-    elements without list items/headings; and current theme controls expose no
-    named group, pressed state or pending disable/busy contract. Checkpoints A1,
-    B2 and B3 above close those semantics. Their exact implementation and
-    verification receipts are required before the packaged scenarios can run;
-    ad-hoc test IDs, positional selectors and page-global absence assertions
-    remain forbidden.
-13. **Local timezone.** `datetime-local` conversion depends on the browser
-    timezone. Capturing the page-derived expected ISO avoids a Europe/Paris
-    snapshot assumption, but browser timezone drift must still be retained in
-    evidence.
-14. **Offline harness seam.** The fixture exposes the Playwright page but no
-    typed network-mode capability. Implementation must wrap the current
-    `BrowserContext.setOffline` call in the closed commands modeled here and
-    prove online cleanup; synthetic page events are not an acceptable fallback.
-15. **Missing dedicated TJM workflow model.** TJM has pure analysis code and a
-    storage adapter but no standalone state/workflow model. This document owns
-    only the packaged read/filter/reload proof; a future TJM mutation workflow
-    requires its own Model -> Review gate.
-16. **CV/availability concurrency debt.** The packaged add-experience checkpoint
-    is sequential and does not close the reported race between CV or
-    availability saves and active sync/push loops. That race remains a separate
-    production-readiness risk.
-17. **Generated asset linkage debt.** Generated assets persist independently,
-    while current generation does not reliably append their IDs to
-    `MissionTracking.generatedAssetIds`. These scenarios neither exercise nor
-    conceal that gap.
+1. **Écart de point de raccordement du harnais.** La fixture publique n'a pas de méthode d'amorçage/capture IndexedDB typée aujourd'hui. L'adaptateur de service worker réservé aux tests et lié par hachage est requis avant que ces scénarios puissent être implémentés sans stubs DEV.
+2. **Bloqueur de la révision 26 du harnais.** La révision 26 au hachage de comportement normalisé `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b` n'est qu'un candidat en attente. Ses reçus distincts d'approbation, d'implémentation et de vérification sont requis ; aucune révision antérieure ou implémentation hachée différemment ne peut s'y substituer.
+3. **Bloqueur d'activation conjointe.** La clarification 11 de préparation à la release et cette révision 11 n'ont aucun `JointReleaseModelActivationV1` validé. Les modèles approuvés ne peuvent entrer que dans la phase d'implémentation conjointe non souveraine ; aucun candidat de release V2 n'est admis tant que le CAS d'activation atomique n'a pas réussi.
+4. **Bloqueur d'implémentation de l'ancre accessible du CV.** La révision 6 du modèle de CV au hachage de comportement `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98` dispose d'une approbation de modèle indépendante et définit la sémantique requise d'article stable, d'expansion contrôlée, de règlement de callback, de port synchrone de sortie de focus et de nettoyage terminal imbriqué. Des reçus d'implémentation et de vérification correspondants sur l'arbre propre conjoint sont toujours requis avant que le checkpoint A3 ne puisse affirmer les compétences post-rechargement.
+5. **Bloqueur de l'inspecteur de diagnostics.** L'inspecteur actuel des flux de travail de release rejette l'étape exacte `upload-artifact` de diagnostic de `test:mv3`. Il doit intégrer la projection fermée non candidate ci-dessus tout en conservant le rejet hermétique en échec de tout téléversement de forme candidate ou non modélisé.
+6. **Écart d'autorité des réglages.** Le modèle étendu de Réglages V2 signale une bascule incomplète du cloisonnement global des écritures. Ce test exerce l'enveloppe de release V1 livrée ; il ne doit pas être cité comme une résolution de ce bloqueur distinct.
+7. **Écart d'autorité de suivi.** Le runtime packagé reste sur le wire v1. Ces tests ne prouvent pas le registre (ledger), le CAS, la réconciliation au redémarrage ou les règles d'époque de données du wire v2.
+8. **Écart de source d'onboarding.** Le choix de source est actuellement éphémère et le modèle de source d'onboarding n'est pas connecté. Si la recette produit s'attend à ce que le connecteur choisi survive au rechargement, la préparation à la production reste bloquée en dehors de la portée de ce scénario.
+9. **Discordance d'omission d'onboarding.** L'achèvement actuel par omission ne prouve pas la règle transactionnelle `autoScan:false` du modèle cible. Le scénario de succès évite l'omission, mais la discordance demeure une dette distincte.
+10. **Dérive de documentation du stockage TJM.** Le module de stockage revendique IndexedDB dans son en-tête tandis que le runtime utilise `chrome.storage.local`. Une migration future doit mettre à jour ce modèle et les fixtures de manière atomique.
+11. **Dérive de schéma/version.** L'adaptateur est épinglé à DB5/data2 et aux chemins de clés de magasin actuels. Une migration structurelle ou de données nécessite une nouvelle révision de modèle revue avant la mise à jour des tests.
+12. **Bloqueur d'implémentation des ancres d'UI packagées.** L'actuel MissionCard possède une racine interactive `role=button` contenant des boutons imbriqués et aucun groupe fermé de règlement de statut nommé ; les aperçus TJM actuels sont des éléments `div` génériques sans éléments de liste ni en-têtes ; et les contrôles actuels de thème n'exposent aucun groupe nommé, état pressé ou contrat d'occupation/désactivation en attente. Les checkpoints A1, B2 et B3 ci-dessus ferment ces sémantiques. Leurs reçus exacts d'implémentation et de vérification sont requis avant que les scénarios packagés ne puissent s'exécuter ; les identifiants de test ad-hoc, les sélecteurs positionnels et les assertions d'absence à l'échelle de la page restent interdits.
+13. **Fuseau horaire local.** La conversion de `datetime-local` dépend du fuseau horaire du navigateur. La capture de l'ISO attendu dérivé de la page évite une hypothèse d'instantané Europe/Paris, mais la dérive du fuseau horaire du navigateur doit toujours être conservée dans les preuves.
+14. **Point de raccordement du harnais hors-ligne.** La fixture expose la page Playwright mais aucune capacité typée de mode réseau. L'implémentation doit encapsuler l'appel actuel `BrowserContext.setOffline` dans les commandes fermées modélisées ici et prouver le nettoyage en ligne ; les événements de page synthétiques ne constituent pas un repli acceptable.
+15. **Absence de modèle dédié de flux de travail TJM.** Le TJM dispose d'un code d'analyse pur et d'un adaptateur de stockage mais d'aucun modèle autonome d'état/flux de travail. Ce document ne détient que la preuve packagée de lecture/filtrage/rechargement ; un futur flux de travail de mutation TJM nécessite sa propre porte Model -> Review.
+16. **Dette de concurrence CV/disponibilité.** Le checkpoint packagé d'ajout d'expérience est séquentiel et ne ferme pas la situation de concurrence signalée entre les sauvegardes de CV ou de disponibilité et les boucles de synchronisation/push actives. Cette concurrence demeure un risque distinct pour la préparation à la production.
+17. **Dette de liaison des assets générés.** Les assets générés persistent indépendamment, tandis que la génération actuelle n'ajoute pas de manière fiable leurs identifiants à `MissionTracking.generatedAssetIds`. Ces scénarios n'exercent ni ne dissimulent cet écart.

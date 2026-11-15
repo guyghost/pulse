@@ -1,54 +1,59 @@
-# Location Completion Model
+# Modèle de complétion de localisation
 
-Source of truth for the **offline autocompletion** of the profile `location`
-field. Companion to `onboarding-workmode-location.model.md` (which fixes what
-onboarding _collects_) and to `core/scoring/location-matching.ts` (which
-_consumes_ the normalized value). This change makes user input converge toward
-the canonical vocabulary the scorer already understands — it does **not** add
-geolocation, permissions, or any network call.
+Source de vérité pour l'**autocomplétion hors ligne** du champ `location` du
+profil. Compagnon de `onboarding-workmode-location.model.md` (qui définit ce
+que l'onboarding _collecte_) et de `core/scoring/location-matching.ts` (qui
+_consomme_ la valeur normalisée). Ce changement fait converger la saisie
+utilisateur vers le vocabulaire canonique que le scorer comprend déjà — il
+n'ajoute **pas** de géolocalisation, de permissions ou d'appels réseau.
 
-## Problem
+## Problème
 
-`UserProfile.location` is a free-text string collected in two places:
+`UserProfile.location` est une chaîne en texte libre collectée à deux endroits :
 
-- `OnboardingWizard.svelte` — `ob-location` input (placeholder `Paris, Lyon, Bordeaux…`).
-- `ProfileSection.svelte` — `profileLocation` input (placeholder `Localisation`).
+- `OnboardingWizard.svelte` — champ `ob-location` (placeholder `Paris, Lyon, Bordeaux…`).
+- `ProfileSection.svelte` — champ `profileLocation` (placeholder `Localisation`).
 
-Both feed `core/scoring/location-matching.ts::matchLocation(missionLoc, profileLoc)`,
-which only recognizes a hardcoded set of canonical names, regional synonyms
-(`paris ↔ 75 ↔ ile de france`), and metropolitan areas (`nanterre → paris`).
+Tous deux alimentent `core/scoring/location-matching.ts::matchLocation(missionLoc, profileLoc)`,
+qui ne reconnaît qu'un ensemble figé de noms canoniques, de synonymes régionaux
+(`paris ↔ 75 ↔ ile de france`) et d'aires métropolitaines (`nanterre → paris`).
 
-Because the input is unconstrained, users type whatever a mission listing
-showed them: typos, casing, accented variants, suburbs, or region names that
-the synonym table does not cover. The result: `matchLocation` returns `'none'`
-or `'partial'` for inputs that are _semantically_ correct, and the location
-weight (`DEFAULT_SCORING_WEIGHTS.location = 20`) silently contributes 0. The
-precision problem is a **vocabulary problem**, not a coordinates problem.
+Comme la saisie n'est pas contrainte, les utilisateurs tapent ce qu'une annonce de
+mission leur a affiché : fautes de frappe, casse variable, variantes accentuées,
+banlieues ou noms de régions que la table de synonymes ne couvre pas. Résultat :
+`matchLocation` retourne `'none'` ou `'partial'` pour des saisies qui sont
+_sémantiquement_ correctes, et le poids de localisation (`DEFAULT_SCORING_WEIGHTS.location = 20`)
+contribue silencieusement à hauteur de 0. Le problème de précision est un
+**problème de vocabulaire**, pas un problème de coordonnées.
 
-## Goal
+## Objectif
 
-Guide the user toward canonical place names with an **offline `<datalist>`**
-backed by a pure catalog. No geolocation permission, no reverse-geocoding, no
-backend, no new message types, no schema change. `location` stays a plain
-`string`; the catalog only biases _what_ the user types.
+Guider l'utilisateur vers des toponymes canoniques avec un **`<datalist>` hors
+ligne** adossé à un catalogue pur. Pas de permission de géolocalisation, pas de
+géocodage inverse, pas de backend, pas de nouveaux types de messages, pas de
+changement de schéma. `location` reste une simple chaîne (`string`) ; le
+catalogue oriente uniquement _ce que_ l'utilisateur saisit.
 
-## Non-goals
+## Hors périmètre
 
-- No `geolocation` permission and no `navigator.geolocation` call. GPS returns
-  coordinates; missions carry city _names_, so geolocation would require a
-  reverse-geocoder (network or heavy offline DB) — rejected by the local-first
-  principle. See `onboarding-workmode-location.model.md` "Out of scope".
-- No change to `UserProfile` shape, bridge messages, or persistence.
-- No change to `relevance.ts`, `DEFAULT_SCORING_WEIGHTS`, or the
-  `matchLocation` **algorithm**. (The catalog is a data source; having
-  `location-matching.ts` consume it is an explicit follow-up, see "Future".)
-- No custom combobox component. Native `<datalist>` only — accessible,
-  keyboard-friendly, stateless, zero JS runtime cost.
+- Pas de permission `geolocation` et aucun appel à `navigator.geolocation`. Le
+  GPS renvoie des coordonnées ; les missions comportent des _noms_ de villes,
+  la géolocalisation nécessiterait donc un géocodeur inverse (réseau ou lourde
+  base de données hors ligne) — rejeté par le principe local-first. Voir
+  `onboarding-workmode-location.model.md` « Hors périmètre ».
+- Aucune modification de la structure de `UserProfile`, des messages du bridge
+  ou de la persistance.
+- Aucune modification de `relevance.ts`, `DEFAULT_SCORING_WEIGHTS` ou de
+  l'**algorithme** `matchLocation`. (Le catalogue est une source de données ;
+  faire en sorte que `location-matching.ts` le consomme est une suite explicite,
+  voir « Évolutions futures ».)
+- Pas de composant combobox personnalisé. Uniquement le `<datalist>` natif —
+  accessible, adapté au clavier, sans état, avec un coût d'exécution JS nul.
 
-## Data source — `core/locations/location-catalog.ts`
+## Source de données — `core/locations/location-catalog.ts`
 
-New pure module. No I/O, no async, no side effects — covered by the mock-free
-`src/lib/core/**` coverage gate.
+Nouveau module pur. Zéro I/O, zéro async, zéro side effect — couvert par le seuil
+de couverture sans mocks de `src/lib/core/**`.
 
 ```ts
 export interface LocationEntry {
@@ -63,152 +68,174 @@ export interface LocationEntry {
 export const LOCATION_CATALOG: readonly LocationEntry[];
 ```
 
-### Seeding rules
+### Règles d'initialisation (seeding)
 
-1. **Derive, don't duplicate.** The seed is generated from the existing
-   `REGION_SYNONYMS` and `METRO_AREAS` in `location-matching.ts`, then
-   augmented with the missing French regional capitals (Rennes, Montpellier,
-   Grenoble, Clermont-Ferrand, Dijon, Tours, Saint-Étienne, Le Mans, Aix-en-
-   Provence, Amiens, Rouen, Caen, Metz, Nancy, Limoges, Annecy, Brest, Reims,
-   Orléans, Toulon, Perpignan, Besançon, Angers, Poitiers, La Rochelle, etc.).
-2. **Labels are human-readable.** Proper case + accents
+1. **Dériver, ne pas dupliquer.** La graine initiale est générée à partir des
+   `REGION_SYNONYMS` et `METRO_AREAS` existants dans `location-matching.ts`, puis
+   enrichie avec les capitales régionales françaises manquantes (Rennes,
+   Montpellier, Grenoble, Clermont-Ferrand, Dijon, Tours, Saint-Étienne, Le Mans,
+   Aix-en-Provence, Amiens, Rouen, Caen, Metz, Nancy, Limoges, Annecy, Brest,
+   Reims, Orléans, Toulon, Perpignan, Besançon, Angers, Poitiers, La Rochelle,
+   etc.).
+2. **Les libellés sont lisibles par un humain.** Casse appropriée + accents
    (`Île-de-France`, `Aix-en-Provence`, `Charenton-le-Pont`).
-3. **Aliases are normalized** via the same rules as `normalizeLocation`
-   (lowercase, accent-stripped, hyphens → spaces). Each entry must include at
-   least its canonical name + department code where relevant.
-4. **Deduplicated by label.** Two entries must not share a label; aliases may
-   overlap (that is fine for display).
-5. **Target size: ~120–160 entries** (regional capitals + department codes +
-   the existing metro suburbs). Keeps the `<datalist>` snappy and the bundle
-   small; no need to ship all 36 000 French communes.
+3. **Les alias sont normalisés** selon les mêmes règles que `normalizeLocation`
+   (minuscules, sans accents, tirets → espaces). Chaque entrée doit inclure au
+   moins son nom canonique + son code départemental le cas échéant.
+4. **Dédupliqués par libellé.** Deux entrées ne doivent pas partager le même
+   libellé ; les alias peuvent se chevaucher (ce qui convient pour l'affichage).
+5. **Taille cible : ~120–160 entrées** (capitales régionales + codes de
+   départements + les banlieues métropolitaines existantes). Maintient le
+   `<datalist>` réactif et le bundle léger ; pas besoin d'embarquer les 36 000
+   communes françaises.
 
-> The catalog is a _display and suggestion_ layer. It is intentionally a
-> separate constant from `REGION_SYNONYMS` / `METRO_AREAS` so this change does
-> not perturb the scorer. A follow-up can make `location-matching.ts` derive
-> its tables from the catalog.
+> Le catalogue est une couche d'_affichage et de suggestion_. Il s'agit
+> délibérément d'une constante distincte de `REGION_SYNONYMS` / `METRO_AREAS`
+> afin que cette modification ne perturbe pas le scorer. Une étape ultérieure
+> pourra faire en sorte que `location-matching.ts` dérive ses tables du
+> catalogue.
 
-## UI surface
+## Surface UI
 
-Each surface renders its **own** `<datalist>` with a surface-scoped `id`, and
-its input references it via `list=`:
+Chaque surface effectue le rendu de son **propre** `<datalist>` avec un `id`
+spécifique à la surface, et son champ de saisie y fait référence via `list=` :
 
-- `OnboardingWizard.svelte` → `ob-location` input with
-  `list="ob-location-catalog"` and `<datalist id="ob-location-catalog">`.
-- `ProfileSection.svelte` → `profileLocation` input with
-  `list="profile-location-catalog"` and
-  `<datalist id="profile-location-catalog">` (rendered only in edit mode).
+- `OnboardingWizard.svelte` → champ `ob-location` avec
+  `list="ob-location-catalog"` et `<datalist id="ob-location-catalog">`.
+- `ProfileSection.svelte` → champ `profileLocation` avec
+  `list="profile-location-catalog"` et
+  `<datalist id="profile-location-catalog">` (rendu uniquement en mode édition).
 
-Native browser behavior handles filtering, keyboard navigation (↑/↓), and
-selection. The text value remains fully editable — the datalist is a _hint_,
-never a constraint. The bound state (`location` / `profileLocation`) is
-unchanged; selecting a suggestion just writes the entry's `label` into it.
+Le comportement natif du navigateur prend en charge le filtrage, la navigation au
+clavier (↑/↓) et la sélection. La valeur textuelle reste entièrement modifiable —
+le datalist est une _indication_ (hint), jamais une contrainte. L'état lié
+(`location` / `profileLocation`) est inchangé ; la sélection d'une suggestion y
+écrit simplement le `label` de l'entrée.
 
-Because `<datalist>` is a document-level registry keyed by `id`, and both
-surfaces can be mounted in the same side panel DOM at the same time, each
-surface uses a distinct id (`ob-location-catalog` / `profile-location-catalog`)
-rather than a single shared id. A shared id would collide when both inputs are
-mounted simultaneously; per-surface ids keep the suggestion lists independent
-and avoid duplicate-id DOM violations.
+Puisque `<datalist>` est un registre au niveau du document indexé par `id`, et
+que les deux surfaces peuvent être montées simultanément dans le DOM du side panel,
+chaque surface utilise un identifiant distinct (`ob-location-catalog` /
+`profile-location-catalog`) plutôt qu'un identifiant partagé unique. Un identifiant
+partagé entrerait en collision lorsque les deux champs sont montés en même temps ;
+les identifiants par surface maintiennent les listes de suggestions indépendantes
+et évitent les violations d'identifiants dupliqués dans le DOM.
 
-## States
+## États
 
-No new state machine. The location field's local state already exists in the
-companion model (`onboarding-workmode-location.model.md`):
+Pas de nouvelle machine à états. L'état local du champ de localisation existe
+déjà dans le modèle compagnon (`onboarding-workmode-location.model.md`) :
 
 ```
 location:  untouched ('') ──input/select──► filled (string) ──clear──► untouched
 ```
 
-The datalist adds no state of its own: it is a stateless suggestion source.
-Selecting a suggestion is just an `input` event that writes `entry.label`.
+Le datalist n'ajoute aucun état propre : il s'agit d'une source de suggestions sans
+état. Sélectionner une suggestion est simplement un événement `input` qui écrit
+`entry.label`.
 
-## Events
+## Événements
 
-| Event            | Source                       | Effect                                             |
-| ---------------- | ---------------------------- | -------------------------------------------------- |
-| `LOCATION_INPUT` | text input / datalist select | `location` (or `profileLocation`) updated to value |
+| Événement        | Source                            | Effet                                                       |
+| ---------------- | --------------------------------- | ----------------------------------------------------------- |
+| `LOCATION_INPUT` | saisie texte / sélection datalist | `location` (ou `profileLocation`) mis à jour avec la valeur |
 
-No new event types. `SUBMIT` / profile-save flows are unchanged.
+Pas de nouveaux types d'événements. Les flux `SUBMIT` / sauvegarde de profil sont inchangés.
 
-## Data flow
+## Flux de données
 
 ```
-LOCATION_CATALOG (pure data, core/locations/)
+LOCATION_CATALOG (données pures, core/locations/)
    │
    ▼
-<datalist id="location-catalog">   ← rendered next to each location input
+<datalist id="location-catalog">   ← rendu à côté de chaque champ de localisation
    │  list="location-catalog"
    ▼
 <input bind:value={location | profileLocation}>
-   │  SUBMIT / save (unchanged)
+   │  SUBMIT / save (inchangé)
    ▼
-UserProfile.location (string, unchanged shape)
+UserProfile.location (string, forme inchangée)
    │
    ▼
-matchLocation(mission.location, profile.location)   ← unchanged algorithm
+matchLocation(mission.location, profile.location)   ← algorithme inchangé
 ```
 
-Direction respects the architecture rule: **UI imports Core; Core never imports
-UI.** The catalog is pure data in `core/`; the Svelte surfaces import it.
+Le sens respecte la règle architecturale : **l'UI importe Core ; Core n'importe
+jamais l'UI.** Le catalogue est constitué de données pures dans `core/` ; les
+surfaces Svelte l'importent.
 
 ## Invariants
 
-1. **Local-first.** No `geolocation` permission added to `manifest.json`, no
-   network call, no third-party dependency. Completion is 100% offline.
-2. **Schema-stable.** `UserProfile.location` remains `string`. No DB migration,
-   no preprocessor change, no bridge message added.
-3. **Scoring-stable.** `matchLocation`, `relevance.ts`, and
-   `DEFAULT_SCORING_WEIGHTS` are unchanged. Precision improves _only_ because
-   user input converges on canonical labels.
-4. **Pure catalog.** `location-catalog.ts` has no I/O, no async, no
-   `Date`/`Math.random`, no `console`. It is unit-tested without mocks and
-   falls under the `src/lib/core/**` coverage gate.
-5. **Hint, not constraint.** The input stays free text. A user can type a value
-   absent from the catalog; it is stored verbatim and scored as today.
-6. **Label uniqueness.** No two `LocationEntry` share the same `label`.
-7. **Display parity.** The same catalog backs both `OnboardingWizard` and
-   `ProfileSection`, so first-run and later edits propose the same vocabulary.
+1. **Local-first.** Aucune permission `geolocation` ajoutée à `manifest.json`,
+   aucun appel réseau, aucune dépendance tierce. La complétion est 100 % hors
+   ligne.
+2. **Schéma stable.** `UserProfile.location` reste une chaîne (`string`). Pas de
+   migration de base de données, pas de modification de préprocesseur, aucun
+   message bridge ajouté.
+3. **Scoring stable.** `matchLocation`, `relevance.ts` et
+   `DEFAULT_SCORING_WEIGHTS` sont inchangés. La précision s'améliore
+   _uniquement_ parce que la saisie utilisateur converge vers des libellés
+   canoniques.
+4. **Catalogue pur.** `location-catalog.ts` n'a aucune I/O, aucun async, aucun
+   `Date`/`Math.random`, aucun `console`. Il est testé unitairement sans mocks
+   et relève du seuil de couverture de `src/lib/core/**`.
+5. **Indication, non contrainte.** Le champ reste en texte libre. Un utilisateur
+   peut saisir une valeur absente du catalogue ; elle est stockée textuellement
+   et scorée comme aujourd'hui.
+6. **Unicité des libellés.** Deux `LocationEntry` ne partagent jamais le même
+   `label`.
+7. **Parité d'affichage.** Le même catalogue alimente à la fois
+   `OnboardingWizard` et `ProfileSection`, de sorte que le premier lancement et
+   les modifications ultérieures proposent le même vocabulaire.
 
-## Edge cases
+## Cas limites
 
-- **User ignores suggestions** and types `tlon` (typo): stored verbatim,
-  scored as today. Completion is opt-in; we do not autocorrect.
-- **User types a suburb not in the catalog** (e.g. `Sceaux`): stored verbatim;
-  `location-matching.ts` still resolves it if it is in `METRO_AREAS`.
-- **Multi-value intent** (`Paris et Lyon`): the input is single-string; the
-  datalist suggests one label at a time. Multi-location is out of scope (see
-  `onboarding-workmode-location.model.md`).
-- **i18n / non-France**: the catalog is France-centric, matching the current
-  scorer scope. Adding countries is a future scope expansion, not a blocker.
-- **Duplicate `<datalist>` ids** when both surfaces are mounted: each surface
-  renders its own `<datalist>` with a stable, surface-scoped id
-  (`ob-location-catalog`, `profile-location-catalog`) to avoid collisions.
-- **Accessibility**: `<datalist>` is accessible by default; the existing
-  `<label for="…">` associations are preserved. No new ARIA attributes needed.
+- **L'utilisateur ignore les suggestions** et tape `tlon` (faute de frappe) :
+  stocké tel quel, scoré comme aujourd'hui. La complétion est optionnelle ; nous
+  ne faisons pas d'autocorrection.
+- **L'utilisateur tape une banlieue absente du catalogue** (par ex. `Sceaux`) :
+  stocké tel quel ; `location-matching.ts` le résout toujours s'il figure dans
+  `METRO_AREAS`.
+- **Intention multi-valeurs** (`Paris et Lyon`) : la saisie est une chaîne
+  unique ; le datalist suggère un libellé à la fois. Le multi-localisation est
+  hors périmètre (voir `onboarding-workmode-location.model.md`).
+- **i18n / hors France** : le catalogue est centré sur la France, conformément
+  au périmètre actuel du scorer. Ajouter d'autres pays constitue une extension de
+  périmètre future, non un point bloquant.
+- **Identifiants `<datalist>` dupliqués** lorsque les deux surfaces sont montées :
+  chaque surface rend son propre `<datalist>` avec un identifiant stable et
+  propre à la surface (`ob-location-catalog`, `profile-location-catalog`) pour
+  éviter toute collision.
+- **Accessibilité** : `<datalist>` est accessible par défaut ; les associations
+  existantes `<label for="…">` sont préservées. Aucun nouvel attribut ARIA
+  n'est nécessaire.
 
-## Testing
+## Tests
 
-- **Unit (mock-free)** in `tests/unit/locations/location-catalog.test.ts`:
-  - every entry has a non-empty `label` and ≥1 alias;
-  - labels are unique;
-  - aliases are normalized (no accents, lowercase);
-  - seed coverage: every key of `REGION_SYNONYMS` and every city in
-    `METRO_AREAS` is represented by at least one entry's alias;
-  - regional capitals list (Rennes, Montpellier, …) is present.
-- **Regression**: `pnpm --filter @pulse/extension test:regression` must stay
-  green (no parser/scoring change).
-- **Manual / E2E**: type `par` in onboarding → suggestions include `Paris`;
-  type `aix` → `Aix-en-Provence`; selecting writes the canonical label.
+- **Unitaires (sans mocks)** dans `tests/unit/locations/location-catalog.test.ts` :
+  - chaque entrée a un `label` non vide et ≥1 alias ;
+  - les libellés sont uniques ;
+  - les alias sont normalisés (sans accents, minuscules) ;
+  - couverture de la graine initiale : chaque clé de `REGION_SYNONYMS` et chaque
+    ville de `METRO_AREAS` est représentée par au moins un alias d'entrée ;
+  - la liste des capitales régionales (Rennes, Montpellier, …) est présente.
+- **Régression** : `pnpm --filter @pulse/extension test:regression` doit rester
+  vert (aucun changement de parser/scoring).
+- **Manuels / E2E** : taper `par` lors de l'onboarding → les suggestions
+  incluent `Paris` ; taper `aix` → `Aix-en-Provence` ; la sélection écrit le
+  libellé canonique.
 
-## Future (explicitly out of scope here)
+## Évolutions futures (explicitement hors périmètre ici)
 
-- ~~Make `location-matching.ts` **derive** `REGION_SYNONYMS` and `METRO_AREAS`
-  from `LOCATION_CATALOG`, so the scorer and the completer share one source of
-  truth.~~ **Delivered** — see `models/location-tables-derivation.model.md`.
-  `core/locations/derive-location-tables.ts` now exports both tables, derived
-  purely from the catalog; `location-matching.ts` imports them with its
-  algorithm unchanged.
-- Optional "use my location" button backed by `navigator.geolocation` + an
-  offline reverse-geocoder, behind a user grant. Requires a separate model due
-  to the local-first tension.
-- Custom combobox with metro-area grouping if the datalist UX proves limiting.
+- ~~Faire en sorte que `location-matching.ts` **dérive** `REGION_SYNONYMS` et
+  `METRO_AREAS` depuis `LOCATION_CATALOG`, afin que le scorer et le module de
+  complétion partagent une unique source de vérité.~~ **Livré** — voir
+  `models/location-tables-derivation.model.md`.
+  `core/locations/derive-location-tables.ts` exporte désormais les deux tables,
+  dérivées de façon pure depuis le catalogue ; `location-matching.ts` les importe
+  avec son algorithme inchangé.
+- Bouton optionnel « Utiliser ma position » basé sur `navigator.geolocation` +
+  un géocodeur inverse hors ligne, soumis à l'autorisation de l'utilisateur.
+  Nécessite un modèle distinct en raison de la tension avec le principe
+  local-first.
+- Combobox sur mesure avec regroupement par aire métropolitaine si l'expérience
+  utilisateur du datalist s'avère limitante.

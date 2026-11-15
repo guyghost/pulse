@@ -1,69 +1,49 @@
-# Connector Build-Time Configuration Model
+# Modèle de configuration des connecteurs au build
 
-Source of truth for selecting which platform connectors are shipped in a given
-production build of the extension. Lets an operator exclude broken or
-unwanted connectors (e.g. Malt, Collective) at **package build time** so the
-produced ZIP never advertises, requests permissions for, or runs them.
+Source de vérité pour sélectionner les connecteurs de plateformes inclus dans un build de production donné de l'extension. Permet à un opérateur d'exclure les connecteurs cassés ou non souhaités (ex. Malt, Collective) au **moment du build du package**, afin que le ZIP produit ne les annonce jamais, ne demande aucune permission pour eux et ne les exécute jamais.
 
-This is a **build-time** decision, distinct from the existing **runtime**
-`AppSettings.enabledConnectors` (which lets the end-user toggle connectors on
-or off inside an already-built package). Build-time wins: a connector absent
-from the build cannot be re-enabled at runtime.
+Il s'agit d'une décision au **build-time**, distincte de la configuration **runtime** existante `AppSettings.enabledConnectors` (qui permet à l'utilisateur final d'activer ou désactiver des connecteurs au sein d'un package déjà construit). Le build-time l'emporte : un connecteur absent du build ne peut pas être réactivé au runtime.
 
-The LLM never decides a transition. Build-time inclusion is resolved by a
-pure function from deterministic inputs (config file + env var) before Vite
-runs. **Le LLM produit des signaux ; le modèle décide.**
+Le LLM ne décide jamais d'une transition. L'inclusion au build-time est résolue par une fonction pure à partir d'entrées déterministes (fichier de config + variable d'environnement) avant que Vite ne s'exécute. **Le LLM produit des signaux ; le modèle décide.**
 
-## Why a model
+## Pourquoi un modèle
 
-The connector catalog is consumed in four independent places that must stay
-in sync when a connector is removed:
+Le catalogue de connecteurs est consommé à quatre endroits indépendants qui doivent rester synchronisés lorsqu'un connecteur est retiré :
 
-1. `manifest.json` `host_permissions` — Chrome refuses cookies/fetch to
-   non-permitted hosts; conversely, shipping unused host permissions is a
-   privacy/store-review red flag.
-2. `getConnectorsMeta()` (`src/lib/shell/connectors/meta.ts`) — drives the UI
-   catalog (FilterBar, ConnectorStatusList, CV sync targets).
-3. `CONNECTOR_REGISTRY` (`src/lib/shell/connectors/index.ts`) — drives the
-   scanner and session detection.
-4. `DEFAULT_SETTINGS.enabledConnectors`
-   (`src/lib/shell/storage/chrome-storage.ts`) — the runtime default; if it
-   references a built-out connector, the scanner reports phantom errors.
+1. `manifest.json` `host_permissions` — Chrome refuse les cookies/fetch vers des hôtes non autorisés ; inversement, distribuer des permissions d'hôtes non utilisées constitue un signal d'alerte pour la confidentialité et la revue du Chrome Web Store.
+2. `getConnectorsMeta()` (`src/lib/shell/connectors/meta.ts`) — pilote le catalogue UI (FilterBar, ConnectorStatusList, cibles de synchronisation CV).
+3. `CONNECTOR_REGISTRY` (`src/lib/shell/connectors/index.ts`) — pilote le scanner et la détection de session.
+4. `DEFAULT_SETTINGS.enabledConnectors` (`src/lib/shell/storage/chrome-storage.ts`) — la valeur par défaut au runtime ; si elle référence un connecteur exclu du build, le scanner signale des erreurs fantômes.
 
-Doing the filtering ad-hoc in each consumer risks drift. This model defines
-one resolution function whose output is the single source of truth consumed
-by all four.
+Effectuer le filtrage de manière ad-hoc dans chaque consommateur risque d'engendrer des dérives. Ce modèle définit une fonction de résolution unique dont la sortie constitue l'unique source de vérité consommée par les quatre composants.
 
-## Inputs
+## Entrées
 
-| Input                        | Source                                  | Precedence                |
-| ---------------------------- | --------------------------------------- | ------------------------- |
-| Catalog                      | `meta.ts` `ALL_CONNECTOR_IDS`           | ground truth of known IDs |
-| Config file                  | `apps/extension/connectors.config.json` | default                   |
-| `CONNECTORS_INCLUDE` env var | build env                               | highest (wins over file)  |
-| `CONNECTORS_EXCLUDE` env var | build env                               | highest (wins over file)  |
+| Entrée                              | Source                                  | Priorité                                  |
+| ----------------------------------- | --------------------------------------- | ----------------------------------------- |
+| Catalogue                           | `meta.ts` `ALL_CONNECTOR_IDS`           | Vérité terrain des identifiants connus    |
+| Fichier de configuration            | `apps/extension/connectors.config.json` | Par défaut                                |
+| Variable d'env `CONNECTORS_INCLUDE` | Environnement de build                  | La plus élevée (l'emporte sur le fichier) |
+| Variable d'env `CONNECTORS_EXCLUDE` | Environnement de build                  | La plus élevée (l'emporte sur le fichier) |
 
-`connectors.config.json` shape (mutually exclusive fields):
+Structure de `connectors.config.json` (champs mutuellement exclusifs) :
 
 ```json
 { "exclude": ["malt", "collective"] }
 ```
 
-or
+ou
 
 ```json
 { "include": ["free-work", "lehibou", "hiway", "cherry-pick"] }
 ```
 
-Env vars are comma-separated connector IDs, e.g.
+Les variables d'environnement sont des identifiants de connecteurs séparés par des virgules, par ex.
 `CONNECTORS_EXCLUDE=malt,collective`.
 
-## Resolution function (pure)
+## Fonction de résolution (pure)
 
-Lives in `apps/extension/scripts/resolve-connectors.ts` so it can run in
-`vite.config.ts`, `verify-manifest.ts`, and `build-extension.sh`. It is part
-of the extension's TypeScript program (`scripts/**/*.ts` is in `tsconfig.json`)
-and is imported directly by the build tooling.
+Réside dans `apps/extension/scripts/resolve-connectors.ts` afin de pouvoir s'exécuter dans `vite.config.ts`, `verify-manifest.ts` et `build-extension.sh`. Elle fait partie du programme TypeScript de l'extension (`scripts/**/*.ts` figure dans `tsconfig.json`) et est importée directement par l'outillage de build.
 
 ```
 resolveIncludedConnectors({ allIds, config, env }) → {
@@ -74,48 +54,38 @@ resolveIncludedConnectors({ allIds, config, env }) → {
 }
 ```
 
-### Algorithm
+### Algorithme
 
-1. `includeEnv` = parse `CONNECTORS_INCLUDE` env (non-empty → set).
-2. `excludeEnv` = parse `CONNECTORS_EXCLUDE` env.
-3. `includeFile` / `excludeFile` = same from config JSON.
-4. **Include wins over exclude.** If any include source is non-empty:
-   - `candidate = includeEnv ?? includeFile` (env wins).
-5. Else if any exclude source is non-empty:
+1. `includeEnv` = parser la variable d'env `CONNECTORS_INCLUDE` (non vide → ensemble / set).
+2. `excludeEnv` = parser la variable d'env `CONNECTORS_EXCLUDE`.
+3. `includeFile` / `excludeFile` = idem à partir du fichier JSON de config.
+4. **Include l'emporte sur exclude.** Si l'une des sources include n'est pas vide :
+   - `candidate = includeEnv ?? includeFile` (l'env l'emporte).
+5. Sinon, si l'une des sources exclude n'est pas vide :
    - `candidate = allIds \ (excludeEnv ?? excludeFile)`.
-6. Else `candidate = allIds`.
-7. Intersect `candidate` with `allIds`. Any ID not in `allIds` → `warnings`.
-8. Preserve `allIds` ordering in `included`.
+6. Sinon `candidate = allIds`.
+7. Intersection de `candidate` avec `allIds`. Tout ID absent de `allIds` → `warnings`.
+8. Préserver l'ordre de `allIds` dans `included`.
 
 ### Invariants
 
-- `included ∪ excluded === allIds` (set equality).
+- `included ∪ excluded === allIds` (égalité d'ensembles).
 - `included ∩ excluded === ∅`.
-- `warnings` is empty iff every input ID is a known connector ID.
-- Output is deterministic given `(allIds, config, env)`. No `Date.now()`, no
-  `Math.random()`, no I/O. The resolver is a pure function (FC&IS core); the
-  only side-effect — reading the JSON file — happens in its thin caller.
+- `warnings` est vide si et seulement si chaque ID fourni en entrée est un ID de connecteur connu.
+- La sortie est déterministe pour `(allIds, config, env)`. Pas de `Date.now()`, pas de `Math.random()`, pas d'E/S. Le résolveur est une fonction pure (core FC&IS) ; le seul effet de bord — lire le fichier JSON — s'effectue dans son appelant léger.
 
-## Wiring (build-time, imperative shell)
+## Câblage (build-time, imperative shell)
 
 ### `vite.config.ts`
 
-Loads `resolveIncludedConnectors()` once at config-eval time and:
+Charge `resolveIncludedConnectors()` une fois au moment de l'évaluation de la configuration et :
 
-1. **Manifest filter** — rewrites `manifest.host_permissions` to keep only
-   patterns owned by an `included` connector. Ownership is declared in
-   `meta.ts` (`ConnectorMeta.hostPermissions: string[]`). Patterns owned by
-   an excluded connector are dropped; patterns not owned by any connector
-   (e.g. the extension's own `missionpulse.app` host) are always kept.
-   Connector-owned infra hosts are declared in that connector's
-   `hostPermissions` so they travel with it — e.g. Hiway's Supabase REST host
-   is listed under Hiway and drops out when Hiway is excluded.
-2. **Compile-time define** — exposes the resolved list as
-   `__PULSE_INCLUDED_CONNECTORS__` (string array literal) for runtime code.
+1. **Filtre du manifest** — réécrit `manifest.host_permissions` pour ne conserver que les motifs appartenant à un connecteur `included`. L'appartenance est déclarée dans `meta.ts` (`ConnectorMeta.hostPermissions: string[]`). Les motifs appartenant à un connecteur exclu sont supprimés ; les motifs n'appartenant à aucun connecteur (par ex. l'hôte propre de l'extension `missionpulse.app`) sont toujours conservés. Les hôtes d'infrastructure appartenant à un connecteur sont déclarés dans le `hostPermissions` de ce connecteur pour être liés à lui — par ex. l'hôte REST Supabase de Hiway est listé sous Hiway et disparaît lorsque Hiway est exclu.
+2. **Define à la compilation** — expose la liste résolue sous forme de `__PULSE_INCLUDED_CONNECTORS__` (littéral de tableau de chaînes) pour le code au runtime.
 
-### Runtime consumption
+### Consommation au runtime
 
-A thin accessor module `src/lib/shell/connectors/build-config.ts`:
+Un module accesseur léger `src/lib/shell/connectors/build-config.ts` :
 
 ```ts
 declare const __PULSE_INCLUDED_CONNECTORS__: ConnectorId[] | undefined;
@@ -124,27 +94,19 @@ export const INCLUDED_CONNECTOR_IDS: ConnectorId[] =
   typeof __PULSE_INCLUDED_CONNECTORS__ === 'undefined' ? FALLBACK : __PULSE_INCLUDED_CONNECTORS__;
 ```
 
-`typeof` on the bare identifier is safe (does not throw on undefined
-globals) so vitest — which does not apply the `define` — falls back to the
-full catalog instead of throwing.
+L'utilisation de `typeof` sur l'identifiant nu est sûre (ne lève pas d'exception sur les variables globales non définies), de sorte que vitest — qui n'applique pas le `define` — bascule vers le catalogue complet au lieu de lever une exception.
 
-Consumers filter against `INCLUDED_CONNECTOR_IDS`:
+Les consommateurs effectuent un filtrage par rapport à `INCLUDED_CONNECTOR_IDS` :
 
-- `meta.ts` `getConnectorsMeta()` → returns only included connectors.
-- `index.ts` `getConnectorIds()` → only included; `getConnector(id)` returns
-  `null` for excluded IDs (so the scanner reports "Connecteur introuvable"
-  rather than crashing).
-- `chrome-storage.ts` `DEFAULT_SETTINGS.enabledConnectors` → intersect with
-  `INCLUDED_CONNECTOR_IDS`.
+- `meta.ts` `getConnectorsMeta()` → ne renvoie que les connecteurs inclus.
+- `index.ts` `getConnectorIds()` → uniquement les connecteurs inclus ; `getConnector(id)` renvoie `null` pour les ID exclus (afin que le scanner signale "Connecteur introuvable" plutôt que de planter).
+- `chrome-storage.ts` `DEFAULT_SETTINGS.enabledConnectors` → intersection avec `INCLUDED_CONNECTOR_IDS`.
 
-### Code stripping
+### Élagage du code (code stripping)
 
-Static imports are kept (the service worker cannot use dynamic `import()`).
-Excluded connector classes remain bundled but are never instantiated —
-acceptable for an MV3 extension. Runtime behavior and manifest permissions
-are the correctness guarantees; tree-shaking is best-effort only.
+Les imports statiques sont conservés (le service worker ne peut pas utiliser `import()` dynamique). Les classes des connecteurs exclus restent incluses dans le bundle mais ne sont jamais instanciées — ce qui est acceptable pour une extension MV3. Le comportement au runtime et les permissions du manifest constituent les garanties d'exactitude ; le tree-shaking n'est qu'un effort au mieux.
 
-## States (build resolution)
+## États (résolution au build)
 
 ```mermaid
 stateDiagram-v2
@@ -156,50 +118,37 @@ stateDiagram-v2
     Subset --> [*]: N connectors in manifest, others hidden
 ```
 
-There is no "error" state: unknown IDs become warnings, the build proceeds
-with the known subset. Empty `included` is permitted (builds a no-scan
-shell) but logs a warning.
+Il n'y a pas d'état "erreur" : les ID inconnus deviennent des avertissements, le build se poursuit avec le sous-ensemble connu. Un ensemble `included` vide est autorisé (construit un shell sans scan), mais consigne un avertissement.
 
-## Permissions model (least-privilege)
+## Modèle de permissions (moindre privilège)
 
-For each `included` connector, **every** entry in its `hostPermissions` array
-must appear in the shipped `manifest.host_permissions`. For each `excluded`
-connector, **none** of its entries may appear. `verify-manifest.ts` enforces
-this against the resolver output instead of a hardcoded list.
+Pour chaque connecteur `included`, **chaque** entrée de son tableau `hostPermissions` doit figurer dans le `manifest.host_permissions` distribué. Pour chaque connecteur `excluded`, **aucune** de ses entrées ne doit y figurer. `verify-manifest.ts` applique cette vérification sur la sortie du résolveur plutôt que sur une liste codée en dur.
 
-## Test plan (Verify)
+## Plan de test (Vérification)
 
-Pure resolver (`resolve-connectors.test.ts`):
+Résolveur pur (`resolve-connectors.test.ts`) :
 
-- Empty config + no env → all IDs, `source: 'all'`.
-- `exclude` file only → subset.
-- `CONNECTORS_EXCLUDE` env overrides file exclude.
-- `include` file only → that subset only.
-- `CONNECTORS_INCLUDE` env overrides file include.
-- `include` beats `exclude` when both present (file include + env exclude →
-  include wins, env only filters within include? — no: include source wins
-  outright; documented + tested).
-- Unknown IDs → collected in `warnings`, ignored from result.
-- Ordering follows `allIds`.
-- Invariants hold for every case.
+- Config vide + pas d'env → tous les ID, `source: 'all'`.
+- Fichier `exclude` uniquement → sous-ensemble.
+- L'env `CONNECTORS_EXCLUDE` surcharge l'exclusion du fichier.
+- Fichier `include` uniquement → ce sous-ensemble uniquement.
+- L'env `CONNECTORS_INCLUDE` surcharge l'inclusion du fichier.
+- `include` l'emporte sur `exclude` lorsque les deux sont présents (include fichier + exclude env → include l'emporte, l'env filtre-t-il uniquement au sein de include ? — non : la source include l'emporte purement et simplement ; documenté + testé).
+- ID inconnus → collectés dans `warnings`, ignorés du résultat.
+- L'ordre respecte `allIds`.
+- Les invariants sont vérifiés pour chaque cas.
 
-Wiring (`meta` / `build-config`):
+Câblage (`meta` / `build-config`) :
 
-- `getConnectorsMeta()` filters by `INCLUDED_CONNECTOR_IDS`.
-- `DEFAULT_SETTINGS.enabledConnectors` is a subset of
-  `INCLUDED_CONNECTOR_IDS`.
-- `getConnector('malt')` returns `null` when malt is excluded.
+- `getConnectorsMeta()` filtre selon `INCLUDED_CONNECTOR_IDS`.
+- `DEFAULT_SETTINGS.enabledConnectors` est un sous-ensemble de `INCLUDED_CONNECTOR_IDS`.
+- `getConnector('malt')` renvoie `null` lorsque malt est exclu.
 
-Manifest coverage (`verify-manifest.test.ts`):
+Couverture du manifest (`verify-manifest.test.ts`) :
 
-- Connector `host_permissions` check now iterates the **resolved** included
-  set, not the full catalog — so excluding `malt` no longer fails the Malt
-  host_permission assertion.
-- Non-connector patterns (the extension's own `missionpulse.app` host) are
-  always retained. Connector-owned infra hosts (Hiway's Supabase REST host)
-  are declared under their owning connector so they drop with it.
+- La vérification des `host_permissions` des connecteurs itère désormais sur l'ensemble inclus **résolu**, et non sur le catalogue complet — ainsi, exclure `malt` ne fait plus échouer l'assertion sur les host_permissions de Malt.
+- Les motifs non liés aux connecteurs (l'hôte propre à l'extension `missionpulse.app`) sont toujours conservés. Les hôtes d'infrastructure appartenant à un connecteur (l'hôte REST Supabase de Hiway) sont déclarés sous leur connecteur propriétaire afin de disparaître avec lui.
 
-## OpenSpec change
+## Changement OpenSpec
 
-This change is recorded in `openspec/changes/connector-build-time-config/`
-(proposal) following the project's spec-driven workflow.
+Cette modification est enregistrée dans `openspec/changes/connector-build-time-config/` (proposition) conformément au workflow piloté par les spécifications du projet.

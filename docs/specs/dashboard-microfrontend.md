@@ -1,75 +1,75 @@
-# Spec: Connected Dashboard, Extension Sync, and Profile Extractors
+# Spécification : Dashboard connecté, synchronisation de l'extension et extracteurs de profil
 
-## Objective
+## Objectif
 
-Align MissionPulse with the product promise shown on the landing page by making `apps/dashboard` the main connected product surface, while keeping `apps/extension` as the local executor for browser-session access and platform scraping.
+Aligner MissionPulse avec la promesse produit affichée sur la landing page en faisant de `apps/dashboard` la surface produit connectée principale, tout en conservant `apps/extension` comme exécuteur local pour l'accès aux sessions de navigation et le scraping des plateformes.
 
-Success means a signed-in freelancer can:
+Le succès signifie qu'un freelance connecté peut :
 
-- Review all detected missions in the dashboard, with scores, source health, deduplication, TJM context, and connector status.
-- Move a mission through the canonical pipeline: `detected` -> `selected` -> `application_prepared` -> `applied` -> `interview` -> `offer` -> `accepted` / `rejected` / `archived`.
-- Keep a canonical CV/profile in Supabase, initially imported from LinkedIn by the extension.
-- Run scans and profile extraction from the extension without storing platform credentials.
-- See dashboard state synchronized through Supabase, not through a scraping backend.
+- Examiner toutes les missions détectées dans le dashboard, avec scores, santé des sources, déduplication, contexte TJM et état des connecteurs.
+- Faire avancer une mission à travers le pipeline canonique : `detected` -> `selected` -> `application_prepared` -> `applied` -> `interview` -> `offer` -> `accepted` / `rejected` / `archived`.
+- Maintenir un CV/profil canonique dans Supabase, initialement importé depuis LinkedIn par l'extension.
+- Lancer des scans et l'extraction de profil depuis l'extension sans stocker d'identifiants de plateforme.
+- Voir l'état du dashboard synchronisé via Supabase, et non via un backend de scraping.
 
-## Assumptions and Decisions
+## Hypothèses et décisions
 
-- Supabase is the synchronization hub and source of truth for connected dashboard data.
-- The extension keeps local IndexedDB/chrome.storage for offline-first execution and best-effort local UX.
-- The dashboard never scrapes LinkedIn or mission platforms.
-- Direct dashboard-to-extension communication is not required for v1; both surfaces converge through Supabase.
-- LinkedIn v1 imports profile/CV data only: experiences, skills, summary, education, and links.
-- Existing "100% local" copy on the landing is now inaccurate for the connected dashboard path and must be adjusted to "local execution, optional cloud sync".
+- Supabase est le hub de synchronisation et la source de vérité pour les données du dashboard connecté.
+- L'extension conserve IndexedDB/chrome.storage en local pour une exécution offline-first et une UX locale au mieux (best-effort).
+- Le dashboard ne scrappe jamais LinkedIn ni les plateformes de missions.
+- La communication directe entre le dashboard et l'extension n'est pas requise pour la v1 ; les deux surfaces convergent via Supabase.
+- La v1 de LinkedIn importe uniquement les données de profil/CV : expériences, compétences, résumé, formation et liens.
+- La mention existante « 100% local » sur la landing est désormais inexacte pour le parcours du dashboard connecté et doit être adaptée en « exécution locale, synchronisation cloud optionnelle ».
 
-## Tech Stack
+## Stack technique
 
-- Monorepo: Turborepo + pnpm.
-- Dashboard: SvelteKit, Svelte 5 runes, TypeScript strict, TailwindCSS 4 via `@pulse/ui/app.css`, Supabase SSR.
-- Extension: Chrome MV3, Svelte 5, Vite + `@crxjs/vite-plugin`, TypeScript strict, IndexedDB, chrome.storage, Supabase JS.
-- Core architecture: Functional Core & Imperative Shell.
-- Tests: Vitest for pure/core and shell units, Playwright for dashboard/extension flows.
+- Monorepo : Turborepo + pnpm.
+- Dashboard : SvelteKit, runes Svelte 5, TypeScript strict, TailwindCSS 4 via `@pulse/ui/app.css`, Supabase SSR.
+- Extension : Chrome MV3, Svelte 5, Vite + `@crxjs/vite-plugin`, TypeScript strict, IndexedDB, chrome.storage, Supabase JS.
+- Architecture core : Functional Core & Imperative Shell.
+- Tests : Vitest pour les tests unitaires purs/core et shell, Playwright pour les flux dashboard/extension.
 
-## Commands
+## Commandes
 
-- Full build: `pnpm build`
-- Full tests: `pnpm test`
-- Full typecheck: `pnpm typecheck`
-- Dashboard dev: `pnpm --filter @pulse/dashboard dev`
-- Dashboard check: `pnpm --filter @pulse/dashboard check`
-- Dashboard test: `pnpm --filter @pulse/dashboard test`
-- Extension dev: `pnpm --filter @pulse/extension dev`
-- Extension test: `pnpm --filter @pulse/extension test`
-- Extension E2E: `pnpm --filter @pulse/extension test:e2e`
-- Landing dev: `pnpm --filter @pulse/landing dev`
+- Build complet : `pnpm build`
+- Tests complets : `pnpm test`
+- Typecheck complet : `pnpm typecheck`
+- Dev dashboard : `pnpm --filter @pulse/dashboard dev`
+- Check dashboard : `pnpm --filter @pulse/dashboard check`
+- Test dashboard : `pnpm --filter @pulse/dashboard test`
+- Dev extension : `pnpm --filter @pulse/extension dev`
+- Test extension : `pnpm --filter @pulse/extension test`
+- E2E extension : `pnpm --filter @pulse/extension test:e2e`
+- Dev landing : `pnpm --filter @pulse/landing dev`
 
-## Project Structure
+## Structure du projet
 
 ```text
 apps/dashboard/
-  src/lib/core/              Pure dashboard domain types and transforms
-  src/lib/server/            Supabase SSR shell
-  src/routes/                Connected dashboard screens
-  tests/unit/                Dashboard pure unit tests
+  src/lib/core/              Types et transformations du domaine pur du dashboard
+  src/lib/server/            Shell SSR Supabase
+  src/routes/                Écrans du dashboard connecté
+  tests/unit/                Tests unitaires purs du dashboard
 
 apps/extension/
-  src/lib/core/              Pure parsers, scoring, tracking, CV normalization
+  src/lib/core/              Parsers purs, scoring, tracking, normalisation du CV
   src/lib/shell/             Chrome, IndexedDB, Supabase, fetch, orchestration
-  src/lib/state/             Svelte 5 rune state modules
-  src/background/            Service worker and bridge handlers
-  tests/unit/                Core/shell unit tests
-  tests/e2e/                 Extension user flows
+  src/lib/state/             Modules d'état avec runes Svelte 5
+  src/background/            Service worker et gestionnaires du bridge
+  tests/unit/                Tests unitaires core/shell
+  tests/e2e/                 Flux utilisateurs de l'extension
 
 apps/landing/
-  src/routes/+page.svelte    Public promise surface
-  supabase/                  Current schema and migrations
+  src/routes/+page.svelte    Surface de promesse publique
+  supabase/                  Schéma actuel et migrations
 
 docs/specs/
-  dashboard-microfrontend.md This decision spec
+  dashboard-microfrontend.md Cette spécification de décision
 ```
 
-## Code Style
+## Style de code
 
-Svelte 5 only:
+Svelte 5 uniquement :
 
 ```svelte
 <script lang="ts">
@@ -81,7 +81,7 @@ Svelte 5 only:
 <button onclick={() => (expanded = !expanded)}>{label}</button>
 ```
 
-Core stays pure:
+Le Core reste pur :
 
 ```ts
 export function normalizePipelineEvent(
@@ -97,169 +97,169 @@ export function normalizePipelineEvent(
 }
 ```
 
-## Testing Strategy
+## Stratégie de test
 
-- Pure core tests:
-  - dashboard application filters, stage transitions, sync conflict resolution;
-  - extension parsers, profile extractors, mission scoring, dedup, tracking adapters;
-  - no mocks for pure parser/normalizer tests.
-- Shell unit tests:
-  - Supabase sync payload builders with mocked Supabase client;
-  - Chrome bridge schemas and typed error responses;
-  - LinkedIn permission/session/DOM failure branches.
-- Integration tests:
-  - extension scan result -> Supabase upsert payload;
-  - dashboard Supabase rows -> dashboard view models;
-  - local tracking migration -> canonical pipeline events.
-- E2E tests:
-  - extension scan -> dashboard feed;
-  - dashboard pipeline update -> extension pull;
-  - extension application update -> dashboard update;
-  - LinkedIn import happy path and typed error states.
+- Tests unitaires du core pur :
+  - filtres de candidatures du dashboard, transitions d'étapes (stage transitions), résolution des conflits de synchronisation ;
+  - parsers de l'extension, extracteurs de profil, scoring de mission, déduplication, adaptateurs de tracking ;
+  - aucun mock pour les tests des parsers/normaliseurs purs.
+- Tests unitaires du shell :
+  - constructeurs de payload de synchronisation Supabase avec client Supabase mocké ;
+  - schémas du bridge Chrome et réponses d'erreur typées ;
+  - branches d'échec de permissions/session/DOM LinkedIn.
+- Tests d'intégration :
+  - résultat de scan de l'extension -> payload d'upsert Supabase ;
+  - lignes Supabase du dashboard -> view models du dashboard ;
+  - migration du tracking local -> événements canoniques du pipeline.
+- Tests E2E :
+  - scan de l'extension -> feed du dashboard ;
+  - mise à jour du pipeline dans le dashboard -> pull de l'extension ;
+  - mise à jour de candidature dans l'extension -> mise à jour du dashboard ;
+  - happy path de l'import LinkedIn et états d'erreur typés.
 
-## Audit Summary
+## Résumé de l'audit
 
-### Landing Promises
+### Promesses de la landing
 
-`apps/landing/src/routes/+page.svelte` promises:
+`apps/landing/src/routes/+page.svelte` promet :
 
-- Chrome extension, free, open source.
-- Scan of 5 platforms: Free-Work, LeHibou, Hiway, Collective, Cherry Pick.
-- Side panel feed with missions consolidated, scored, deduplicated, and filtered.
-- Score explanation by stack, TJM, location, seniority, and Gemini Nano semantic scoring.
-- Mission comparison and shortlist.
-- Application assistant: ready-to-copy message, source link, CV alignment, follow-up.
-- Automatic background scan and smart alerts.
-- TJM dashboard/history by stack/source.
-- Existing browser sessions, no stored platform credentials.
-- "100% local/private", "aucun serveur", "aucune collecte".
+- Extension Chrome, gratuite, open source.
+- Scan de 5 plateformes : Free-Work, LeHibou, Hiway, Collective, Cherry Pick.
+- Feed dans le side panel avec missions consolidées, scorées, dédupliquées et filtrées.
+- Explication du score par stack, TJM, localisation, séniorité et scoring sémantique Gemini Nano.
+- Comparaison de missions et shortlist.
+- Assistant de candidature : message prêt à copier, lien source, alignement avec le CV, relance.
+- Scan automatique en arrière-plan et alertes intelligentes.
+- Dashboard/historique TJM par stack/source.
+- Sessions de navigation existantes, aucun identifiant de plateforme stocké.
+- « 100% local/privé », « aucun serveur », « aucune collecte ».
 - 700+ tests, FC&IS, TypeScript strict.
 
-### Dashboard Current State
+### État actuel du dashboard
 
-`apps/dashboard` currently has:
+`apps/dashboard` dispose actuellement de :
 
-- SvelteKit microfrontend package `@pulse/dashboard`.
-- Supabase SSR session bootstrap and redirect to landing login.
-- Account entitlements derived from `profiles`.
-- Connected feed loaded from Supabase `missions`, `mission_scores`, `mission_duplicates`, and
+- Package microfrontend SvelteKit `@pulse/dashboard`.
+- Amorçage (bootstrap) de session SSR Supabase et redirection vers la connexion de la landing.
+- Droits du compte dérivés de `profiles`.
+- Feed connecté chargé depuis les tables Supabase `missions`, `mission_scores`, `mission_duplicates` et
   `connector_health_events`.
-- Canonical applications loaded from Supabase `applications` with synchronized pipeline events,
-  generated application assets, next actions, notes, ratings, and stage transitions.
-- Canonical CV loaded from Supabase `candidate_profiles` plus experiences, education, skills,
-  links, import history, and field suggestions.
-- Sync status, connector health, alert preferences, and pending conflicts loaded from Supabase.
-- UI sections for mission feed, applications, comparison/shortlist, TJM radar, CV, sync readiness,
-  connector health, alert preferences, export, and connected-data deletion.
-- Pure dashboard helpers and unit tests in `src/lib/core/dashboard.ts`.
+- Candidatures canoniques chargées depuis Supabase `applications` avec événements de pipeline synchronisés,
+  assets de candidature générés, actions suivantes, notes, évaluations et transitions d'étapes.
+- CV canonique chargé depuis Supabase `candidate_profiles` ainsi qu'expériences, formations, compétences,
+  liens, historique d'import et suggestions de champs.
+- État de synchronisation, santé des connecteurs, préférences d'alerte et conflits en attente chargés depuis Supabase.
+- Sections d'interface pour le feed de missions, les candidatures, la comparaison/shortlist, le radar TJM, le CV, la disponibilité de synchronisation,
+  la santé des connecteurs, les préférences d'alerte, l'export et la suppression des données connectées.
+- Helpers purs du dashboard et tests unitaires dans `src/lib/core/dashboard.ts`.
 
-Dashboard implementation evidence:
+Preuves d'implémentation du dashboard :
 
-- `apps/dashboard/src/routes/+page.server.ts` reads and writes connected Supabase product tables.
-- `apps/dashboard/src/routes/+page.svelte` renders the connected product surface.
-- `apps/dashboard/tests/unit/core/dashboard.test.ts` covers dashboard view-model transforms.
-- `apps/dashboard/tests/unit/server/*.test.ts` covers Supabase write actions, conflict
-  resolution, sync status, export, and data deletion.
-- `apps/dashboard/tests/e2e/dashboard-smoke.test.ts` verifies the connected surfaces render even
-  without local Supabase configuration.
+- `apps/dashboard/src/routes/+page.server.ts` lit et écrit dans les tables produit connectées de Supabase.
+- `apps/dashboard/src/routes/+page.svelte` effectue le rendu de la surface produit connectée.
+- `apps/dashboard/tests/unit/core/dashboard.test.ts` couvre les transformations des view models du dashboard.
+- `apps/dashboard/tests/unit/server/*.test.ts` couvre les actions d'écriture Supabase, la résolution de conflits,
+  l'état de synchronisation, l'export et la suppression des données.
+- `apps/dashboard/tests/e2e/dashboard-smoke.test.ts` vérifie que les surfaces connectées s'affichent même
+  sans configuration Supabase locale.
 
-### Extension Current State
+### État actuel de l'extension
 
-`apps/extension` currently has:
+`apps/extension` dispose actuellement de :
 
-- Connectors for Free-Work, LeHibou, Hiway, Collective, Cherry Pick.
-- Pure parsers in `src/lib/core/connectors/`.
-- Shell connectors in `src/lib/shell/connectors/`.
-- Scanner orchestration in the service worker with alarms, connector status, scoring, dedup, semantic scoring, notifications, and health snapshots.
-- Local mission storage in IndexedDB.
-- Local tracking storage in IndexedDB.
-- Auth via Supabase JS and chrome.storage-backed session persistence.
-- Supabase sync for missions, mission scores, duplicate relations, applications, pipeline events,
-  generated assets, canonical CV imports, sync status, alert preferences, conflicts, and connector
-  health.
-- Canonical shared application pipeline stages from `@pulse/domain`.
-- LinkedIn profile/CV extractor v1 with pure parser, shell connector, optional host permission,
-  `activeTab`, `scripting`, typed errors, preview, and Supabase import.
-- Bridge handlers for scan, tracking, generated assets, auth, favorite compatibility, connected
-  dashboard sync, LinkedIn preview/import, and connector health.
-- UI pages for feed, applications, CV/profile sync draft, TJM, settings, and connector health.
+- Connecteurs pour Free-Work, LeHibou, Hiway, Collective, Cherry Pick.
+- Parsers purs dans `src/lib/core/connectors/`.
+- Connecteurs shell dans `src/lib/shell/connectors/`.
+- Orchestration du scanner dans le service worker avec alarmes, état des connecteurs, scoring, déduplication, scoring sémantique, notifications et snapshots de santé.
+- Stockage local des missions dans IndexedDB.
+- Stockage local du tracking dans IndexedDB.
+- Authentification via Supabase JS et persistance de session adossée à chrome.storage.
+- Synchronisation Supabase pour les missions, scores de missions, relations de doublons, candidatures, événements de pipeline,
+  assets générés, imports de CV canonique, état de synchronisation, préférences d'alerte, conflits et santé des
+  connecteurs.
+- Étapes canoniques partagées du pipeline de candidature issues de `@pulse/domain`.
+- Extracteur de profil/CV LinkedIn v1 avec parser pur, connecteur shell, permission d'hôte optionnelle,
+  `activeTab`, `scripting`, erreurs typées, prévisualisation et import Supabase.
+- Gestionnaires de bridge pour le scan, le tracking, les assets générés, l'authentification, la compatibilité des favoris,
+  la synchronisation du dashboard connecté, la prévisualisation/import LinkedIn et la santé des connecteurs.
+- Pages UI pour le feed, les candidatures, le brouillon de synchronisation CV/profil, le TJM, les paramètres et la santé des connecteurs.
 
-Extension implementation evidence:
+Preuves d'implémentation de l'extension :
 
-- `apps/extension/src/lib/core/sync/connected-dashboard.ts` builds pure sync payloads and merges
-  remote dashboard state.
-- `apps/extension/src/lib/shell/sync/connected-dashboard.ts` orchestrates Supabase I/O.
-- `apps/extension/src/lib/core/profile-extractors/linkedin-parser.ts` normalizes LinkedIn payloads
-  without I/O.
-- `apps/extension/src/lib/shell/profile-extractors/linkedin.extractor.ts` performs Chrome session
-  and DOM extraction in the shell.
+- `apps/extension/src/lib/core/sync/connected-dashboard.ts` construit les payloads de synchronisation purs et
+  fusionne l'état distant du dashboard.
+- `apps/extension/src/lib/shell/sync/connected-dashboard.ts` orchestre les I/O Supabase.
+- `apps/extension/src/lib/core/profile-extractors/linkedin-parser.ts` normalise les payloads LinkedIn
+  sans I/O.
+- `apps/extension/src/lib/shell/profile-extractors/linkedin.extractor.ts` gère la session Chrome
+  et l'extraction DOM dans le shell.
 - `apps/extension/tests/unit/sync/*.test.ts`, `apps/extension/tests/unit/profile-extractors/*.test.ts`,
-  and `apps/extension/tests/e2e/linkedin-import.test.ts` cover connected sync and LinkedIn v1.
+  et `apps/extension/tests/e2e/linkedin-import.test.ts` couvrent la synchronisation connectée et LinkedIn v1.
 
-### Existing Spec Open Questions
+### Questions ouvertes de la spec existante
 
-Replaced decisions:
+Décisions remplacées :
 
-- Extension sync protocol: Supabase-backed table sync with per-entity revision, operation metadata, and extension-origin writes. No dashboard scraping backend. No direct external messaging required for v1.
-- Source of truth: Supabase is the source of truth for connected dashboard data; extension local stores are offline/cache/execution state and reconcile with Supabase.
+- Protocole de synchronisation de l'extension : synchronisation de tables adossée à Supabase avec révision par entité, métadonnées d'opération et écritures provenant de l'extension. Aucun backend de scraping pour le dashboard. Aucun messaging externe direct requis pour la v1.
+- Source de vérité : Supabase est la source de vérité pour les données du dashboard connecté ; les stores locaux de l'extension constituent l'état offline/cache/exécution et se réconcilient avec Supabase.
 
-## Promise Gap Matrix
+## Matrice des écarts par rapport aux promesses
 
-| Landing promise              | Current implementation                                                                        | Missing work                                                                       | Priority |
-| ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------- |
-| 5 platforms scanned          | Extension has Free-Work, LeHibou, Hiway, Collective, Cherry Pick connectors and parser tests  | Done: scan output syncs to Supabase `missions`; connector health renders dashboard | Done     |
-| Centralized mission feed     | Dashboard feed reads Supabase `missions`, scores, sources, duplicates, filters, and freshness | Done                                                                               | Done     |
-| Scoring IA with Gemini Nano  | Extension scoring and semantic cache persist score breakdowns to Supabase mission scores      | Done: dashboard score criteria and semantic reason UI                              | Done     |
-| Deduplication                | Extension dedup persists canonical mission identity and duplicate source records              | Done                                                                               | Done     |
-| Smart alerts                 | Extension notifications plus dashboard alert preferences sync                                 | Done                                                                               | Done     |
-| Mission comparison/shortlist | Dashboard comparison uses selected/active Supabase applications                               | Done                                                                               | Done     |
-| Application assistant        | Generated assets sync to Supabase and render in dashboard history with copy/open actions      | Done                                                                               | Done     |
-| Pipeline follow-up           | Shared canonical pipeline, events, next actions, conflicts, dashboard and extension sync      | Done                                                                               | Done     |
-| Dashboard TJM/history        | Dashboard TJM radar derives trends by source and stack from synchronized missions             | Done                                                                               | Done     |
-| Existing browser sessions    | Extension connectors use browser sessions; LinkedIn v1 extracts profile via active tab        | Done                                                                               | Done     |
-| 100% local/private           | Public copy now says local execution plus optional Supabase dashboard sync                    | Done                                                                               | Done     |
-| No platform credentials      | Credentials/cookies/session tokens excluded from synced data and covered by tests/copy        | Done                                                                               | Done     |
-| Open source/tests/FC&IS      | Core/shell boundaries, parser tests, sync tests, E2E, and strict typecheck are in place       | Done                                                                               | Done     |
+| Promesse de la landing              | Implémentation actuelle                                                                                                    | Travail restant                                                                                                             | Priorité |
+| ----------------------------------- | -------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- | -------- |
+| 5 plateformes scannées              | L'extension a les connecteurs Free-Work, LeHibou, Hiway, Collective, Cherry Pick et les tests de parsers                   | Fait : la sortie du scan se synchronise vers `missions` dans Supabase ; la santé des connecteurs s'affiche sur le dashboard | Fait     |
+| Feed de missions centralisé         | Le feed du dashboard lit les `missions`, scores, sources, doublons, filtres et fraîcheur depuis Supabase                   | Fait                                                                                                                        | Fait     |
+| Scoring IA avec Gemini Nano         | Le scoring et le cache sémantique de l'extension persistent les détails des scores dans les scores de mission Supabase     | Fait : UI pour les critères de score et la justification sémantique sur le dashboard                                        | Fait     |
+| Déduplication                       | La déduplication de l'extension persiste l'identité canonique de la mission et les enregistrements de sources en doublon   | Fait                                                                                                                        | Fait     |
+| Alertes intelligentes               | Notifications de l'extension et synchronisation des préférences d'alerte du dashboard                                      | Fait                                                                                                                        | Fait     |
+| Comparaison de missions / shortlist | La comparaison du dashboard utilise les candidatures Supabase sélectionnées/actives                                        | Fait                                                                                                                        | Fait     |
+| Assistant de candidature            | Les assets générés se synchronisent vers Supabase et s'affichent dans l'historique du dashboard avec actions copier/ouvrir | Fait                                                                                                                        | Fait     |
+| Suivi du pipeline                   | Pipeline canonique partagé, événements, prochaines actions, conflits, synchronisation dashboard et extension               | Fait                                                                                                                        | Fait     |
+| Dashboard / historique TJM          | Le radar TJM du dashboard dérive les tendances par source et stack à partir des missions synchronisées                     | Fait                                                                                                                        | Fait     |
+| Sessions de navigation existantes   | Les connecteurs de l'extension utilisent les sessions de navigation ; LinkedIn v1 extrait le profil via l'onglet actif     | Fait                                                                                                                        | Fait     |
+| 100% local/privé                    | La copy publique indique désormais exécution locale plus synchronisation optionnelle avec le dashboard Supabase            | Fait                                                                                                                        | Fait     |
+| Aucun identifiant de plateforme     | Identifiants/cookies/tokens de session exclus des données synchronisées et couverts par des tests/copy                     | Fait                                                                                                                        | Fait     |
+| Open source / tests / FC&IS         | Frontières core/shell, tests de parsers, tests de synchronisation, E2E et typecheck strict sont en place                   | Fait                                                                                                                        | Fait     |
 
-## Target Product Surface
+## Surface produit cible
 
 ### Dashboard
 
-Dashboard becomes the connected cockpit:
+Le dashboard devient le cockpit connecté :
 
-- Feed: all synced missions, search, filters, score, source, dedup badge, freshness, hide/archive.
-- Applications: kanban/list/table for canonical pipeline, next action, notes, generated assets, source link, activity timeline.
-- CV canonical: profile summary, experiences, skills, education, links, import history, source confidence, manual overrides.
-- Sync: extension connection status, last seen time, pending upload/download counts, conflicts, failed jobs.
-- Connector health: per-platform readiness, last scan, last error type/message, session required, permission required.
-- Account: Supabase session, credits, premium status, privacy/export/delete controls.
+- Feed : toutes les missions synchronisées, recherche, filtres, score, source, badge de déduplication, fraîcheur, masquer/archiver.
+- Candidatures : kanban/liste/tableau pour le pipeline canonique, prochaine action, notes, assets générés, lien source, chronologie d'activité.
+- CV canonique : résumé du profil, expériences, compétences, formation, liens, historique d'import, confiance de la source, remplacements manuels.
+- Synchronisation : statut de connexion de l'extension, date de dernière activité, décomptes d'envois/téléchargements en attente, conflits, tâches en échec.
+- Santé des connecteurs : disponibilité par plateforme, dernier scan, dernier type/message d'erreur, session requise, permission requise.
+- Compte : session Supabase, crédits, statut premium, contrôles de confidentialité/export/suppression.
 
 ### Extension
 
-Extension remains the local executor:
+L'extension reste l'exécuteur local :
 
-- Scans mission platforms through browser sessions.
-- Extracts LinkedIn profile/CV from the browser context.
-- Writes local-first results to IndexedDB.
-- Uploads sanitized snapshots to Supabase when authenticated.
-- Receives Supabase canonical state for applications/CV/settings when online.
-- Shows typed connector/extractor errors in the side panel.
+- Scanne les plateformes de missions via les sessions du navigateur.
+- Extrait le profil/CV LinkedIn depuis le contexte du navigateur.
+- Écrit les résultats local-first dans IndexedDB.
+- Envoie des snapshots assainis vers Supabase une fois authentifié.
+- Reçoit l'état canonique Supabase pour les candidatures/CV/paramètres en étant en ligne.
+- Affiche les erreurs typées des connecteurs/extracteurs dans le side panel.
 
-## Canonical Pipeline
+## Pipeline canonique
 
-Stages:
+Étapes :
 
-- `detected`: mission found by a connector and visible in the feed.
-- `selected`: user shortlisted the mission or marked it as worth pursuing.
-- `application_prepared`: pitch/message/CV notes are ready.
-- `applied`: user has applied on the source platform or through a recruiter.
-- `interview`: interview process started.
-- `offer`: offer received or commercial terms under negotiation.
-- `accepted`: mission accepted.
-- `rejected`: opportunity declined by client/recruiter or refused by user.
-- `archived`: no longer active, retained for history.
+- `detected` : mission trouvée par un connecteur et visible dans le feed.
+- `selected` : l'utilisateur a retenu la mission dans sa shortlist ou l'a marquée comme intéressante à poursuivre.
+- `application_prepared` : le pitch / message / notes de CV sont prêts.
+- `applied` : l'utilisateur a postulé sur la plateforme source ou auprès d'un recruteur.
+- `interview` : processus d'entretien démarré.
+- `offer` : offre reçue ou conditions commerciales en cours de négociation.
+- `accepted` : mission acceptée.
+- `rejected` : opportunité déclinée par le client/recruteur ou refusée par l'utilisateur.
+- `archived` : n'est plus active, conservée pour l'historique.
 
-Allowed transitions:
+Transitions autorisées :
 
 ```text
 detected -> selected | archived
@@ -273,13 +273,13 @@ rejected -> archived
 archived -> detected
 ```
 
-Dashboard and extension may expose shortcuts, but persisted state must be represented as valid pipeline events. For example, moving directly from `selected` to `applied` creates one event; moving from `detected` to `applied` should either be rejected by core or expanded by shell into `detected -> selected -> application_prepared -> applied` only if the user action explicitly requests "mark as applied".
+Le dashboard et l'extension peuvent exposer des raccourcis, mais l'état persisté doit être représenté sous forme d'événements de pipeline valides. Par exemple, passer directement de `selected` à `applied` crée un événement ; passer de `detected` à `applied` doit soit être rejeté par le core, soit être décomposé par le shell en `detected -> selected -> application_prepared -> applied` uniquement si l'action utilisateur demande explicitement de « marquer comme postulé ».
 
-## Supabase Data Model
+## Modèle de données Supabase
 
-All tables are RLS-protected with `auth.uid() = user_id`, except service-owned billing tables already present.
+Toutes les tables sont protégées par RLS avec `auth.uid() = user_id`, à l'exception des tables de facturation gérées par le service déjà présentes.
 
-### Core Tables
+### Tables Core
 
 ```sql
 profiles (
@@ -345,7 +345,7 @@ mission_duplicates (
 )
 ```
 
-### Applications and Pipeline
+### Candidatures et pipeline
 
 ```sql
 applications (
@@ -408,7 +408,7 @@ generated_application_assets (
 )
 ```
 
-### Canonical CV/Profile
+### CV/Profil canonique
 
 ```sql
 candidate_profiles (
@@ -488,7 +488,7 @@ profile_imports (
 )
 ```
 
-### Sync and Health
+### Synchronisation et santé
 
 ```sql
 extension_devices (
@@ -567,95 +567,95 @@ connector_health_events (
 )
 ```
 
-Keep `favorite_missions` during migration as a compatibility source. It should become either a view over `applications(stage in selected...)` or be deprecated after dashboard reads from canonical tables.
+Conserver `favorite_missions` pendant la migration comme source de compatibilité. Elle devrait devenir soit une vue sur `applications(stage in selected...)`, soit être dépréciée après que le dashboard lise depuis les tables canoniques.
 
-## Sync Protocol
+## Protocole de synchronisation
 
-### Direction
+### Sens
 
-- Extension -> Supabase:
-  - Scanned missions and score snapshots.
-  - Application state changes made in the side panel.
-  - Generated assets created in the extension, upserted idempotently with `client_asset_id`.
-  - LinkedIn profile import output.
-  - Connector/extractor health events.
-- Dashboard -> Supabase:
-  - Application state changes.
-  - Notes, ratings, next action dates.
-  - Canonical CV edits.
-  - User preferences that affect connected dashboard behavior.
-  - Connected alert preferences used by extension scans.
-- Extension <- Supabase:
-  - Canonical applications for local side panel.
-  - Candidate profile/settings used for scoring.
-  - Conflict resolutions and dashboard edits.
+- Extension -> Supabase :
+  - Missions scannées et snapshots de scores.
+  - Changements d'état des candidatures effectués dans le side panel.
+  - Assets générés créés dans l'extension, insérés ou mis à jour (upsert) de manière idempotente avec `client_asset_id`.
+  - Résultat de l'import de profil LinkedIn.
+  - Événements de santé des connecteurs/extracteurs.
+- Dashboard -> Supabase :
+  - Changements d'état des candidatures.
+  - Notes, évaluations, dates de prochaine action.
+  - Modifications du CV canonique.
+  - Préférences utilisateur influençant le comportement du dashboard connecté.
+  - Préférences d'alerte connectées utilisées par les scans de l'extension.
+- Extension <- Supabase :
+  - Candidatures canoniques pour le side panel local.
+  - Profil candidat / paramètres utilisés pour le scoring.
+  - Résolutions de conflits et modifications apportées depuis le dashboard.
 
-### Mechanics
+### Mécanique
 
-- Each local extension install has a stable `install_id` generated in shell and registered in `extension_devices`.
-- Each syncable table has:
+- Chaque installation locale de l'extension possède un `install_id` stable généré dans le shell et enregistré dans `extension_devices`.
+- Chaque table synchronisable comporte :
   - `revision bigint`.
   - `updated_at timestamptz`.
   - `updated_by`.
-  - client-generated idempotency keys for event inserts.
-- Extension stores a per-entity cursor in chrome.storage/IndexedDB:
-  - last pushed local revision or event id.
-  - last pulled remote `updated_at`.
-  - last successful sync timestamp.
-- Push is batched:
-  - missions: upsert by `(user_id, source, external_id)`.
-  - applications: upsert by `(user_id, mission_id)` with revision check.
-  - pipeline events: insert-only with `client_event_id`.
-  - profile import: transaction-like batch from normalized profile snapshot.
-- Pull uses `updated_at > cursor` and excludes rows last written by the same device when possible.
-- Manual retry from the side panel uses the `RETRY_CONNECTED_SYNC` bridge message and replays the same local snapshot reconciliation path as scheduled sync.
+  - clés d'idempotence générées par le client pour les insertions d'événements.
+- L'extension stocke un curseur par entité dans chrome.storage/IndexedDB :
+  - dernière révision locale poussée ou id d'événement.
+  - dernier `updated_at` distant récupéré (pull).
+  - horodatage de la dernière synchronisation réussie.
+- Le push est effectué par lots :
+  - missions : upsert par `(user_id, source, external_id)`.
+  - candidatures : upsert par `(user_id, mission_id)` avec vérification de révision.
+  - événements de pipeline : insertion uniquement avec `client_event_id`.
+  - import de profil : lot transactionnel à partir du snapshot de profil normalisé.
+- Le pull utilise `updated_at > cursor` et exclut les lignes écrites en dernier par le même appareil lorsque c'est possible.
+- La nouvelle tentative manuelle depuis le side panel utilise le message de bridge `RETRY_CONNECTED_SYNC` et rejoue le même chemin de réconciliation de snapshot local que la synchronisation planifiée.
 
-### Conflict Resolution
+### Résolution des conflits
 
-- Pipeline events are append-only. The current `applications.stage` is derived from the latest valid event, then materialized for fast reads.
-- Notes, ratings, next action dates, and CV fields are last-writer-wins by `updated_at` for v1, with conflict rows created when two updates touch the same field within a short window.
-- Dashboard has final authority for manual CV edits.
-- Extension profile imports never overwrite manually edited fields silently. They create field-level suggestions when a canonical field already has a dashboard edit newer than the import cursor.
-- Duplicate mission upserts merge by source/external id first, then by canonical key/dedup confidence.
-- Failed sync states are visible in both dashboard and extension with entity, code, message, retry timestamp.
+- Les événements de pipeline sont en ajout seul (append-only). Le `applications.stage` actuel est dérivé du dernier événement valide, puis matérialisé pour des lectures rapides.
+- Les notes, évaluations, dates de prochaine action et champs du CV suivent la règle du dernier écrivain qui gagne (last-writer-wins) par `updated_at` pour la v1, avec des lignes de conflit créées lorsque deux mises à jour modifient le même champ dans une fenêtre de temps rapprochée.
+- Le dashboard a l'autorité finale pour les modifications manuelles du CV.
+- Les imports de profil par l'extension n'écrasent jamais silencieusement les champs modifiés manuellement. Ils créent des suggestions au niveau des champs lorsqu'un champ canonique comporte déjà une modification depuis le dashboard plus récente que le curseur d'import.
+- Les upserts de missions en doublon fusionnent d'abord par source/id externe, puis par clé canonique / confiance de déduplication.
+- Les états de synchronisation en échec sont visibles à la fois dans le dashboard et l'extension avec l'entité, le code, le message et l'horodatage de nouvelle tentative.
 
-## Chrome Permissions
+## Permissions Chrome
 
-Current permissions are sufficient for mission scan except LinkedIn extraction.
+Les permissions actuelles sont suffisantes pour le scan de missions, à l'exception de l'extraction LinkedIn.
 
-Required additions for LinkedIn v1:
+Ajouts requis pour LinkedIn v1 :
 
-- `host_permissions` or `optional_host_permissions`: `https://www.linkedin.com/*`.
-- `permissions`: `scripting` for DOM extraction from a user-opened LinkedIn profile tab.
-- `permissions`: `activeTab` for user-initiated import without broad always-on LinkedIn script access.
-- Keep `cookies` only for session/readiness checks; never read or persist credential values.
+- `host_permissions` ou `optional_host_permissions` : `https://www.linkedin.com/*`.
+- `permissions` : `scripting` pour l'extraction DOM depuis un onglet de profil LinkedIn ouvert par l'utilisateur.
+- `permissions` : `activeTab` pour un import déclenché par l'utilisateur sans accès permanent étendu aux scripts sur LinkedIn.
+- Conserver `cookies` uniquement pour les vérifications de session/disponibilité ; ne jamais lire ni persister de valeurs d'identifiants.
 
-Recommended LinkedIn extraction UX:
+UX d'extraction LinkedIn recommandée :
 
-- User opens their LinkedIn profile in Chrome.
-- User clicks "Importer depuis LinkedIn" in the extension.
-- Extension validates active tab origin/path.
-- Service worker injects a small script with `chrome.scripting.executeScript`.
-- Script returns sanitized DOM-derived data, not raw full-page HTML.
-- Shell passes sanitized raw data to a pure core parser/normalizer.
+- L'utilisateur ouvre son profil LinkedIn dans Chrome.
+- L'utilisateur clique sur « Importer depuis LinkedIn » dans l'extension.
+- L'extension valide l'origine et le chemin de l'onglet actif.
+- Le service worker injecte un script léger via `chrome.scripting.executeScript`.
+- Le script renvoie des données assainies issues du DOM, et non le HTML brut complet de la page.
+- Le shell transmet les données brutes assainies à un parser/normaliseur pur dans le core.
 
-## Security and Privacy Boundaries
+## Frontières de sécurité et de confidentialité
 
-- Never store LinkedIn or mission-platform credentials.
-- Do not build dashboard-side scraping, browser automation, or server fetches for platform sessions.
-- Store only normalized mission/profile snapshots needed for product functionality.
-- Do not sync raw LinkedIn HTML to Supabase. Store a hash and field counts in `profile_imports`.
-- Supabase RLS is mandatory on all user-owned tables.
-- Extension Supabase client uses anon key + user JWT only.
-- Service role remains limited to billing/webhook/admin flows in landing server code.
-- Gemini Nano remains optional, local, cached, and non-blocking. Semantic scores can be synced only as result snapshots.
-- Provide export/delete controls for connected data.
+- Ne jamais stocker d'identifiants LinkedIn ou de plateformes de missions.
+- Ne pas concevoir de scraping côté dashboard, d'automatisation de navigateur ou de requêtes serveur pour les sessions de plateformes.
+- Ne stocker que les snapshots normalisés de missions/profils nécessaires au fonctionnement du produit.
+- Ne pas synchroniser le HTML brut de LinkedIn vers Supabase. Stocker un hash et le décompte des champs dans `profile_imports`.
+- Supabase RLS est obligatoire sur toutes les tables appartenant à l'utilisateur.
+- Le client Supabase de l'extension utilise uniquement la clé anonyme (anon key) et le JWT utilisateur.
+- Le rôle service reste limité aux flux de facturation/webhooks/admin dans le code serveur de la landing.
+- Gemini Nano reste optionnel, local, mis en cache et non-bloquant. Les scores sémantiques ne peuvent être synchronisés que sous forme de snapshots de résultats.
+- Fournir des contrôles d'export et de suppression pour les données connectées.
 
 ## LinkedIn v1
 
-### Core Parser
+### Parser Core
 
-Add pure core modules:
+Ajouter des modules core purs :
 
 ```text
 apps/extension/src/lib/core/profile-extractors/
@@ -664,7 +664,7 @@ apps/extension/src/lib/core/profile-extractors/
   normalize-candidate-profile.ts
 ```
 
-Core input is sanitized extractor payload, not browser APIs:
+L'entrée du core est un payload d'extracteur assaini, et non des APIs de navigateur :
 
 ```ts
 export interface RawPlatformProfile {
@@ -693,17 +693,17 @@ export interface CanonicalCandidateProfileDraft {
 }
 ```
 
-Rules:
+Règles :
 
-- No `fetch`, no `chrome.*`, no async, no ambient time.
-- `capturedAt` is injected by shell.
-- Parser tolerates missing sections.
-- Parser returns typed errors for malformed payloads.
-- Unit tests use sanitized fixtures.
+- Pas de `fetch`, pas de `chrome.*`, pas d'async, pas de temps ambiant.
+- `capturedAt` est injecté par le shell.
+- Le parser tolère les sections manquantes.
+- Le parser renvoie des erreurs typées pour les payloads mal formés.
+- Les tests unitaires utilisent des fixtures assainies.
 
-### Shell Extractor
+### Extracteur Shell
 
-Add shell modules:
+Ajouter des modules shell :
 
 ```text
 apps/extension/src/lib/shell/profile-extractors/
@@ -713,7 +713,7 @@ apps/extension/src/lib/shell/profile-extractors/
   profile-extractor-errors.ts
 ```
 
-Interface:
+Interface :
 
 ```ts
 export interface PlatformProfileExtractor {
@@ -727,79 +727,79 @@ export interface PlatformProfileExtractor {
 }
 ```
 
-LinkedIn typed errors:
+Erreurs typées LinkedIn :
 
-- `permission_required`: LinkedIn host permission or scripting permission missing.
-- `session_required`: active page redirects to login or session markers missing.
-- `profile_not_found`: active tab is not a LinkedIn profile page.
-- `dom_changed`: required profile containers absent or parse confidence below threshold.
-- `rate_limited_or_blocked`: LinkedIn returns challenge, checkpoint, or unusually empty DOM.
-- `sync_failed`: normalized profile could not be persisted to Supabase.
+- `permission_required` : permission d'hôte LinkedIn ou permission scripting manquante.
+- `session_required` : la page active redirige vers la connexion ou les marqueurs de session sont absents.
+- `profile_not_found` : l'onglet actif n'est pas une page de profil LinkedIn.
+- `dom_changed` : conteneurs de profil requis absents ou confiance de parsing inférieure au seuil.
+- `rate_limited_or_blocked` : LinkedIn renvoie un challenge, un point de contrôle (checkpoint) ou un DOM anormalement vide.
+- `sync_failed` : le profil normalisé n'a pas pu être persisté dans Supabase.
 
-### Dashboard Mapping
+### Mapping Dashboard
 
 - `CanonicalCandidateProfileDraft.title` -> `candidate_profiles.title`.
 - `summary` -> `candidate_profiles.summary`.
-- Experiences -> `candidate_experiences`.
-- Skills -> `candidate_skills`.
-- Education -> `candidate_education`.
-- Links -> `candidate_links`.
-- Import metadata -> `profile_imports`.
-- Existing dashboard edits produce field-level suggestions instead of blind overwrite.
+- Expériences -> `candidate_experiences`.
+- Compétences -> `candidate_skills`.
+- Formation -> `candidate_education`.
+- Liens -> `candidate_links`.
+- Métadonnées d'import -> `profile_imports`.
+- Les modifications existantes sur le dashboard génèrent des suggestions au niveau des champs au lieu d'un écrasement aveugle.
 
-## Extensible Platform Profile Extractors
+## Extracteurs de profil de plateforme extensibles
 
-LinkedIn is the first implementation. Future extractors follow the same template:
+LinkedIn est la première implémentation. Les futurs extracteurs suivront le même modèle :
 
-1. Add a pure parser/normalizer in `core/profile-extractors/{platform}-parser.ts`.
-2. Add a shell extractor in `shell/profile-extractors/{platform}.extractor.ts`.
-3. Register metadata in `shell/profile-extractors/index.ts`.
-4. Add host/optional permissions if needed.
-5. Add unit tests with sanitized fixtures.
-6. Add shell tests for typed errors and permission/session behavior.
-7. Add dashboard mapping only through canonical CV tables, never platform-specific dashboard tables.
+1. Ajouter un parser/normaliseur pur dans `core/profile-extractors/{platform}-parser.ts`.
+2. Ajouter un extracteur shell dans `shell/profile-extractors/{platform}.extractor.ts`.
+3. Enregistrer les métadonnées dans `shell/profile-extractors/index.ts`.
+4. Ajouter les permissions d'hôte/optionnelles si nécessaire.
+5. Ajouter des tests unitaires avec des fixtures assainies.
+6. Ajouter des tests shell pour les erreurs typées et le comportement des permissions/sessions.
+7. Ajouter le mapping dashboard uniquement via les tables canoniques de CV, jamais dans des tables de dashboard spécifiques à la plateforme.
 
-Shared shell behavior:
+Comportement shell partagé :
 
-- permission check;
-- session check;
-- extraction dispatch;
-- normalized Supabase upload;
-- sync status update;
-- connector/extractor health event.
+- vérification des permissions ;
+- vérification de la session ;
+- déclenchement de l'extraction ;
+- upload normalisé vers Supabase ;
+- mise à jour du statut de synchronisation ;
+- événement de santé du connecteur/extracteur.
 
-## Implementation Plan
+## Plan d'implémentation
 
-### Phase 1: Audit, Gap Matrix, Supabase Schema
+### Phase 1 : Audit, matrice des écarts, schéma Supabase
 
-Tasks:
+Tâches :
 
-- Replace this spec's decisions in PR description and product docs.
-- Add Supabase migrations for canonical missions, applications, pipeline events, CV profile, sync status, and connector health.
-- Preserve `favorite_missions` as compatibility.
-- Add RLS policies and indexes.
-- Add generated TypeScript types if the project adopts Supabase type generation.
+- Remplacer les décisions de cette spec dans la description de PR et les docs produit.
+- Ajouter les migrations Supabase pour les missions canoniques, les candidatures, les événements de pipeline, le profil CV, le statut de synchronisation et la santé des connecteurs.
+- Conserver `favorite_missions` pour la compatibilité.
+- Ajouter les politiques RLS et les index.
+- Ajouter les types TypeScript générés si le projet adopte la génération de types Supabase.
 
-Acceptance:
+Critères d'acceptation :
 
-- Schema supports every landing promise and canonical pipeline state.
-- Existing auth/billing/profile behavior remains compatible.
-- No dashboard scraping backend is introduced.
+- Le schéma prend en charge chaque promesse de la landing et chaque état du pipeline canonique.
+- Le comportement existant d'auth / facturation / profil reste compatible.
+- Aucun backend de scraping pour le dashboard n'est introduit.
 
-Verify:
+Vérification :
 
 - `pnpm --filter @pulse/landing test`
-- Manual SQL review of RLS for every user-owned table.
+- Revue manuelle du SQL des RLS pour chaque table appartenant à l'utilisateur.
 
-### Phase 2: Shared Application/Pipeline Model
+### Phase 2 : Modèle partagé de candidature / pipeline
 
-Tasks:
+Tâches :
 
-- Add shared pure pipeline types and transitions.
-- Replace dashboard `ApplicationStage` and extension `ApplicationStatus` with canonical stage names.
-- Fix bridge schema mismatch for tracking messages.
-- Add pure tests for every valid and invalid transition.
-- Add migration/adapters from current local tracking values:
+- Ajouter les types de pipeline purs et les transitions partagés.
+- Remplacer `ApplicationStage` du dashboard et `ApplicationStatus` de l'extension par les noms d'étapes canoniques.
+- Corriger l'incompatibilité de schéma du bridge pour les messages de tracking.
+- Ajouter des tests purs pour chaque transition valide et invalide.
+- Ajouter des adaptateurs/migrations à partir des valeurs actuelles de tracking local :
   - `new` -> `detected`
   - `interested` -> `selected`
   - `applying` -> `application_prepared`
@@ -808,131 +808,131 @@ Tasks:
   - `rejected` -> `rejected`
   - `archived` -> `archived`
 
-Acceptance:
+Critères d'acceptation :
 
-- Dashboard and extension use the same stage union.
-- Invalid transitions are rejected in core.
-- Existing local tracking records can be read and migrated.
+- Le dashboard et l'extension utilisent la même union d'étapes.
+- Les transitions invalides sont rejetées dans le core.
+- Les enregistrements existants de tracking local peuvent être lus et migrés.
 
-Verify:
+Vérification :
 
 - `pnpm --filter @pulse/extension test -- tests/unit/tracking`
 - `pnpm --filter @pulse/dashboard test`
 - `pnpm --filter @pulse/extension typecheck`
 
-### Phase 3: Robust Supabase Sync Extension <-> Dashboard
+### Phase 3 : Synchronisation robuste Supabase Extension <-> Dashboard
 
-Tasks:
+Tâches :
 
-- Register extension devices.
-- Implement mission upsert sync from extension scan results.
-- Implement application/pipeline event sync both ways.
-- Implement sync cursors and retryable error reporting.
-- Persist connector health snapshots/events to Supabase.
-- Add side panel bridge messages for sync status and manual retry.
+- Enregistrer les appareils de l'extension.
+- Implémenter la synchronisation par upsert des missions à partir des résultats de scan de l'extension.
+- Implémenter la synchronisation bidirectionnelle des candidatures et événements de pipeline.
+- Implémenter les curseurs de synchronisation et la remontée d'erreurs rejouables.
+- Persister les snapshots / événements de santé des connecteurs dans Supabase.
+- Ajouter des messages de bridge dans le side panel pour le statut de synchronisation et la nouvelle tentative manuelle.
 
-Acceptance:
+Critères d'acceptation :
 
-- Signed-in extension scan populates dashboard mission feed.
-- Dashboard stage changes appear in extension after pull.
-- Extension stage changes appear in dashboard after push.
-- Offline changes queue and retry without data loss.
+- Le scan d'une extension connectée remplit le feed de missions du dashboard.
+- Les changements d'étape du dashboard apparaissent dans l'extension après un pull.
+- Les changements d'étape de l'extension apparaissent dans le dashboard après un push.
+- Les modifications hors-ligne sont mises en file d'attente et rejouées sans perte de données.
 
-Verify:
+Vérification :
 
-- Unit tests for sync payload builders and conflict handling.
-- Integration tests with mocked Supabase client.
-- Manual smoke with local dashboard and extension dev mode.
+- Tests unitaires pour les constructeurs de payload de synchronisation et la gestion des conflits.
+- Tests d'intégration avec client Supabase mocké.
+- Test manuel préliminaire (smoke test) avec le dashboard local et le mode dev de l'extension.
 
-### Phase 4: Dashboard Complete Against Landing
+### Phase 4 : Dashboard complet conforme à la landing
 
-Tasks:
+Tâches :
 
-- Replace mock dashboard data with Supabase reads.
-- Build dashboard feed with mission score, source, dedup, filters, and freshness.
-- Build applications pipeline and detail panel.
-- Build canonical CV profile view/editor with import history.
-- Build sync/connector health screen.
-- Add generated assets history and application assistant UI.
-- Adjust landing copy to reflect connected dashboard + local execution privacy model.
+- Remplacer les données mockées du dashboard par des lectures Supabase.
+- Construire le feed du dashboard avec score de mission, source, déduplication, filtres et fraîcheur.
+- Construire le pipeline des candidatures et le panneau de détail.
+- Construire la vue/éditeur du profil CV canonique avec historique d'import.
+- Construire l'écran de synchronisation et de santé des connecteurs.
+- Ajouter l'historique des assets générés et l'UI de l'assistant de candidature.
+- Ajuster la copy de la landing pour refléter le modèle de confidentialité du dashboard connecté + exécution locale.
 
-Acceptance:
+Critères d'acceptation :
 
-- Every P0/P1 landing promise has a dashboard surface.
-- Unauthenticated users are redirected cleanly.
-- Dashboard never accesses platform sessions.
+- Chaque promesse P0/P1 de la landing dispose d'une surface sur le dashboard.
+- Les utilisateurs non authentifiés sont redirigés proprement.
+- Le dashboard n'accède jamais aux sessions des plateformes.
 
-Verify:
+Vérification :
 
 - `pnpm --filter @pulse/dashboard check`
 - `pnpm --filter @pulse/dashboard build`
-- Dashboard Playwright smoke tests for feed, pipeline, CV, sync.
+- Smoke tests Playwright du dashboard pour le feed, le pipeline, le CV et la synchronisation.
 
-### Phase 5: LinkedIn Profile/CV Extractor
+### Phase 5 : Extracteur de profil/CV LinkedIn
 
-Tasks:
+Tâches :
 
-- Add LinkedIn optional host permission and `scripting`/`activeTab` permissions.
-- Implement pure LinkedIn profile parser/normalizer with fixtures.
-- Implement shell extractor using active tab DOM extraction.
-- Implement Supabase upload to canonical CV tables.
-- Add extension UI flow: permission -> session/profile check -> import preview -> sync.
-- Add dashboard import history and field suggestions.
+- Ajouter la permission d'hôte optionnelle LinkedIn et les permissions `scripting`/`activeTab`.
+- Implémenter le parser/normaliseur pur de profil LinkedIn avec fixtures.
+- Implémenter l'extracteur shell utilisant l'extraction DOM de l'onglet actif.
+- Implémenter l'upload Supabase vers les tables de CV canonique.
+- Ajouter le flux UI dans l'extension : permission -> vérification de session/profil -> prévisualisation de l'import -> synchronisation.
+- Ajouter l'historique d'import et les suggestions de champs sur le dashboard.
 
-Acceptance:
+Critères d'acceptation :
 
-- User can import LinkedIn profile data without entering LinkedIn credentials.
-- Parser handles missing sections and typed failure states.
-- Existing dashboard CV edits are not silently overwritten.
+- L'utilisateur peut importer les données de son profil LinkedIn sans saisir ses identifiants LinkedIn.
+- Le parser gère les sections manquantes et les états d'échec typés.
+- Les modifications existantes du CV sur le dashboard ne sont pas écrasées silencieusement.
 
-Verify:
+Vérification :
 
-- Unit parser tests with sanitized LinkedIn fixtures.
-- Shell tests for permission/session/dom failure branches.
-- Manual browser test on a LinkedIn profile page.
+- Tests unitaires du parser avec fixtures LinkedIn assainies.
+- Tests shell pour les branches d'échec de permissions/session/DOM.
+- Test manuel dans le navigateur sur une page de profil LinkedIn.
 
-### Phase 6: E2E and Hardening
+### Phase 6 : E2E et durcissement
 
-Tasks:
+Tâches :
 
-- Add E2E: scan -> Supabase sync -> dashboard feed.
-- Add E2E: dashboard stage update -> extension pull.
-- Add E2E: extension stage update -> dashboard update.
-- Add E2E/manual: LinkedIn import happy path and typed errors.
-- Add privacy/export/delete coverage.
-- Add observability for sync status and connector health.
+- Ajouter le test E2E : scan -> synchronisation Supabase -> feed du dashboard.
+- Ajouter le test E2E : mise à jour d'étape sur le dashboard -> pull de l'extension.
+- Ajouter le test E2E : mise à jour d'étape sur l'extension -> mise à jour du dashboard.
+- Ajouter le test E2E/manuel : happy path de l'import LinkedIn et erreurs typées.
+- Ajouter la couverture confidentialité/export/suppression.
+- Ajouter l'observabilité pour le statut de synchronisation et la santé des connecteurs.
 
-Acceptance:
+Critères d'acceptation :
 
-- Critical connected flows are tested end-to-end.
-- Sync failures are visible and recoverable.
-- Privacy boundaries are documented and enforced.
+- Les flux connectés critiques sont testés de bout en bout.
+- Les échecs de synchronisation sont visibles et récupérables.
+- Les frontières de confidentialité sont documentées et respectées.
 
-Verify:
+Vérification :
 
 - `pnpm test`
 - `pnpm typecheck`
 - `pnpm build`
 - `pnpm --filter @pulse/extension test:e2e`
 
-## Risks and Mitigations
+## Risques et atténuations
 
-| Risk                                  | Impact                   | Mitigation                                                                 |
-| ------------------------------------- | ------------------------ | -------------------------------------------------------------------------- |
-| LinkedIn DOM changes frequently       | Import breaks            | Keep parser fixture-based, confidence scoring, typed `dom_changed` errors  |
-| Supabase schema grows too fast        | Migration churn          | Ship Phase 1 as additive schema and keep `favorite_missions` compatibility |
-| Conflicting dashboard/extension edits | Lost user notes/stages   | Append-only pipeline events, revision checks, field-level CV suggestions   |
-| Privacy promise mismatch              | User trust issue         | Update landing copy before connected dashboard launch                      |
-| MV3 service worker hibernation        | Missed sync              | Cursor-based retry and explicit manual sync action                         |
-| Bridge stage mismatch                 | Runtime invalid messages | Phase 2 canonical stage union and schema tests                             |
+| Risque                                             | Impact                            | Atténuation                                                                                                           |
+| -------------------------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Le DOM de LinkedIn change fréquemment              | L'import casse                    | Garder un parser basé sur des fixtures, scoring de confiance, erreurs typées `dom_changed`                            |
+| Le schéma Supabase grossit trop vite               | Instabilité des migrations        | Livrer la Phase 1 sous forme de schéma additif et maintenir la compatibilité avec `favorite_missions`                 |
+| Modifications conflictuelles dashboard / extension | Perte de notes/étapes utilisateur | Événements de pipeline en ajout seul (append-only), vérifications de révision, suggestions de CV au niveau des champs |
+| Décalage avec la promesse de confidentialité       | Problème de confiance utilisateur | Mettre à jour la copy de la landing avant le lancement du dashboard connecté                                          |
+| Hibernation du service worker MV3                  | Synchronisation manquée           | Nouvelle tentative basée sur curseur et action explicite de synchronisation manuelle                                  |
+| Incompatibilité d'étapes dans le bridge            | Messages invalides à l'exécution  | Union canonique des étapes en Phase 2 et tests de schémas                                                             |
 
-## Boundaries
+## Frontières
 
-- Always: keep core pure, inject time, write parser tests with fixtures, expose typed errors in UI.
-- Always: use Supabase only for connected sync and user-owned product data.
-- Ask first: adding new external services, storing raw profile HTML, broad LinkedIn host permission instead of optional/activeTab flow.
-- Never: store platform credentials, scrape from dashboard/server, bypass RLS, use Svelte legacy stores/events, add Tailwind JS config, put I/O in core.
+- Toujours : garder le core pur, injecter le temps, écrire des tests de parsers avec fixtures, exposer des erreurs typées dans l'UI.
+- Toujours : utiliser Supabase uniquement pour la synchronisation connectée et les données produit appartenant à l'utilisateur.
+- Demander au préalable : ajout de nouveaux services externes, stockage de HTML brut de profil, permission d'hôte LinkedIn globale plutôt qu'un flux optionnel/activeTab.
+- Jamais : stocker des identifiants de plateforme, scraper depuis le dashboard/serveur, contourner les RLS, utiliser les stores/événements legacy de Svelte, ajouter une configuration Tailwind JS, mettre des I/O dans le core.
 
-## Open Questions
+## Questions ouvertes
 
-None blocking for implementation. Product copy must be updated because the prior "aucun serveur / 100% local" promise conflicts with the accepted Supabase hub decision.
+Aucune bloquante pour l'implémentation. La copy produit doit être mise à jour car la promesse antérieure « aucun serveur / 100% local » entre en conflit avec la décision adoptée du hub Supabase.

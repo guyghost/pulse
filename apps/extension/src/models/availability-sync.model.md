@@ -1,30 +1,31 @@
-# Availability Sync Model
+# Modèle de synchronisation de la disponibilité
 
-Source of truth for the "Disponibilité" block shown in the **Suivi** tab
-(`ApplicationsPage`): the freelancer declares when they are next available, the
-value is persisted on `UserProfile`, and a cross-platform **push** copies a
-formatted availability message to the clipboard then opens each mission
-connector so the user can paste it manually.
+Source de vérité pour le bloc « Disponibilité » affiché dans l'onglet **Suivi**
+(`ApplicationsPage`) : le freelance déclare sa prochaine date de disponibilité,
+la valeur est persistée sur `UserProfile`, et un **push** multi-plateformes copie
+un message de disponibilité formaté dans le presse-papiers puis ouvre chaque
+connecteur de mission afin que l'utilisateur puisse le coller manuellement.
 
-Modeled as two cooperating state machines in a Svelte 5 runes module
-(`src/lib/state/availability.svelte.ts`), per the project standard (runes over
-XState — see `profile-state.model.md`). Availability owns this guided-paste
-transport independently: the CV manual synchronization workflow has been
-retired. No backend, no stored credentials — local-first.
+Modélisé sous la forme de deux machines à états coopérantes dans un module de runes
+Svelte 5 (`src/lib/state/availability.svelte.ts`), selon le standard du projet
+(runes plutôt que XState — voir `profile-state.model.md`). La disponibilité possède
+ce transport de collage guidé de manière autonome : le workflow de synchronisation
+manuelle de CV a été retiré. Pas de backend, pas d'identifiants stockés — local-first.
 
-The LLM never decides a transition here. **Le LLM produit des signaux ; le
-modèle décide.** (No LLM is involved in this feature at all.)
+Le LLM ne décide jamais d'une transition ici. **Le LLM produit des signaux ; le
+modèle décide.** (Aucun LLM n'est impliqué dans cette fonctionnalité.)
 
-## Why not auto-write?
+## Pourquoi pas d'écriture automatique ?
 
-The extension cannot mutate platform state directly: it has no stored
-credentials and no backend. The availability "push" is a **guided paste**:
-copy the formatted payload, open the platform's profile page, let the user
-paste. This is the only transport compatible with the architecture.
+L'extension ne peut pas muter directement l'état des plateformes : elle ne stocke
+aucun identifiant et n'a pas de backend. Le « push » de disponibilité est un
+**collage guidé** : copier le payload formaté, ouvrir la page de profil de la
+plateforme, laisser l'utilisateur coller. C'est le seul transport compatible avec
+l'architecture.
 
-## Domain entities
+## Entités du domaine
 
-### Availability (canonical, persisted on `UserProfile.availability`)
+### Availability (canonique, persisté sur `UserProfile.availability`)
 
 ```ts
 type AvailabilityStatus = 'immediate' | 'from-date' | 'in-mission-until' | 'unavailable';
@@ -32,26 +33,27 @@ type AvailabilityStatus = 'immediate' | 'from-date' | 'in-mission-until' | 'unav
 interface Availability {
   status: AvailabilityStatus;
   /**
-   * ISO date "YYYY-MM-DD". Semantics depend on status:
-   * - 'from-date'        → first available day
-   * - 'in-mission-until' → last day of the current mission
-   * - 'immediate'        → must be null
-   * - 'unavailable'      → must be null
+   * Date ISO "YYYY-MM-DD". La sémantique dépend du statut :
+   * - 'from-date'        → premier jour de disponibilité
+   * - 'in-mission-until' → dernier jour de la mission en cours
+   * - 'immediate'        → doit être null
+   * - 'unavailable'      → doit être null
    */
   date: string | null;
-  note: string; // free text, trimmed, ≤ 280 chars
-  updatedAt: number; // epoch ms (injected by shell)
+  note: string; // texte libre, nettoyé (trimmed), ≤ 280 caractères
+  updatedAt: number; // ms epoch (injecté par le shell)
 }
 ```
 
-`UserProfile` is extended with `availability: Availability | null` (default
-`null` = never set). Scoring ignores it. The schema declares it with
-`.default(null)` so any stored record created before this field existed is
-backfilled to `null` on read (idempotent — no structural/data migration needed;
-reads always parse through `UserProfileSchema`). `withProfileDefaults` also
-seeds it.
+`UserProfile` est étendu avec `availability: Availability | null` (`null` par
+défaut = jamais défini). Le scoring l'ignore. Le schéma le déclare avec
+`.default(null)` de sorte que tout enregistrement stocké créé avant l'existence
+de ce champ est rétro-rempli (backfilled) à `null` lors de la lecture (idempotent —
+aucune migration structurelle ou de données requise ; les lectures passent
+toujours par le parse de `UserProfileSchema`). `withProfileDefaults` l'initialise
+également.
 
-### AvailabilityStatus labels (copy + a11y)
+### Labels de AvailabilityStatus (copy + a11y)
 
 ```ts
 const AVAILABILITY_STATUS_LABELS: Record<AvailabilityStatus, string> = {
@@ -62,7 +64,7 @@ const AVAILABILITY_STATUS_LABELS: Record<AvailabilityStatus, string> = {
 };
 ```
 
-### PushTarget (reuse the CV sync target shape)
+### PushTarget (réutilise la structure de la cible de sync CV)
 
 ```ts
 interface PlatformSyncTarget {
@@ -72,17 +74,19 @@ interface PlatformSyncTarget {
 }
 ```
 
-Targets = the 6 mission connectors (`getConnectorsMeta()`). LinkedIn is **not**
-included (user choice). `profileUrl` defaults to `connector.url`; per-platform
-availability-edit URLs can replace it later without touching the machine.
+Cibles = les 6 connecteurs de missions (`getConnectorsMeta()`). LinkedIn n'est **pas**
+inclus (choix de l'utilisateur). `profileUrl` prend par défaut `connector.url` ; des
+URLs d'édition de disponibilité par plateforme pourront la remplacer ultérieurement
+sans toucher à la machine.
 
 ## Machines
 
-The store composes two machines. The edit/load machine and the push machine are
-independent: editing does not block a running push, and a running push does not
-block editing (edits persist on the next save and participate in the next push).
+Le store compose deux machines. La machine de chargement/édition et la machine
+de push sont indépendantes : éditer ne bloque pas un push en cours, et un push
+en cours ne bloque pas l'édition (les modifications sont persistées lors de la
+prochaine sauvegarde et participent au prochain push).
 
-### 1. Load/Edit machine — `editStatus`
+### 1. Machine de chargement/édition — `editStatus`
 
 ```
 loading ──LOAD_RESULT(ok)──► ready
@@ -100,15 +104,15 @@ dirty   ──SAVE_RESULT──► (n/a — saving gates this)
 
 `EditStatus = 'loading' | 'ready' | 'dirty' | 'saving' | 'error'`.
 
-`ready` with `availability === null` renders the empty state
-("Renseignez votre disponibilité pour la pousser sur vos plateformes").
+`ready` avec `availability === null` affiche l'état vide
+(« Renseignez votre disponibilité pour la pousser sur vos plateformes »).
 
-`dirty` holds a `draft: Availability` (a deep copy of the current availability,
-or a blank `{ status: 'immediate', date: null, note: '', updatedAt: 0 }` when
-starting from null). The form binds directly to `draft`; nothing is persisted
-until `SUBMIT`.
+`dirty` contient un `draft: Availability` (une copie profonde de la disponibilité
+actuelle, ou un objet vierge `{ status: 'immediate', date: null, note: '', updatedAt: 0 }`
+en partant de null). Le formulaire se lie directement à `draft` ; rien n'est persisté
+avant `SUBMIT`.
 
-### 2. Push machine — `pushStatus`
+### 2. Machine de push — `pushStatus`
 
 ```
 idle      ──PUSH_START──►        preparing
@@ -125,34 +129,33 @@ pushed|partial|error ──PUSH_START──► preparing
 
 `PushStatus = 'idle' | 'preparing' | 'pushing' | 'cancelled' | 'pushed' | 'partial' | 'error'`.
 
-Per-platform status lives in `Map<platformId, PlatformSyncStatus>` and is only
-meaningful while `pushStatus` is `pushing`/terminal. It resets on `PUSH_START`.
+Le statut par plateforme réside dans `Map<platformId, PlatformSyncStatus>` et n'a de sens
+que lorsque `pushStatus` est à `pushing`/terminal. Il est réinitialisé lors de `PUSH_START`.
 
-```
+```ts
 type PlatformSyncStatus =
-  | 'pending' | 'copying' | 'done'
-  | 'error' | 'auth-required' | 'blocked' | 'skipped';
+  'pending' | 'copying' | 'done' | 'error' | 'auth-required' | 'blocked' | 'skipped';
 ```
 
-(Reused verbatim from the CV sync — same semantics, same UI chips.)
+(Réutilisé tel quel depuis la synchronisation du CV — même sémantique, mêmes pastilles UI.)
 
-## Context
+## Contexte
 
 ```ts
 interface AvailabilityContext {
-  availability: Availability | null; // canonical, persisted
+  availability: Availability | null; // canonique, persisté
   editStatus: EditStatus;
-  draft: Availability | null; // non-null in dirty/saving
+  draft: Availability | null; // non-null dans dirty/saving
   pushStatus: PushStatus;
   platformStatuses: Map<string, PlatformSyncStatus>;
-  lastPushedAt: number | null; // epoch ms
+  lastPushedAt: number | null; // ms epoch
   loadError: string | null;
   editError: string | null;
   pushError: string | null;
 }
 ```
 
-## Events
+## Événements
 
 ```ts
 type AvailabilityEvent =
@@ -178,78 +181,80 @@ type AvailabilityEvent =
   | { type: 'ALL_SETTLED' };
 ```
 
-## Transition table (edit + push; load is trivial above)
+## Table de transition (édition + push ; le chargement est trivial ci-dessus)
 
-| From \ Event   | EDIT    | CANCEL  | SUBMIT  | SAVE_RESULT | SAVE_ERROR | PUSH_START | PROFILE_UPDATED |
-| -------------- | ------- | ------- | ------- | ----------- | ---------- | ---------- | --------------- |
-| `loading`      | -       | -       | -       | -           | -          | (push)     | dropped         |
-| `ready`        | dirty   | -       | -       | -           | -          | allowed    | ready (replace) |
-| `dirty`        | -       | ready   | saving  | -           | -          | allowed\*  | dropped         |
-| `saving`       | ignored | ignored | ignored | ready       | dirty      | ignored    | dropped         |
-| `error` (edit) | dirty   | ready   | saving  | -           | -          | allowed\*  | ready (replace) |
+| De \ Événement | EDIT   | CANCEL | SUBMIT | SAVE_RESULT | SAVE_ERROR | PUSH_START | PROFILE_UPDATED  |
+| -------------- | ------ | ------ | ------ | ----------- | ---------- | ---------- | ---------------- |
+| `loading`      | -      | -      | -      | -           | -          | (push)     | dropped          |
+| `ready`        | dirty  | -      | -      | -           | -          | autorisé   | ready (remplace) |
+| `dirty`        | -      | ready  | saving | -           | -          | autorisé\* | dropped          |
+| `saving`       | ignoré | ignoré | ignoré | ready       | dirty      | ignoré     | dropped          |
+| `error` (edit) | dirty  | ready  | saving | -           | -          | autorisé\* | ready (remplace) |
 
-\* `PUSH_START` is allowed while a draft is open (draft is preserved; push
-operates on the **committed** availability, not the draft). The two machines
-are independent.
+\* `PUSH_START` est autorisé lorsqu'un brouillon (draft) est ouvert (le brouillon est
+conservé ; le push opère sur la disponibilité **validée** (committed), pas sur le brouillon).
+Les deux machines sont indépendantes.
 
-| From \ Event (push) | PUSH_START | PREPARE_DONE | PLATFORM\_\* | PUSH_CANCEL | ALL_SETTLED | PROFILE_UPDATED |
-| ------------------- | ---------- | ------------ | ------------ | ----------- | ----------- | --------------- |
-| `idle`              | preparing  | -            | -            | -           | -           | idle (replace)  |
-| `preparing`         | ignored    | pushing      | -            | idle        | -           | dropped         |
-| `pushing`           | ignored    | -            | updates pm   | cancelled   | terminal    | dropped         |
-| `cancelled`         | preparing  | -            | -            | -           | -           | idle (replace)  |
-| `pushed/partial/er` | preparing  | -            | -            | -           | -           | idle (replace)  |
+| De \ Événement (push) | PUSH_START | PREPARE_DONE | PLATFORM\_\*  | PUSH_CANCEL | ALL_SETTLED | PROFILE_UPDATED |
+| --------------------- | ---------- | ------------ | ------------- | ----------- | ----------- | --------------- |
+| `idle`                | preparing  | -            | -             | -           | -           | idle (remplace) |
+| `preparing`           | ignoré     | pushing      | -             | idle        | -           | dropped         |
+| `pushing`             | ignoré     | -            | met à jour pm | cancelled   | terminal    | dropped         |
+| `cancelled`           | preparing  | -            | -             | -           | -           | idle (remplace) |
+| `pushed/partial/er`   | preparing  | -            | -             | -           | -           | idle (remplace) |
 
-## Side effects (shell — `deps`)
+## Effets de bord (shell — `deps`)
 
-- **Enter `loading`** (LOAD/RELOAD/RETRY): `deps.loadAvailability()` reads
-  `UserProfile.availability` via the profile bridge. Resolves → `ready`;
-  rejects → `error`.
-- **Enter `saving`** (SUBMIT): `normalizeAvailability(draft, now)` (pure, core)
-  enforces the status↔date invariant and trims/caps the note, then
-  `deps.saveAvailability(normalized)` merges it into the persisted profile.
-  Resolves → `SAVE_RESULT(availability)`; rejects → `SAVE_ERROR`, `draft`
-  retained.
-- **Enter `preparing`** (PUSH_START): if `availability === null` →
-  `PREPARE_ERROR`. Else pure `buildAvailabilityPayloads(availability, targets)`
-  in core → `PREPARE_DONE(payloads)`.
-- **Enter `pushing`** (PREPARE_DONE): `deps.pushAll(payloads)` iterates targets.
-  Clipboard write is attempted **once globally** before any platform opens:
-  - Clipboard denied → every platform → `error`, `ALL_SETTLED` → `error`.
-  - Else, per platform: `PLATFORM_START` → `deps.open(url)` → `PLATFORM_DONE`
-    (or `PLATFORM_ERROR` if open rejects). Platforms run sequentially so the
-    user can paste in each opened tab before the next. The payload stays on the
-    clipboard from the global probe (re-copying would fail once the first tab
-    steals focus — no `clipboardWrite` permission; `navigator.clipboard` needs
-    transient activation).
-- **`PROFILE_UPDATED`** (external save / re-import): replaces `availability`
-  when the load/edit machine is `ready`/`error` and the push machine is not
-  busy. Applied from terminal push states too (resets the push machine to
-  `idle`). Dropped during `saving`/`preparing`/`pushing` (invariant 3).
+- **Entrée dans `loading`** (LOAD/RELOAD/RETRY) : `deps.loadAvailability()` lit
+  `UserProfile.availability` via le bridge de profil. Résolution → `ready` ;
+  rejet → `error`.
+- **Entrée dans `saving`** (SUBMIT) : `normalizeAvailability(draft, now)` (pur, core)
+  applique l'invariant statut↔date et nettoie/plafonne la note, puis
+  `deps.saveAvailability(normalized)` la fusionne dans le profil persisté.
+  Résolution → `SAVE_RESULT(availability)` ; rejet → `SAVE_ERROR`, `draft`
+  conservé.
+- **Entrée dans `preparing`** (PUSH_START) : si `availability === null` →
+  `PREPARE_ERROR`. Sinon, fonction pure `buildAvailabilityPayloads(availability, targets)`
+  dans core → `PREPARE_DONE(payloads)`.
+- **Entrée dans `pushing`** (PREPARE_DONE) : `deps.pushAll(payloads)` itère sur les cibles.
+  L'écriture dans le presse-papiers est tentée **une seule fois globalement** avant
+  qu'aucune plateforme ne s'ouvre :
+  - Presse-papiers refusé → chaque plateforme → `error`, `ALL_SETTLED` → `error`.
+  - Sinon, par plateforme : `PLATFORM_START` → `deps.open(url)` → `PLATFORM_DONE`
+    (ou `PLATFORM_ERROR` si open rejette). Les plateformes s'exécutent séquentiellement
+    afin que l'utilisateur puisse coller dans chaque onglet ouvert avant le suivant.
+    Le payload reste dans le presse-papiers issu du test global (une nouvelle copie
+    échouerait dès que le premier onglet prend le focus — pas de permission `clipboardWrite` ;
+    `navigator.clipboard` nécessite une activation transitoire).
+- **`PROFILE_UPDATED`** (sauvegarde externe / réimport) : remplace `availability`
+  lorsque la machine de chargement/édition est dans `ready`/`error` et que la machine
+  de push n'est pas occupée. Appliqué également depuis les états de push terminaux
+  (réinitialise la machine de push à `idle`). Ignoré (dropped) pendant
+  `saving`/`preparing`/`pushing` (invariant 3).
 
 ## Invariants
 
-1. `dirty`/`saving` are gated by `editStatus`: `EDIT` is accepted only from
-   `ready` or `error`. `loading`/`saving` ignore it.
-2. `saving` ignores all edit events until settled (no re-entrancy).
-3. `PROFILE_UPDATED` during `saving`/`preparing`/`pushing` is **dropped** (never
-   clobbers an in-flight op). Applied only from `ready`/`error`/terminal push.
-4. During `pushing`, one platform's failure never aborts the others (except a
-   global clipboard denial, which fails all before any tab opens).
-5. **status↔date invariant** (enforced by `normalizeAvailability`):
+1. `dirty`/`saving` sont conditionnés par `editStatus` : `EDIT` n'est accepté
+   que depuis `ready` ou `error`. `loading`/`saving` l'ignorent.
+2. `saving` ignore tous les événements d'édition jusqu'à stabilisation (pas de réentrance).
+3. `PROFILE_UPDATED` pendant `saving`/`preparing`/`pushing` est **ignoré (dropped)**
+   (n'écrase jamais une opération en cours). Appliqué uniquement depuis `ready`/`error`/push terminal.
+4. Pendant `pushing`, l'échec d'une plateforme n'interrompt jamais les autres
+   (sauf en cas de refus global du presse-papiers, qui fait échouer l'ensemble avant qu'aucun onglet ne s'ouvre).
+5. **Invariant statut↔date** (appliqué par `normalizeAvailability`) :
    - `immediate` / `unavailable` ⇒ `date === null`
-   - `from-date` / `in-mission-until` ⇒ `date` is a valid `YYYY-MM-DD`
-6. `note` is trimmed and capped at 280 characters by the normalizer; the form
-   also enforces the cap, but the normalizer is the source of truth.
-7. `pushStatus` terminal state (`pushed`/`partial`/`error`) is **derived** from
-   the per-platform statuses at `ALL_SETTLED`, not stored independently.
-8. The push operates on the **committed** `availability`, never on an unsaved
-   `draft`. An open draft does not participate in the push.
-9. Error slots are per-machine (`loadError`/`editError`/`pushError`): a failure
-   in one never overwrites another machine's terminal error copy.
+   - `from-date` / `in-mission-until` ⇒ `date` est un `YYYY-MM-DD` valide
+6. `note` est nettoyée et plafonnée à 280 caractères par le normaliseur ; le formulaire
+   applique également ce plafond, mais le normaliseur est la source de vérité.
+7. L'état terminal de `pushStatus` (`pushed`/`partial`/`error`) est **dérivé** des
+   statuts par plateforme lors de `ALL_SETTLED`, non stocké indépendamment.
+8. Le push opère sur la `availability` **validée**, jamais sur un `draft` non sauvegardé.
+   Un brouillon ouvert ne participe pas au push.
+9. Les emplacements d'erreur sont propres à chaque machine (`loadError`/`editError`/`pushError`) :
+   une défaillance dans l'une n'écrase jamais le message d'erreur terminal d'une autre machine.
 10. `canPush === availability !== null && editStatus !== 'saving' && !isPushBusy`.
 
-## Public API (consumed by ApplicationsPage via an organism)
+## API publique (consommée par ApplicationsPage via un organisme)
 
 ```ts
 createAvailabilityStore(deps): {
@@ -279,7 +284,7 @@ createAvailabilityStore(deps): {
 }
 ```
 
-`deps` (shell-injected, mockable in tests):
+`deps` (injecté par le shell, mockable dans les tests) :
 
 ```ts
 interface AvailabilityDeps {
@@ -292,55 +297,58 @@ interface AvailabilityDeps {
 }
 ```
 
-## Pure helpers (core, unit-tested without mocks)
+## Helpers purs (core, testés unitairement sans mocks)
 
-Location: `src/lib/core/availability/availability-helpers.ts`.
+Emplacement : `src/lib/core/availability/availability-helpers.ts`.
 
-- `normalizeAvailability(draft, now): Availability` — enforces status↔date,
-  trims/caps note (280), validates `YYYY-MM-DD`. Throws nothing; clamps.
-- `formatAvailabilityPayload(availability): string` — the copy-pasteable block:
+- `normalizeAvailability(draft, now): Availability` — applique statut↔date,
+  nettoie/plafonne la note (280), valide `YYYY-MM-DD`. Ne lève aucune exception ; borne les valeurs.
+- `formatAvailabilityPayload(availability): string` — le bloc copiable-collable :
   - `immediate` → "Disponible immédiatement"
   - `from-date` → "Disponible à partir du DD/MM/YYYY"
   - `in-mission-until` → "En mission jusqu'au DD/MM/YYYY"
   - `unavailable` → "Non disponible"
-  - - note on a new line when non-empty.
-- `buildAvailabilityPayloads(availability, targets): Map<id, string>` — same
-  payload string for every target (platforms format availability identically).
-- `AVAILABILITY_STATUS_LABELS` + `AVAILABILITY_STATUS_ORDER` (select order).
+  - - note sur une nouvelle ligne lorsqu'elle est non vide.
+- `buildAvailabilityPayloads(availability, targets): Map<id, string>` — même
+  chaîne de payload pour chaque cible (les plateformes formatent la disponibilité de manière identique).
+- `AVAILABILITY_STATUS_LABELS` + `AVAILABILITY_STATUS_ORDER` (ordre de sélection).
 
-## UI placement
+## Intégration UI
 
-A new organism `AvailabilityPanel.svelte` (edit form + push list in a standalone
-status card) is inserted at the **top** of `ApplicationsPage.svelte`
-(before the existing pipeline section), so availability is the first action in
-the Suivi tab. It receives the store + the platform targets from the facade.
+Un nouvel organisme `AvailabilityPanel.svelte` (formulaire d'édition + liste de push dans une
+carte de statut autonome) est inséré en **haut** de `ApplicationsPage.svelte`
+(avant la section de pipeline existante), de sorte que la disponibilité soit la première action
+dans l'onglet Suivi. Il reçoit le store + les cibles de plateforme depuis la façade.
 
-## Persistence & migration
+## Persistance et migration
 
-- `UserProfile.availability: Availability | null` (type, required — always
-  present via `withProfileDefaults`).
-- `UserProfileSchema`: `availability` field with `.default(null)` and a nullable
-  object sub-schema. Reads of pre-existing records backfill to `null` on parse.
-- `withProfileDefaults`: `availability: profile.availability ?? null`.
-- **No data migration needed.** The schema default is idempotent and runs on
-  every read. (Documented here so the next contributor doesn't add a redundant
-  v2→v3 migration.)
+- `UserProfile.availability: Availability | null` (type, requis — toujours
+  présent via `withProfileDefaults`).
+- `UserProfileSchema` : champ `availability` avec `.default(null)` et un sous-schéma
+  d'objet nullable. Les lectures des enregistrements préexistants se rétro-remplissent
+  à `null` lors du parse.
+- `withProfileDefaults` : `availability: profile.availability ?? null`.
+- **Aucune migration de données nécessaire.** La valeur par défaut du schéma est
+  idempotente et s'exécute à chaque lecture. (Documenté ici afin que le prochain
+  contributeur n'ajoute pas de migration v2→v3 redondante.)
 
-## Review checklist (Model → Review)
+## Checklist de revue (Modèle → Revue)
 
-- [x] Nominal: set availability → save → push → all platforms `done` → `pushed`.
-- [x] Empty: `availability === null` → `PUSH_START` → `PREPARE_ERROR`, no tab
-      opens.
-- [x] Cancel mid-push: `PUSH_CANCEL` during `pushing` → remaining platforms
-      `skipped`, terminal `cancelled` (not `pushed`).
-- [x] Clipboard denied globally: every platform → `error`, terminal `error`,
-      no tab opens.
-- [x] Per-platform `openUrl` reject → that platform `error`, others continue,
-      terminal `partial` if ≥1 done.
-- [x] Edit during push: allowed; draft preserved; push uses committed value.
-- [x] Push during dirty draft: allowed; uses committed availability, not draft.
-- [x] `PROFILE_UPDATED` during `saving`/`pushing`: dropped (invariant 3).
-- [x] status↔date invariant enforced by normalizer (form + model + tests).
-- [x] Terminal push state derived from per-platform statuses (invariant 7).
-- [x] No LLM in the loop; no transition depends on free text. **Le LLM produit
-      des signaux ; le modèle décide.** (Here: no LLM at all.)
+- [x] Nominal : définir la disponibilité → enregistrer → push → toutes plateformes `done` → `pushed`.
+- [x] Vide : `availability === null` → `PUSH_START` → `PREPARE_ERROR`, aucun onglet
+      ne s'ouvre.
+- [x] Annulation en cours de push : `PUSH_CANCEL` pendant `pushing` → plateformes
+      restantes `skipped`, état terminal `cancelled` (pas `pushed`).
+- [x] Presse-papiers refusé globalement : chaque plateforme → `error`, état terminal
+      `error`, aucun onglet ne s'ouvre.
+- [x] Rejet de `openUrl` par plateforme → cette plateforme passe à `error`, les autres
+      continuent, état terminal `partial` si ≥1 terminée.
+- [x] Édition pendant le push : autorisée ; brouillon préservé ; le push utilise la
+      valeur validée.
+- [x] Push pendant un brouillon modifié (dirty) : autorisé ; utilise la disponibilité
+      validée, pas le brouillon.
+- [x] `PROFILE_UPDATED` pendant `saving`/`pushing` : ignoré (invariant 3).
+- [x] Invariant statut↔date appliqué par le normaliseur (formulaire + modèle + tests).
+- [x] État de push terminal dérivé des statuts par plateforme (invariant 7).
+- [x] Aucun LLM dans la boucle ; aucune transition ne dépend de texte libre.
+      **Le LLM produit des signaux ; le modèle décide.** (Ici : aucun LLM du tout.)
