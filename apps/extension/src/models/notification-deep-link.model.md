@@ -1,45 +1,47 @@
-# Notification Deep-Link — State Model
+# Notification Deep-Link — Modèle d'état
 
-> Source of truth for the deep-link experience: when a notification fires (or
-> the user opens the panel while notified missions exist), the feed focuses on
-> those missions. Short rule: **the notification produces a focus intent; the
-> model decides what the feed shows.**
+> Source de vérité pour l'expérience de lien profond (_deep-link_) :
+> lorsqu'une notification se déclenche (ou que l'utilisateur ouvre le panneau
+> alors que des missions notifiées existent), le feed se focalise sur ces
+> missions. Règle courte : **la notification produit une intention de focus ; le
+> modèle décide ce que le feed affiche.**
 
-Two cooperating state machines, one per context:
+Deux machines à états coopératives, une par contexte :
 
-- **Intent** (service worker, `chrome.storage.session`) — what to show.
-- **Focus** (side panel, `feed-page.svelte.ts`) — how the feed renders it.
+- **Intent** (service worker, `chrome.storage.session`) — quoi afficher.
+- **Focus** (side panel, `feed-page.svelte.ts`) — comment le feed le restitue.
 
 ---
 
-## 1. Intent machine (service worker)
+## 1. Machine Intent (service worker)
 
-Persisted in `chrome.storage.session` under `deepLinkIntent`. Written when a
-notification is created; read + cleared atomically when the panel mounts.
+Persistée dans `chrome.storage.session` sous `deepLinkIntent`. Écrite lorsqu'une
+notification est créée ; lue et effacée atomiquement lorsque le panneau est
+monté.
 
-### States
+### États
 
-| State      | Meaning                                        |
-| ---------- | ---------------------------------------------- |
-| `absent`   | No intent in storage. Default.                 |
-| `pending`  | An intent is written, not yet consumed.        |
-| `consumed` | Intent has been read and cleared by the panel. |
+| État       | Signification                                    |
+| ---------- | ------------------------------------------------ |
+| `absent`   | Aucune intention en stockage. Par défaut.        |
+| `pending`  | Une intention est écrite, pas encore consommée.  |
+| `consumed` | L'intention a été lue et effacée par le panneau. |
 
-### Events
+### Événements
 
-| Event           | From → To              | Side effect                                                       |
-| --------------- | ---------------------- | ----------------------------------------------------------------- |
-| `NOTIFY`        | any → `pending`        | overwrite storage with `{ focusMissionIds, source, triggeredAt }` |
-| `CONSUME`       | `pending` → `consumed` | atomically read + remove from storage; return value to panel      |
-| `CONSUME`       | `absent` → `absent`    | no-op, returns `null`                                             |
-| `SESSION_RESET` | any → `absent`         | storage area cleared by browser                                   |
+| Événement       | De → Vers              | Effet de bord                                                          |
+| --------------- | ---------------------- | ---------------------------------------------------------------------- |
+| `NOTIFY`        | tout → `pending`       | écrase le stockage avec `{ focusMissionIds, source, triggeredAt }`     |
+| `CONSUME`       | `pending` → `consumed` | lit + supprime atomiquement du stockage ; renvoie la valeur au panneau |
+| `CONSUME`       | `absent` → `absent`    | aucune opération, renvoie `null`                                       |
+| `SESSION_RESET` | tout → `absent`        | zone de stockage effacée par le navigateur                             |
 
-### Shape
+### Forme
 
 ```ts
 type DeepLinkIntentSource = 'notification' | 'digest';
 interface DeepLinkIntent {
-  focusMissionIds: string[]; // non-empty, ≤ 20, deduped
+  focusMissionIds: string[]; // non vide, ≤ 20, dédupliqué
   source: DeepLinkIntentSource;
   triggeredAt: number; // epoch ms
 }
@@ -47,91 +49,103 @@ interface DeepLinkIntent {
 
 ### Invariants (Intent)
 
-- **I1 (single consume):** a given intent is returned to exactly one panel
-  mount. `CONSUME` is atomic read-then-clear.
-- **I2 (non-empty):** `NOTIFY` is only fired with ≥1 mission id; empty writes
-  are dropped.
-- **I3 (bounded):** `focusMissionIds` length ≤ 20 (display cap; mirrors
-  `maxResults` ceiling).
-- **I4 (latest wins):** a new `NOTIFY` overwrites a pending intent.
-- **I5 (no leakage):** intent lives only in session storage; never persisted to
-  disk, never logged with mission content.
+- **I1 (consommation unique) :** une intention donnée est renvoyée à
+  exactement un montage de panneau. `CONSUME` est une lecture-puis-effacement
+  atomique.
+- **I2 (non vide) :** `NOTIFY` n'est déclenché qu'avec ≥ 1 id de mission ; les
+  écritures vides sont ignorées.
+- **I3 (borné) :** la longueur de `focusMissionIds` est ≤ 20 (plafond
+  d'affichage ; reflète le plafond `maxResults`).
+- **I4 (le dernier gagne) :** un nouveau `NOTIFY` écrase une intention en
+  attente.
+- **I5 (aucune fuite) :** l'intention ne vit que dans le stockage de session ;
+  jamais persistée sur disque, jamais journalisée avec le contenu des missions.
 
 ---
 
-## 2. Focus machine (side panel / feed-page)
+## 2. Machine Focus (side panel / feed-page)
 
-Lives in `createFeedPageState()`. Drives `displayMissions` + the banner.
+Vit dans `createFeedPageState()`. Pilote `displayMissions` + la bannière.
 
-### States
+### États
 
-| State       | Meaning                                                  |
-| ----------- | -------------------------------------------------------- |
-| `idle`      | No intent consumed; feed is normal.                      |
-| `focused`   | Feed is filtered to the intent missions; banner visible. |
-| `dismissed` | User dismissed; feed is normal again.                    |
+| État        | Signification                                                          |
+| ----------- | ---------------------------------------------------------------------- |
+| `idle`      | Aucune intention consommée ; le feed est normal.                       |
+| `focused`   | Le feed est filtré sur les missions de l'intention ; bannière visible. |
+| `dismissed` | L'utilisateur a fermé ; le feed est de nouveau normal.                 |
 
-The earlier `focusing` intermediate state was removed during implementation
-(see "Race handling" below). `APPLY` enters `focused` optimistically and a
-deferred effect re-checks the match once missions are available.
+L'état intermédiaire antérieur `focusing` a été supprimé lors de
+l'implémentation (voir « Gestion des courses » ci-dessous). `APPLY` entre dans
+`focused` de manière optimiste et un effet différé revérifie la correspondance
+une fois les missions disponibles.
 
-### Events
+### Événements
 
-| Event           | From → To               | Side effect                                       |
-| --------------- | ----------------------- | ------------------------------------------------- |
-| `APPLY(intent)` | `idle` → `focused`      | set focus ids; banner + filter applied at once    |
-| `APPLY(intent)` | `idle` → `idle`         | intent is null (nothing consumed)                 |
-| `STALE_GUARD`   | `focused` → `idle`      | missions loaded but no intent id matches → revert |
-| `DISMISS`       | `focused` → `dismissed` | clear focus ids; restore full feed                |
+| Événement       | De → Vers               | Effet de bord                                                        |
+| --------------- | ----------------------- | -------------------------------------------------------------------- |
+| `APPLY(intent)` | `idle` → `focused`      | définit les ids de focus ; bannière + filtre appliqués immédiatement |
+| `APPLY(intent)` | `idle` → `idle`         | l'intention est nulle (rien consommé)                                |
+| `STALE_GUARD`   | `focused` → `idle`      | missions chargées mais aucun id d'intention ne correspond → retour   |
+| `DISMISS`       | `focused` → `dismissed` | efface les ids de focus ; restaure le feed complet                   |
 
-`STALE_GUARD` is a deferred `$effect`, not a message: it fires after the
-async mission load settles, so a consumed intent survives until missions are
-reactively present.
+`STALE_GUARD` est un `$effect` différé, pas un message : il se déclenche après
+le règlement du chargement asynchrone des missions, afin qu'une intention
+consommée survive jusqu'à ce que les missions soient réactivement présentes.
 
-### Race handling
+### Gestion des courses (_race handling_)
 
-The panel consumes the intent on mount (async facade call) while missions load
-async in parallel. Rather than an intermediate state, `APPLY` enters `focused`
-optimistically (banner shows immediately, `displayMissions` filters at once)
-and the `STALE_GUARD` effect re-checks the match once `missions.length > 0`.
-This collapses the earlier `focusing` + `MISSIONS_LOADED` design into one state
-and shows the banner without delay.
+Le panneau consomme l'intention au montage (appel façade asynchrone) pendant
+que les missions se chargent de façon asynchrone en parallèle. Plutôt qu'un
+état intermédiaire, `APPLY` entre dans `focused` de manière optimiste (la
+bannière s'affiche immédiatement, `displayMissions` filtre aussitôt) et l'effet
+`STALE_GUARD` revérifie la correspondance dès que `missions.length > 0`. Cela
+fusionne la conception antérieure `focusing` + `MISSIONS_LOADED` en un seul
+état et affiche la bannière sans délai.
 
 ### Invariants (Focus)
 
-- **F1 (override):** when `focused`, `displayMissions` shows only intent
-  missions (still sorted), ignoring all other filters. Other filters are NOT
-  mutated — dismissing restores the prior filter state untouched.
-- **F2 (focus ≠ seen):** focus ids are matched against loaded missions by id,
-  never against the seen set. Seen-marking at notify time does not affect focus.
-- **F3 (dismissable):** `DISMISS` is always available in `focused`. It never
-  mutates persisted filter state.
-- **F4 (auto-expire):** once missions are loaded and no intent id matches, the
-  `STALE_GUARD` effect reverts `focused` → `idle` (no empty feed, no dead lens).
-- **F5 (single activation):** once `dismissed`, the panel does not re-enter
-  `focused` without a new consumed intent (i.e. a new `NOTIFY` → `APPLY`).
-- **F6 (scroll):** on `focused`, the feed scrolls the mission section into view.
+- **F1 (surcharge) :** lorsqu'il est `focused`, `displayMissions` n'affiche que
+  les missions de l'intention (toujours triées), en ignorant tous les autres
+  filtres. Les autres filtres ne sont PAS mutés — fermer restaure l'état de
+  filtrage antérieur intact.
+- **F2 (focus ≠ vu) :** les ids de focus sont comparés aux missions chargées
+  par id, jamais à l'ensemble des missions vues. Le marquage comme vu au moment
+  de la notification n'affecte pas le focus.
+- **F3 (fermable) :** `DISMISS` est toujours disponible en `focused`. Il ne mute
+  jamais l'état de filtre persisté.
+- **F4 (expiration auto) :** une fois les missions chargées et qu'aucun id
+  d'intention ne correspond, l'effet `STALE_GUARD` ramène `focused` → `idle`
+  (aucun feed vide, aucune loupe morte).
+- **F5 (activation unique) :** une fois `dismissed`, le panneau ne revient pas
+  en `focused` sans une nouvelle intention consommée (c.-à-d. un nouveau
+  `NOTIFY` → `APPLY`).
+- **F6 (défilement) :** sur `focused`, le feed fait défiler la section des
+  missions dans la vue.
 
 ---
 
-## 3. Why seen-marking is decoupled
+## 3. Pourquoi le marquage « vu » est découplé
 
-Today `persistScanResults` calls `saveSeenIds(markAsSeen(seenIds, notifiedMissionIds))`
-at notify time. The legacy `showNewOnly` filter excludes seen missions, so
-toggling it after a notification would hide the very missions we want to show.
-The focus lens bypasses seen entirely (F2): focus is an explicit id allow-list
-applied after the normal pipeline, so seen-marking becomes harmless to the
-deep-link UX. We keep the seen-mark (it prevents re-alerting the same missions)
-but it no longer dictates the focus surface.
+Aujourd'hui `persistScanResults` appelle
+`saveSeenIds(markAsSeen(seenIds, notifiedMissionIds))` au moment de la
+notification. L'ancien filtre `showNewOnly` exclut les missions vues, donc
+l'activer après une notification masquerait les missions mêmes que nous voulons
+afficher. La loupe de focus contourne entièrement « vu » (F2) : le focus est une
+liste blanche explicite d'ids appliquée après le pipeline normal, rendant ainsi
+le marquage « vu » inoffensif pour l'UX de deep-link. Nous conservons le
+marquage « vu » (il évite de ré-alerter les mêmes missions), mais il ne dicte
+plus la surface de focus.
 
-The extension icon badge is driven by `notifiableMissionIds` from
-`notifyHighScoreMissions` (same score/smart-alert filter as the Chrome
-notification), not by the raw unseen-mission count from the scan.
+Le badge de l'icône d'extension est piloté par `notifiableMissionIds` issu de
+`notifyHighScoreMissions` (même filtre de score / alerte intelligente que la
+notification Chrome), et non par le nombre brut de missions non vues du scan.
 
 ---
 
-## 4. Zero-LLM invariant
+## 4. Invariant Zéro-LLM
 
-No state transition in either machine depends on an LLM. `filterSmartNotifications`
-(used at notify time to pick which missions to surface) only filters by
-score/stack/TJM thresholds — deterministic. The LLM never decides focus.
+Aucune transition d'état dans l'une ou l'autre machine ne dépend d'un LLM.
+`filterSmartNotifications` (utilisé au moment de la notification pour choisir
+quelles missions remonter) filtre uniquement par seuils de score / stack / TJM —
+de manière déterministe. Le LLM ne décide jamais du focus.

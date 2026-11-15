@@ -1,43 +1,47 @@
-# Undo Window — State Model (source of truth)
+# Fenêtre d'annulation — Modèle d'état (source de vérité)
 
-This document is the **authoritative spec** for the soft-delete undo window used by
-destructive side-panel actions: **hide mission** and **delete saved view**.
+Ce document est la **spec faisant autorité** pour la fenêtre d'annulation en
+suppression douce (_soft-delete_) utilisée par les actions destructrices du
+panneau latéral : **masquer une mission** et **supprimer une vue enregistrée**.
 
-Rule: _"Si le comportement ne peut pas être modélisé, il n'est pas prêt à être
-implémenté. Si une transition d'état dépend d'un LLM, l'architecture est
-incorrecte."_ There is **no LLM** anywhere in this flow. The reducer is pure; the
-shell executes the effects it emits.
+Règle : _« Si le comportement ne peut pas être modélisé, il n'est pas prêt à
+être implémenté. Si une transition d'état dépend d'un LLM, l'architecture est
+incorrecte. »_ Il n'y a **aucun LLM** nulle part dans ce flux. Le reducer est
+pur ; le shell exécute les effets qu'il émet.
 
-## Why a model
+## Pourquoi un modèle
 
-Before this model, `handleHide` / `deleteSavedView` used an **optimistic hard-delete +
-restore-on-click** pattern: the deletion was persisted to `chrome.storage` the
-instant the user clicked, and the "Annuler" toast only re-persisted the previous
-state if clicked within ~6s. If the toast expired **or** the side panel closed
-during the window, the data was already committed and **unrecoverable**.
+Avant ce modèle, `handleHide` / `deleteSavedView` utilisaient un motif
+**suppression dure optimiste + restauration au clic** : la suppression était
+persistée dans `chrome.storage` à l'instant où l'utilisateur cliquait, et le
+toast « Annuler » ne repersistait l'état précédent que s'il était cliqué dans
+les ~6 s. Si le toast expirait **ou** si le panneau latéral se fermait pendant
+la fenêtre, la donnée était déjà validée et **irrécupérable**.
 
-The fix is a **soft-delete window**: while the window is open the action lives only
-in memory (storage still holds the pre-action state); the action commits to storage
-only when the window closes without an undo. Closing the panel mid-window is
-safe-by-default — storage still has the data, so it reappears on next load.
+La correction est une **fenêtre de suppression douce** : tant que la fenêtre est
+ouverte, l'action ne vit qu'en mémoire (le stockage contient toujours l'état
+antérieur à l'action) ; l'action n'est validée dans le stockage que lorsque la
+fenêtre se ferme sans annulation. Fermer le panneau en cours de fenêtre est sûr
+par défaut — le stockage conserve toujours la donnée, qui réapparaît donc au
+chargement suivant.
 
-## Scope
+## Périmètre
 
-Applies to two actions (both initiated from the side panel):
+S'applique à deux actions (toutes deux initiées depuis le panneau latéral) :
 
-| Action       | Target id    | Snapshot captured at REQUEST                | Restore on UNDO             | Commit on TIMEOUT                 |
-| ------------ | ------------ | ------------------------------------------- | --------------------------- | --------------------------------- |
-| Hide mission | `mission.id` | previous `hidden: Record<id, ts>`           | `hidden` reverted in memory | persist final `hidden` to storage |
-| Delete view  | `view.id`    | previous `savedViews` + `activeSavedViewId` | both reverted in memory     | persist final `savedViews`        |
+| Action              | Id cible     | Instantané capturé à `REQUEST`                | Restauration sur `UNDO`      | Validation sur `TIMEOUT`               |
+| ------------------- | ------------ | --------------------------------------------- | ---------------------------- | -------------------------------------- |
+| Masquer une mission | `mission.id` | `hidden: Record<id, ts>` précédent            | `hidden` rétabli en mémoire  | persiste le `hidden` final en stockage |
+| Supprimer une vue   | `view.id`    | `savedViews` + `activeSavedViewId` précédents | les deux rétablis en mémoire | persiste les `savedViews` finales      |
 
-## Per-target state machine
+## Machine à états par cible
 
-One instance per target id. The reducer (`core/undo/undo-window.ts`) manages a
-**registry** of pending entries keyed by target id.
+Une instance par identifiant cible. Le reducer (`core/undo/undo-window.ts`) gère
+un **registre** des entrées en attente indexé par identifiant cible.
 
 ```
-States:   idle · pending-undo · committed
-Events:   REQUEST · UNDO · TIMEOUT
+États :      idle · pending-undo · committed
+Événements : REQUEST · UNDO · TIMEOUT
 ```
 
 ```
@@ -52,69 +56,80 @@ Events:   REQUEST · UNDO · TIMEOUT
                                   terminal
 ```
 
-### Transition table
+### Table de transitions
 
-| from         | event                             | to           | Effect emitted to the shell                                      |
-| ------------ | --------------------------------- | ------------ | ---------------------------------------------------------------- |
-| idle         | REQUEST                           | pending-undo | `start-timer` (deadline = now + durationMs); show undo toast     |
-| pending-undo | UNDO                              | idle         | `restore(snapshot)`; cancel-timer; dismiss toast                 |
-| pending-undo | TIMEOUT (shell timer fired)       | committed    | `commit(snapshot, stillPending)`; dismiss toast                  |
-| pending-undo | REQUEST (same target, same kind)  | pending-undo | `cancel-timer` + `start-timer` (re-arm; snapshot replaced)       |
-| pending-undo | REQUEST (same target, other kind) | pending-undo | rejected → `none` (I1; shell must never issue conflicting kinds) |
-| any          | EXPIRE_ALL(now)                   | committed\*  | `commit-all(entries)` for every entry with `deadline <= now`     |
-| committed    | \*                                | committed    | terminal — no-op                                                 |
+| De           | Événement                        | Vers         | Effet émis vers le shell                                                   |
+| ------------ | -------------------------------- | ------------ | -------------------------------------------------------------------------- |
+| idle         | REQUEST                          | pending-undo | `start-timer` (deadline = now + durationMs) ; affiche le toast undo        |
+| pending-undo | UNDO                             | idle         | `restore(snapshot)` ; `cancel-timer` ; ferme le toast                      |
+| pending-undo | TIMEOUT (timer shell déclenché)  | committed    | `commit(snapshot, stillPending)` ; ferme le toast                          |
+| pending-undo | REQUEST (même cible, même type)  | pending-undo | `cancel-timer` + `start-timer` (réarme ; instantané remplacé)              |
+| pending-undo | REQUEST (même cible, autre type) | pending-undo | rejeté → `none` (I1 ; le shell ne doit jamais émettre de types en conflit) |
+| tout état    | EXPIRE_ALL(now)                  | committed\*  | `commit-all(entries)` pour chaque entrée avec `deadline <= now`            |
+| committed    | \*                               | committed    | terminal — aucune opération                                                |
 
-\* Only the expired entries commit; still-open windows are untouched (I6).
+\* Seules les entrées expirées sont validées ; les fenêtres encore ouvertes ne
+sont pas touchées (I6).
 
-**Timer ownership (shell):** the shell owns exactly one `setTimeout` per pending
-target, started on `start-timer` and cleared on `cancel-timer` / panel destroy. The
-undo toast is a **non-authoritative visual**: its internal auto-dismiss timer and its
-close button are cosmetic — clicking the toast's `×` does **not** commit early; the
-undo window simply runs its full duration unless the user clicks **Annuler**. This
-keeps a single source of timing truth (the shell timer) and avoids double-timer bugs.
-The toast's lifecycle follows the undo window: the shell dismisses the toast on
-`UNDO`, on `commit`, on re-arm, and on panel destroy, so a resolved action does not
-leave a stale toast behind.
+**Propriété du timer (shell) :** le shell possède exactement un `setTimeout` par
+cible en attente, démarré sur `start-timer` et nettoyé sur `cancel-timer` /
+destruction du panneau. Le toast d'annulation est un **visuel non faisant
+autorité** : son minuteur interne de fermeture automatique et son bouton de
+fermeture sont cosmétiques — cliquer sur le `×` du toast ne valide **pas**
+prématurément ; la fenêtre d'annulation suit simplement sa durée complète sauf
+si l'utilisateur clique sur **Annuler**. Cela conserve une source unique de
+vérité temporelle (le timer du shell) et évite les bugs de double timer. Le
+cycle de vie du toast suit la fenêtre d'annulation : le shell ferme le toast sur
+`UNDO`, sur `commit`, sur réarmement et sur destruction du panneau, afin qu'une
+action résolue ne laisse pas de toast périmé derrière elle.
 
-`EXPIRE_ALL(now)` is a bulk safety primitive: for every pending entry whose
-`deadline <= now`, emit a single `commit-all` effect listing **all** expired targets
-so the shell commits every one — no expired entry is dropped silently. In practice the
-shell clears its timers on unload and commits nothing (safe-by-default, invariant I5),
-so `EXPIRE_ALL` is a documented escape hatch rather than part of the happy path.
+`EXPIRE_ALL(now)` est une primitive de sécurité en lot : pour chaque entrée en
+attente dont `deadline <= now`, émet un unique effet `commit-all` listant
+**toutes** les cibles expirées afin que le shell valide chacune — aucune entrée
+expirée n'est ignorée silencieusement. En pratique, le shell nettoie ses timers
+au déchargement et ne valide rien (sûr par défaut, invariant I5), donc
+`EXPIRE_ALL` est une porte de sortie documentée plutôt qu'un cas nominal.
 
 ## Invariants
 
-- **I1 — One entry per target.** At most one pending entry per `targetId`. A second
-  REQUEST for the same `(targetId, kind)` re-arms the timer and replaces the
-  snapshot. A REQUEST for the same `targetId` with a _different_ `kind` is rejected
-  (returns `none`); the shell must never issue conflicting kinds for one target.
-- **I2 — Storage is the commit step, never the request step.** While any entry is
-  `pending-undo`, `chrome.storage` MUST still contain the pre-action collection.
-  `REQUEST` emits only `start-timer`, never `commit`. Persistence happens solely on
-  `TIMEOUT` / `commit-all`.
-- **I3 — Snapshots are immutable.** `UNDO` restores the exact object captured at
-  REQUEST. The reducer never mutates a snapshot.
-- **I4 — Deadlines are deterministic.** `deadline === requestedAt + durationMs`.
-  `now` and `durationMs` are injected (no `Date.now()` in core).
-- **I5 — Safe-by-default on unload.** If the panel closes while `pending-undo`,
-  in-memory state is lost but storage holds the pre-action state → the mission/view
-  reappears on next load. No silent data loss.
-- **I6 — Timers are cancellable.** `UNDO`, a re-arm, and panel destroy all cancel
-  the active shell timer so no late `TIMEOUT` fires against a restored target.
-- **I7 — Commit scopes to the committing target.** When one target commits, the
-  shell must NOT finalize a _different_ target whose window is still open. The
-  `commit` effect carries `stillPending` (the other open windows' snapshots); the
-  committer excludes them (hide: omit their ids from the persisted map; delete-view:
-  re-include their views in the persisted list).
+- **I1 — Une entrée par cible.** Au plus une entrée en attente par `targetId`.
+  Un second `REQUEST` pour le même `(targetId, kind)` réarme le timer et
+  remplace l'instantané. Un `REQUEST` pour le même `targetId` avec un `kind`
+  _différent_ est rejeté (renvoie `none`) ; le shell ne doit jamais émettre de
+  types en conflit pour une même cible.
+- **I2 — Le stockage est l'étape de validation, jamais l'étape de requête.**
+  Tant qu'une entrée est en `pending-undo`, `chrome.storage` DOIT toujours
+  contenir la collection antérieure à l'action. `REQUEST` n'émet que
+  `start-timer`, jamais `commit`. La persistance n'a lieu que sur `TIMEOUT` /
+  `commit-all`.
+- **I3 — Les instantanés sont immuables.** `UNDO` restaure l'objet exact capturé
+  à `REQUEST`. Le reducer ne mute jamais un instantané.
+- **I4 — Les échéances sont déterministes.**
+  `deadline === requestedAt + durationMs`. `now` et `durationMs` sont injectés
+  (aucun `Date.now()` dans le core).
+- **I5 — Sûr par défaut au déchargement.** Si le panneau se ferme pendant
+  `pending-undo`, l'état en mémoire est perdu mais le stockage conserve l'état
+  antérieur à l'action → la mission / vue réapparaît au chargement suivant.
+  Aucune perte de données silencieuse.
+- **I6 — Les timers sont annulables.** `UNDO`, un réarmement et la destruction
+  du panneau annulent tous le timer shell actif afin qu'aucun `TIMEOUT` tardif
+  ne se déclenche sur une cible restaurée.
+- **I7 — La validation se limite à la cible en cours de validation.**
+  Lorsqu'une cible est validée, le shell ne doit PAS finaliser une _autre_ cible
+  dont la fenêtre est encore ouverte. L'effet `commit` transporte
+  `stillPending` (les instantanés des autres fenêtres ouvertes) ; le module de
+  persistance les exclut (masquage : omet leurs ids de la table persistée ;
+  suppression de vue : réinclut leurs vues dans la liste persistée).
 
-## Constants
+## Constantes
 
-- `DEFAULT_UNDO_WINDOW_MS = 5000` (PRODUCT.md: 5s undo window).
+- `DEFAULT_UNDO_WINDOW_MS = 5000` (PRODUCT.md : fenêtre d'annulation de 5 s).
 
-## Executable model
+## Modèle exécutable
 
-`apps/extension/src/lib/core/undo/undo-window.ts` — pure reducer returning
-`{ state, effect }`. Fully unit-tested with no I/O, no timers, no `Date.now`.
-The shell (`lib/shell/undo/undo-controller.ts` + `lib/state/feed-page.svelte.ts`)
-owns: timers, `chrome.storage` persistence, toast display, and in-memory
-collection mutation.
+`apps/extension/src/lib/core/undo/undo-window.ts` — reducer pur renvoyant
+`{ state, effect }`. Entièrement testé unitairement sans I/O, sans timers, sans
+`Date.now`. Le shell (`lib/shell/undo/undo-controller.ts` +
+`lib/state/feed-page.svelte.ts`) possède : les timers, la persistance
+`chrome.storage`, l'affichage des toasts et la mutation de la collection en
+mémoire.
