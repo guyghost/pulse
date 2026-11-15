@@ -1,134 +1,156 @@
-# Remote Copilot Job Model
+# Modèle de job Copilot distant
 
-## Purpose
+## Objectif
 
-Coordinate one server-owned Copilot operation. Analysis costs zero credits;
-`pitch`, `cover-message`, `cv-summary` and `tjm-coach` cost one credit.
+Coordonner une opération Copilot gérée par le serveur. L'analyse coûte zéro
+crédit ; `pitch`, `cover-message`, `cv-summary` et `tjm-coach` coûtent un
+crédit.
 
-## States
+## États
 
 ```text
 idle -> authorizing -> reserving? -> queued -> running -> validating -> review
 review -- USER_ACCEPTED --> accepted
 review -- USER_REJECTED --> rejected
 
-authorizing -> failed                 auth/entitlement/ownership refusal
-reserving -> failed                   insufficient credit or reserve failure
-queued|running|validating -> failed   provider/schema failure (free job)
-queued|running|validating -> refunding -> failed   paid failure
-queued|running -> cancelling -> cancelled          free cancellation
-queued|running -> cancelling -> refunding -> cancelled  paid cancellation
+authorizing -> failed                 refus auth / entitlement / propriété
+reserving -> failed                   crédit insuffisant ou échec de réservation
+queued|running|validating -> failed   échec fournisseur / schéma (job gratuit)
+queued|running|validating -> refunding -> failed   échec payant
+queued|running -> cancelling -> cancelled          annulation gratuite
+queued|running -> cancelling -> refunding -> cancelled  annulation payante
 ```
 
-A failed attempt is terminal. An explicit user retry starts a new logical job
-from the dossier's `ready` state with a new `jobId`, `attemptId`, idempotency
-key and billing key. It therefore receives a fresh quota slot and, for paid
-content, a fresh credit reservation. Transport recovery of the original job is
-limited to its canonical idempotent RPCs and is not a user retry.
+Une tentative échouée est terminale. Une nouvelle tentative explicite de
+l'utilisateur démarre un nouveau job logique depuis l'état `ready` du dossier avec
+un nouvel identifiant `jobId`, `attemptId`, une nouvelle clé d'idempotence et
+une nouvelle clé de facturation. Elle reçoit donc un nouveau créneau de quota et,
+pour le contenu payant, une nouvelle réservation de crédit. La reprise de
+transport du job initial est limitée à ses RPC idempotentes canoniques et ne
+constitue pas une nouvelle tentative utilisateur.
 
-## Events and Evidence
+## Événements et preuves
 
-All provider/payment events repeat `jobId`, `userId` and `attemptId`.
-Reservation/refund events also repeat the deterministic `idempotencyKey`.
-Provider content is never an event type.
+Tous les événements fournisseur / paiement répètent `jobId`, `userId` et
+`attemptId`. Les événements de réservation / remboursement répètent également la
+clé déterministe `idempotencyKey`. Le contenu fournisseur n'est jamais un type
+d'événement.
 
 ## Invariants
 
-1. Authorization and ownership precede any credit mutation or Eve call.
-2. A paid attempt has at most one successful reservation and one successful
-   refund; a successful reviewed result is never refunded.
-3. `review` requires a schema-valid result. Invalid output is a failed attempt.
-   Artifact results contain no free-form draft: every ordered draft segment is
-   grounded by typed, allowlisted source refs and the server assembles the
-   review/copy text only after validation.
-4. `accepted` and `rejected` record user review only; they do not mutate the
-   application pipeline.
-5. Cancel is explicit. A transport timeout is `uncertain` until the durable job
-   is reconciled; it is not blindly retried.
-6. Duplicate `CREATE_JOB` with the same idempotency key returns the canonical
-   job and cannot start a second Eve run.
-7. A user retry never reopens a terminal job or reuses its billing identity. It
-   creates a new logical job after fresh consent confirmation. This prevents a
-   refunded reservation from authorizing a later provider run for free.
-8. Pilot admission is an atomic pre-job guard: 10 analysis jobs and 20 total
-   jobs per user per UTC day. A canonical transport retry with the same
-   idempotency key is checked before this guard and cannot consume another
-   quota slot; a new user-requested job does consume one.
-9. Durable recovery is phase-specific: `reserving` replays only the idempotent
-   reserve RPC; `queued` may dispatch only when no provider dispatch timestamp
-   exists; `refunding` replays only the idempotent refund RPC. A `running` job
-   or any job with a possible provider dispatch and no durable result moves to
-   `uncertain`, because Eve 0.26.2 offers no lookup authority.
-10. A dossier session becomes continuation-eligible only after
-    `USER_ACCEPTED`. The next job claims and disables that eligibility before
-    dispatch. Rejected, cancelled, invalid and failed turns cannot seed later
-    prompts.
-11. Recording a provider handle and proving `provider_disposition_known` is one
-    database transition. No crash may leave a durable handle without its job
-    proof, or a proof without the matching handle.
-12. A terminal transition that does not require a credit mutation commits the
-    job terminal state and the dossier return to `ready` in one transaction.
-    This covers entitlement/credit admission refusal before reservation, free
-    analysis failure, free cancellation and idempotent terminal healing.
-13. A provider-session `activeJob` is valid only when `jobId + userId +
-dossierId` identify the same durable job. Cross-dossier bindings are
-    structurally impossible, not merely rejected by application code.
-14. The dossier persists the currently active `jobId` from admission through
-    review/refund. Stage, review, no-credit settlement and refund must match
-    that exact ID before clearing it. A late terminal retry from an older job
-    cannot return a dossier occupied by a newer job to `ready`.
-15. An existing provider-session row cannot be rebound by record/stage. Only
-    the explicit accepted-continuation claim may move its `activeJobId`; every
-    later record/stage must observe that already-correlated ID.
-16. Job admission consumes a durable UTC-day counter that is independent of
-    dossier/job cascade deletion. A non-expired payload-free deletion receipt
-    for the same user/idempotency key returns `GONE` before quota, credit or
-    provider effects.
-17. An idempotency key is canonical only for the same input hash, dossier and
-    operation kind. Any mismatch is a conflict and performs no dossier, quota,
-    credit or provider effect.
-18. Every API read/duplicate path capable of resuming reservation, refund or
-    provider work revalidates rollout and active entitlement first. Auth-only
-    dossier reads, cancellation, terminal user review and deletion may recover
-    or settle owner-controlled data after expiry/revocation, but never dispatch
-    new provider work or mutate credits. A later continuation still requires a
-    newly authorized job.
-19. Multi-row settlement follows one lock order: dossier serialization row,
-    then correlated job row, then ledger/profile rows. Refund and no-credit
-    retries never invert that order against deletion.
-20. A durable `cancelling` checkpoint is resumable after process loss. The
-    service replays only a provable cancellation obligation: no provider
-    handle means no remote effect; a known handle uses the idempotent provider
-    cancellation/reconciliation path. Terminalization still uses the matching
-    refund or no-credit transaction.
-21. A deleted-job receipt is payload-free and blocks replay only until its
-    database expiry. Expired receipts are physically removed by a bounded,
-    service-role-only purge. Admission/replay checks opportunistically purge a
-    batch, while a daily authenticated maintenance run drains all expired
-    batches. The operational deletion target is no later than 25 hours after
-    `expiresAt`; a missed maintenance run is a production alert and prevents a
-    stronger public retention claim.
+1. L'autorisation et la vérification de propriété précèdent toute mutation de
+   crédit ou appel à Eve.
+2. Une tentative payante possède au plus une réservation réussie et un
+   remboursement réussi ; un résultat révisé avec succès n'est jamais remboursé.
+3. `review` exige un résultat valide selon le schéma. Une sortie invalide est une
+   tentative échouée. Les résultats d'artefacts ne contiennent aucun brouillon
+   libre : chaque segment ordonné du brouillon est ancré par des références
+   sources typées et autorisées (_allowlisted_), et le serveur n'assemble le
+   texte de révision / copie qu'après validation.
+4. `accepted` et `rejected` enregistrent uniquement la révision utilisateur ; ils
+   ne mutent pas le pipeline de candidature.
+5. L'annulation est explicite. Un timeout de transport produit `uncertain`
+   jusqu'à la réconciliation du job durable ; il n'est pas relancé à l'aveugle.
+6. Un `CREATE_JOB` dupliqué avec la même clé d'idempotence renvoie le job
+   canonique et ne peut pas démarrer une seconde exécution Eve.
+7. Une nouvelle tentative utilisateur ne rouvre jamais un job terminal ni ne
+   réutilise son identité de facturation. Elle crée un nouveau job logique après
+   une nouvelle confirmation de consentement. Cela empêche qu'une réservation
+   remboursée autorise gratuitement une exécution fournisseur ultérieure.
+8. L'admission au pilote est une garde atomique pré-job : 10 jobs d'analyse et
+   20 jobs au total par utilisateur et par jour UTC. Une relance de transport
+   canonique avec la même clé d'idempotence est vérifiée avant cette garde et ne
+   peut pas consommer un autre créneau de quota ; un nouveau job demandé par
+   l'utilisateur en consomme un.
+9. La reprise durable est spécifique à la phase : `reserving` rejoue uniquement
+   la RPC idempotente de réservation ; `queued` ne peut être envoyé que s'il
+   n'existe aucun horodatage d'envoi fournisseur ; `refunding` rejoue uniquement
+   la RPC idempotente de remboursement. Un job `running` ou tout job avec un
+   envoi fournisseur possible sans résultat durable passe à `uncertain`, car Eve
+   0.26.2 n'offre aucune autorité de consultation.
+10. Une session de dossier ne devient éligible à la continuation qu'après
+    `USER_ACCEPTED`. Le job suivant réclame et désactive cette éligibilité avant
+    l'envoi. Les tours rejetés, annulés, invalides ou échoués ne peuvent pas
+    alimenter les prompts suivants.
+11. L'enregistrement d'un handle fournisseur et la preuve de
+    `provider_disposition_known` forment une seule transition en base de données.
+    Aucun crash ne peut laisser un handle durable sans la preuve de son job, ni
+    une preuve sans le handle correspondant.
+12. Une transition terminale qui ne nécessite pas de mutation de crédit valide
+    l'état terminal du job et le retour du dossier à `ready` en une seule
+    transaction. Cela couvre le refus d'admission entitlement / crédit avant
+    réservation, l'échec d'analyse gratuit, l'annulation gratuite et la
+    réparation terminale idempotente.
+13. Un `activeJob` de session fournisseur n'est valide que lorsque
+    `jobId + userId + dossierId` identifient le même job durable. Les liaisons
+    inter-dossiers sont structurellement impossibles, et pas seulement rejetées
+    par le code applicatif.
+14. Le dossier persiste le `jobId` actuellement actif depuis l'admission jusqu'à
+    la révision / remboursement. L'étape, la révision, le règlement sans crédit
+    et le remboursement doivent correspondre à cet identifiant exact avant de
+    l'effacer. Une tentative terminale tardive d'un ancien job ne peut pas
+    ramener à `ready` un dossier occupé par un job plus récent.
+15. Une ligne de session fournisseur existante ne peut pas être réassociée par
+    enregistrement / étape. Seule la réclamation explicite de continuation
+    acceptée peut déplacer son `activeJobId` ; chaque enregistrement / étape
+    ultérieur doit observer cet identifiant déjà corrélé.
+16. L'admission d'un job consomme un compteur durable par jour UTC indépendant de
+    la suppression en cascade dossier / job. Un reçu de suppression sans payload
+    non expiré pour le même utilisateur / clé d'idempotence renvoie `GONE` avant
+    tout effet sur le quota, le crédit ou le fournisseur.
+17. Une clé d'idempotence n'est canonique que pour le même hash d'entrée,
+    dossier et type d'opération. Toute discordance est un conflit et ne produit
+    aucun effet sur le dossier, le quota, le crédit ou le fournisseur.
+18. Chaque chemin de lecture / duplication d'API capable de reprendre une
+    réservation, un remboursement ou un travail fournisseur revalide d'abord le
+    déploiement (_rollout_) et l'entitlement actif. Les lectures de dossier par
+    auth seule, l'annulation, la révision utilisateur terminale et la suppression
+    peuvent récupérer ou régler des données contrôlées par le propriétaire après
+    expiration / révocation, mais n'envoient jamais de nouveau travail
+    fournisseur ni ne mutent les crédits. Une continuation ultérieure exige
+    toujours un nouveau job autorisé.
+19. Le règlement multi-lignes suit un ordre de verrouillage unique : ligne de
+    sérialisation du dossier, puis ligne du job corrélé, puis lignes du registre
+    / profil. Les relances de remboursement et sans crédit n'inversent jamais
+    cet ordre face à une suppression.
+20. Un point de contrôle durable `cancelling` est reprenable après une perte de
+    processus. Le service rejoue uniquement une obligation d'annulation
+    prouvable : l'absence de handle fournisseur signifie l'absence d'effet
+    distant ; un handle connu utilise le chemin idempotent d'annulation /
+    réconciliation fournisseur. La terminalisation utilise toujours la
+    transaction correspondante de remboursement ou sans crédit.
+21. Un reçu de job supprimé est sans payload et bloque le rejeu uniquement
+    jusqu'à son expiration en base de données. Les reçus expirés sont supprimés
+    physiquement par une purge bornée réservée au `service-role`. Les
+    vérifications d'admission / rejeu purgent un lot de façon opportuniste,
+    tandis qu'une tâche de maintenance quotidienne authentifiée vide tous les
+    lots expirés. L'objectif opérationnel de suppression est au plus tard
+    25 heures après `expiresAt` ; une tâche de maintenance manquée déclenche une
+    alerte de production et empêche une promesse publique de rétention plus
+    stricte.
 
-## Review Coverage
+## Couverture de revue
 
-- Included analysis and each one-credit content kind.
-- Entitlement denial, insufficient credits and wrong dossier owner.
-- Duplicate requests before/after reservation and after completion.
-- Provider timeout, invalid schema, cancellation and refund failure.
-- Crash after reservation, provider completion or refund; reconciliation must
-  settle exactly once.
-- Crash while recording a provider handle or a no-credit terminal transition;
-  observers must see either the complete before-state or complete after-state.
-- A session cannot bind to a job from another owner or dossier, including via
-  direct service-role SQL.
-- Late refund/settlement for job A after job B starts must be rejected without
-  changing job B or the dossier; record/stage cannot rebind job A's session.
-- Stale provider/refund results from an older attempt.
-- Deleted-job replay after a lost DELETE response, and quota reset attempts by
-  deleting a dossier.
-- Restart from `cancelling` before provider cancellation, after confirmed
-  cancellation and before refund/no-credit terminalization.
-- Retryable terminal failure followed by a fresh user-created job with distinct
-  job, attempt, idempotency and billing identities.
-- Physical deletion of expired receipts, including more than one bounded
-  batch, unauthorized maintenance calls and a missed-run alert boundary.
+- Analyse incluse et chaque type de contenu à un crédit.
+- Refus d'entitlement, crédits insuffisants et mauvais propriétaire de dossier.
+- Requêtes dupliquées avant / après réservation et après achèvement.
+- Timeout fournisseur, schéma invalide, annulation et échec de remboursement.
+- Crash après réservation, achèvement fournisseur ou remboursement ; la
+  réconciliation doit régler exactement une fois.
+- Crash lors de l'enregistrement d'un handle fournisseur ou d'une transition
+  terminale sans crédit ; les observateurs doivent voir soit l'état complet
+  avant, soit l'état complet après.
+- Une session ne peut pas se lier à un job d'un autre propriétaire ou dossier, y
+  compris via SQL direct en `service-role`.
+- Un remboursement / règlement tardif pour le job A après le démarrage du job B
+  doit être rejeté sans modifier le job B ni le dossier ; un enregistrement /
+  étape ne peut pas réassocier la session du job A.
+- Résultats fournisseur / remboursement périmés d'une tentative antérieure.
+- Rejeu d'un job supprimé après une réponse `DELETE` perdue, et tentatives de
+  réinitialisation du quota en supprimant un dossier.
+- Redémarrage depuis `cancelling` avant l'annulation fournisseur, après
+  annulation confirmée et avant terminalisation par remboursement / sans crédit.
+- Échec terminal relançable suivi d'un nouveau job créé par l'utilisateur avec
+  des identités de job, tentative, idempotence et facturation distinctes.
+- Suppression physique des reçus expirés, incluant plus d'un lot borné, des
+  appels de maintenance non autorisés et la limite d'alerte de tâche manquée.

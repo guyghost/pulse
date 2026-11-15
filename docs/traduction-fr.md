@@ -58,11 +58,11 @@ checklist au fil des traductions.
 
 ### Models vivants (`packages/domain/src/models/`)
 
-- [ ] `missionpulse-copilot.spec.md` (~170 lignes)
-- [ ] `copilot-dossier.model.md` (~170 lignes)
-- [ ] `remote-copilot-job.model.md` (~135 lignes)
-- [ ] `copilot-metrics.model.md` (~95 lignes)
-- [ ] `premium-entitlement-sync.model.md` (~55 lignes)
+- [x] `missionpulse-copilot.spec.md` (~170 lignes)
+- [x] `copilot-dossier.model.md` (~170 lignes)
+- [x] `remote-copilot-job.model.md` (~135 lignes)
+- [x] `copilot-metrics.model.md` (~95 lignes)
+- [x] `premium-entitlement-sync.model.md` (~55 lignes)
 
 ## Conservés en anglais (décision)
 
