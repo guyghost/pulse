@@ -19,7 +19,7 @@ checklist au fil des traductions.
 > renommer). Traduire le contenu, pas les chemins.
 
 - [x] `release-readiness.model.md` (~4 400 lignes)
-- [ ] `sealed-candidate-transport-producer.model.md` (~4 100 lignes)
+- [x] `sealed-candidate-transport-producer.model.md` (~4 100 lignes)
 - [x] `mv3-packaged-harness.model.md` (~2 070 lignes)
 - [x] `packaged-tab-scenarios.model.md` (~1 950 lignes)
 - [x] `sealed-candidate-transport-consumer.model.md` (~1 770 lignes)
