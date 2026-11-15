@@ -2,7 +2,7 @@
 
 Statut : **RÉVISION 6 DU MODÈLE — en attente de revue indépendante ; implémentation interdite jusqu'à approbation**.
 
-SHA-256 du comportement en attente : `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`.
+Pending behavior SHA-256: `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`.
 
 Le hachage normalisé du comportement est le SHA-256 de l'intégralité des octets bruts UTF-8/LF de ce fichier après remplacement uniquement de la valeur entre accents graves (backticks) sur la ligne `Pending behavior SHA-256` par le littéral `__PENDING_BEHAVIOR_SHA256__`. Aucune autre normalisation n'est autorisée.
 

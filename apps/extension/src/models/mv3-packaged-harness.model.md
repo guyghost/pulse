@@ -1,7 +1,7 @@
 # Modèle du harnais packagé MV3
 
 Statut : **proposé — révision 26 du bail CDP à session persistante**.
-SHA-256 du comportement en attente : `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`.
+Pending behaviour SHA-256: `da2440b21f2c901b6afe1a309121e405844d73b3bf7d679d66b3154d1208c32b`.
 
 Convention de hachage : calculer le SHA-256 sur l'ensemble des octets UTF-8/LF bruts de ce fichier après
 avoir remplacé uniquement la valeur entre les accents graves sur la ligne `Pending behaviour SHA-256`

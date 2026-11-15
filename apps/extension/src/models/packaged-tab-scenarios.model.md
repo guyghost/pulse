@@ -2,7 +2,7 @@
 
 Statut : **RÉVISION 11 DU MODÈLE — EN ATTENTE DE REVUE INDÉPENDANTE ; IMPLÉMENTATION INTERDITE**.
 
-SHA-256 du comportement en attente : `30b628046132da3222a7affb19044ed92d46ea71bf31192509f10a98e400ddb9`.
+Pending behavior SHA-256: `30b628046132da3222a7affb19044ed92d46ea71bf31192509f10a98e400ddb9`.
 
 Le hachage normalisé du comportement en attente est le SHA-256 de l'intégralité des
 octets bruts UTF-8/LF de ce fichier après remplacement exclusif de la valeur entre
